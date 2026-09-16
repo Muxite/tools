@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tundlekit"
+version = "0.1.0"
+description = "Agent-agnostic tools (CLI, MCP server, skills) distilled from the tundle transfer bundle"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+office = ["python-pptx", "Pillow"]
+pdf = ["pymupdf"]
+all = ["tundlekit[office,pdf]"]
+dev = ["tundlekit[all]", "pytest"]
+
+[project.scripts]
+tundlekit = "tundlekit.cli:console"
+tundlekit-mcp = "tundlekit.mcp_server:console"
+
+[tool.setuptools.packages.find]
+include = ["tundlekit*"]
+
+[tool.setuptools.package-data]
+"tundlekit.translate" = ["data/*", "prompts/*"]

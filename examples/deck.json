@@ -1,0 +1,149 @@
+{
+  "meta": {
+    "id": "example",
+    "title": "Build tools behind a held-out gate",
+    "inserts": "shown",
+    "budget": {"target": "5:00", "max": "6:00"},
+    "words_per_second": 2.3
+  },
+  "slides": [
+    {
+      "type": "title",
+      "title": "Build tools behind a held-out gate",
+      "subtitle": "Why agents that write their own tools must be tested by someone else",
+      "byline": "Research update",
+      "notes": {
+        "time": "0:15",
+        "say": "Today's update is about agents that build their own tools, and why every tool they build needs a check they did not write."
+      }
+    },
+    {
+      "type": "content",
+      "eyebrow": "Goal",
+      "title": "Agents must not ship broken self-built tools",
+      "stage": "intent",
+      "source": "Project brief",
+      "body": {
+        "kind": "bullets",
+        "items": [
+          "Long-running agents meet steps that no existing tool covers",
+          "Building tools on the fly fills those gaps without waiting for a human",
+          "A broken tool usually still runs, so nothing in the session flags it",
+          "The real question: which check keeps broken tools out of the library"
+        ]
+      },
+      "notes": {
+        "time": "0:40",
+        "say": "Here's the goal. Our agents run for weeks, and they'll hit steps that no existing tool covers, so they need to build tools themselves. The catch is that a broken tool usually still runs, so nobody notices. The real question is which check stops a broken tool from entering the library."
+      }
+    },
+    {
+      "type": "divider",
+      "title": "The evidence",
+      "subtitle": "Each result, then the design rule it leads to",
+      "notes": {"time": "0:05", "say": "So here's the evidence, one result at a time."}
+    },
+    {
+      "type": "content",
+      "eyebrow": "Research",
+      "title": "96.8% of kept tools fail their held-out tests",
+      "stage": "gates",
+      "source": "Beyond Task Completion, Table 5",
+      "demonstrated_by": {
+        "paper": "Beyond Task Completion (arXiv 2604.00392)",
+        "setup": "99 tasks, Claude Haiku 4.5, 222 kept tools"
+      },
+      "body": {
+        "kind": "chart",
+        "categories": ["One-Shot", "ToolMaker-style", "CREATOR-style", "All 222 tools"],
+        "values": [100.0, 100.0, 91.7, 96.8],
+        "highlight": 3,
+        "unit": "%",
+        "takeaway": "Tools that run cleanly still return wrong answers on inputs the agent never saw"
+      },
+      "notes": {
+        "time": "0:45",
+        "say": "This paper replayed every tool that 3 tool-building methods kept against tests of that tool's own capability, on inputs the agent never saw. 215 of 222 tools scored zero. They didn't crash, they just returned wrong answers. The hand-written reference tools pass every suite, so the tests are fair.",
+        "asked": [
+          "Are the suites too hard: the reference implementations score 1.00 on all 16 capability suites",
+          "How big are the suites: 10 to 22 inputs per tool, median 11"
+        ]
+      }
+    },
+    {
+      "type": "content",
+      "eyebrow": "Research",
+      "title": "Unverified self-made skills barely beat none",
+      "stage": "gates",
+      "insert": true,
+      "source": "CoEvoSkills, Fig. 4",
+      "demonstrated_by": {
+        "paper": "CoEvoSkills (arXiv 2604.01687)",
+        "setup": "SkillsBench, Claude Opus 4.6"
+      },
+      "body": {
+        "kind": "table",
+        "rows": [
+          ["Condition", "Pass rate"],
+          ["No skills", "30.6%"],
+          ["Structured self-generation prompt", "30.7%"],
+          ["Self-generated, benchmark baseline", "32.0%"],
+          ["Naive skill creator", "34.1%"],
+          ["Human-curated skills", "53.5%"],
+          ["Self-generated with a verification loop", "71.1%"]
+        ],
+        "widths": [8.3, 3.5]
+      },
+      "notes": {
+        "time": "0:40",
+        "say": "Three ways of letting an agent write its own skills land between 30.7 and 34.1 percent, against 30.6 with no skills at all. Human-curated skills reach 53.5. Adding a verification loop lifts self-made skills to 71.1, so the gain comes from checking, not from writing.",
+        "asked": ["Why not 75%: the paper's curve reaches 75% by round 5, but its headline number is 71.1%"]
+      }
+    },
+    {
+      "type": "content",
+      "eyebrow": "Rule",
+      "title": "What this means: the builder never writes its own tests",
+      "stage": "gates",
+      "source": "Beyond Task Completion, Table 5; CoEvoSkills, Fig. 4",
+      "body": {
+        "kind": "lines",
+        "items": [
+          "R1  A separate suite author writes the tests from the manifest",
+          "R2  The implementer never sees the held-out tests",
+          "R3  Gate attempts are capped and reveal only admit or reject plus a reason"
+        ]
+      },
+      "thus": "every tool enters the library through a gate its builder did not write",
+      "notes": {
+        "time": "0:35",
+        "say": "So here's the rule I take from both results. The agent that builds a tool never writes the tests for it. A separate author writes them from the manifest, before any code exists. And the builder only hears admit or reject with a reason, a limited number of times."
+      }
+    },
+    {
+      "type": "content",
+      "eyebrow": "Design",
+      "title": "Three roles, three views: nobody grades their own work",
+      "stage": "build",
+      "source": "Design proposal, not built or measured yet",
+      "phase": {"in": "gap record", "out": "admitted tool"},
+      "body": {
+        "kind": "table",
+        "rows": [
+          ["Role", "Reads", "Never reads"],
+          ["Build-decision agent", "gap records and their costs", "test code"],
+          ["Suite author", "the manifest only", "the implementation"],
+          ["Implementer", "manifest and visible tests", "held-out tests"],
+          ["Admission gate (code)", "implementation and all tests", "nothing is hidden from it"]
+        ],
+        "widths": [3.6, 4.2, 4.0]
+      },
+      "thus": "the plan is a manifest first, tests second, code last",
+      "notes": {
+        "time": "0:45",
+        "say": "Here's how that turns into roles. The build-decision agent reads the gap records and writes the manifest. The suite author reads only that manifest and writes visible and held-out tests. The implementer sees the manifest and the visible tests, never the held-out ones. The gate is plain code and runs everything.",
+        "asked": ["Why cap the tries: unlimited retries let the builder learn the held-out tests"]
+      }
+    }
+  ]
+}

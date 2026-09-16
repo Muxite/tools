@@ -1,0 +1,27 @@
+{
+  "title": "Build path for a new tool",
+  "direction": "LR",
+  "nodes": [
+    {"id": "gaps", "label": "gap records", "sub": "cost and count per gap", "stage": "build", "actor": "record"},
+    {"id": "decide", "label": "build-decision agent", "sub": "build, version or wait", "stage": "build", "actor": "model"},
+    {"id": "author", "label": "suite author", "sub": "tests from the manifest alone", "stage": "gates", "actor": "model"},
+    {"id": "impl", "label": "implementer", "sub": "sees visible tests only", "stage": "build", "actor": "model"},
+    {"id": "gate", "label": "admission gate\nFIXED AT THE FREEZE", "sub": "admit or reject + reason", "stage": "gates", "actor": "code"},
+    {"id": "lib", "label": "library\nappend-only · versioned", "stage": "library", "actor": "record"}
+  ],
+  "edges": [
+    {"from": "gaps", "to": "decide"},
+    {"from": "decide", "to": "author", "label": "manifest"},
+    {"from": "decide", "to": "impl", "label": "manifest"},
+    {"from": "author", "to": "gate", "label": "held-out tests"},
+    {"from": "impl", "to": "gate", "label": "submission"},
+    {"from": "gate", "to": "impl", "label": "admit / reject", "dashed": true},
+    {"from": "gate", "to": "lib", "label": "admitted"}
+  ],
+  "groups": [
+    {"id": "cold", "label": "cold path (between sprints)", "nodes": ["decide", "author", "impl"], "stage": "build"}
+  ],
+  "legend": "auto",
+  "tags": true,
+  "note": "(illustrative)"
+}

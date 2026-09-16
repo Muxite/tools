@@ -1,0 +1,106 @@
+# glossary.tsv: terminology for /home/muk/work/translate. The source of truth for term renderings.
+# Format: tab-separated; `|` separates alternatives (the first is preferred); `#` lines are comments.
+# Columns: en, zh, banned_en (never write these in English output), banned_zh (never in Chinese output),
+#   domain (general | ai4research | dsh), status (approved | pending), evidence (file:line refs, or user-draft / standard), note.
+# Agents: APPEND new rows with status=pending; never reorder, and never flip a row to approved yourself. A human approves.
+# DSH repo terms live in deepseek-harness/docs/i18n/terminology.md; don't copy them here.
+en	zh	banned_en	banned_zh	domain	status	evidence	note
+idempotent|idempotency	幂等|幂等性			general	approved	user-draft	repeat-safe, not side-effect-free
+idempotency key	幂等键			general	approved	user-draft	
+eventual consistency	最终一致性	asynchronous consistency	异步一致性	general	approved	user-draft	a named consistency model
+linearizability|linearizable	线性一致性|线性一致	strong consistency|sequential consistency	强一致性|顺序一致性	general	approved	user-draft	strictly stronger than sequential consistency
+race condition	竞态条件|竞态			general	approved	user-draft	
+backpressure	背压|反压	rate limit|throttling	限流|速率限制	general	approved	user-draft	consumer signals producer to slow down
+rate limit|rate limiting	速率限制|限流|限速	backpressure	背压|反压	general	approved	user-draft	a cap on request rate
+retryable	可重试			general	approved	user-draft	
+at-least-once delivery|at least once	至少一次投递|至少一次	retried until it succeeds|guaranteed delivery	重试直到成功	general	approved	user-draft	duplicates possible
+exactly-once processing|exactly once	恰好一次处理|精确一次处理|恰好一次	processed only once	只处理一次	general	approved	user-draft	
+thread-safe|thread safety	线程安全	reentrant|reentrancy	可重入	general	approved	user-draft	not equivalent to reentrant
+reentrant|reentrancy	可重入|可重入性	thread-safe|thread safety	线程安全	general	approved	user-draft	not equivalent to thread-safe
+authentication|authenticate	认证|身份验证|身份认证	authorization|authorize	授权	general	approved	user-draft	who you are
+authorization|authorize	授权	authentication|authenticate	认证|身份验证	general	approved	user-draft	what you may do; 鉴权 is ambiguous, mark it
+release	发布	deployment|deploy	部署	general	approved	user-draft	a versioned artifact; 发布 may also mean publish
+deployment|deploy	部署	release	发布|上线	general	approved	user-draft	putting a build into an environment
+go live	上线	deploy|deployment	部署	general	approved	standard	becoming user-visible; 'launch' also fine, not listed because it matches too much English
+latency	延迟|时延	response time	响应时间	general	approved	user-draft	
+response time	响应时间	latency	延迟|时延	general	approved	user-draft	includes service time
+process	进程	thread	线程	general	approved	user-draft	OS process only; process meaning procedure is 流程, and 进程 can mean course of events: override with [TN]
+thread	线程	process	进程	general	approved	user-draft	
+middleware	中间件	intermediary	中介	general	approved	user-draft	a software layer
+intermediary	中介|中间方	middleware	中间件	general	approved	user-draft	a role
+interface	接口	user interface|UI	界面	general	approved	standard	界面 is UI
+roll back|rollback	回滚			general	approved	standard	undo a deployment or transaction; for a VCS commit, revert (还原提交) is also correct
+schedule|scheduler|scheduling	调度	orchestrate|orchestration	编排	general	approved	standard	when/where one unit runs
+orchestrate|orchestration|orchestrator	编排	schedule|scheduling	调度	general	approved	standard	coordinating many units
+concurrency|concurrent	并发	parallelism|parallel	并行	general	approved	standard	interleaved progress; not necessarily simultaneous
+parallelism|parallel	并行	concurrency|concurrent	并发	general	approved	standard	simultaneous execution
+throughput	吞吐量|吞吐	bandwidth	带宽	general	approved	standard	work per unit time
+deadlock	死锁	livelock	活锁	general	approved	standard	
+immutable	不可变	read-only	只读	general	approved	standard	cannot change at all vs cannot be written through this handle
+read-only	只读	immutable	不可变	general	approved	standard	
+real-time|near-real-time	实时	hard real-time	硬实时	general	approved	standard	say real-time only with a stated latency bound; 'live' is fine too (zh-en-traps §4)
+capability capsule|capsule	胶囊	capsule pill|capsule module		ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:21; AI4Research/harness/schemas/draft/capability-capsule.v1.draft.json:22 (capability_capsule_id); notes/07-capability-capsules.md:8	能力胶囊 occurs nowhere in the repo; sources write Capsule（胶囊）
+capability atom	能力原子	capability unit		ai4research	pending	AI4Research/docs/CAPSULE_ARCHITECTURE.md:3,21; notes/11-capsule-architecture-digest-en.md:22; notes/07-capability-capsules.md:9 (unit of capability)	notes disagree; 11 keeps the source's atomic metaphor (原子胶囊, 最小能力单元 :713)
+self-contained closed loop	自闭环	self-closing		ai4research	pending	AI4Research/docs/CAPSULE_ARCHITECTURE.md:21; notes/11-capsule-architecture-digest-en.md:46 (self-closing); notes/07-capability-capsules.md:8 (self-contained)	notes disagree: self-closing is unidiomatic, self-contained drops the loop; owner decides
+boundary-explicit|clear boundaries	边界清晰			ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:21; notes/07-capability-capsules.md:8; notes/11-capsule-architecture-digest-en.md:46	边界模糊 (:13) = fuzzy boundaries
+formally verifiable	可形式化验证	formally verified		ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:21; notes/11-capsule-architecture-digest-en.md:46	-able claim about an unbuilt phase; never render as achieved (FM-9)
+safety	安全性	boundaries are verifiable		ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:29 (**S**afety - 安全性可验证); notes/11-capsule-architecture-digest-en.md:57; notes/07-capability-capsules.md:24 (wrong)	SCARE S, source English fixes it; outside SCARE 安全 may mean security: decide from context
+completeness	完备性	completion		ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:30 (**C**ompleteness); notes/11-capsule-architecture-digest-en.md:58; notes/07-capability-capsules.md:25 (wrong)	SCARE C; not 规约完整度 spec completeness (CAPSULE_ECOSYSTEM_DESIGN.md:270)
+evolution|evolve|evolvable|can evolve	演进|可演进	evolves under version control|under version control|self-evolution		ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:33 (**E**volution - 可演进); notes/14-cross-panel-corrections.md:96-97; notes/07-capability-capsules.md:28 (embellished)	可演进 = can evolve, nothing more (FM-4); 演进中 = still evolving
+specification|spec	规约	protocol|convention	合同	ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:25,37; AI4Research/docs/CAPSULE_ECOSYSTEM_DESIGN.md:383; notes/11-capsule-architecture-digest-en.md:50; notes/12-capsule-ecosystem-digest-en.md:210	capsule-design term; named sub-specs keep the source's own English (接口规约 = Interface Contract, :53); 协议 = protocol
+contract	合同	agreement	契约	ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:21,45; notes/00-orientation.md:36; notes/08-workflow-end-to-end.md:60; AI4Research/harness/capability-capsules/cap.research-literature-discover.yaml:17 (contract:)	software contract, never legal; [TN] on first use if a reader might misread
+freeze|frozen	冻结	lock|snapshot		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:21,35,54; notes/02-architecture-pipeline.md:23; AI4Research/harness/lib/elastic_planner_runtime.py:370 (verify_frozen_execution_chain)	end of planning; TRIGGERS.md:99 冻结模式 = the /freeze skill, unrelated: override with [TN]
+execution authority	执行权威	execution power		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:55,91; notes/02-architecture-pipeline.md:95	权威编译 = authoritative compile
+operator	算子		操作员|运算符	ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:16,52; AI4Research/README.md:14; AI4Research/harness/lib/operator_runtime.py:2-4	execution worker; DSL symbols >> || ? are combinators, not operators
+logical operator	逻辑算子	abstract operator		ai4research	approved	AI4Research/README.md:101,115; AI4Research/harness/schemas/planning/capsule-plan.v1.schema.json:20 (logical_operator); notes/07-capability-capsules.md:313	role/interface bound in the TaskGraph
+physical operator	物理算子	hardware operator		ai4research	approved	AI4Research/USER-GUIDE.md:109; AI4Research/README.md:115; AI4Research/harness/lib/operator_runtime.py:4; notes/07-capability-capsules.md:316	concrete executor resolved at runtime
+binding|bind	绑定			ai4research	approved	AI4Research/README.md:101,256; notes/02-architecture-pipeline.md:36; AI4Research/harness/capability-capsules/cap.research-literature-discover.yaml:77 (bindings:)	重绑定 = rebind; README.md:702 绑定 loopback = network bind
+composition|compose|composable	组合			ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:407,716; notes/11-capsule-architecture-digest-en.md:209; AI4Research/harness/capability-capsules/cap.research-literature-discover.yaml:51 (composition:)	组合胶囊 = composite capsule; 原子胶囊/元胶囊 = atomic/meta capsule
+combinator|composition type	组合类型	operator		ai4research	pending	AI4Research/docs/CAPSULE_ARCHITECTURE.md:410; AI4Research/docs/CAPSULE_ECOSYSTEM_DESIGN.md:630; notes/11-capsule-architecture-digest-en.md:209; notes/12-capsule-ecosystem-digest-en.md:313 (operator set)	notes disagree; operator collides with 算子
+derivation|derive|derived	推导|派生	inference		ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:472,478 (SPECIFICATION DERIVATION); AI4Research/docs/CAPSULE_ECOSYSTEM_DESIGN.md:902; notes/11-capsule-architecture-digest-en.md:223	spec derivation
+registry	注册表	index		ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:523; AI4Research/harness/config/capability-capsules.registry.yaml; notes/07-capability-capsules.md:82	a gate, not an index; 注册 = register
+admission	准入	acceptance	验收	ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:4-5; notes/08-workflow-end-to-end.md:204; AI4Research/harness/lib/capability_admission.py:12	static well-formedness gate; NEW-MACHINE:83 itself also uses 准入 for acceptance schemas: check context
+acceptance	验收	admission	准入	ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:9,25; notes/08-workflow-end-to-end.md:206; AI4Research/AGENTS.md:13	sign-off by a real run; 验收证据 = acceptance evidence
+gate	门禁	access control|entrance guard		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:65 (硬门禁); notes/02-architecture-pipeline.md:73; AI4Research/harness/lib/research/survey/golden_style_gate.py:47	质量/硬/软门禁 = quality/hard/soft gate
+receipt	回执	proof of execution		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:50,65; notes/02-architecture-pipeline.md:39; AI4Research/harness/lib/graph_node_dispatcher.py:820 (closeout_receipt)	a submit receipt is never execution evidence
+ledger	账本	account book		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:17 (执行账本); AI4Research/harness/lib/gate_ledger.py:323	执行账本 = execution ledger; 运行账本 = run ledger
+verdict	判定	ruling		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:51,94 (claim_verdict.v1); notes/02-architecture-pipeline.md:40	evaluator/gate outcome; as a verb 判定 = determine/decide: override with [TN]
+evidence	证据	proof	证明	ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:10,50; notes/02-architecture-pipeline.md:39; AI4Research/harness/schemas/evidence/	evidence is not proof (FM-4 strengthening); 证明 = proof
+declare|declaration	声明			ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:100,580; notes/11-capsule-architecture-digest-en.md:290; AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:51	能力声明协议 = Capability Advertisement (source gloss, CAPSULE_ECOSYSTEM_DESIGN.md:123)
+permission	权限	effects		ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:87 (Permission Contract),355; notes/11-capsule-architecture-digest-en.md:78; notes/13-capsule-roadmap-and-open-questions.md:35	design-doc permissions are not the shipped `effects` field (FM-9)
+side effect	副作用	effects	效果	ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:119,362 (side_effect_audit); notes/11-capsule-architecture-digest-en.md:191	not the six-axis `effects` field
+outcome|result	效果	effects		ai4research	pending	AI4Research/TRIGGERS.md:11; AI4Research/docs/SOLAR_EVOLUTION_REPORT_OUTLINE.md:226	generic impact/result; the manifest `effects` has no Chinese form
+trust	信任	trust class		ai4research	approved	AI4Research/docs/CAPSULE_ECOSYSTEM_DESIGN.md:31,261,284-285 (trust_score); notes/12-capsule-ecosystem-digest-en.md:32,148	ecosystem reputation-style trust; never map to execution_trust
+trust class	信任等级	trust level|trust tier	信任分数	ai4research	pending	AI4Research/harness/capability-capsules/cap.research-literature-discover.yaml:108 (trust_class); notes/22-execution-trust-resolved.md:22; notes/07-capability-capsules.md:192 (trust level, wrong)	zh unattested anywhere; English fixed by code; an unordered class, not a level
+reputation	声誉			ai4research	approved	AI4Research/docs/CAPSULE_ECOSYSTEM_DESIGN.md:261,278; notes/12-capsule-ecosystem-digest-en.md:148	community_trust dimension
+federation	联邦			ai4research	approved	AI4Research/docs/CAPSULE_ECOSYSTEM_DESIGN.md:192,195 (FederationRegistry); notes/12-capsule-ecosystem-digest-en.md:117	cross-agent registry layer; unbuilt (FM-9)
+multi-agent collaboration	多智能体协作	multi-agent federation		ai4research	pending	AI4Research/docs/CAPSULE_ECOSYSTEM_DESIGN.md:3,153; notes/12-capsule-ecosystem-digest-en.md:114 (heading says federation)	federation is only one layer inside it
+verification|verify|verifiable	验证	validation	校验	ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:25,333; notes/11-capsule-architecture-digest-en.md:50,182	验证和认证 = verified and certified
+validation|validate	校验	verification	验证	ai4research	approved	AI4Research/docs/CAPSULE_ARCHITECTURE.md:354 (input_validation # 输入校验); AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:21; notes/00-orientation.md:35	structural/schema checking
+task graph	任务图	task map		ai4research	approved	AI4Research/README.md:9,75; notes/00-orientation.md:25; AI4Research/harness/lib/graph_scheduler.py:474 (task_graph_state)	受治理的任务图 = governed task graph
+write scope	写域	write domain		ai4research	approved	AI4Research/README.md:97,168; AI4Research/harness/lib/graph_scheduler.py:11-12 (write_scope)	undeclared = exclusive writer
+closure	闭合		闭环	ai4research	approved	AI4Research/README.md:132,625 (closure.json 闭合投影); AI4Research/harness/lib/graph_scheduler.py:380; notes/14-cross-panel-corrections.md:38	sprint closure only
+closed loop|closed-loop	闭环	closure	闭合	ai4research	pending	AI4Research/README.md:9 (闭环交付); AI4Research/docs/MEMORY_SYSTEM_ARCHITECTURE.md:16; notes/00-orientation.md:24 (omitted)	feedback-loop sense; no note renders it yet
+projection	投影	forecast		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:49,92 (verify_runtime_projection); notes/02-architecture-pipeline.md:38	runtime graph/context/closure projection
+handoff	交接	transfer		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:65; notes/02-architecture-pipeline.md:72; AI4Research/harness/lib/intent_compiler.py:1508 (requirement_handoff)	收尾 = closeout
+repair	修复			ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:9,47; notes/02-architecture-pipeline.md:36; AI4Research/harness/lib/executable_node.py:200	bounded retry loop; 源码修复 = source repair
+review	审查|评审	audit	审计	ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:45,47,85; notes/02-architecture-pipeline.md:34	审计 = audit
+fail-closed	封闭失败	closed failure|fail-safe		ai4research	approved	AI4Research/harness/metadata/pre-scheduler-stabilization-log-20260829.md:447; AI4Research/harness/lib/gate_ledger.py:323; notes/14-cross-panel-corrections.md:113	reject on doubt; fail-safe is a different property
+control plane	控制平面|控制面	control surface		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:18; AI4Research/README.md:21,166; notes/00-orientation.md:30	same term, two spellings
+requirement	需求	demand		ai4research	approved	AI4Research/README.md:13; AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:24; AI4Research/harness/lib/requirement_compiler/	in the capsule growth path (CAPSULE_ARCHITECTURE.md:727) 需求 = need: override with [TN]
+claim	论断	argument|thesis		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:19,94 (research_claims.v1); notes/00-orientation.md:50	extracted research assertion
+ingestion|ingest	摄取	intake		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:18; notes/00-orientation.md:50; AI4Research/harness/capability-capsules/ (cap.research-paper-ingest)	intake = the GUI/CLI stage, a different thing
+fallback	降级			ai4research	approved	AI4Research/docs/CAPSULE_ECOSYSTEM_DESIGN.md:737 (Fallback (降级)),1129; notes/12-capsule-ecosystem-digest-en.md:314	composition/DSL sense; 优雅降级 = graceful degradation, and in review logs 降级 = downgraded to a warning
+journey test	旅程测试			ai4research	pending	AI4Research/AGENTS.md:13; notes/03-conventions-and-rules.md:57	zh unattested (the only Chinese journey plan is mojibake); keep the English
+round	本轮|首轮|每轮	turn	回合	ai4research	pending	AI4Research/harness/metadata/migration-handoff-20260831.md:5,13	attempt round; bare 轮 is too common to list (轮询 = polling); 回合 occurs nowhere
+target design	目标设计	core design|design thesis		ai4research	approved	AI4Research/harness/metadata/NEW-MACHINE-START-HERE.md:21; notes/00-orientation.md:33 and notes/09-report-presentation-kit.md:37 drop the word target	status marker: keep target, it separates aim from fact (FM-9)
+proof|prove	证明			general	approved	standard	counterpart of evidence; lets proof pass where 证明 is in the source
+index	索引			general	approved	standard	counterpart of registry
+audit	审计			general	approved	standard	counterpart of review
+lock	锁			general	approved	standard	counterpart of freeze; 死锁 is matched by the longer deadlock row
+snapshot	快照			general	approved	standard	counterpart of freeze
+protocol	协议			general	approved	standard	counterpart of specification
+inference|infer	推理|推断			general	approved	standard	counterpart of derivation
+access control	访问控制			general	approved	standard	counterpart of gate
+user interface|UI	界面|用户界面		接口	general	approved	standard	lets en→zh 'user interface' bypass the interface row
+research truth	研究真值	ground truth		ai4research	pending	AI4Research/harness/metadata/pre-scheduler-stabilization-log-20260829.md:638	"ground truth" imports an ML-dataset sense the source does not carry

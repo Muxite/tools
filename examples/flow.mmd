@@ -1,0 +1,17 @@
+%% Build path for a new tool, in the tundlekit Mermaid subset
+flowchart LR
+    gaps>"gap records"]:::build
+    subgraph cold [cold path]
+        decide("build-decision agent<br>build, version or wait"):::build
+        author("suite author<br>tests from the manifest alone"):::gates
+        impl("implementer<br>sees visible tests only"):::build
+    end
+    gate["admission gate<br>admit or reject + reason"]:::gates
+    lib[("library<br>append-only · versioned")]:::library
+    gaps --> decide
+    decide -->|manifest| author
+    decide -->|manifest| impl
+    author -->|held-out tests| gate
+    impl -- submission --> gate
+    gate -.->|admit / reject| impl
+    gate --> lib
