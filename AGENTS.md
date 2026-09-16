@@ -48,7 +48,8 @@ tundlekit diagram render examples/diagram.json -o build/diagram.svg --json
 
 **MCP** (agents that speak the Model Context Protocol): run `tundlekit-mcp` as a stdio server. Tools have the same
 names and arguments as `tundlekit call` (`bundle_status`, `deck_build`, `diagram_render`, `chart_bar`,
-`palette_get`, `text_lint`, `render_office`, `papers_fetch`, `translate_check`, …). Results come back as JSON text
+`palette_get`, `text_lint`, `render_office`, `review_coverage`, `claims_trace`, `papers_fetch`, `translate_check`,
+…). Results come back as JSON text
 plus `structuredContent`; failures come back with `isError: true` and a message.
 
 **Python**: `import tundlekit.registry as reg; reg.load_all(); reg.call("palette_get", {})`.
@@ -211,6 +212,7 @@ with either connection. They need `tundlekit` installed where the agent runs.
 | `paper-reading` | fetching, reading, citing or summarising papers |
 | `zh-en-translation` | reading, quoting or translating Chinese ↔ English technical text |
 | `held-out-build-gate` | building a capability with independent, held-out tests |
+| `review-prompts` | dispatching fresh-context reviewers (so-what, first-time reader, flaw classes, fact-check) |
 
 ## 5. Working on this repository
 

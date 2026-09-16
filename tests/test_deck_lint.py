@@ -229,7 +229,8 @@ def test_pptx_mode_basic(tmp_path):
     assert res["insert_seconds"] == 60
     assert [x["line"] for x in rules(res, "D001")] == [2]
     assert rules(res, "D002") == []
-    assert rules(res, "D009") == []
+    # §14.4: D009 is checked on .pptx; these content slides have no footer frame at or below 6.9 in
+    assert [x["line"] for x in rules(res, "D009")] == [2, 3]
     assert all(f["path"] == p.as_posix() for f in res["findings"] if f["line"] is not None)
 
 

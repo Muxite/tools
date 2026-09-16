@@ -32,8 +32,8 @@ ACTORS = ("model", "code", "record", "external")
 DIRECTIONS = ("LR", "TB")
 DEFAULT_STAGE, DEFAULT_ACTOR, DEFAULT_DIRECTION = "dispatch", "code", "LR"
 
-_TOP_KEYS = ("title", "direction", "nodes", "edges", "groups", "legend", "tags", "note")
-_NODE_KEYS = ("id", "label", "sub", "stage", "actor", "dashed")
+_TOP_KEYS = ("title", "direction", "nodes", "edges", "groups", "legend", "tags", "note", "wrap")
+_NODE_KEYS = ("id", "label", "sub", "stage", "actor", "dashed", "rank")
 _EDGE_KEYS = ("from", "to", "label", "dashed")
 _GROUP_KEYS = ("id", "label", "nodes", "stage")
 
@@ -70,6 +70,7 @@ def check_spec(spec) -> tuple[list[str], list[str]]:
     if not (legend is True or legend is False or legend == "auto"):
         problems.append(f"legend: must be \"auto\", true or false, got {_show(legend)}")
     _check_bool(spec, "tags", "", problems)
+    _check_count(spec, "wrap", "", 1, problems)
 
     ids: dict[str, str] = {}          # id -> where it was defined (nodes and groups share 1 namespace)
     node_ids: set[str] = set()
@@ -89,6 +90,7 @@ def check_spec(spec) -> tuple[list[str], list[str]]:
         _check_choice(n, "stage", where, tuple(STAGE), problems)
         _check_choice(n, "actor", where, ACTORS, problems)
         _check_bool(n, "dashed", where, problems)
+        _check_count(n, "rank", where, 0, problems)
 
     edges = spec.get("edges", [])
     if not isinstance(edges, list):
@@ -187,6 +189,21 @@ def _check_choice(obj: dict, key: str, where: str, choices: tuple, problems: lis
 def _check_bool(obj: dict, key: str, where: str, problems: list) -> None:
     if key in obj and not isinstance(obj[key], bool):
         problems.append(f"{_field(where, key)}: must be true or false, got {_show(obj[key])}")
+
+
+def _check_count(obj: dict, key: str, where: str, minimum: int, problems: list) -> None:
+    """An optional integer >= minimum (booleans, strings and floats are refused; §13.4 finite)."""
+    if key not in obj:
+        return
+    value = obj[key]
+    ok = isinstance(value, int) and not isinstance(value, bool) and value >= minimum
+    if ok:
+        try:
+            ok = math.isfinite(float(value))
+        except OverflowError:
+            ok = False
+    if not ok:
+        problems.append(f"{_field(where, key)}: must be an integer >= {minimum}, got {_show(value)}")
 
 
 def _check_id(value, where: str, ids: dict, problems: list, node_ids: set | None = None) -> None:
@@ -555,6 +572,7 @@ TAG_ROW = 16                   # height reserved for the MODEL / CODE tag
 MARGIN = 20
 NODE_GAP = 22                  # between neighbours in the same rank
 RANK_GAP = {"LR": 56, "TB": 48}
+ROW_GAP = {"LR": 40, "TB": 48}         # the channel between wrapped rows (columns in TB)
 GROUP_PAD, GROUP_LABEL_H = 12, 18
 DUMMY = 8                      # cross-axis room for an edge passing through a rank
 
@@ -624,6 +642,7 @@ class _Node:
     tag: bool
     group: str | None = None
     rank: int = 0
+    level: int = 0                  # index of the rank among the ranks that hold nodes
     w: float = 0.0
     h: float = 0.0
     x: float = 0.0
@@ -637,10 +656,12 @@ class _Edge:
     label: list[str]
     dashed: bool
     back: bool = False
+    flat: bool = False                              # both ends in the same rank
     chain: list = field(default_factory=list)       # layer items from the lower rank to the higher
+    split: int | None = None                        # chain index where the chain continues in a later row
     path: list = field(default_factory=list)        # [(command, [(x, y), ...]), ...]
     label_box: tuple | None = None                  # (cx, cy, w, h)
-    label_gap: int = -1                             # the gap between ranks that holds the label
+    label_gap: tuple | None = None                  # ("gap", level) or ("channel", row) holding the label
 
 
 @dataclass
@@ -709,24 +730,37 @@ def _mark_back_edges(order: list[str], edges: list[_Edge]) -> None:
                 stack.append((e.dst, iter(out[e.dst])))
 
 
-def _assign_ranks(order: list[str], nodes: dict, edges: list[_Edge]) -> None:
-    """rank = longest path from a source over the forward edges (topological order, spec order for ties)."""
+def _assign_ranks(order: list[str], nodes: dict, edges: list[_Edge], fixed: dict | None = None) -> None:
+    """rank = longest path from a source over the forward edges (topological order, spec order for ties).
+
+    Nodes in `fixed` keep their given rank (§14.6). Back edges are found by depth-first search over the edges
+    that do not join 2 fixed nodes. Afterwards every edge is classed by its final ranks: forward, back
+    (against the ranks) or flat (both ends in the same rank).
+    """
+    fixed = fixed or {}
+    _mark_back_edges(order, [e for e in edges if not (e.src in fixed and e.dst in fixed)])
     succ = {nid: [] for nid in order}
     indeg = dict.fromkeys(order, 0)
     for e in edges:
-        if not e.back:
+        if not e.back and not (e.src in fixed and e.dst in fixed):
             succ[e.src].append(e.dst)
             indeg[e.dst] += 1
+    for nid in order:
+        nodes[nid].rank = fixed.get(nid, 0)
     ready = [nid for nid in order if indeg[nid] == 0]
     i = 0
     while i < len(ready):
         u = ready[i]
         i += 1
         for v in succ[u]:
-            nodes[v].rank = max(nodes[v].rank, nodes[u].rank + 1)
+            if v not in fixed:
+                nodes[v].rank = max(nodes[v].rank, nodes[u].rank + 1)
             indeg[v] -= 1
             if indeg[v] == 0:
                 ready.append(v)
+    for e in edges:
+        a, b = nodes[e.src].rank, nodes[e.dst].rank
+        e.back, e.flat = a > b, a == b
 
 
 def _crossings(layers: list[list], segments: list[tuple]) -> int:
@@ -781,26 +815,36 @@ def _order_layers(layers: list[list], segments: list[tuple]) -> list[list]:
 
 
 class _Layout:
-    """Compute node boxes, edge paths, group rectangles and the canvas for 1 validated spec."""
+    """Compute node boxes, edge paths, group rectangles and the canvas for 1 validated spec.
+
+    Ranks are compacted into levels (only ranks that hold a node take room), and levels are grouped into rows
+    of `wrap` ranks (§14.6): the main axis restarts in every row and rows stack along the cross axis. An edge
+    between rows leaves its row through the gap after the row's last level (the tail), runs along the channel
+    below the row and enters its target's row from the gutter before the first level.
+    """
 
     def __init__(self, spec: dict):
         self.spec = spec
         self.direction = spec.get("direction", DEFAULT_DIRECTION)
         self.lr = self.direction == "LR"
+        self.wrap = spec.get("wrap")
         self.nodes, self.edges, self.groups = _build_model(spec)
         self.order = list(self.nodes)
         for n in self.nodes.values():
             _size_node(n)
-        _mark_back_edges(self.order, self.edges)
-        _assign_ranks(self.order, self.nodes, self.edges)
-        self.n_ranks = max(n.rank for n in self.nodes.values()) + 1
+        fixed = {n["id"]: n["rank"] for n in spec["nodes"] if "rank" in n}
+        _assign_ranks(self.order, self.nodes, self.edges, fixed)
+        self._make_levels()
         self._build_layers()
         self._place_main_axis()
         self._place_cross_axis()
         self._route_edges()
         self._place_groups()
 
-    # -- helpers on layer items: a node id (str) or a dummy ("~", edge index, rank)
+    # -- helpers on layer items: a node id (str) or a dummy ("~", edge index, level)
+    def _level(self, item) -> int:
+        return self.nodes[item].level if isinstance(item, str) else item[2]
+
     def _main_size(self, item) -> float:
         if isinstance(item, str):
             n = self.nodes[item]
@@ -819,49 +863,94 @@ class _Layout:
     def _point(self, main: float, cross: float) -> tuple[float, float]:
         return (main, cross) if self.lr else (cross, main)
 
+    def _near(self, n: _Node) -> float:
+        return n.x if self.lr else n.y
+
+    def _far(self, n: _Node) -> float:
+        return (n.x + n.w) if self.lr else (n.y + n.h)
+
     # -- steps
+    def _make_levels(self) -> None:
+        ranks = sorted({n.rank for n in self.nodes.values()})
+        level_of = {r: i for i, r in enumerate(ranks)}
+        for n in self.nodes.values():
+            n.level = level_of[n.rank]
+        self.n_levels = len(ranks)
+        keys = [r // self.wrap if self.wrap else 0 for r in ranks]
+        row_index = {k: i for i, k in enumerate(sorted(set(keys)))}
+        self.row_of = [row_index[k] for k in keys]
+        self.rows = []                   # [(first level, last level)]
+        for level, row in enumerate(self.row_of):
+            if row == len(self.rows):
+                self.rows.append((level, level))
+            else:
+                self.rows[row] = (self.rows[row][0], level)
+
     def _build_layers(self) -> None:
-        layers = [[] for _ in range(self.n_ranks)]
+        layers = [[] for _ in range(self.n_levels)]
         for nid in self.order:
-            layers[self.nodes[nid].rank].append(nid)
+            layers[self.nodes[nid].level].append(nid)
         segments = []
         for k, e in enumerate(self.edges):
+            if e.flat:
+                e.chain = [e.src, e.dst]
+                continue
             low, high = (e.dst, e.src) if e.back else (e.src, e.dst)
-            r0, r1 = self.nodes[low].rank, self.nodes[high].rank
-            e.chain = [low] + [("~", k, r) for r in range(r0 + 1, r1)] + [high]
-            for r in range(r0 + 1, r1):
-                layers[r].append(("~", k, r))
-            for i in range(len(e.chain) - 1):
-                segments.append((r0 + i, e.chain[i], e.chain[i + 1]))
+            l0, l1 = self.nodes[low].level, self.nodes[high].level
+            r0, r1 = self.row_of[l0], self.row_of[l1]
+            if r0 == r1:
+                parts = [[low] + [("~", k, lv) for lv in range(l0 + 1, l1)] + [high]]
+            else:
+                first = [low] + [("~", k, lv) for lv in range(l0 + 1, self.rows[r0][1] + 1)]
+                second = [("~", k, lv) for lv in range(self.rows[r1][0], l1)] + [high]
+                parts = [first, second]
+                e.split = len(first)
+            e.chain = [item for part in parts for item in part]
+            for part in parts:
+                for item in part:
+                    if not isinstance(item, str):
+                        layers[item[2]].append(item)
+                start = self._level(part[0])
+                for i in range(len(part) - 1):
+                    segments.append((start + i, part[i], part[i + 1]))
         self.layers = _order_layers(layers, segments)
 
+    def _label_level(self, e: _Edge) -> int | None:
+        """The level whose following gap holds the edge's label (None: the label sits in a row channel)."""
+        if e.split is not None:
+            return None
+        src = self.nodes[e.src].level
+        return src - 1 if e.back else src
+
     def _place_main_axis(self) -> None:
-        n_ranks = self.n_ranks
         thick = [max(self._main_size(i) for i in layer if isinstance(i, str)) for layer in self.layers]
-        before = [0.0] * n_ranks      # group padding needed before / after each rank
-        after = [0.0] * n_ranks
+        before = [0.0] * self.n_levels      # group padding needed before / after each level
+        after = [0.0] * self.n_levels
         for g in self.groups:
-            ranks = [self.nodes[m].rank for m in g.members]
-            before[min(ranks)] = max(before[min(ranks)], GROUP_PAD + (0 if self.lr else GROUP_LABEL_H))
-            after[max(ranks)] = max(after[max(ranks)], GROUP_PAD)
-        need = [0.0] * n_ranks         # room an edge label needs in the gap after each rank
+            levels = [self.nodes[m].level for m in g.members]
+            before[min(levels)] = max(before[min(levels)], GROUP_PAD + (0 if self.lr else GROUP_LABEL_H))
+            after[max(levels)] = max(after[max(levels)], GROUP_PAD)
+        need = [0.0] * self.n_levels         # room an edge label needs in the gap after each level
         for e in self.edges:
-            if e.label:                # the label sits in the gap next to the edge's source
-                r = self.nodes[e.src].rank - (1 if e.back else 0)
+            level = self._label_level(e) if e.label else None
+            if level is not None:            # the label sits in the gap next to the edge's source
                 w, h = self._label_size(e)
-                need[r] = max(need[r], (w if self.lr else h) + 16)
-        self.layer_start, self.layer_end, self.free = [], [], []
-        pos = before[0]
-        for r in range(n_ranks):
-            self.layer_start.append(pos)
-            self.layer_end.append(pos + thick[r])
-            if r + 1 < n_ranks:
+                need[level] = max(need[level], (w if self.lr else h) + 16)
+        self.layer_start = [0.0] * self.n_levels
+        self.layer_end = [0.0] * self.n_levels
+        self.free = [(0.0, 0.0)] * self.n_levels     # the gap after each level (after a row's last: its tail)
+        for first, last in self.rows:
+            pos = before[first]
+            for r in range(first, last + 1):
+                self.layer_start[r] = pos
+                self.layer_end[r] = pos + thick[r]
                 free_start = pos + thick[r] + after[r]
                 free = max(RANK_GAP[self.direction], need[r])
-                self.free.append((free_start, free_start + free))
-                pos = free_start + free + before[r + 1]
+                self.free[r] = (free_start, free_start + free)
+                if r < last:
+                    pos = free_start + free + before[r + 1]
         for n in self.nodes.values():
-            main = self.layer_start[n.rank] + (thick[n.rank] - self._main_size(n.id)) / 2
+            main = self.layer_start[n.level] + (thick[n.level] - self._main_size(n.id)) / 2
             if self.lr:
                 n.x = main
             else:
@@ -890,9 +979,23 @@ class _Layout:
             if prev_group is not None:
                 pos += GROUP_PAD
             extents.append((positions, pos))
-        for layer, (positions, total) in zip(self.layers, extents):
+        # rows stack along the cross axis, with a channel between them for the edges that change rows
+        channel = [float(ROW_GAP[self.direction])] * len(self.rows)
+        for e in self.edges:
+            if e.split is not None and e.label:
+                row = self.row_of[self.nodes[e.chain[0]].level]
+                w, h = self._label_size(e)
+                channel[row] = max(channel[row], (h if self.lr else w) + 16)
+        offsets, self.channel_mid = [], []
+        for k, (first, last) in enumerate(self.rows):
+            lo = min(-extents[r][1] / 2 for r in range(first, last + 1))
+            hi = max(extents[r][1] / 2 for r in range(first, last + 1))
+            offset = 0.0 if not k else self.channel_mid[-1] + channel[k - 1] / 2 - lo
+            offsets.append(offset)
+            self.channel_mid.append(offset + hi + channel[k] / 2)
+        for level, (layer, (positions, total)) in enumerate(zip(self.layers, extents)):
             for item, p in zip(layer, positions):
-                self.cross_pos[item] = p - total / 2
+                self.cross_pos[item] = p - total / 2 + offsets[self.row_of[level]]
         for n in self.nodes.values():
             if self.lr:
                 n.y = self.cross_pos[n.id]
@@ -912,57 +1015,116 @@ class _Layout:
             return centre + self._cross_size(item) / 4
         return centre
 
+    def _set_label(self, e: _Edge, main: float, cross: float, gap: tuple) -> None:
+        if e.label:
+            w, h = self._label_size(e)
+            e.label_box = (*self._point(main, cross), w, h)
+            e.label_gap = gap
+
+    def _through(self, e: _Edge, items: list, main: float, label_step: int | None) -> tuple[list, float]:
+        """Segments along items (consecutive levels of 1 row), starting at `main` on the main axis."""
+        segments = []
+        start = self._level(items[0])
+        for i in range(len(items) - 1):
+            a, b = items[i], items[i + 1]
+            fs, fe = self.free[start + i]
+            ca, cb = self._attach(a, e.back), self._attach(b, e.back)
+            if fs > main + 0.01:
+                segments.append(("L", self._point(main, ca), self._point(fs, ca)))
+            mid = (fs + fe) / 2
+            segments.append(("C", self._point(fs, ca), self._point(mid, ca), self._point(mid, cb),
+                             self._point(fe, cb)))
+            main = fe
+            if i == label_step:
+                self._set_label(e, mid, (ca + cb) / 2, ("gap", start + i))
+            if isinstance(b, str):
+                near = self._near(self.nodes[b])
+                if near > main + 0.01:
+                    segments.append(("L", self._point(main, cb), self._point(near, cb)))
+                    main = near
+        return segments, main
+
+    def _flat_segments(self, e: _Edge) -> list:
+        """An edge between 2 nodes of the same rank: out of the source's far side, a loop through the gap after
+        the level, and into the target's far side."""
+        src, dst = self.nodes[e.src], self.nodes[e.dst]
+        fs, fe = self.free[src.level]
+        cs, cd = self._attach(e.src, True), self._attach(e.dst, True)
+        mid = (fs + fe) / 2
+        segments = []
+        if fs > self._far(src) + 0.01:
+            segments.append(("L", self._point(self._far(src), cs), self._point(fs, cs)))
+        segments.append(("C", self._point(fs, cs), self._point(mid, cs), self._point(mid, cd),
+                         self._point(fs, cd)))
+        if fs > self._far(dst) + 0.01:
+            segments.append(("L", self._point(fs, cd), self._point(self._far(dst), cd)))
+        self._set_label(e, mid, (cs + cd) / 2, ("gap", src.level))
+        return segments
+
+    def _cross_row_segments(self, e: _Edge, j: int) -> list:
+        """An edge from a lower row to a higher one (drawn low to high): through the rest of its row, along the
+        row's tail, the channel below the row and the gutter before the rows, and into its target."""
+        first, second = e.chain[:e.split], e.chain[e.split:]
+        low = self.nodes[first[0]]
+        segments, main = self._through(e, first, self._far(low), None)
+        offset = (j % 5 - 2) * 4
+        row = self.row_of[low.level]
+        tail = self.free[self.rows[row][1]][0] + 20 + offset
+        gutter = -20 + offset
+        channel = self.channel_mid[row] + offset
+        c_last, c_first = self._attach(first[-1], e.back), self._attach(second[0], e.back)
+        corners = [(main, c_last), (tail, c_last), (tail, channel), (gutter, channel), (gutter, c_first)]
+        for (m0, c0), (m1, c1) in zip(corners, corners[1:]):
+            if abs(m0 - m1) > 0.01 or abs(c0 - c1) > 0.01:
+                segments.append(("L", self._point(m0, c0), self._point(m1, c1)))
+        self._set_label(e, (tail + gutter) / 2, channel, ("channel", row))
+        if len(second) > 1:
+            more, _ = self._through(e, second, gutter, None)
+            segments += more
+        else:
+            near = self._near(self.nodes[second[0]])
+            segments.append(("L", self._point(gutter, c_first), self._point(near, c_first)))
+        return segments
+
     def _route_edges(self) -> None:
         """Route every edge along its chain, low rank to high rank, through the free part of each gap.
 
         A back edge is laid out as if it pointed forward and its path is then reversed, so its arrow still
         ends at its real target (on the target's far side).
         """
+        crossing = 0
         for e in self.edges:
-            low = self.nodes[e.chain[0]]
-            segments = []
-            main = (low.x + low.w) if self.lr else (low.y + low.h)
-            label_step = len(e.chain) - 2 if e.back else 0
-            for i in range(len(e.chain) - 1):
-                a, b = e.chain[i], e.chain[i + 1]
-                fs, fe = self.free[low.rank + i]
-                ca, cb = self._attach(a, e.back), self._attach(b, e.back)
-                if fs > main + 0.01:
-                    segments.append(("L", self._point(main, ca), self._point(fs, ca)))
-                mid = (fs + fe) / 2
-                segments.append(("C", self._point(fs, ca), self._point(mid, ca), self._point(mid, cb),
-                                 self._point(fe, cb)))
-                main = fe
-                if i == label_step and e.label:
-                    w, h = self._label_size(e)
-                    e.label_box = (*self._point(mid, (ca + cb) / 2), w, h)
-                    e.label_gap = low.rank + i
-                if isinstance(b, str):
-                    high = self.nodes[b]
-                    near = high.x if self.lr else high.y
-                    if near > main + 0.01:
-                        segments.append(("L", self._point(main, cb), self._point(near, cb)))
+            if e.flat:
+                segments = self._flat_segments(e)
+            elif e.split is not None:
+                segments = self._cross_row_segments(e, crossing)
+                crossing += 1
+            else:
+                low = self.nodes[e.chain[0]]
+                segments, _ = self._through(e, e.chain, self._far(low), len(e.chain) - 2 if e.back else 0)
             if e.back:
                 segments = [(kind, *reversed(points)) for kind, *points in reversed(segments)]
             e.path = [("M", [segments[0][1]])] + [(kind, list(points[1:])) for kind, *points in segments]
         self._spread_labels()
 
     def _spread_labels(self) -> None:
-        """Move labels that share a gap apart along the cross axis (gaps hold no nodes, so this is safe).
+        """Move labels that share a gap apart along the cross axis, and labels that share a row channel apart
+        along the main axis (neither place holds nodes, so this is safe).
 
         Overlapping labels merge into clusters; each cluster is centred on its labels' wanted positions.
         """
         spacing = 3.0
-        by_gap: dict[int, list] = {}
+        by_gap: dict[tuple, list] = {}
         for k, e in enumerate(self.edges):
             if e.label_box:
                 cx, cy, w, h = e.label_box
-                want, size = (cy, h) if self.lr else (cx, w)
-                by_gap.setdefault(e.label_gap, []).append((want, k, size, e))
+                along_x = self.lr != (e.label_gap[0] == "gap")      # the axis the labels are spread along
+                want, size = (cx, w) if along_x else (cy, h)
+                by_gap.setdefault(e.label_gap, []).append((want, k, size, e, along_x))
         for items in by_gap.values():
             items.sort(key=lambda t: (t[0], t[1]))
-            clusters: list[list] = []          # [start, total size, [(offset of centre, item)]]
-            for want, _, size, e in items:
+            clusters: list[list] = []          # [start, total size, [(offset of centre, wanted, edge)]]
+            for want, _, size, e, _ in items:
                 clusters.append([want - size / 2, size, [(size / 2, want, e)]])
                 while len(clusters) > 1 and clusters[-2][0] + clusters[-2][1] + spacing > clusters[-1][0]:
                     last = clusters.pop()
@@ -972,11 +1134,12 @@ class _Layout:
                     prev[1] = shift + last[1]
                     prev[2] = members
                     prev[0] = sum(w_ - off for off, w_, _ in members) / len(members)
+            along_x = items[0][4]
             for start, _, members in clusters:
                 for off, _, e in members:
                     cx, cy, w, h = e.label_box
                     centre = start + off
-                    e.label_box = (cx, centre, w, h) if self.lr else (centre, cy, w, h)
+                    e.label_box = (centre, cy, w, h) if along_x else (cx, centre, w, h)
 
     def _place_groups(self) -> None:
         for g in self.groups:
@@ -1256,6 +1419,39 @@ def _png_converters():
     if inkscape:
         yield "inkscape", lambda src, dst: _run([inkscape, str(src), "--export-type=png",
                                                  f"--export-filename={dst}"])
+    pymupdf = _load_pymupdf()
+    if pymupdf is not None:
+        yield "pymupdf", lambda src, dst: _pymupdf_png(pymupdf, src, dst)
+
+
+def _load_pymupdf():
+    """pymupdf (or its old name fitz), imported only when needed, with MuPDF messages sent to stderr."""
+    for name in ("pymupdf", "fitz"):
+        try:
+            mod = importlib.import_module(name)
+        except Exception:        # missing, hidden (sys.modules[name] = None) or broken
+            continue
+        if not hasattr(mod, "open"):
+            continue
+        try:
+            mod.set_messages(fd=2)
+        except Exception:        # older releases lack set_messages or its fd argument
+            pass
+        return mod
+    return None
+
+
+PYMUPDF_SCALE = 2                # pixels per SVG unit, for a sharp PNG
+
+
+def _pymupdf_png(pymupdf, src: pathlib.Path, dst: pathlib.Path) -> None:
+    doc = pymupdf.open(stream=src.read_bytes(), filetype="svg")
+    try:
+        page = doc[0]
+        pix = page.get_pixmap(matrix=pymupdf.Matrix(PYMUPDF_SCALE, PYMUPDF_SCALE), alpha=False)
+        pix.save(str(dst))
+    finally:
+        doc.close()
 
 
 def _run(argv: list[str]) -> None:
@@ -1284,7 +1480,8 @@ def _write_png(svg: str, png_path: str) -> None:
                 failures.append(f"{name}: {e}")
     if not failures:
         raise ToolError("no SVG to PNG converter found: install the Python package cairosvg "
-                        "(pip install cairosvg), rsvg-convert (librsvg) or Inkscape")
+                        "(pip install cairosvg), rsvg-convert (librsvg), Inkscape, or pymupdf "
+                        "(pip install pymupdf)")
     raise ToolError("SVG to PNG conversion failed: " + "; ".join(failures))
 
 
@@ -1297,9 +1494,9 @@ _SOURCE_PROPS = {
 }
 _SPEC_HELP = (
     "Spec: {title?, direction?: LR|TB, nodes: [{id, label, sub?, stage?, actor?: model|code|record|external, "
-    "dashed?}], edges?: [{from, to, label?, dashed?}], groups?: [{id, label?, nodes: [ids], stage?}], "
-    "legend?: auto|true|false, tags?: bool, note?}. stage is a palette stage (default dispatch); "
-    "label lines split on \\n."
+    "dashed?, rank?: int>=0 (fixed)}], edges?: [{from, to, label?, dashed?}], groups?: [{id, label?, nodes: "
+    "[ids], stage?}], legend?: auto|true|false, tags?: bool, note?, wrap?: int>=1 (ranks per row/column)}. "
+    "stage is a palette stage (default dispatch); label lines split on \\n."
 )
 
 
@@ -1309,7 +1506,8 @@ _SPEC_HELP = (
       "= document shape, external = grey), 1 box per model call, automatic legend when more than 1 actor is "
       "shown. Give exactly 1 of spec, spec_path, mermaid or mermaid_path. Layout is automatic, layered by "
       "rank and deterministic. " + _SPEC_HELP + " Returns {svg (when out is absent), path, png, width, "
-      "height, nodes: {id: {x, y, w, h, rank}}, warnings}. PNG needs cairosvg, rsvg-convert or Inkscape.",
+      "height, nodes: {id: {x, y, w, h, rank}}, warnings}. PNG needs cairosvg, rsvg-convert, Inkscape or "
+      "pymupdf (tried in that order).",
       {"type": "object",
        "properties": dict(_SOURCE_PROPS,
                           out={"type": "string", "description": "Write the SVG to this path."},

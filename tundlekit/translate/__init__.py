@@ -8,6 +8,7 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -101,6 +102,117 @@ def translate_check(mode: str, src: str, tgt: str | None = None, direction: str 
     return {"exit_code": code, "ok": code == 0, "output": out.getvalue(), "errors": err.getvalue()}
 
 
+# ---------------------------------------------------------------------------------------------- terms
+
+_AW = "A-Za-z0-9"                                   # ASCII word characters: CJK never counts as a boundary word
+CAMEL = re.compile(rf"(?<![{_AW}])(?:[A-Z][a-z]+[A-Z][{_AW}]*|[a-z]+[A-Z][{_AW}]*)(?![{_AW}])")
+CAPS = re.compile(rf"(?<![{_AW}])[A-Z]{{2,}}[{_AW}]*(?![{_AW}])")
+ASCII_RUN = re.compile(r"[A-Za-z0-9-]+(?: [A-Za-z0-9-]+)*")
+FENCED = re.compile(r"^[ \t]*(`{3,}|~{3,})[^\n]*\n.*?^[ \t]*\1[ \t]*$", re.M | re.S)
+INLINE_CODE = re.compile(r"(`+)(?!`).+?(?<!`)\1(?!`)", re.S)
+URL = re.compile(r"(?:https?|ftp)://\S+|www\.\S+")
+FILE_PATH = re.compile(r"[\w.~-]*[/\\][\w./\\~-]*|\b[\w-]+\.(?:py|md|json|jsonl|txt|tsv|csv|ya?ml|toml|js|ts|"
+                       r"sh|ps1|bat|pptx|docx|xlsx|pdf|png|jpe?g|svg|html?|xml|ipynb|cfg|ini|log)\b")
+
+
+def _terms_text(text: str) -> str:
+    """Text with fenced code, inline code, URLs and file paths blanked out (newlines kept)."""
+    for rx in (FENCED, INLINE_CODE, URL, FILE_PATH):
+        text = rx.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+    return text
+
+
+def _borders_ok(line: str, start: int, end: int) -> bool:
+    """True when a run has a non-ASCII character (or the line edge) on both sides, a single space allowed."""
+    before = line[:start]
+    if before.endswith(" "):
+        before = before[:-1]
+    after = line[end:]
+    if after.startswith(" "):
+        after = after[1:]
+    return (before == "" or ord(before[-1]) > 127) and (after == "" or ord(after[0]) > 127)
+
+
+def find_terms(text: str) -> list[str]:
+    """Technical terms in text, as first written, in order of first appearance (MANIFEST §15.6)."""
+    found: dict[str, tuple[int, str]] = {}
+
+    def add(pos: int, term: str) -> None:
+        key = term.lower()
+        if key not in found or pos < found[key][0]:
+            found[key] = (pos, term)
+
+    offset = 0
+    for line in _terms_text(text).split("\n"):
+        for rx in (CAMEL, CAPS):
+            for m in rx.finditer(line):
+                add(offset + m.start(), m.group(0))
+        for m in ASCII_RUN.finditer(line):
+            run = m.group(0)
+            if 2 <= len(run.split(" ")) <= 4 and re.search("[A-Za-z]", run) \
+                    and _borders_ok(line, m.start(), m.end()):
+                add(offset + m.start(), run)
+        offset += len(line) + 1
+    return [term for _, term in sorted(found.values())]
+
+
+def _count(text: str, term: str) -> int:
+    words = [re.escape(w) for w in term.split()]
+    rx = re.compile(rf"(?<![{_AW}])" + r"\s+".join(words) + rf"(?![{_AW}])", re.I)
+    return len(rx.findall(text))
+
+
+@tool(
+    "translate_terms",
+    "Check that technical terms carry over between a source text and its translations: finds terms in src "
+    "(CamelCase words, capitalised acronyms such as MCP, and runs of 2-4 English words set in Chinese text; "
+    "code, URLs and file paths excluded), counts each in every file, and compares each target with the "
+    "previous file. L001 (warning): a term that disappeared. L002 (info): a term whose count changed.",
+    {"type": "object",
+     "properties": {
+         "src": {"type": "string", "description": "source file"},
+         "targets": {"type": "array", "items": {"type": "string"}, "minItems": 1,
+                     "description": "translated files, compared in order"},
+     },
+     "required": ["src", "targets"],
+     "additionalProperties": False},
+    readOnlyHint=True,
+)
+def translate_terms(src: str, targets: list[str]) -> dict:
+    if not targets:
+        raise ToolError("give at least 1 target file")
+    texts = []
+    for path in [src, *targets]:
+        p = Path(path)
+        if not p.is_file():
+            raise ToolError(f"file not found: {path}")
+        try:
+            raw = p.read_bytes().decode("utf-8", errors="replace").lstrip("﻿")
+        except OSError as exc:
+            raise ToolError(f"cannot read {path}: {exc}") from None
+        texts.append(_terms_text(raw.replace("\r\n", "\n").replace("\r", "\n")))
+    terms = find_terms(texts[0])
+    table = {t: [_count(text, t) for text in texts] for t in terms}
+    findings = []
+    for i, target in enumerate(targets, 1):
+        shown = target.replace("\\", "/")
+        previous = src if i == 1 else targets[i - 2]
+        for term, counts in table.items():
+            before, now = counts[i - 1], counts[i]
+            if before > 0 and now == 0:
+                findings.append({"rule": "L001", "severity": "warning", "path": shown, "line": None,
+                                 "message": f"'{term}' appears {before} time(s) in {previous} and not in {target}",
+                                 "excerpt": term})
+            elif before != now and before and now:
+                findings.append({"rule": "L002", "severity": "info", "path": shown, "line": None,
+                                 "message": f"'{term}' appears {before} time(s) in {previous} and {now} in {target}",
+                                 "excerpt": term})
+    findings.sort(key=lambda f: (f["path"], f["line"] or 0, f["rule"]))
+    counts = {"error": 0, "warning": sum(f["severity"] == "warning" for f in findings),
+              "info": sum(f["severity"] == "info" for f in findings)}
+    return {"ok": True, "findings": findings, "counts": counts, "terms": table}
+
+
 def _resources() -> list[str]:
     names = []
     for sub in RESOURCE_DIRS:
@@ -154,6 +266,16 @@ def add_cli(groups) -> None:
     c.add_argument("--name")
     common_flags(c)
     c.set_defaults(handler=_cli_resources)
+
+    c = cmds.add_parser("terms", help="check that technical terms carry over into translations")
+    c.add_argument("src")
+    c.add_argument("targets", nargs="+", metavar="TGT")
+    common_flags(c, checker=True)
+    c.set_defaults(handler=_cli_terms)
+
+
+def _cli_terms(args) -> CliResult:
+    return CliResult(translate_terms(args.src, args.targets))
 
 
 def _cli_check(args) -> CliResult:

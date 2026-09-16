@@ -311,6 +311,9 @@ def _no_converters(monkeypatch, tmp_path):
         if Path(p).exists():
             pytest.skip(f"a converter is installed at a fixed location: {p}")
     monkeypatch.setitem(sys.modules, "cairosvg", None)
+    # §14.6: pymupdf is a fallback converter; hide it too so that no converter is available
+    monkeypatch.setitem(sys.modules, "pymupdf", None)
+    monkeypatch.setitem(sys.modules, "fitz", None)
     monkeypatch.setenv("PATH", "")
     monkeypatch.chdir(tmp_path)
 

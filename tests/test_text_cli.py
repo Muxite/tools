@@ -30,7 +30,7 @@ def test_lint_clean_exit_0(here, capsys):
 
 
 def test_lint_warning_exit_0_and_strict_exit_1(here, capsys):
-    write(here / "r.md", "It may work.\n")
+    write(here / "r.md", "It may be wrong.\n")
     code, res, _ = cli_json(capsys, ["text", "lint", "r.md", "--json"])
     assert code == 0 and res["counts"]["warning"] == 1
     code, _, _ = cli_json(capsys, ["text", "lint", "r.md", "--strict", "--json"])
@@ -38,7 +38,7 @@ def test_lint_warning_exit_0_and_strict_exit_1(here, capsys):
 
 
 def test_lint_rules_and_ignore_options(here, capsys):
-    write(here / "r.md", "We may — go; now.\n")
+    write(here / "r.md", "We may be — late; now.\n")
     _, res, _ = cli_json(capsys, ["text", "lint", "r.md", "--rules", "S001,S005", "--json"])
     assert sorted(f["rule"] for f in res["findings"]) == ["S001", "S005"]
     _, res, _ = cli_json(capsys, ["text", "lint", "r.md", "--ignore", "S001", "--json"])

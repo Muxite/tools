@@ -275,8 +275,10 @@ def test_list_default_dir_is_cwd(library, capsys, monkeypatch):
 
 
 def test_list_empty_dir(tmp_path):
-    """§9.4: no papers gives an empty list."""
-    assert h.call_tool("papers_list", {"dir": str(tmp_path)}) == {"papers": []}
+    """§9.4: no papers gives an empty list (§14.7 adds missing_summary, also empty)."""
+    data = h.call_tool("papers_list", {"dir": str(tmp_path)})
+    assert data["papers"] == []
+    assert data.get("missing_summary", []) == []
 
 
 @pytest.mark.parametrize("name", ["papers_body", "papers_peek", "papers_list"])

@@ -17,11 +17,13 @@ import pathlib
 import re
 import unicodedata
 
-from tundlekit.palette import PPT, STAGE, tint
+from tundlekit.palette import OUTCOME, PPT, STAGE, tint
 from tundlekit.registry import ToolError, tool
 
 SLIDE_TYPES = ("title", "divider", "content")
-BODY_KINDS = ("bullets", "lines", "table", "figure", "excerpt", "chart")
+BODY_KINDS = ("bullets", "lines", "table", "figure", "excerpt", "chart", "point")
+CHART_TYPES = ("bar", "line")
+BLOCK_BOX = ("x", "y", "w", "h")             # optional block position and size, inches (§14.5)
 INSERT_MODES = ("shown", "hidden", "off")
 DEFAULT_TARGET, DEFAULT_MAX, DEFAULT_WPS = "40:00", "45:00", 2.3
 INSERT_LINE = "INSERT: optional slide; delete or hide it and the talk flows unchanged"
@@ -262,7 +264,10 @@ class Plan:
                 _check_text(phase.get("in"), f"{where}.phase.in", problems, required=True)
                 _check_text(phase.get("out"), f"{where}.phase.out", problems, required=True)
         body = s.get("body")
-        if body is not None:
+        if isinstance(body, list):                          # §14.5: a list of blocks
+            for i, block in enumerate(body):
+                self._body(block, f"{where}.body[{i}]", problems)
+        elif body is not None:
             self._body(body, f"{where}.body", problems)
         seconds, say, asked = self._notes(s.get("notes"), f"{where}.notes", problems)
         if not asked and s.get("asked") is not None:      # tolerated: asked beside notes instead of inside
@@ -272,13 +277,28 @@ class Plan:
 
     def _body(self, body, where: str, problems: list) -> None:
         if not isinstance(body, dict):
-            problems.append(f"{where}: must be an object")
+            problems.append(f"{where}: must be an object or a list of objects")
             return
         kind = body.get("kind")
         if not isinstance(kind, str) or kind not in BODY_KINDS:
             problems.append(f"{where}.kind: unknown body kind {_short(kind)} (one of {', '.join(BODY_KINDS)})")
             return
-        if kind in ("bullets", "lines"):
+        for key in BLOCK_BOX:
+            v = body.get(key)
+            if v is None:
+                continue
+            if not _is_num(v):
+                problems.append(f"{where}.{key}: must be a finite number (inches)")
+            elif key in ("w", "h") and v <= 0:
+                problems.append(f"{where}.{key}: must be greater than 0")
+            elif key in ("x", "y") and v < 0:
+                problems.append(f"{where}.{key}: must not be negative")
+        size = body.get("size")
+        if size is not None and (not _is_num(size) or not 1 <= size <= 400):
+            problems.append(f"{where}.size: must be a number of points from 1 to 400")
+        if kind == "point":
+            _check_text(body.get("text"), f"{where}.text", problems, required=True)
+        elif kind in ("bullets", "lines"):
             self._texts(body.get("items"), f"{where}.items", problems)
             if kind == "lines" and not isinstance(body.get("mono", False), bool):
                 problems.append(f"{where}.mono: must be true or false")
@@ -334,6 +354,13 @@ class Plan:
                     problems.append(f"{where}.highlight: {_short(hl)} is not one of the categories")
             for key in ("unit", "takeaway"):
                 _check_text(body.get(key), f"{where}.{key}", problems)
+            ctype = body.get("chart_type", "bar")
+            if not isinstance(ctype, str) or ctype not in CHART_TYPES:
+                problems.append(f"{where}.chart_type: must be bar or line, not {_short(ctype)}")
+            hc = body.get("highlight_color")
+            if hc is not None and (not isinstance(hc, str) or (hc not in STAGE and hc not in OUTCOME)):
+                problems.append(f"{where}.highlight_color: unknown colour key {_short(hc)} "
+                                f"(a stage: {', '.join(STAGE)}; or an outcome: {', '.join(OUTCOME)})")
 
     @staticmethod
     def _texts(items, where: str, problems: list, non_empty: bool = False) -> bool:
@@ -383,6 +410,7 @@ class Plan:
             sl["label"] = sl["number"] or str(pos)
             sl["notes_text"] = notes_text(sl)
             sl["face"] = face_text(sl["spec"], sl["type"])
+            sl["face_body"] = face_text(sl["spec"], sl["type"], with_title=False)
 
     @property
     def core_seconds(self) -> int:
@@ -417,9 +445,23 @@ def _strip_texts(s: dict) -> list[str]:
     return out
 
 
-def face_text(s: dict, kind: str) -> str:
+def body_blocks(body) -> list[dict]:
+    """A slide body as a list of blocks: a single block (§3.1) or a list of blocks (§14.5)."""
+    if isinstance(body, dict):
+        return [body]
+    if isinstance(body, list):
+        return [b for b in body if isinstance(b, dict)]
+    return []
+
+
+def _point_text(text: str) -> str:
+    """A point block is 1 line: line breaks become spaces."""
+    return " ".join(text.splitlines())
+
+
+def face_text(s: dict, kind: str, with_title: bool = True) -> str:
     """All text a spec slide shows (§3.3): title, eyebrow, subtitle, byline, body, strips, cells, takeaway."""
-    out = [s.get("title") or ""]
+    out = [s.get("title") or ""] if with_title else []
     for key in ("eyebrow", "subtitle", "byline"):
         if s.get(key):
             out.append(s[key].upper() if key == "eyebrow" else s[key])
@@ -427,20 +469,22 @@ def face_text(s: dict, kind: str) -> str:
         if s.get("source"):
             out.append(s["source"])
         out.extend(_strip_texts(s))
-        body = s.get("body") or {}
-        k = body.get("kind")
-        if k in ("bullets", "lines"):
-            out.extend(body.get("items", []))
-        elif k == "table":
-            out.extend(str(c) for r in body.get("rows", []) for c in r)
-        elif k == "excerpt":
-            out.append(body.get("text", ""))
-            if body.get("caption"):
-                out.append(body["caption"])
-        elif k == "chart":
-            out.extend(body.get("categories", []))
-            if body.get("takeaway"):
-                out.append(body["takeaway"])
+        for body in body_blocks(s.get("body")):
+            k = body.get("kind")
+            if k in ("bullets", "lines"):
+                out.extend(body.get("items", []))
+            elif k == "table":
+                out.extend(str(c) for r in body.get("rows", []) for c in r)
+            elif k == "excerpt":
+                out.append(body.get("text", ""))
+                if body.get("caption"):
+                    out.append(body["caption"])
+            elif k == "point":
+                out.append(_point_text(body.get("text", "")))
+            elif k == "chart":
+                out.extend(body.get("categories", []))
+                if body.get("takeaway"):
+                    out.append(body["takeaway"])
     return "\n".join(t for t in out if t)
 
 
@@ -451,6 +495,10 @@ FONT, MONO = "Calibri", "Consolas"
 LOGO_W = 0.42
 BODY_X, BODY_W = 0.75, 11.8
 FIG_W, FIG_H = 11.8, 5.3
+BODY_BOTTOM, BODY_BOTTOM_THUS = 6.9, 6.25    # the body area ends at 6.9 in, or above the THUS strip (6.38 in)
+GAP = 0.15                                   # between stacked body blocks
+POINT_SIZE, EXCERPT_SIZE = 20, 15
+MIN_BLOCK_H, MIN_CHART_H = 0.3, 1.0
 
 
 class _Builder:
@@ -477,13 +525,19 @@ class _Builder:
     def warn(self, text: str) -> None:
         self.warnings.append(f"slide {self.label}: {text}")
 
-    def check_text(self, y, w, h, paras, spacing, body=True) -> None:
-        """deckkit's overflow heuristic: warn when the estimated text height exceeds its box or the slide."""
+    @staticmethod
+    def text_need(w, paras, spacing) -> float:
+        """deckkit's estimate of the height (in) that paras of (text, size, mono) need in a box w in wide."""
         need = 0.0
         for text, size, mono in paras:
             cpl = max(1, int((w - 0.1) * 72 / (size * (0.6 if mono else 0.5))))
             lines = sum(max(1, math.ceil(len(seg) / cpl)) for seg in text.split("\n"))
             need += lines * size * 1.2 / 72 + size * spacing / 72
+        return need
+
+    def check_text(self, y, w, h, paras, spacing, body=True) -> None:
+        """deckkit's overflow heuristic: warn when the estimated text height exceeds its box or the slide."""
+        need = self.text_need(w, paras, spacing)
         if need > h + 0.08 or (body and y + need > H - 0.45):
             first = paras[0][0] if paras else ""
             self.warn(f"text needs {need:.2f} in, box {h:.2f} in: {first[:48]!r}")
@@ -617,7 +671,7 @@ class _Builder:
         self.logo(s)
         self.tb(s, W - 1.2, 7.02, 0.6, 0.3, [(sl["number"], 10, False, MUTED)], align=PP_ALIGN.RIGHT, body=False)
 
-        top, bottom = 1.6, 6.9
+        top, bottom = 1.6, BODY_BOTTOM
         demo = spec.get("demonstrated_by")
         if demo:
             text = f"{demo['paper']}  ·  {demo.get('setup', '')}"
@@ -636,30 +690,137 @@ class _Builder:
             fill = tint(thus_col, 0.12).lstrip("#").upper()
             self.strip(s, 6.38, [("THUS   ", True, thus_col, 12), (spec["thus"], False, INK, 17)],
                        thus_col, fill, 0.56, 7 + len(spec["thus"]), 17)
-            bottom = 6.25
-        body = spec.get("body")
-        if body:
-            self.body(s, body, top + 0.2, bottom, stage)
+            bottom = BODY_BOTTOM_THUS
+        blocks = body_blocks(spec.get("body"))
+        if blocks:
+            self.layout(s, blocks, top, bottom, stage)
 
-    # ------------------------------------------------------------ bodies
-    def body(self, s, body, y, bottom, stage):
-        h = bottom - y
-        kind = body["kind"]
+    # ------------------------------------------------------------ bodies (§3.2, §14.5)
+    def natural_h(self, b, w) -> float | None:
+        """Estimated height (in) of a block with no h; None for charts and figures, which take what is left."""
+        kind = b["kind"]
+        if kind in ("bullets", "lines", "point"):
+            _, paras, spacing = self.block_paras(b)
+            need = self.text_need(w, [(p[0], p[1], len(p) > 4 and p[4] == MONO) for p in paras], spacing)
+            return need + 0.1
+        if kind == "table":
+            size, head, row_h = self.table_sizes(b)
+            return self.table_est(b["rows"], b.get("widths"), w, size, head, row_h)
+        if kind == "excerpt":
+            size = b.get("size") or EXCERPT_SIZE
+            lines = b["text"].rstrip("\n").split("\n")
+            need = self.text_need(w - 0.36, [(line, size, True) for line in lines], 0.0)
+            return need + 0.34 + (0.45 if b.get("caption") else 0)
+        return None
+
+    @staticmethod
+    def block_paras(b):
+        """(size, paragraphs for tb, paragraph spacing) of a text block."""
+        kind = b["kind"]
         if kind == "bullets":
-            self.tb(s, BODY_X, y, BODY_W, h, [(f"•  {t}", 24, False, INK) for t in body["items"]], spacing=0.6)
-        elif kind == "lines":
-            font = MONO if body.get("mono") else FONT
-            self.tb(s, BODY_X, y, BODY_W, h, [(t, 22, False, INK, font) for t in body["items"]], spacing=0.5)
-        elif kind == "table":
-            self.table(s, body["rows"], y, body.get("widths"))
-        elif kind == "figure":
-            self.figure(s, _resolve(self.plan.base, body["path"]), y - 0.2, bottom)
-        elif kind == "excerpt":
-            self.excerpt(s, body["text"], y, h - (0.45 if body.get("caption") else 0), body.get("caption"))
-        elif kind == "chart":
-            self.chart(s, body, y, h, stage)
+            size = b.get("size") or 24
+            return size, [(f"•  {t}", size, False, INK) for t in b["items"]], 0.6
+        if kind == "lines":
+            size = b.get("size") or 22
+            font = MONO if b.get("mono") else FONT
+            return size, [(t, size, False, INK, font) for t in b["items"]], 0.5
+        size = b.get("size") or POINT_SIZE
+        return size, [(_point_text(b["text"]), size, True, INK)], 0.0
 
-    def table(self, s, rows, y, widths, x=BODY_X, w=BODY_W, size=17, head=15, row_h=0.62):
+    @staticmethod
+    def table_sizes(b):
+        size = b.get("size")
+        if size is None:
+            return 17, 15, 0.62
+        return size, round(size * 15 / 17, 1), max(0.3, 0.62 * size / 17)
+
+    def layout(self, s, blocks, top, bottom, stage):
+        """Place the blocks: positioned ones where they say, the others stacked top to bottom (§14.5).
+
+        Text blocks and tables take their estimated height; charts and figures share what is left above
+        `bottom` after the stacked blocks below them. The last stacked text block runs to `bottom`, as a single
+        body always did. A figure without h shrinks to fit, so it never runs past the body area."""
+        start = top + 0.2
+        cursor = start
+        stacked = [i for i, b in enumerate(blocks) if b.get("y") is None]
+        for i, b in enumerate(blocks):
+            kind = b["kind"]
+            x = b["x"] if b.get("x") is not None else BODY_X
+            if b.get("w") is not None:
+                w = b["w"]
+            elif b.get("x") is not None:
+                w = max(0.5, min(BODY_X + BODY_W, W - 0.6) - x)
+            else:
+                w = BODY_W
+            positioned = b.get("y") is not None
+            later = [blocks[j] for j in stacked if j > i] if not positioned else []
+            if positioned:
+                y = b["y"]
+            elif kind == "figure" and cursor == start:
+                y = top                        # a figure at the head of the body starts right under the strips
+            else:
+                y = cursor
+            reserve, flex = 0.0, 1
+            for r in later:
+                rw = r["w"] if r.get("w") is not None else BODY_W
+                nat = r["h"] if r.get("h") is not None else self.natural_h(r, rw)
+                if nat is None:
+                    flex += 1
+                    reserve += GAP
+                else:
+                    reserve += nat + GAP
+            room = bottom - y - reserve
+            h = b.get("h")
+            if kind in ("bullets", "lines", "point"):
+                if h is None:
+                    nat = self.natural_h(b, w)
+                    h = room if not later and not positioned else min(nat, room)
+                    h = max(h, MIN_BLOCK_H)
+                size, paras, spacing = self.block_paras(b)
+                self.tb(s, x, y, w, h, paras, spacing=spacing)
+                used = h
+            elif kind == "table":
+                size, head, row_h = self.table_sizes(b)
+                if h is not None:
+                    row_h = h / len(b["rows"])
+                used = self.table(s, b["rows"], y, b.get("widths"), x=x, w=w, size=size, head=head, row_h=row_h,
+                                  box_h=h)
+            elif kind == "excerpt":
+                if h is None:
+                    nat = self.natural_h(b, w)
+                    h = room if not later and not positioned else min(nat, room)
+                    h = max(h, MIN_BLOCK_H + (0.45 if b.get("caption") else 0))
+                cap = 0.45 if b.get("caption") else 0
+                self.excerpt(s, b["text"], y, h - cap, b.get("caption"), x=x, w=w,
+                             size=b.get("size") or EXCERPT_SIZE)
+                used = h
+            elif kind == "chart":
+                if h is None:
+                    h = max(room / flex, MIN_CHART_H)
+                self.chart(s, b, x, y, w, h, stage)
+                used = h
+            else:                                   # figure
+                limit = h if h is not None else max(room / flex, MIN_BLOCK_H)
+                used = self.figure(s, _resolve(self.plan.base, b["path"]), y, bottom, x=x, max_w=w,
+                                   max_h=limit, fixed_h=h is not None)
+            cursor = max(cursor, y + used + GAP)
+
+    def table_est(self, rows, widths, w, size, head, row_h) -> float:
+        nc = len(rows[0])
+        tot = sum(widths) if widths else nc
+        colw = [w * (widths[j] if widths else 1) / tot for j in range(nc)]
+        est = 0.0
+        for i, row in enumerate(rows):
+            row_need = row_h
+            for j, cell in enumerate(row):
+                sz = head if i == 0 else size
+                cpl = max(1, int((colw[j] - 0.16) * 72 / (sz * 0.5)))
+                row_need = max(row_need, math.ceil(max(1, len(str(cell))) / cpl) * sz * 1.2 / 72 + 0.12)
+            est += row_need
+        return est
+
+    def table(self, s, rows, y, widths, x=BODY_X, w=BODY_W, size=17, head=15, row_h=0.62, box_h=None):
+        """A native table; returns its estimated height (in)."""
         from pptx.enum.text import MSO_ANCHOR
         from pptx.util import Inches, Pt
 
@@ -670,10 +831,8 @@ class _Builder:
         for j in range(nc):
             shp.columns[j].width = Inches(colw[j])
         shp.first_row = True
-        est = 0.0
         for i, row in enumerate(rows):
             shp.rows[i].height = Inches(row_h)
-            row_need = row_h
             for j, cell in enumerate(row):
                 c = shp.cell(i, j)
                 c.fill.solid()
@@ -691,14 +850,17 @@ class _Builder:
                 r.font.name = FONT
                 r.font.bold = i == 0 or (j == 0 and nc > 1)
                 r.font.color.rgb = self.rgb(INK)
-                cpl = max(1, int((colw[j] - 0.16) * 72 / (sz * 0.5)))
-                row_need = max(row_need, math.ceil(max(1, len(text)) / cpl) * sz * 1.2 / 72 + 0.12)
-            est += row_need
+        est = self.table_est(rows, widths, w, size, head, row_h)
         if y + est > H - 0.4:
             self.warn(f"table needs {est:.2f} in from y={y:.2f} and runs past the slide bottom")
-        return shp
+        elif box_h is not None and est > box_h + 0.08:
+            self.warn(f"table needs {est:.2f} in, box {box_h:.2f} in")
+        return est
 
-    def figure(self, s, path, y, bottom, x=BODY_X):
+    def figure(self, s, path, y, bottom, x=BODY_X, max_w=FIG_W, max_h=FIG_H, fixed_h=False):
+        """A picture fitted into max_w x max_h keeping its aspect ratio, centred across max_w; returns its height.
+
+        Without a fixed h, max_h is the room left in the body area, so the picture shrinks to fit (§14.5)."""
         from PIL import Image
         from pptx.util import Inches
 
@@ -707,15 +869,17 @@ class _Builder:
                 iw, ih = im.size
         except Exception as e:
             raise ToolError(f"cannot read figure {path}: {e}") from None
-        fw, fh = FIG_W, FIG_W * ih / iw
-        if fh > FIG_H:
-            fh, fw = FIG_H, FIG_H * iw / ih
+        if not fixed_h:
+            max_h = min(max_h, FIG_H)               # at most the §3.2 size, less when the body area is shorter
+        fw, fh = max_w, max_w * ih / iw
+        if fh > max_h:
+            fh, fw = max_h, max_h * iw / ih
         if y + fh > bottom + 0.05:
             self.warn(f"figure needs {fh:.2f} in from y={y:.2f} and runs past the body area")
-        return s.shapes.add_picture(str(path), Inches(x + (FIG_W - fw) / 2), Inches(y),
-                                    width=Inches(fw), height=Inches(fh))
+        s.shapes.add_picture(str(path), Inches(x + (max_w - fw) / 2), Inches(y), width=Inches(fw), height=Inches(fh))
+        return fh
 
-    def excerpt(self, s, text, y, h, caption, x=BODY_X, w=BODY_W, size=15):
+    def excerpt(self, s, text, y, h, caption, x=BODY_X, w=BODY_W, size=EXCERPT_SIZE):
         from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
         from pptx.util import Inches, Pt
 
@@ -741,28 +905,34 @@ class _Builder:
             self.tb(s, x, y + h + 0.06, w, 0.35, [(caption, 12, False, MUTED)])
         return box
 
-    def chart(self, s, body, y, h, stage):
+    def chart(self, s, body, x, y, w, h, stage):
         from pptx.chart.data import CategoryChartData
-        from pptx.enum.chart import XL_CHART_TYPE
+        from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_MARKER_STYLE
         from pptx.util import Inches, Pt
 
         cats, vals = body["categories"], body["values"]
         takeaway = body.get("takeaway")
-        chart_h = h - (0.6 if takeaway else 0)
+        size = body.get("size") or 14
+        take_size = size + 4
+        take_h = max(0.5, take_size * 1.2 / 72 + 0.2)
+        chart_h = max(h - (take_h + 0.1 if takeaway else 0), MIN_BLOCK_H)
+        line = body.get("chart_type", "bar") == "line"
         data = CategoryChartData()
         data.categories = cats
         data.add_series("values", vals)
-        gf = s.shapes.add_chart(XL_CHART_TYPE.BAR_CLUSTERED, Inches(BODY_X), Inches(y), Inches(BODY_W),
-                                Inches(chart_h), data)
+        kind = XL_CHART_TYPE.LINE_MARKERS if line else XL_CHART_TYPE.BAR_CLUSTERED
+        gf = s.shapes.add_chart(kind, Inches(x), Inches(y), Inches(w), Inches(chart_h), data)
         chart = gf.chart
         chart.has_legend = False
-        chart.font.size = Pt(14)
+        chart.font.size = Pt(size)
         chart.font.name = FONT
-        chart.category_axis.reverse_order = True     # first category on top, as in the spec
+        if not line:
+            chart.category_axis.reverse_order = True     # first category on top, as in the spec
         chart.value_axis.has_major_gridlines = False
         chart.value_axis.visible = False
         plot = chart.plots[0]
-        plot.gap_width = 60
+        if not line:
+            plot.gap_width = 60
         plot.has_data_labels = True
         labels = plot.data_labels
         labels.show_value = True
@@ -772,13 +942,27 @@ class _Builder:
         labels.number_format_is_linked = False
         hl = body.get("highlight")
         hi = cats.index(hl) if isinstance(hl, str) else hl
-        colour = PPT[stage or "gates"]
+        key = body.get("highlight_color") or stage or "gates"      # §14.5
+        colour = (STAGE.get(key) or OUTCOME[key]).lstrip("#").upper()
+        series = plot.series[0]
+        if line:
+            labels.position = XL_LABEL_POSITION.ABOVE
+            series.smooth = False
+            series.format.line.color.rgb = self.rgb(GREYBAR)
+            series.format.line.width = Pt(2.25)
         for i in range(len(vals)):
-            fill = plot.series[0].points[i].format.fill
-            fill.solid()
-            fill.fore_color.rgb = self.rgb(colour if i == hi else GREYBAR)
+            point = series.points[i]
+            rgb = self.rgb(colour if i == hi else GREYBAR)
+            point.format.fill.solid()
+            point.format.fill.fore_color.rgb = rgb
+            if line:
+                point.marker.style = XL_MARKER_STYLE.CIRCLE
+                point.marker.size = 11 if i == hi else 8
+                point.marker.format.fill.solid()
+                point.marker.format.fill.fore_color.rgb = rgb
+                point.marker.format.line.color.rgb = rgb
         if takeaway:
-            self.tb(s, BODY_X, y + chart_h + 0.1, BODY_W, 0.5, [(takeaway, 18, True, INK)])
+            self.tb(s, x, y + chart_h + 0.1, w, take_h, [(takeaway, take_size, True, INK)])
         return gf
 
 
@@ -917,13 +1101,19 @@ def parse_notes(notes: str) -> tuple[int | None, str | None]:
     return seconds, (say.group(1).strip() if say else None)
 
 
+FOOTER_TOP_EMU = round(6.9 * 914400)     # §14.4: a footer frame's top is at or below 6.9 in
+
+
 def read_slide(slide, index: int) -> dict:
-    frames, cells = [], []
+    frames, cells, low = [], [], []
     best_size, title = -1, None
     for sh in _iter_shapes(slide.shapes):
         if getattr(sh, "has_text_frame", False) and sh.has_text_frame:
             tf = sh.text_frame
             frames.append(tf.text)
+            top = getattr(sh, "top", None)
+            if top is not None and top >= FOOTER_TOP_EMU:
+                low.append(tf.text.strip())
             for p in tf.paragraphs:
                 for r in p.runs:
                     size = r.font.size or p.font.size or 0
@@ -938,9 +1128,10 @@ def read_slide(slide, index: int) -> dict:
     notes = slide.notes_slide.notes_text_frame.text if slide.has_notes_slide else ""
     notes = notes.replace("\r\n", "\n").replace("\r", "\n").replace("\x0b", "\n")
     seconds, say = parse_notes(notes)
+    footer = " ".join(t for t in low if t and not NUMBER_RE.fullmatch(t))
     return {"index": index, "number": number, "title": title, "texts": frames + cells, "notes": notes,
             "seconds": seconds, "say_words": _words(say or ""), "insert": notes.startswith("INSERT:"),
-            "hidden": slide._element.get("show") in ("0", "false"), "say": say or ""}
+            "hidden": slide._element.get("show") in ("0", "false"), "say": say or "", "footer": footer}
 
 
 @tool("deck_inspect",
@@ -959,16 +1150,23 @@ def deck_inspect(pptx_path: str) -> dict:
     for i, slide in enumerate(prs.slides, 1):
         info = read_slide(slide, i)
         info.pop("say")
+        info.pop("footer")
         slides.append(info)
     return {"path": str(pptx_path), "slides": slides}
 
 
-# ------------------------------------------------------------------ linting (§3.3)
+# ------------------------------------------------------------------ linting (§3.3, §14.4)
 DEFENSIVE = ("i'm not going to", "i am not going to", "i'm not claiming", "i'll show", "i will show",
-             "this talk will", "that's fine for")
+             "this talk will", "that's fine for",
+             "i'll go through", "i'm going to show", "i will go through", "instead i'll")
 BACKREF_RE = re.compile(r"(?i)\b(as we saw|as i said|as mentioned|next slide|coming up)\b")
 INSERT_REF_RE = re.compile(r"(?i)\bslide\s+\d+[a-z]\b")
 EQ_RE = re.compile(r"\bEq\.?\s*\d")
+# D014 typography: an em dash; a double period that is not part of `...`; exactly 2 spaces between a
+# lower-case letter or .,;:) and a capital (3 or more spaces are a deliberate gutter, as in the phase strip)
+TYPO_RES = (("an em dash", re.compile("—")),
+            ("a double period", re.compile(r"(?<!\.)\.\.(?!\.)")),
+            ("a double space mid-sentence", re.compile(r"(?<=[a-z.,;:)])  (?=[A-Z])")))
 
 
 def _excerpt(text: str, start: int = 0, end: int | None = None) -> str:
@@ -977,13 +1175,13 @@ def _excerpt(text: str, start: int = 0, end: int | None = None) -> str:
     return " ".join(text[a:b].split())[:80]
 
 
-def _lint_records(records: list[dict], shown: str, wps: float, target: int, maximum: int,
-                  is_spec: bool) -> list[dict]:
+def _lint_records(records: list[dict], shown: str, wps: float) -> list[dict]:
+    """Per-slide findings (every rule but D008 and D013) for 1 deck."""
     findings = []
 
     def add(rule, severity, rec, message, excerpt=""):
         findings.append({"rule": rule, "severity": severity, "path": shown,
-                         "line": rec["position"] if rec else None, "message": message, "excerpt": excerpt})
+                         "line": rec["position"], "message": message, "excerpt": excerpt})
 
     for r in records:
         say, notes, face, title = r["say"], r["notes"], r["face"], r["title"]
@@ -1022,20 +1220,34 @@ def _lint_records(records: list[dict], shown: str, wps: float, target: int, maxi
                     add("D007", "error", r, f"core slide mentions an insert slide in its {where}: {m.group(0)!r}",
                         _excerpt(text, m.start(), m.end()))
                     break
-        if is_spec and r["content"] and not r["source"]:
+        if r["content"] and not r["source"]:
             add("D009", "warning", r, "content slide has no source footer")
         m = re.search(r"et al\.", face) or EQ_RE.search(face)
         if m:
             add("D010", "warning", r, f"face text contains {m.group(0)!r}", _excerpt(face, m.start(), m.end()))
         if len(title) > 90:
             add("D011", "warning", r, f"title is {len(title)} characters (over 90)", title[:80])
-
-    core = sum(r["seconds"] or 0 for r in records if not r["insert"])
-    if core > maximum:
-        add("D008", "error", None, f"core time {mmss(core)} is over the {mmss(maximum)} maximum")
-    elif core > target:
-        add("D008", "warning", None, f"core time {mmss(core)} is over the {mmss(target)} target")
+        found, first = [], None
+        for where, text in (("face text", r["face_body"]), ("SAY", say)):
+            for what, rx in TYPO_RES:
+                m = rx.search(text)
+                if m:
+                    found.append(f"{what} in {where}")
+                    if first is None:
+                        first = _excerpt(text, m.start(), m.end())
+        if found:
+            add("D014", "warning", r, "typography: " + "; ".join(found), first)
     return findings
+
+
+def _d008(core: int, target: int, maximum: int, shown: str, what: str) -> dict | None:
+    if core > maximum:
+        severity, message = "error", f"{what} {mmss(core)} is over the {mmss(maximum)} maximum"
+    elif core > target:
+        severity, message = "warning", f"{what} {mmss(core)} is over the {mmss(target)} target"
+    else:
+        return None
+    return {"rule": "D008", "severity": severity, "path": shown, "line": None, "message": message, "excerpt": ""}
 
 
 def _time_arg(name: str, value, default: str) -> int:
@@ -1046,63 +1258,350 @@ def _time_arg(name: str, value, default: str) -> int:
     return seconds
 
 
+def _pptx_records(path: str) -> list[dict]:
+    prs = _open_pptx(path)
+    records = []
+    for i, slide in enumerate(prs.slides, 1):
+        info = read_slide(slide, i)
+        texts = list(info["texts"])
+        if info["title"] in texts:
+            texts.remove(info["title"])          # D014 leaves titles to D003
+        records.append({"position": i, "title": info["title"], "face": "\n".join(info["texts"]),
+                        "face_body": "\n".join(texts), "say": info["say"], "notes": info["notes"],
+                        "seconds": info["seconds"], "insert": info["insert"],
+                        "content": info["number"] is not None, "source": info["footer"]})
+    return records
+
+
+def _read_ledger(times_file) -> tuple[str, dict]:
+    """The times ledger for linting: it must exist and be a JSON object of non-negative numbers."""
+    if not isinstance(times_file, str) or not times_file:
+        raise ToolError("times_file must be a non-empty path string")
+    path = pathlib.Path(times_file)
+    data = read_json(path, "times file")
+    if not isinstance(data, dict) or not all(_is_num(v) and v >= 0 for v in data.values()):
+        raise ToolError(f"times file {times_file} must be a JSON object of non-negative numbers")
+    return _display(times_file), data
+
+
 @tool("deck_lint",
-      "Check a deck spec (spec or spec_path) or a built .pptx (pptx_path) against the speaker-note and slide "
-      "rules: D001 SAY longer than TIME x words_per_second; D002 core content slide with under 20 SAY words; "
-      "D003 em dash in a title; D004 MUST HIT or 'The point of this slide' in notes; D005 meta or defensive "
-      "lines in SAY; D006 insert slide referring to the flow; D007 core slide mentioning an insert slide; D008 "
-      "core time over target (warning) or max (error); D009 content slide without source; D010 'et al.' or "
-      "'Eq. N' on the face; D011 title over 90 chars; D012 slide without TIME. A spec needs no optional "
-      "packages; a .pptx needs python-pptx.",
+      "Check a deck spec (spec or spec_path) or built .pptx decks (pptx_path: 1 path or a list) against the "
+      "speaker-note and slide rules: D001 SAY longer than TIME x words_per_second; D002 core content slide with "
+      "under 20 SAY words; D003 em dash in a title; D004 MUST HIT or 'The point of this slide' in notes; D005 "
+      "meta or defensive lines in SAY; D006 insert slide referring to the flow; D007 core slide mentioning an "
+      "insert slide; D008 core time over target (warning) or max (error); D009 content slide without a source "
+      "footer; D010 'et al.' or 'Eq. N' on the face; D011 title over 90 chars; D012 slide without TIME; D013 "
+      "core time differs from the times_file entry (deck id = file stem, or ids); D014 em dash, '..' or a "
+      "mid-sentence double space in face text or SAY. With times_file, D008 checks the combined time of all "
+      "decks. A spec needs no optional packages; a .pptx needs python-pptx.",
       {"type": "object",
        "properties": {
            "spec": {"type": "object", "description": "the deck spec"},
            "spec_path": {"type": "string", "description": "path to a JSON deck spec"},
-           "pptx_path": {"type": "string", "description": "path to a built .pptx"},
+           "pptx_path": {"type": ["string", "array"], "items": {"type": "string"},
+                         "description": "path to a built .pptx, or a list of paths"},
            "words_per_second": {"type": "number", "description": "speaking rate (default meta, else 2.3)"},
            "target": {"type": "string", "description": "target core time M:SS (default meta budget, else 40:00)"},
-           "max": {"type": "string", "description": "maximum core time M:SS (default meta budget, else 45:00)"}},
+           "max": {"type": "string", "description": "maximum core time M:SS (default meta budget, else 45:00)"},
+           "times_file": {"type": "string",
+                          "description": "JSON time ledger {deck_id: seconds} shared by several decks (read only)"},
+           "ids": {"type": "array", "items": {"type": "string"},
+                   "description": "deck ids for the times_file, 1 per deck (default: the file stems)"}},
        "additionalProperties": False},
       readOnlyHint=True)
-def deck_lint(spec: dict | None = None, spec_path: str | None = None, pptx_path: str | None = None,
-              words_per_second: float | None = None, target: str | None = None, max: str | None = None) -> dict:
+def deck_lint(spec: dict | None = None, spec_path: str | None = None, pptx_path=None,
+              words_per_second: float | None = None, target: str | None = None, max: str | None = None,
+              times_file: str | None = None, ids: list[str] | None = None) -> dict:
     if sum(x is not None for x in (spec, spec_path, pptx_path)) != 1:
         raise ToolError("give exactly 1 of spec, spec_path or pptx_path")
     if words_per_second is not None and (not _is_num(words_per_second) or words_per_second <= 0):
         raise ToolError("words_per_second must be a positive number")
+    if ids is not None and (not isinstance(ids, list) or not all(isinstance(i, str) and i for i in ids)):
+        raise ToolError("ids must be a list of non-empty strings")
 
+    decks = []                          # (shown path, records, deck id or None)
     if pptx_path is not None:
-        prs = _open_pptx(pptx_path)
-        shown = _display(pptx_path)
+        paths = [pptx_path] if isinstance(pptx_path, str) else pptx_path
+        if not isinstance(paths, list) or not paths or not all(isinstance(p, str) and p for p in paths):
+            raise ToolError("pptx_path must be a path or a non-empty list of paths")
+        if ids is not None and len(ids) != len(paths):
+            raise ToolError(f"ids has {len(ids)} entries for {len(paths)} deck(s)")
         wps = words_per_second or DEFAULT_WPS
         target_s = _time_arg("target", target, DEFAULT_TARGET)
         max_s = _time_arg("max", max, DEFAULT_MAX)
-        records = []
-        for i, slide in enumerate(prs.slides, 1):
-            info = read_slide(slide, i)
-            records.append({"position": i, "title": info["title"], "face": "\n".join(info["texts"]),
-                            "say": info["say"], "notes": info["notes"], "seconds": info["seconds"],
-                            "insert": info["insert"], "content": info["number"] is not None, "source": None})
-        is_spec = False
+        for k, p in enumerate(paths):
+            deck_id = ids[k] if ids is not None else pathlib.Path(p).stem
+            decks.append((_display(p), _pptx_records(p), deck_id))
     else:
         plan = Plan(*load_spec(spec, spec_path))
-        shown = plan.shown
+        if ids is not None and len(ids) != 1:
+            raise ToolError(f"ids has {len(ids)} entries for 1 deck")
         wps = words_per_second or plan.meta["words_per_second"]
         target_s = _time_arg("target", target, plan.meta["target"])
         max_s = _time_arg("max", max, plan.meta["max"])
-        records = [{"position": s["position"], "title": s["title"], "face": s["face"], "say": s["say"],
-                    "notes": s["notes_text"], "seconds": s["seconds"], "insert": s["insert"],
+        records = [{"position": s["position"], "title": s["title"], "face": s["face"], "face_body": s["face_body"],
+                    "say": s["say"], "notes": s["notes_text"], "seconds": s["seconds"], "insert": s["insert"],
                     "content": s["type"] == "content", "source": s["spec"].get("source")}
                    for s in plan.slides]
-        is_spec = True
+        deck_id = (ids[0] if ids is not None else plan.meta["id"]
+                   or (pathlib.Path(spec_path).stem if spec_path is not None else None))
+        decks.append((plan.shown, records, deck_id))
 
-    findings = _lint_records(records, shown, wps, target_s, max_s, is_spec)
+    ledger_path, ledger = _read_ledger(times_file) if times_file is not None else (None, None)
+    if ledger is not None and any(d[2] is None for d in decks):
+        raise ToolError("an inline spec needs meta.id (or ids) when times_file is given")
+
+    findings, summary, measured = [], [], {}
+    for shown, records, deck_id in decks:
+        core = sum(r["seconds"] or 0 for r in records if not r["insert"])
+        ins = sum(r["seconds"] or 0 for r in records if r["insert"])
+        summary.append({"path": shown, "id": deck_id, "core_seconds": core, "insert_seconds": ins,
+                        "core_time": mmss(core), "slides": len(records)})
+        findings.extend(_lint_records(records, shown, wps))
+        if ledger is None:
+            f = _d008(core, target_s, max_s, shown, "core time")
+            if f:
+                findings.append(f)
+            continue
+        measured[deck_id] = measured.get(deck_id, 0) + core
+        entry = ledger.get(deck_id)
+        if entry is None:
+            findings.append({"rule": "D013", "severity": "error", "path": shown, "line": None,
+                             "message": f"{ledger_path} has no entry {deck_id!r}; measured core time {mmss(core)}",
+                             "excerpt": ""})
+        elif abs(float(entry) - core) > 1e-9:
+            findings.append({"rule": "D013", "severity": "error", "path": shown, "line": None,
+                             "message": f"core time {mmss(core)} ({core} s) differs from {ledger_path} entry "
+                                        f"{deck_id!r} ({entry:g} s)", "excerpt": ""})
+
+    combined = None
+    if ledger is not None:
+        combined = sum(v for k, v in ledger.items() if not k.endswith("_inserts") and k not in measured)
+        combined += sum(measured.values())
+        f = _d008(int(math.ceil(combined)), target_s, max_s, decks[0][0], f"combined core time in {ledger_path}")
+        if f:
+            findings.append(f)
+
     findings.sort(key=lambda f: (f["path"], f["line"] or 0, f["rule"]))
     counts = {sev: sum(1 for f in findings if f["severity"] == sev) for sev in ("error", "warning", "info")}
-    core = sum(r["seconds"] or 0 for r in records if not r["insert"])
-    return {"ok": counts["error"] == 0, "findings": findings, "counts": counts,
-            "core_seconds": core, "insert_seconds": sum(r["seconds"] or 0 for r in records if r["insert"]),
-            "core_time": mmss(core), "slides": len(records)}
+    core = sum(d["core_seconds"] for d in summary)
+    result = {"ok": counts["error"] == 0, "findings": findings, "counts": counts,
+              "core_seconds": core, "insert_seconds": sum(d["insert_seconds"] for d in summary),
+              "core_time": mmss(core), "slides": sum(d["slides"] for d in summary), "decks": summary}
+    if ledger is not None:
+        result["ledger"] = {"path": ledger_path, "combined_seconds": combined,
+                            "combined_time": mmss(int(math.ceil(combined))),
+                            "status": budget_status(combined, target_s, max_s)}
+    return result
+
+
+# ------------------------------------------------------------------ diffing decks (§15.4)
+HINT_SUFFIXES = (".py", ".json", ".md")
+PAIR_SIMILARITY = 0.6
+
+
+def search_files(search: list[str] | None) -> list[tuple[str, str]]:
+    """(hint path, text) for every searchable file under the `search` entries (§15.4).
+
+    Directories are walked for .py, .json and .md files; a file given directly is searched whatever its
+    suffix. Hint paths join the entry with the walked path, so a relative entry gives relative hints.
+    """
+    import os
+
+    out = []
+    for entry in search or []:
+        if not isinstance(entry, str) or not entry:
+            raise ToolError("search entries must be non-empty path strings")
+        try:
+            is_dir, is_file = os.path.isdir(entry), os.path.isfile(entry)
+        except (OSError, ValueError):
+            is_dir = is_file = False
+        if is_file:
+            paths = [(entry, entry)]
+        elif is_dir:
+            paths = []
+            for dirpath, dirnames, filenames in os.walk(entry):
+                dirnames.sort()
+                for name in sorted(filenames):
+                    if name.lower().endswith(HINT_SUFFIXES):
+                        full = os.path.join(dirpath, name)
+                        paths.append((full, full))
+        else:
+            raise ToolError(f"search path not found: {entry}")
+        for shown, full in paths:
+            try:
+                with open(full, encoding="utf-8-sig", errors="replace") as f:
+                    out.append((shown.replace("\\", "/"), f.read()))
+            except OSError:
+                continue
+    return out
+
+
+def find_hints(old: str, files: list[tuple[str, str]], limit: int = 3) -> list[str]:
+    """Up to `limit` `path:line` places where `old` (else its longest line of 12+ characters) occurs."""
+    if not old or not files:
+        return []
+    needles = [old]
+    longest = max(old.splitlines() or [""], key=len).strip()
+    if len(longest) >= 12 and longest != old:
+        needles.append(longest)
+    for needle in needles:
+        hits = []
+        for shown, text in files:
+            start = text.find(needle)
+            while start != -1 and len(hits) < limit:
+                hits.append(f"{shown}:{text.count(chr(10), 0, start) + 1}")
+                start = text.find(needle, start + len(needle))
+            if len(hits) >= limit:
+                break
+        if hits:
+            return hits
+    return []
+
+
+def _similar(a: str, b: str) -> float:
+    import difflib
+
+    norm = lambda s: " ".join(s.lower().split())  # noqa: E731
+    return difflib.SequenceMatcher(None, norm(a), norm(b)).ratio()
+
+
+def _unified(old: str, new: str) -> str:
+    import difflib
+
+    return "\n".join(difflib.unified_diff(old.split("\n"), new.split("\n"), "old", "new", lineterm=""))
+
+
+def _pair_slides(old: list[dict], new: list[dict]) -> dict[int, int]:
+    """new index -> old index: by number text, then by title similarity, then by position."""
+    pairs: dict[int, int] = {}
+    used: set[int] = set()
+    for j, n in enumerate(new):
+        if n["number"] is None:
+            continue
+        for i, o in enumerate(old):
+            if i not in used and o["number"] == n["number"]:
+                pairs[j] = i
+                used.add(i)
+                break
+    for j, n in enumerate(new):
+        if j in pairs or not n["title"].strip():
+            continue
+        best, best_score = None, PAIR_SIMILARITY
+        for i, o in enumerate(old):
+            if i in used or not o["title"].strip():
+                continue
+            if o["number"] is not None and n["number"] is not None:
+                continue            # 2 numbered slides with different numbers are different slides
+            score = _similar(o["title"], n["title"])
+            if score >= best_score and (best is None or score > best_score):
+                best, best_score = i, score
+        if best is not None:
+            pairs[j] = best
+            used.add(best)
+    for j in range(len(new)):
+        if j not in pairs and j < len(old) and j not in used:
+            pairs[j] = j
+            used.add(j)
+    return pairs
+
+
+def _kept_in_order(seq: list[int]) -> set[int]:
+    """Indexes of seq forming a longest increasing subsequence (the slides that did not move)."""
+    import bisect
+
+    tails, tails_idx, prev = [], [], [-1] * len(seq)
+    for k, v in enumerate(seq):
+        pos = bisect.bisect_left(tails, v)
+        if pos == len(tails):
+            tails.append(v)
+            tails_idx.append(k)
+        else:
+            tails[pos] = v
+            tails_idx[pos] = k
+        prev[k] = tails_idx[pos - 1] if pos else -1
+    keep, k = set(), tails_idx[-1] if tails_idx else -1
+    while k != -1:
+        keep.add(k)
+        k = prev[k]
+    return keep
+
+
+def _without_title(texts: list[str], title: str) -> list[str]:
+    out = list(texts)
+    if title in out:
+        out.remove(title)
+    return out
+
+
+def _frame_changes(old_texts: list[str], new_texts: list[str]):
+    """(old, new) per changed text frame, aligned with difflib."""
+    import difflib
+
+    sm = difflib.SequenceMatcher(None, old_texts, new_texts, autojunk=False)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            continue
+        for k in range(max(i2 - i1, j2 - j1)):
+            o = old_texts[i1 + k] if i1 + k < i2 else ""
+            n = new_texts[j1 + k] if j1 + k < j2 else ""
+            if o != n:
+                yield o, n
+
+
+@tool("deck_diff",
+      "Compare 2 .pptx decks (old and new, for example a built deck and a hand-edited copy) and list the changes "
+      "per slide: title, text (per text frame), notes, hidden, added, removed and moved slides, with a unified "
+      "diff for text changes. Slides pair by slide number, else by title similarity, else by position. With "
+      "search (files or directories; .py, .json and .md are walked), each change carries up to 3 'path:line' "
+      "hints where the old text occurs, to carry hand edits back into build scripts. Needs python-pptx.",
+      {"type": "object",
+       "properties": {
+           "old": {"type": "string", "description": "the original .pptx"},
+           "new": {"type": "string", "description": "the edited .pptx"},
+           "search": {"type": "array", "items": {"type": "string"},
+                      "description": "files or directories to search for the old text"}},
+       "required": ["old", "new"],
+       "additionalProperties": False},
+      readOnlyHint=True)
+def deck_diff(old: str, new: str, search: list[str] | None = None) -> dict:
+    old_slides = deck_inspect(old)["slides"]
+    new_slides = deck_inspect(new)["slides"]
+    files = search_files(search)
+    pairs = _pair_slides(old_slides, new_slides)
+    changes = []
+
+    def add(slide, field, o, n, diff=None, hint_text=None):
+        changes.append({"slide": slide, "field": field, "old": o, "new": n, "diff": diff,
+                        "hint": find_hints(hint_text, files) if hint_text else []})
+
+    paired_new = sorted(pairs)
+    kept = _kept_in_order([pairs[j] for j in paired_new])
+    moved = {paired_new[k] for k in range(len(paired_new)) if k not in kept}
+
+    for j, n in enumerate(new_slides):
+        label = n["number"] if n["number"] is not None else n["index"]
+        if j not in pairs:
+            add(label, "added", "", n["title"])
+            continue
+        o = old_slides[pairs[j]]
+        if j in moved:
+            add(label, "moved", o["index"], n["index"])
+        if o["title"] != n["title"]:
+            add(label, "title", o["title"], n["title"], _unified(o["title"], n["title"]), o["title"])
+        for ot, nt in _frame_changes(_without_title(o["texts"], o["title"]),
+                                     _without_title(n["texts"], n["title"])):
+            add(label, "text", ot, nt, _unified(ot, nt), ot)
+        if o["notes"] != n["notes"]:
+            add(label, "notes", o["notes"], n["notes"], _unified(o["notes"], n["notes"]), o["notes"])
+        if o["hidden"] != n["hidden"]:
+            add(label, "hidden", o["hidden"], n["hidden"])
+    matched_old = set(pairs.values())
+    for i, o in enumerate(old_slides):
+        if i not in matched_old:
+            add(o["number"] if o["number"] is not None else o["index"], "removed", o["title"], "",
+                hint_text=o["title"])
+    return {"changes": changes}
 
 
 # ------------------------------------------------------------------ CLI
@@ -1120,13 +1619,23 @@ def add_cli(groups) -> None:
     common_flags(c)
     c.set_defaults(handler=_cli_build)
 
-    c = cmds.add_parser("lint", help="check a deck spec or a built .pptx")
-    c.add_argument("path", help="deck spec (.json) or deck (.pptx)")
+    c = cmds.add_parser("lint", help="check a deck spec or built .pptx decks")
+    c.add_argument("path", nargs="+", help="deck spec (.json), or 1 or more decks (.pptx)")
     c.add_argument("--words-per-second", dest="words_per_second", type=float, help="speaking rate")
     c.add_argument("--target", help="target core time M:SS")
     c.add_argument("--max", help="maximum core time M:SS")
+    c.add_argument("--times-file", dest="times_file", help="JSON time ledger shared by several decks (read only)")
+    c.add_argument("--ids", nargs="+", metavar="ID", help="deck ids for --times-file, 1 per deck (default: stems)")
     common_flags(c, checker=True)
     c.set_defaults(handler=_cli_lint)
+
+    c = cmds.add_parser("diff", help="list hand edits between 2 .pptx decks")
+    c.add_argument("old", help="the original .pptx")
+    c.add_argument("new", help="the edited .pptx")
+    c.add_argument("--search", nargs="+", action="extend", metavar="PATH",
+                   help="files or directories to search for the old text")
+    common_flags(c)
+    c.set_defaults(handler=_cli_diff)
 
     c = cmds.add_parser("inspect", help="list the slides, texts and notes of a .pptx")
     c.add_argument("pptx_path", help="deck (.pptx)")
@@ -1152,13 +1661,20 @@ def _cli_build(args):
 def _cli_lint(args):
     from tundlekit.cli_support import CliResult, format_findings
 
-    kw = {"words_per_second": args.words_per_second, "target": args.target, "max": args.max}
+    kw = {"words_per_second": args.words_per_second, "target": args.target, "max": args.max,
+          "times_file": args.times_file, "ids": args.ids}
     kw = {k: v for k, v in kw.items() if v is not None}
-    if args.path.lower().endswith(".pptx"):
-        r = deck_lint(pptx_path=args.path, **kw)
+    pptx = [p for p in args.path if p.lower().endswith(".pptx")]
+    if len(pptx) == len(args.path):
+        r = deck_lint(pptx_path=pptx[0] if len(pptx) == 1 else pptx, **kw)
+    elif len(args.path) == 1:
+        r = deck_lint(spec_path=args.path[0], **kw)
     else:
-        r = deck_lint(spec_path=args.path, **kw)
+        raise ToolError("give either 1 deck spec (.json) or 1 or more decks (.pptx)")
     text = format_findings(r) + f"\n{r['slides']} slides, core time {r['core_time']}"
+    if "ledger" in r:
+        led = r["ledger"]
+        text += f"\ncombined core time in {led['path']}: {led['combined_time']} ({led['status']})"
     return CliResult(r, text=text)
 
 
@@ -1173,3 +1689,14 @@ def _cli_inspect(args):
         lines.append(f"{s['index']:>3} [{s['number'] or '-'}] {s['title']!r} {time}, "
                      f"{s['say_words']} SAY words {flags}".rstrip())
     return CliResult(r, text="\n".join(lines))
+
+
+def _cli_diff(args):
+    from tundlekit.cli_support import CliResult
+
+    r = deck_diff(args.old, args.new, search=args.search)
+    lines = []
+    for c in r["changes"]:
+        lines.append(f"slide {c['slide']}: {c['field']}: {c['old']!r} -> {c['new']!r}")
+        lines += [f"  at {h}" for h in c["hint"]]
+    return CliResult(r, text="\n".join(lines) or "no changes")

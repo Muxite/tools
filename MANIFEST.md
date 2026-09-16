@@ -1006,6 +1006,8 @@ Where they conflict with earlier sections, this section wins.
 - **D014** (warning): face text or SAY containing an em dash `—`, a double period that is not part of `...`, or
   2 spaces between a lower-case letter or `.,;:)` and a capital letter (mid-sentence). Titles are covered by D003,
   and D014 does not repeat them.
+- D014's mid-sentence double space means exactly 2 spaces (3 or more is a deliberate gutter, as in the
+  phase strip).
 - D005 also matches `I'll go through`, `I'm going to show`, `I will go through`, and `Instead I'll`.
 - **D009 for pptx.** A content slide has a footer when some text frame whose top is at or below 6.9 in holds
   non-empty text other than the slide number.
@@ -1014,6 +1016,7 @@ Where they conflict with earlier sections, this section wins.
 - `body` may be a single block (as before) or a **list of blocks**. Each block may carry optional `x`, `y`, `w`,
   `h` (inches) and `size` (pt). Without positions, the blocks stack top to bottom in the body area, and the warning
   rules apply to each block.
+- `highlight_color` defaults to the slide's `stage` when it has one, else `gates`.
 - A new block kind, **`point`**: `{"kind": "point", "text": str}`, 1 bold line of 20 pt text.
 - Chart blocks take `chart_type`, `bar` (default) or `line`, and `highlight_color`, a `palette.STAGE` key or an
   `OUTCOME` key (default `gates`).
@@ -1103,6 +1106,44 @@ the report line, or the slide position.
 Result: checker shape, plus `"outline": [{"section", "heading", "slides": [slide numbers]}]` and
 `"slides": [{"number", "title", "sections": [...]}]`.
 
+**15.1–15.5 pinned details** (from the test authors' questions)
+
+- **review_coverage fields.**
+  - `outline[].section` is the number without `§` (`"2.1"`), and `heading` is the heading text without its number.
+  - Slide numbers are strings.
+  - A `cuts` entry `slide N` names the displayed slide number. `#` starts a comment anywhere on a line.
+- **review_coverage finding locations.** C003, C002 and C006 findings, and C004 findings for rules present only in
+  the deck, use the deck path and the slide position as `line`. The other findings use the report path and line.
+- **review_coverage footers.** Footers are split into segments at `;` and `·`. A `§` mention in a segment that
+  contains `arXiv` or the whole word `paper` before it cites a paper, not the report, so it is skipped
+  (`arXiv 2510.23601 §3.3` is not a C003).
+- **review_coverage rules.**
+  - The rule line pattern also accepts a leading bullet `•`, and a table first cell that is exactly `R<n>`.
+  - "Report body" means the body bucket.
+- **text_xref edits.** `old`/`new` are the reference texts. References in the report's prose are renumbered too.
+- **text_xref markers.** A reference matches only as a whole: `§4.2` does not match inside `§4.2.1`. X002 markers are
+  the string-literal first 2 arguments. Literals starting with a newline, or blank after stripping, are skipped. The
+  finding's path and line are the `.py` file and the call line.
+- **claims_trace numbers.**
+  - `arXiv:ID` and `arXiv ID` numbers are excluded.
+  - `number` is the token as written, without a sign.
+  - Duplicate citations within a sentence are removed.
+  - Claims are ordered by line, then position.
+  - A number without `%` never matches a decimal fraction.
+- **claims_trace sentences.**
+  - Sentence splitting never splits inside `[...]`.
+  - `App.`, `Tab.`, `Sec.`, `Ref.` and `Refs.` join the §7.1 abbreviation list, which applies to text_lint as well.
+- **claims_trace ledger.**
+  - Markdown emphasis around a cell value (`**2.75**`) is ignored.
+  - When both a derived row and a plain row match, `derived` wins.
+  - The ledger also applies to `no_source` numbers: a ledger match gives `derived` or `ledgered` instead of `no_source`.
+- **text_apply_edits.**
+  - `applied` is the count of edits applied.
+  - `failures[].index` is 0-based.
+  - Occurrences are counted like `str.count` (non-overlapping).
+  - Line endings of text files are preserved.
+- **Missing files.** Any missing input file for a §15 tool is a `ToolError`.
+
 ### 15.2 `text_xref` / `tundlekit text xref REPORT.md --in FILE... [--renumber OLD=NEW ...] [--write]`
 
 Resolves cross-references against a report.
@@ -1189,6 +1230,10 @@ Result:
 - Result `{"changes": [{"op": "replace" | "insert" | "delete", "old": [str], "new": [str], "old_index", "new_index", "hint"}]}`,
   where `hint` is as above for the first old paragraph. Identical content gives `[]`.
 
+Pinned: `docx_diff` indices are 0-based, and `old`/`new` hold the raw (un-normalised) paragraph text. `deck_diff`
+`moved` positions are 1-based. Hint paths are formed by joining the `search` entry with the path found while walking
+it, so they are relative when the entry was relative. A file given directly in `search` is searched too.
+
 ### 15.5 `text_apply_edits` / `tundlekit text apply-edits EDITS.json FILE [--write]`
 
 Anchored find and replace. Arguments: `edits` (a list, or CLI a JSON file), `path`, `write`. Each edit is
@@ -1209,12 +1254,15 @@ Anchored find and replace. Arguments: `edits` (a list, or CLI a JSON file), `pat
 Checks that technical terms carry over. Arguments: `src`, `targets` (list).
 
 - **Terms** are found in `SRC`:
-  - CamelCase words (`[A-Z][a-z]+[A-Z]\w*` or `[a-z]+[A-Z]\w*`);
-  - words of 2+ capital letters (`[A-Z]{2,}\w*`);
+  - CamelCase words (`[A-Z][a-z]+[A-Z][A-Za-z0-9]*` or `[a-z]+[A-Z][A-Za-z0-9]*`);
+  - words of 2+ capital letters (`[A-Z]{2,}[A-Za-z0-9]*`);
+  - all patterns use ASCII classes only, so a term followed directly by CJK text (`MCP协议`) is still `MCP`, and a
+    run of ASCII words counts when bordered by CJK letters, CJK punctuation, spaces next to CJK, or line ends;
   - maximal runs of 2–4 ASCII words (letters, digits, `-`) joined by single spaces that have a non-ASCII letter
     (such as CJK) or line start/end on both sides. Only runs made entirely of such words count.
   - Inline code, URLs and file paths are excluded.
-- Counting is case-insensitive, on whole words.
+- Counting is case-insensitive, on whole words (ASCII word boundaries). Term keys are written as they first appear
+  in `SRC`.
 - **Findings** for each target in order, compared with the previous file (`SRC` for the first):
   - **L001** (warning): a term with count > 0 in the previous file and 0 in this one;
   - **L002** (info): the count changed and neither count is 0.
@@ -1239,10 +1287,19 @@ Checks that technical terms carry over. Arguments: `src`, `targets` (list).
   - Install:    {install or <steps>}
   ```
 
-- `version` is the first match of `\d+(?:[._]\d+)+(?:-?rc\d+)?` in the stem, with underscores turned into dots, or
-  empty (the heading then has no trailing space).
-- `program` is the stem text before the version, with `_` and `-` turned into spaces, and trailing separators or a
-  trailing `v` removed and trimmed, or the whole stem when there is no version.
+- The stem is the file name without its extension. Compound archive extensions (`.tar.gz`, `.tar.xz`, `.tar.bz2`,
+  `.tar.zst`) count as 1 extension, so `nvim-linux-x86_64.tar.gz` gives `nvim linux` and no version.
+- First, architecture tokens are removed from the stem: `x86_64`, `x86-64`, `x64`, `x86`, `amd64`, `arm64`,
+  `aarch64`, `win64`, `win32`, `64-bit`, `32-bit` (case-insensitive, only when delimited by the start, the end or
+  one of `-_. `). The separators around a removed token collapse to 1.
+- `version` is the first match of `(?<![0-9])v?([0-9]+(?:[._][0-9]+)+(?:-?rc[0-9]+)?)` in the result (group 1),
+  with underscores turned into dots, or empty (the heading then has no trailing space). Examples:
+  `tsetup-x64.6.8.1` gives `tsetup` and `6.8.1`; `NVIDIA-Linux-x86_64-570.169` gives `NVIDIA Linux` and `570.169`;
+  `CrystalDiskInfo9_8_0` gives `CrystalDiskInfo` and `9.8.0`; `cmake-4.1.0-rc1-windows-x86_64` gives `cmake` and
+  `4.1.0-rc1`; `7z2603-x64` gives `7z2603` and no version.
+- `program` is the text before the version (the whole architecture-stripped stem when there is no version), with
+  `_` and `-` turned into spaces, runs of spaces collapsed, and a trailing separator or a trailing separate `v`
+  token removed, then trimmed.
 - Without `write`, the tool returns the text only.
 - Result `{"path", "text", "sha256", "program", "version", "written"}`.
 - A written file passes `bundle_verify`.
@@ -1283,10 +1340,11 @@ Checks that technical terms carry over. Arguments: `src`, `targets` (list).
   ## Relevance
   ```
 
-- `title` is the first non-empty line of page 1 with more than 3 words, with whitespace collapsed.
+- `title` is the first non-empty line of page 1 with more than 3 words, joined with each following line that
+  starts with a lower-case letter (a wrapped title), with whitespace collapsed and stripped.
 - `short` defaults to the title's text before the first `:`, truncated to 40 characters. Characters invalid in file
   names (`\/:*?"<>|`) are removed, and the result is trimmed.
-- `authors` is the next non-empty line after the title.
+- `authors` is the next non-empty line after the title's last line, stripped.
 - `body` is the references page − 1 (§9.2), or `pages` when there is none.
 - Result `{"path", "text", "written"}`.
 

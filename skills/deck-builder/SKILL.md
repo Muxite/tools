@@ -6,7 +6,8 @@ description: Write a presentation as a JSON deck spec and build it into an edita
 # Building a deck from a spec
 
 The deck is generated from a JSON spec, never edited by hand and regenerated over. If someone edited the built
-`.pptx`, inspect it (`tundlekit deck inspect DECK.pptx`), carry the edits into the spec, then rebuild.
+`.pptx`, find their edits with `tundlekit deck diff BUILT.pptx EDITED.pptx --search deck-src`, carry them into the
+spec, then rebuild (see "Carrying hand edits back").
 Building needs the `office` extra (`pip install -e ".[office]"` in the tundlekit checkout); linting a spec needs nothing.
 
 | Task | CLI | MCP tool |
@@ -14,6 +15,8 @@ Building needs the `office` extra (`pip install -e ".[office]"` in the tundlekit
 | build a .pptx from a spec | `tundlekit deck build SPEC.json -o OUT.pptx [--inserts shown\|hidden\|off] [--times-file PATH]` | `deck_build` |
 | check a spec or a built deck | `tundlekit deck lint SPEC.json` or `tundlekit deck lint DECK.pptx` | `deck_lint` |
 | read back any .pptx (texts, notes, times) | `tundlekit deck inspect DECK.pptx` | `deck_inspect` |
+| what changed between 2 decks, with where the old text lives in the sources | `tundlekit deck diff OLD.pptx NEW.pptx [--search PATH...]` | `deck_diff` |
+| does the deck cover the report, section by section, rule by rule | `tundlekit review coverage REPORT.md DECK.pptx [--cuts cuts.txt]` | `review_coverage` |
 | stage colours for `stage` | `tundlekit palette show` | `palette_get` |
 
 Add `--json` for a machine-readable result. Through MCP, pass `spec_path` (a file) or `spec` (an inline object).
@@ -27,7 +30,8 @@ Add `--json` for a machine-readable result. Through MCP, pass `spec_path` (a fil
 3. `tundlekit deck lint SPEC.json --json` and fix every error; fix warnings unless there is a stated reason.
 4. `tundlekit deck build SPEC.json -o OUT.pptx --json`. Read `warnings` (text overflow, table past the slide
    bottom, strip too long, over budget) and `budget.status`; fix the spec and rebuild until both are clean.
-5. `tundlekit deck lint OUT.pptx` on the built file, then run the deliverable-review skill (render every
+5. `tundlekit deck lint OUT.pptx` on the built file and `tundlekit review coverage REPORT.md OUT.pptx` when there is
+   a report; then run the deliverable-review skill (render every
    slide, contact sheets, adversarial pass).
 
 Close PowerPoint before building (an open file can be locked or clobbered) and back up the previous
@@ -92,8 +96,29 @@ Field reference:
 - `body.kind`: `bullets` (`items`), `lines` (`items`, optional `mono`), `table` (`rows`, first row is the header,
   equal lengths; optional `widths` in inches, 1 per column), `figure` (`path` to an existing PNG/JPEG, fitted to
   11.8 × 5.3 in), `excerpt` (`text`, optional `caption`; monospace), `chart` (`categories`, `values`, optional
-  `highlight` index or category, `unit`, `takeaway`; a native editable bar chart, grey bars, 1 highlighted bar,
-  data labels on).
+  `highlight` index or category, `unit`, `takeaway`, `"chart_type": "bar"` (default) or `"line"`, `highlight_color` a
+  stage or outcome name, default `gates`; a native editable chart, grey bars, 1 highlighted bar, data labels on),
+  `point` (`text`: 1 bold 20 pt line, the takeaway under a table or figure).
+- `body` is 1 block or a **list of blocks**. Blocks stack top to bottom in the body area unless a block gives
+  `x`, `y`, `w`, `h` (inches); `size` (pt) overrides the text size. Overflow warnings apply per block. A figure
+  without `h` shrinks to fit above the THUS strip, so it never runs off the slide.
+- Example of a multi-block body (a table with its takeaway, then a figure beside it):
+
+  ```json
+  {"type": "content", "eyebrow": "Research", "title": "Unverified self-made skills barely beat none",
+   "stage": "gates", "source": "CoEvoSkills, Fig. 4",
+   "body": [
+     {"kind": "table", "rows": [["Condition", "Pass rate"], ["No skills", "30.6%"], ["With a verification loop", "71.1%"]],
+      "x": 0.75, "y": 1.9, "w": 6.0, "h": 2.0},
+     {"kind": "point", "text": "The gain comes from checking, not from writing", "x": 0.75, "y": 4.2, "w": 6.0},
+     {"kind": "chart", "categories": ["No skills", "Verified"], "values": [30.6, 71.1], "highlight": 1,
+      "unit": "%", "highlight_color": "passed", "x": 7.0, "y": 1.9, "w": 5.6, "h": 4.0}
+   ],
+   "notes": {"time": "0:35", "say": "With no skills an agent passes 30.6 percent. Self-made skills that go through a verification loop reach 71.1, so the gain comes from checking, not from writing it."}}
+  ```
+
+  Prefer 1 block per slide; use several when a table or diagram needs its takeaway line, or a table and a small
+  chart make 1 point together.
 - `notes`: `time` (`M:SS`, required on every slide), `say`, `asked` (list of "question: short answer").
 - Strips: `demonstrated_by` renders `DEMONSTRATED BY   {paper}  ·  {setup}`; `thus` renders `THUS   {thus}`;
   `phase` renders `IN   {in}        OUT   {out}`.
@@ -194,6 +219,13 @@ is about 140 wpm, minus time for pointing and pauses.
   Plan about 10% under the slot (a 45:00 slot: target 40:00, max 45:00).
 - Several talks sharing 1 slot: give each spec a `meta.id` and build all with the same
   `--times-file deck-times.json`. The result's `ledger` sums the core times of every deck and checks the sum.
+- Check the built decks against that file together, so a deck rebuilt without updating the file is caught:
+  ```
+  tundlekit deck lint workflow.pptx capsule.pptx --times-file deck-times.json
+  ```
+  Each deck's id is its file stem (or give `ids` through `tundlekit call deck_lint`). D013 flags a deck whose
+  measured core time differs from its entry; D008 then checks the **combined** core time of all decks against
+  the budget.
 - Over budget: hide or drop insertion slides first, then cut in the order above.
 
 ## Insertion slides
@@ -224,6 +256,32 @@ Time is controlled by hiding or deleting insertion slides, never by trimming cor
 If the report has a section, the deck has a slide, or an explicit cut agreed with the owner, and the reverse.
 Rule numbering and names match between deck and report. The report-writing skill has the element mapping.
 
+Check it mechanically before the review:
+
+```
+tundlekit review coverage report.md build/deck.pptx --cuts cuts.txt
+```
+
+A section is covered when a slide's source footer cites it (`Report §2.3`) or the slide title is close to the
+heading. C001 lists report sections with no slide, C002 slides that cover no section, C003 footers citing a
+section that does not exist, C004-C006 rules (`R1`…) missing on one side, named differently, or repeated on
+several slides. Record agreed cuts in `cuts.txt`, 1 per line (`§2.7`, `slide 12`, `#` for comments), so they stop
+being reported. Cite the report section in every content slide's `source` to make coverage exact.
+
+## Carrying hand edits back
+
+When the owner edited a built deck, never rebuild over it until their edits are in the spec:
+
+```
+tundlekit deck diff build/deck.pptx edited/deck.pptx --search deck-src
+```
+
+Each change names the slide, the field (`title`, `text`, `notes`, `hidden`, `added`, `removed`, `moved`), the old
+and new text with a unified diff, and `hint`: up to 3 `path:line` places under `--search` where the old text
+occurs, which is usually the line of the spec to edit. Apply every change to the spec (for many small text edits,
+`tundlekit text apply-edits EDITS.json deck.json` applies anchored replacements and fails if an anchor is not
+unique), rebuild, and diff again: the result should list only changes you chose not to carry.
+
 ## Lint rules (`tundlekit deck lint`)
 
 | Rule | Severity | Finding |
@@ -232,14 +290,16 @@ Rule numbering and names match between deck and report. The report-writing skill
 | D002 | warning | core content slide with fewer than 20 SAY words |
 | D003 | error | em dash in a title |
 | D004 | error | notes with `MUST HIT` or "The point of this slide" |
-| D005 | warning | meta/defensive SAY ("I'm not going to", "I'm not claiming", "I'll show", "this talk will", "that's fine for") |
+| D005 | warning | meta/defensive SAY ("I'm not going to", "I'm not claiming", "I'll show", "I'll go through", "I'm going to show", "Instead I'll", "this talk will", "that's fine for") |
 | D006 | error | insert slide that says "as we saw", "as I said", "as mentioned", "next slide", "coming up" |
 | D007 | error | non-insert slide that mentions an insert slide by number |
 | D008 | error / warning | core total over max / over target |
-| D009 | warning | content slide with no source footer |
+| D009 | warning | content slide with no source footer (built decks: no text low on the slide besides the number) |
 | D010 | warning | `et al.` or "Eq. N" on the slide face |
 | D011 | warning | title longer than 90 characters |
 | D012 | error | slide without TIME (built decks) |
+| D013 | error | a deck's core time differs from its entry in `--times-file` |
+| D014 | warning | em dash, a stray double period, or a double space mid-sentence in slide text or SAY |
 
 Tool arguments `words_per_second`, `target` and `max` override the spec meta; `--strict` makes warnings fail too. A spec run and a .pptx run
 should both be clean before review.

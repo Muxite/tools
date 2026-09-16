@@ -9,7 +9,11 @@ description: Draft and check technical report prose in a fixed house voice (the 
 |---|---|---|
 | style lint (voice, markers, sentence length) | `tundlekit text lint REPORT.md [--rules S001,S002] [--ignore S003] [--max-words 42]` | `text_lint` |
 | figure and table numbering, dangling references | `tundlekit text fignums REPORT.md [--refs DECK-NOTES.md]` | `text_fignums` |
-| words per section, change since a git ref | `tundlekit text wordcount REPORT.md [--baseline HEAD~1]` | `text_wordcount` |
+| words per section and bucket, change since a git ref or a file | `tundlekit text wordcount REPORT.md [--baseline HEAD~1] [--baseline-file OLD.md] [--no-tables]` | `text_wordcount` |
+| § / App. / Fig. / Table references in other files; renumbering | `tundlekit text xref REPORT.md --in FILE... [--renumber OLD=NEW] [--write]` | `text_xref` |
+| every cited number located on a page of its paper | `tundlekit claims trace REPORT.md --papers DIR [--ledger LEDGER.md] [--in FILE...]` | `claims_trace` |
+| apply exact review edits (dry run first) | `tundlekit text apply-edits EDITS.json FILE [--write]` | `text_apply_edits` |
+| hand edits in a .docx vs the source | `tundlekit text docx-diff OLD NEW [--search PATH...]` | `docx_diff` |
 
 Paths may be files or folders (folders are walked for `*.md` and `*.txt`). Add `--json` for machine-readable
 results, `--strict` to fail on warnings. Write Markdown; convert to .docx only at the end.
@@ -115,44 +119,120 @@ Check that rule numbering and names match between deck and report (same count, s
 ## Checking
 
 ```
-tundlekit text lint report.md
-tundlekit text fignums report.md --refs deck-notes.md
+tundlekit text lint report.md --band 15,25
+tundlekit text fignums report.md --refs deck-notes.md=report.md
+tundlekit text xref report.md --in deck-src/deck.json notes/presenter-pack.md
+tundlekit claims trace report.md --papers papers --ledger notes/LEDGER.md
 tundlekit text wordcount report.md --baseline HEAD
 ```
 
-`text lint` masks code blocks, inline code, HTML comments, URLs, link targets and YAML front matter, so they
-never trigger findings. Suppress a finding on a line and the next with `<!-- lint-ignore S005 -->`
-(no ids = all rules). Use suppressions sparingly and only with a reason.
+`text lint` masks code blocks (also when indented under a list item), inline code, HTML comments, URLs, link targets
+and YAML front matter, so they never trigger findings. Suppress a finding on a line and the next with
+`<!-- lint-ignore S005 -->` (no ids = all rules). Suppress a rule in a whole file with
+`<!-- lint-file-ignore S009 -->` (ids are required), for example in an appendix file of long tables. Use
+suppressions sparingly and only with a reason.
 
 | Rule | Severity | Finding | Fix |
 |---|---|---|---|
 | S001 | error | em dash | a comma, colon or full stop |
 | S002 | error | first person (we, our, ours, us, "I …") | describe the system; passive or impersonal |
-| S003 | warning | hedge (arguably, seems, perhaps, somewhat, possibly, might, may, to some extent, it appears) | state flat, then add the limitations list |
+| S003 | warning | hedge (arguably, seems, perhaps, somewhat, possibly, might, to some extent, it appears; "may" only in "may be/have/well/also/not/help/seem/lead/cause", not the permission sense "a server may use") | state flat, then add the limitations list |
 | S004 | error | contraction | spell it out |
-| S005 | warning | semicolon | 2 sentences, or a list |
-| S006 | error | status marker or placeholder | plain words; move provenance to notes |
-| S007 | warning | question in prose | a statement; questions only in headings |
+| S005 | warning | semicolon in prose (table rows are skipped) | 2 sentences, or a list |
+| S006 | error | status marker or placeholder, in prose or headings | plain words; move provenance to notes |
+| S007 | warning | question in prose (table rows, and sections whose heading contains "question", are exempt) | a statement; questions only in headings |
 | S008 | error | "et al." outside references / Appendix A | cite by title |
-| S009 | warning | sentence over `--max-words` words (default 42) | split it or break to a list |
+| S009 | warning | sentence over `--max-words` words (default 42; table rows skipped) | split it or break to a list |
 | S010 | warning | section opening "This section…", "In this section…", "Here we…" | open with the subject's function or status |
-| S011 | warning | jargon: "Eq. 5", "pp" | say what the equation does; write "points" |
+| S011 | warning | jargon: "Eq. 5", "pp" outside a citation bracket (`[2, Eq. (5)]` is fine) | say what the equation does; write "points" |
+| S012 | info | the file's mean prose sentence length is outside `--band` (default 15,25; needs 5+ sentences) | split long sentences, or join choppy ones |
 
 `text fignums` rules: F001 duplicate caption number, F002 gap, F003 sequence not starting at 1, F004 captions out
 of order, F005 a mention (`Fig. 3`, `Table A2`) with no matching caption in the checked reports (mentions after
 "arXiv" or the word "paper" point into a cited paper and are skipped). Pass deck notes or other documents with
-`--refs` so their mentions are checked against the report's captions.
+`--refs` so their mentions are checked against the report's captions; `--refs NOTES.md=REPORT.md` resolves that
+file against 1 report only, when several reports are checked together.
 
-`text wordcount` lists words per heading (levels 1-3) and the total. With `--baseline GITREF` it adds the change
-per section (`"new"` for new headings), which shows where an edit grew or shrank the report. Use it to keep
-sections balanced and to report what changed.
+## Cross-references and renumbering (`text xref`)
+
+`tundlekit text xref REPORT.md --in FILE...` checks every `§N.M`, `App. X.n`, `Fig. N` and `Table N` in the deck
+script or spec, presenter packs and notes against the report's headings and captions. X001 is a reference with no
+target. X002 is a heading marker that a build script slices on (`between("…")`, `section("4.2")`) and that appears
+other than once in the report. To renumber, give all moves in 1 call: they apply simultaneously, so swaps work,
+and only whole references change (`Fig. 1` never touches `Fig. 10`):
+
+```
+tundlekit text xref report.md --in deck-src/deck.json --renumber "Fig. 9=Fig. 10" "Fig. 10=Fig. 9"
+tundlekit text xref report.md --in deck-src/deck.json --renumber "§4.2=§4.3" --write
+```
+
+Without `--write` it lists the planned edits (path, line, old, new). With it, the report's headings and captions
+and every file under `--in` are rewritten.
+
+## Tracing numbers to pages (`claims trace`)
+
+`tundlekit claims trace REPORT.md --papers DIR [--ledger LEDGER.md] [--in FILE...]` takes every body sentence that
+cites `[n]` and contains a number, maps `[n]` to an arXiv id through the reference list (`arXiv:ID` in the entry),
+and searches that paper's text page by page (`51%` also matches `0.51`). Each number gets a status:
+
+| Status | Meaning | Action |
+|---|---|---|
+| located | found on the listed pages | check the page matches the locator in the text |
+| derived | not in the paper, but a ledger row marks it derived | the ledger row must show the arithmetic |
+| ledgered | not in the paper, but in a ledger row | the ledger row must give its source |
+| untraced | not found in the cited papers (T001) | find the page, fix the number, or cite the right source |
+| no_source | no cited paper has a text file (T002) | fetch the paper (`tundlekit papers fetch`) and re-run |
+
+`--in` checks deck notes or presenter packs with the report's reference list. A located number can still be the
+wrong quantity; the fact-check brief (review-prompts skill) covers meaning.
+
+## Applying review edits (`text apply-edits`)
+
+Apply a reviewer's exact edits as anchored replacements, never by retyping paragraphs:
+
+```json
+[
+  {"find": "passed 31% to 34% of their verified tasks", "replace": "passed 28.7% to 35.8% of their verified tasks"},
+  {"find": "Typed selection is already settled", "replace": "Typed selection is settled once the 2 type vocabularies are normalized", "count": 1}
+]
+```
+
+```
+tundlekit text apply-edits edits.json report.md
+tundlekit text apply-edits edits.json report.md --write
+```
+
+Each `find` must occur exactly `count` times (default 1), or nothing is written and every failure is listed. The
+dry run prints a unified diff. It also works on a `.docx` (within 1 paragraph, across runs), which keeps the
+owner's formatting.
+
+## Carrying hand edits back (`text docx-diff`)
+
+When the owner edited the built `.docx`, compare it with the Markdown source (or with the previous build) before
+regenerating:
+
+```
+tundlekit text docx-diff report.md edited/report.docx --search report-src
+```
+
+Changes are paragraph-level `replace`, `insert` and `delete` operations with a `hint` (`path:line`) where the old
+text lives. Carry each into the source, rebuild, and diff again.
+
+## Word counts (`text wordcount`)
+
+`text wordcount` lists words per heading (levels 1-3), the total, and `buckets`: `body`, `appendix` (from a level-2
+`Appendix` heading) and `references` (from `References` / `Bibliography`), so a body limit can be checked apart from
+the appendices. `--baseline GITREF` compares with a git revision and `--baseline-file OLD.md` with another file
+(not both); each section gets its change (`"new"` for new headings). `--no-tables` leaves table rows out. Use it to
+keep sections balanced and to report what an edit grew or shrank.
 
 ## Before handing over
 
 - [ ] `tundlekit text lint` clean (no errors; every warning fixed or explained)
 - [ ] `tundlekit text fignums` clean, with the deck notes passed as `--refs`
+- [ ] `tundlekit text xref` clean for the deck script and notes; `tundlekit claims trace` has no untraced numbers
 - [ ] every paper named by title in each section that uses it; every number traced to a page, table or file:line
 - [ ] every claim bounded by a labelled limitations list where it needs one; status stated in plain words
-- [ ] coverage matches the deck; rule names and counts match
+- [ ] coverage matches the deck (`tundlekit review coverage REPORT.md DECK.pptx`); rule names and counts match
 - [ ] previous version backed up to `versions/` before overwriting; the rendered document reviewed page by page
   (deliverable-review skill)

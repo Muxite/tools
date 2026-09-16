@@ -10,15 +10,28 @@ description: Fetch arXiv papers, extract their text, and read them efficiently w
 | download PDFs and extract text | `tundlekit papers fetch 2604.00392 2604.01687 [--dir papers] [--delay 3]` | `papers_fetch` |
 | what is here (pdf, txt, pages, summary file) | `tundlekit papers list [--dir papers]` | `papers_list` |
 | the abstract | `tundlekit papers abs 2604.00392 [--chars 2200] [--dir papers]` | `papers_peek` (`mode` = abstract) |
-| lines matching a regex, with page numbers | `tundlekit papers grep 2604.00392 "silent rot" [--context 2] [--max-hits 12]` | `papers_peek` (`mode` = grep) |
-| the main body, page-marked, up to the references | `tundlekit papers body 2604.00392 [--start 1] [--end 7] [--max-chars 90000]` | `papers_body` |
+| lines matching a regex, with page numbers | `tundlekit papers grep 2604.00392 "silent rot" [--context 2] [--max-hits 12] [--width 200]` | `papers_peek` (`mode` = grep) |
+| the main body, page-marked, up to the references (`--appendix`: to the last page) | `tundlekit papers body 2604.00392 [--start 1] [--end 7] [--max-chars 90000] [--appendix]` | `papers_body` |
+| a summary file skeleton (title, authors, pages filled in) | `tundlekit papers summary 2604.00392 [--short NAME] [--write]` | `papers_summary` |
+| summaries vs papers vs INDEX.md vs a report's references | `tundlekit papers index-check [--index PATH] [--report REPORT.md]` | `papers_index_check` |
 
 Files live in 1 folder (`--dir`, default the current directory): `{id}.pdf`, `{id}.txt`, and summaries in
 `summaries/{id} - {short title}.md`. Old-style ids (`cs/0112017`) are stored with `_` for `/`.
 Text extraction uses pymupdf (`pip install -e ".[pdf]"`) or `pdftotext`; without either, the PDF is kept and the
 result says `text: false`. `fetch` skips PDFs already present, waits `--delay` seconds between downloads (be
 polite to arXiv), and never lets 1 failed id stop the others; check `ok` and each `status`.
-`--base-url` or the `TUNDLEKIT_ARXIV_BASE` environment variable points at a mirror.
+`--base-url` or the `TUNDLEKIT_ARXIV_BASE` environment variable points at a mirror. `--reextract` rewrites the
+`.txt` from the PDF even when it exists. `papers list` also reports `missing_summary` (ids with no summary file)
+and `layout_text` per paper.
+
+**Layout-text trap.** Text made by `pdftotext -layout` keeps the page's columns side by side, so 2-column papers
+come out with sentences from both columns interleaved on each line. It reads plausibly and misattributes numbers.
+`papers body` and `papers list` flag such files (`layout_text: true`, plus a warning in `body`). Re-extract before
+reading or quoting:
+
+```
+tundlekit papers fetch 2604.00392 --dir papers --reextract
+```
 
 ## Reading procedure
 
@@ -27,9 +40,11 @@ polite to arXiv), and never lets 1 failed id stop the others; check `ok` and eac
 3. **Read the body**: `tundlekit papers body ID`. It runs from page 1 to the references page, with each page
    marked `[pN]`, so every statement can be located. Long papers: read in ranges (`--start 1 --end 6`, then
    `--start 7 --end 12`); `truncated: true` means text was cut at `--max-chars`. Appendices sit after the
-   references: read them with an explicit `--start`.
+   references: add `--appendix` (the range then runs to the last page) or give an explicit `--start`.
+   Check `warnings` first: a layout-text warning means re-extract (above).
 4. **Locate specifics with grep**: `tundlekit papers grep ID "Table 5|held-out"`. Each hit gives `page` and
-   `line`, the anchor for a citation. Grep is case-insensitive; widen `--context` to see a whole table row.
+   `line`, the anchor for a citation. Grep is case-insensitive; widen `--context` to see a whole table row, and
+   use `--width 200` to cut each hit to 200 characters around the match when a term occurs many times.
 5. **Check every number you will repeat** at its page: the value, the unit, the setup (data, model, n) and what
    exactly was measured. Note the page next to it.
 6. **Write the summary file** (format below) before using the paper anywhere else.
@@ -56,6 +71,15 @@ polite to arXiv), and never lets 1 failed id stop the others; check `ok` and eac
 ## Summary file format
 
 One file per paper: `summaries/{id} - {short title}.md`. `tundlekit papers list` shows which papers have one.
+Start from the generated skeleton rather than a blank file; it fills in the title, authors and page counts from the
+text and refuses to overwrite an existing summary:
+
+```
+tundlekit papers summary 2604.00392 --dir papers                       # preview
+tundlekit papers summary 2604.00392 --dir papers --short "Beyond Task Completion" --write
+```
+
+Then fill in every section from the pages actually read.
 
 ```markdown
 # 2604.00392 · Beyond Task Completion: <full title as printed>
@@ -89,8 +113,25 @@ Rules for the file:
 - "Read:" is honest: if only the abstract and introduction were read, say so, and do not summarise results from
   pages not read.
 - Mark caveats the paper does not state as your own, so no one later cites them as the paper's.
-- Keep an `INDEX.md` next to the summaries: groups that follow the report's structure, 1 table per group with
+- Keep an `INDEX.md` next to the summaries (check it with `papers index-check`, below): groups that follow the report's structure, 1 table per group with
   columns Paper (`id` + short title) and One line (the finding that matters, with its number).
+
+## Checking the collection
+
+```
+tundlekit papers index-check --dir papers --report report.md
+```
+
+| Rule | Finding | Fix |
+|---|---|---|
+| P001 | a paper with no summary file | write one (`papers summary`) or remove the paper |
+| P002 | a summary not mentioned in INDEX.md | add its row |
+| P003 | INDEX.md's "N summaries" count is wrong | update the count |
+| P004 | a summary missing `## Summary`, `## How it works`, `## Results`, `## Limitations` or `## Relevance` | add the section |
+| P005 | an arXiv id in the report's references with no summary | read the paper and summarise it before citing it |
+
+To check that each number a report cites is on a page of its source, use `tundlekit claims trace REPORT.md --papers papers`
+(report-writing skill).
 
 ## Numbers ledger
 

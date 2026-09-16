@@ -14,6 +14,11 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
 | read a deck's texts, notes and times | `tundlekit deck inspect DECK.pptx` | `deck_inspect` |
 | deck rules | `tundlekit deck lint DECK.pptx` | `deck_lint` |
 | report prose and numbering | `tundlekit text lint REPORT.md`, `tundlekit text fignums REPORT.md` | `text_lint`, `text_fignums` |
+| report ↔ deck coverage, section by section and rule by rule | `tundlekit review coverage REPORT.md DECK.pptx [--cuts cuts.txt]` | `review_coverage` |
+| every cited number located on a page of its paper | `tundlekit claims trace REPORT.md --papers papers [--ledger LEDGER.md] [--in NOTES.md]` | `claims_trace` |
+| hand edits in a built deck, with where the old text lives | `tundlekit deck diff BUILT.pptx EDITED.pptx --search deck-src` | `deck_diff` |
+| hand edits in a built .docx vs its source | `tundlekit text docx-diff REPORT.md EDITED.docx --search report-src` | `docx_diff` |
+| stale § / Fig. / Table references in scripts and notes | `tundlekit text xref REPORT.md --in FILE...` | `text_xref` |
 
 ## Hard rules
 
@@ -23,8 +28,9 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
 - **Back up first.** Before any change, copy the current deliverable to
   `versions/<name> (before <change> <date>).<ext>`.
 - **Build from the script only.** Never hand-edit a built file and then regenerate over it. If the owner edited
-  the built file, diff it (`tundlekit deck inspect`, or the text backend of `render office`), carry the edits into
-  the source, then regenerate.
+  the built file, diff it (`tundlekit deck diff BUILT.pptx EDITED.pptx --search deck-src`, or
+  `tundlekit text docx-diff REPORT.md EDITED.docx --search report-src`), carry every change into the source, then
+  regenerate and diff again.
 - **Render into a scratch folder**, never into the source folder, the repository root or the home folder.
   `render office` refuses those, never opens the original (it renders a copy) and empties its output folder
   first, so stale renders never survive.
@@ -38,8 +44,17 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
 1. **Build** the deck and report from their scripts or specs (`tundlekit deck build SPEC.json -o OUT.pptx`).
    Fix every build warning (overflow, table past the bottom, strip too long, over budget).
 2. **Lint** mechanically: `tundlekit deck lint OUT.pptx`, `tundlekit text lint REPORT.md`,
-   `tundlekit text fignums REPORT.md --refs NOTES.md`. Also search the report text for em dashes, first person
-   and markers; nothing may remain.
+   `tundlekit text fignums REPORT.md --refs NOTES.md`, `tundlekit text xref REPORT.md --in deck-src/deck.json NOTES.md`.
+   Also search the report text for em dashes, first person and markers; nothing may remain.
+   Then the 2 checks that replace most of a manual cross-read:
+   ```
+   tundlekit review coverage REPORT.md build/deck.pptx --cuts cuts.txt
+   tundlekit claims trace REPORT.md --papers papers --ledger LEDGER.md --in NOTES.md
+   ```
+   `review coverage` lists report sections with no slide (C001), slides with no section (C002), footers citing
+   missing sections (C003) and rule names that differ between the 2 (C004-C006); agreed cuts go in `cuts.txt`.
+   `claims trace` marks every cited number as located (with pages), derived, ledgered, untraced or no_source;
+   every untraced number is a must-fix until its page is found.
 3. **Render** every slide and page:
    ```
    tundlekit render backends
@@ -57,7 +72,9 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
 5. **Read the slides alone**, without notes. Can the talk be followed? If not, move content from the notes onto
    the slide. Then read the notes: they say what the slide says, plus a little more, in first person.
 6. **Adversarial pass.** Act as a hostile reader of the owner's instructions and go through every flaw class
-   below, for every slide, section, figure and table.
+   below, for every slide, section, figure and table. Better: hand the briefs in the review-prompts skill to
+   reviewers in a fresh context (fact-check, adversarial flaw classes, so-what, first-time reader), with the
+   outputs of steps 2-3 as their inputs, and merge their tables.
 7. **Propagate.** For each flaw found, search the script, report, figures and notes for every other instance of
    the same class and fix all of them, not just the one spotted.
 8. **Cover gaps in the owner's own explanation** and tell the owner (for example: uncapped gate retries would leak
@@ -98,7 +115,11 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
 
 For every section, paragraph, bullet, table row and slide, answer "so what?". Anything without an answer is cut.
 A separate reviewer (a fresh session that did not write the text) does this best; it also checks that the slides
-alone carry the point and that the notes say that and more.
+alone carry the point and that the notes say that and more. The so-what brief in the review-prompts skill is the
+ready-made instruction for it, with a fixed `Element · So what · Verdict` table.
+
+Apply the accepted edits with `tundlekit text apply-edits EDITS.json FILE` (dry run, then `--write`), so every
+replacement is anchored and a missing anchor fails instead of silently doing nothing.
 
 ## Past mistakes not to repeat
 

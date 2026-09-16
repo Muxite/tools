@@ -17,6 +17,7 @@ glossary and a separate critic matter far more than which model translates.
 | protected spans intact (code, inline code, URLs, paths, numbers) | `tundlekit translate check spans SRC.md OUT.md` | `translate_check` (`mode` = spans) |
 | glossary conformance (approved and banned renderings) | `tundlekit translate check glossary SRC.md OUT.md --dir zh-en` | `translate_check` (`mode` = glossary) |
 | all mechanical checks on a pair | `tundlekit translate check all SRC.md OUT.md --dir zh-en` | `translate_check` (`mode` = all) |
+| technical terms (CamelCase, acronyms, English runs in Chinese text) carried into each version | `tundlekit translate terms SRC.md OUT.md [MORE.md...]` | `translate_terms` |
 | list the rules, traps, glossary and prompts | `tundlekit translate resources` | `translate_resources` |
 | print one of them | `tundlekit translate resources --name data/RULES.md` | `translate_resources` (`name`) |
 
@@ -62,6 +63,7 @@ tundlekit translate check encoding SRC.md                       # 1. garbled? re
 tundlekit translate check glossary-slice SRC.md --dir zh-en     # 2. terms relevant to this source
 tundlekit translate resources --name prompts/zh-to-en.md        # 3. translator brief: fill slots, paste the slice; save output as OUT.md
 tundlekit translate check all SRC.md OUT.md --dir zh-en         # 4. mechanical checks
+tundlekit translate terms SRC.md OUT.md                         # 4b. terms dropped (L001) or changed in count (L002)
 tundlekit translate resources --name prompts/critic.md          # 5. critic brief, FRESH session: source, translation, step-4 output
 ```
 
@@ -119,6 +121,21 @@ additions, omissions, scope, causality, actors and status are the critic's job.
 - **en→zh**: keep the English modal force (may ≠ 必须, should ≠ 必须, can ≠ 保证); natural technical Chinese with
   explicit actors; half-width space between CJK and Latin/digits, full-width punctuation, 顿号 for enumerations,
   你 not 您; keep the English term on first use for unsettled jargon: `背压（backpressure）`.
+
+## Term carry-over (`translate terms`)
+
+`tundlekit translate terms SRC TGT [TGT...]` finds the technical terms in the source (CamelCase words, words of 2+
+capitals such as `MCP`, and runs of 2-4 ASCII words embedded in Chinese text; inline code, URLs and paths
+excluded) and counts each one, case-insensitively, in every following file. Each file is compared with the one
+before it, so a chain `SRC DRAFT FINAL` shows where a term was lost.
+
+- **L001** (warning): a term present before and absent now. Usually a dropped clause or a term translated away;
+  check it against the glossary, and restore it or record why it is gone.
+- **L002** (info): the count changed. Often harmless (a pronoun replaced a repeat), sometimes a dropped or added
+  mention; look at each.
+
+It complements `check all`: that checks protected spans and the glossary, this checks identifiers and English terms
+that no glossary row lists. Neither judges faithfulness; the critic does.
 
 ## Quoting convention (notes, reports, decks)
 

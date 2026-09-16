@@ -32,6 +32,7 @@ REQUIRED_SKILLS = [
     "paper-reading",
     "zh-en-translation",
     "held-out-build-gate",
+    "review-prompts",  # §15.9 / §15.10: added to the §11 required table
 ]
 
 # Groups listed in the manifest sections (§2-§10).

@@ -11,7 +11,7 @@ import pathlib
 import unicodedata
 from xml.sax.saxutils import escape
 
-from tundlekit.palette import HAIR, INK, GREY, STAGE
+from tundlekit.palette import HAIR, INK, GREY, OUTCOME, PALE, STAGE
 from tundlekit.registry import ToolError, tool
 
 FONT = "Calibri, Arial, Helvetica, sans-serif"
@@ -21,6 +21,8 @@ BAR_T = 26              # bar thickness
 BAR_GAP = 14
 PLOT_LONG = 480         # length of the value axis in px
 TITLE_SIZE, LABEL_SIZE, TAKEAWAY_SIZE = 18, 13, 15
+LINE_H = LABEL_SIZE + 3     # line pitch of multi-line category labels
+TICK_GAP = 18               # room under a horizontal chart for the value axis tick labels (axis: true)
 
 
 # ------------------------------------------------------------------ spec
@@ -123,6 +125,15 @@ def _validate(spec: dict) -> list[str]:
         problems.append("stage: must be a string")
     elif stage not in STAGE:
         problems.append(f"stage: unknown stage {stage!r} (one of {', '.join(STAGE)})")
+    hc = spec.get("highlight_color")
+    if hc is not None:
+        if not isinstance(hc, str):
+            problems.append("highlight_color: must be a string")
+        elif hc not in STAGE and hc not in OUTCOME:
+            problems.append(f"highlight_color: unknown colour key {hc!r} "
+                            f"(a stage: {', '.join(STAGE)}; or an outcome: {', '.join(OUTCOME)})")
+    if not isinstance(spec.get("axis", False), bool):
+        problems.append("axis: must be true or false")
     return problems
 
 
@@ -134,7 +145,7 @@ def _x(v: float) -> str:
 
 
 def _attr(s) -> str:
-    return escape(str(s), {'"': "&quot;"})
+    return escape(str(s), {'"': "&quot;", "\n": "&#10;", "\r": "&#13;", "\t": "&#9;"})
 
 
 def _text(x, y, s, size=LABEL_SIZE, anchor="start", cls=None, fill=INK, bold=False) -> str:
@@ -144,8 +155,32 @@ def _text(x, y, s, size=LABEL_SIZE, anchor="start", cls=None, fill=INK, bold=Fal
             f"{escape(s)}</text>")
 
 
+def _lines_text(x, y, lines, anchor="start", cls=None) -> str:
+    """A label of 1 or more lines: 1 line is plain text, several are <tspan> lines, the first at y."""
+    if len(lines) == 1:
+        return _text(x, y, lines[0], anchor=anchor, cls=cls)
+    c = f' class="{cls}"' if cls else ""
+    spans = "".join(f'<tspan x="{_x(x)}" y="{_x(y + k * LINE_H)}">{escape(line)}</tspan>'
+                    for k, line in enumerate(lines))
+    return (f'<text{c} x="{_x(x)}" y="{_x(y)}" font-size="{LABEL_SIZE}" text-anchor="{anchor}" '
+            f'fill="{INK}">{spans}</text>')
+
+
 def _textw(s: str, size=LABEL_SIZE) -> float:
-    return len(s) * CHAR_W * size / LABEL_SIZE
+    return max(len(line) for line in s.split("\n")) * CHAR_W * size / LABEL_SIZE
+
+
+def _ticks(axis_max: float) -> tuple[list[float], int]:
+    """Round tick values from 0 up to axis_max (3 to 6 steps), and the decimals they need."""
+    raw = axis_max / 6
+    mag = 10 ** math.floor(math.log10(raw))
+    step = next(m * mag for m in (1, 2, 2.5, 5, 10) if m * mag >= raw * (1 - 1e-9))
+    count = int(math.floor(axis_max / step + 1e-9))
+    ticks = [round(k * step, 10) for k in range(count + 1)]
+    decimals = 0
+    while decimals < 10 and any(abs(round(t, decimals) - t) > 1e-9 for t in ticks):
+        decimals += 1
+    return ticks, decimals
 
 
 def _raw_value(v) -> str:
@@ -157,8 +192,10 @@ def _raw_value(v) -> str:
       "Draw a bar chart as SVG from a JSON spec (spec object or spec_path): categories, values (finite, >= 0), "
       "optional n per bar (label becomes 'name (n=N)'), highlight (index or category; drawn in the stage colour, "
       "the other bars grey), unit, decimals, takeaway (bold line under the chart), title, orientation "
-      "(horizontal|vertical), max (axis maximum), stage (palette stage key, default gates). Every bar carries a "
-      "value label. Writes the SVG to out when given, else returns the SVG text. Returns the size and the "
+      "(horizontal|vertical), max (axis maximum), stage (palette stage key, default gates), highlight_color "
+      "(a stage or outcome key; overrides stage for the highlight), axis (true: value axis with gridlines and "
+      "tick labels). A newline in a category splits its label into lines. Every bar carries a value label. "
+      "Writes the SVG to out when given, else returns the SVG text. Returns the size and the "
       "length of every bar in px.",
       {"type": "object",
        "properties": {
@@ -201,6 +238,9 @@ def _render(spec: dict):
     unit = spec.get("unit") or ""
     title, takeaway = spec.get("title"), spec.get("takeaway")
     colour = STAGE[spec.get("stage", "gates")].lower()
+    hc = spec.get("highlight_color")
+    if hc is not None:                          # §14.6: overrides stage for the highlight
+        colour = (STAGE.get(hc) or OUTCOME[hc]).lower()
     hl = spec.get("highlight")
     hi_index = cats.index(hl) if isinstance(hl, str) else hl
 
@@ -215,8 +255,12 @@ def _render(spec: dict):
     labels = [f"{c} (n={ns[i]})" if ns is not None else c for i, c in enumerate(cats)]
     value_texts = [f"{v:.{decimals}f}{unit}" for v in vals]
 
+    axis = None
+    if spec.get("axis"):
+        ticks, tick_decimals = _ticks(axis_max)
+        axis = [(t, f"{t:.{tick_decimals}f}{unit}") for t in ticks]
     layout = _vertical if spec.get("orientation", "horizontal") == "vertical" else _horizontal
-    body, width, body_h, bars = layout(cats, labels, vals, value_texts, axis_max, hi_index, colour)
+    body, width, body_h, bars = layout(cats, labels, vals, value_texts, axis_max, hi_index, colour, axis)
 
     parts, y = [], PAD
     if title:
@@ -250,48 +294,77 @@ def _bar(x, y, w, h, label, value, highlight, colour) -> str:
             f'x="{_x(x)}" y="{_x(y)}" width="{_x(w)}" height="{_x(h)}" fill="{fill}"/>')
 
 
-def _horizontal(cats, labels, vals, value_texts, axis_max, hi_index, colour):
+def _axis_group(lines_and_labels) -> list[str]:
+    """<g class="axis">: gridlines and tick labels, drawn before (under) the bars."""
+    return ['<g class="axis">', *lines_and_labels, "</g>"]
+
+
+def _horizontal(cats, labels, vals, value_texts, axis_max, hi_index, colour, axis=None):
     """Bars grow rightwards from a vertical axis; category labels sit left of it."""
     label_w = max(_textw(s) for s in labels)
     value_w = max(_textw(s) for s in value_texts)
     x0 = PAD + label_w + 10
+    split = [s.split("\n") for s in labels]
+    slot = max(BAR_T, max(len(lines) for lines in split) * LINE_H)
     parts, bars = [], []
     for i, v in enumerate(vals):
-        y = i * (BAR_T + BAR_GAP)
+        y = i * (slot + BAR_GAP) + (slot - BAR_T) / 2
         length = round(v / axis_max * PLOT_LONG, 2)
         hi = i == hi_index
         mid = y + BAR_T / 2 + LABEL_SIZE * 0.35
-        parts.append(_text(x0 - 10, mid, labels[i], anchor="end", cls="category"))
+        first = mid - (len(split[i]) - 1) * LINE_H / 2
+        parts.append(_lines_text(x0 - 10, first, split[i], anchor="end", cls="category"))
         parts.append(_bar(x0, y, length, BAR_T, cats[i], v, hi, colour))
         parts.append(_text(x0 + length + 6, mid, value_texts[i], cls="value", bold=hi))
         bars.append({"label": cats[i], "value": v, "length": length, "highlight": hi})
-    axis_h = len(vals) * (BAR_T + BAR_GAP) - BAR_GAP
-    parts.append(f'<line class="axis" x1="{_x(x0)}" y1="-4" x2="{_x(x0)}" y2="{_x(axis_h + 4)}" '
+    axis_h = len(vals) * (slot + BAR_GAP) - BAR_GAP
+    parts.append(f'<line class="baseline" x1="{_x(x0)}" y1="-4" x2="{_x(x0)}" y2="{_x(axis_h + 4)}" '
                  f'stroke="{GREY}" stroke-width="1"/>')
     width = x0 + PLOT_LONG + 6 + value_w + PAD
+    if axis:
+        g = []
+        for t, label in axis:
+            x = x0 + t / axis_max * PLOT_LONG
+            g.append(f'<line class="grid" x1="{_x(x)}" y1="-4" x2="{_x(x)}" y2="{_x(axis_h + 4)}" '
+                     f'stroke="{PALE}" stroke-width="1"/>')
+            g.append(_text(x, axis_h + 6 + LABEL_SIZE, label, anchor="middle", cls="tick", fill=GREY))
+        parts = _axis_group(g) + parts
+        width = max(width, x0 + PLOT_LONG + _textw(axis[-1][1]) / 2 + PAD)
+        axis_h += TICK_GAP
     return parts, width, axis_h, bars
 
 
-def _vertical(cats, labels, vals, value_texts, axis_max, hi_index, colour):
+def _vertical(cats, labels, vals, value_texts, axis_max, hi_index, colour, axis=None):
     """Bars grow upwards from a horizontal axis; category labels sit under each bar."""
     plot_h = PLOT_LONG * 0.6
     slot = max(BAR_T * 2.2, max(_textw(s) for s in labels + value_texts) + 12)
     top = LABEL_SIZE + 8                      # room for the value label above the tallest bar
     base = top + plot_h
+    left = PAD + (max(_textw(label) for _, label in axis) + 8 if axis else 0)   # tick labels sit left
+    split = [s.split("\n") for s in labels]
     parts, bars = [], []
     for i, v in enumerate(vals):
-        cx = PAD + slot * i + slot / 2
+        cx = left + slot * i + slot / 2
         length = round(v / axis_max * plot_h, 2)
         hi = i == hi_index
         bw = min(slot - 12, BAR_T * 1.6)
         parts.append(_bar(cx - bw / 2, base - length, bw, length, cats[i], v, hi, colour))
         parts.append(_text(cx, base - length - 6, value_texts[i], anchor="middle", cls="value", bold=hi))
-        parts.append(_text(cx, base + LABEL_SIZE + 6, labels[i], anchor="middle", cls="category"))
+        parts.append(_lines_text(cx, base + LABEL_SIZE + 6, split[i], anchor="middle", cls="category"))
         bars.append({"label": cats[i], "value": v, "length": length, "highlight": hi})
-    parts.append(f'<line class="axis" x1="{_x(PAD)}" y1="{_x(base)}" x2="{_x(PAD + slot * len(vals))}" '
+    right = left + slot * len(vals)
+    parts.append(f'<line class="baseline" x1="{_x(left)}" y1="{_x(base)}" x2="{_x(right)}" '
                  f'y2="{_x(base)}" stroke="{GREY}" stroke-width="1"/>')
-    width = PAD + slot * len(vals) + PAD
-    return parts, width, base + LABEL_SIZE + 10, bars
+    if axis:
+        g = []
+        for t, label in axis:
+            y = base - t / axis_max * plot_h
+            g.append(f'<line class="grid" x1="{_x(left)}" y1="{_x(y)}" x2="{_x(right)}" y2="{_x(y)}" '
+                     f'stroke="{PALE}" stroke-width="1"/>')
+            g.append(_text(left - 6, y + LABEL_SIZE * 0.35, label, anchor="end", cls="tick", fill=GREY))
+        parts = _axis_group(g) + parts
+    height = base + LABEL_SIZE + 10 + (max(len(lines) for lines in split) - 1) * LINE_H
+    return parts, right + PAD, height, bars
 
 
 # ------------------------------------------------------------------ CLI

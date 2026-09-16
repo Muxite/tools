@@ -64,7 +64,7 @@ def test_s002_in_heading(lint):
     "This is arguably best.\n",
     "Perhaps not.\n",
     "It might work.\n",
-    "It may work.\n",
+    "It may be wrong.\n",
     "To some extent the tool works.\n",
     "It appears correct.\n",
 ])
@@ -262,11 +262,11 @@ def test_line_numbers_after_fence(lint):
 
 # ------------------------------------------------------------------ suppression
 def test_suppress_listed_rule_on_next_line(lint):
-    assert rules(lint("<!-- lint-ignore S003 -->\nIt may work.\n")) == []
+    assert rules(lint("<!-- lint-ignore S003 -->\nIt may be wrong.\n")) == []
 
 
 def test_suppress_only_listed_rules(lint):
-    assert rules(lint("<!-- lint-ignore S003 -->\nWe may work.\n")) == [("S002", 2)]
+    assert rules(lint("<!-- lint-ignore S003 -->\nWe may be wrong.\n")) == [("S002", 2)]
 
 
 def test_suppress_all_rules(lint):
@@ -274,7 +274,7 @@ def test_suppress_all_rules(lint):
 
 
 def test_suppress_does_not_reach_two_lines_down(lint):
-    assert rules(lint("<!-- lint-ignore S003 -->\nFine.\nIt may work.\n")) == [("S003", 3)]
+    assert rules(lint("<!-- lint-ignore S003 -->\nFine.\nIt may be wrong.\n")) == [("S003", 3)]
 
 
 def test_suppress_on_same_line(lint):
@@ -287,7 +287,7 @@ def test_rules_filter(lint):
 
 
 def test_ignore_filter(lint):
-    assert sorted(rules(lint("We — may go.\n", ignore=["S002"]))) == [("S001", 1), ("S003", 1)]
+    assert sorted(rules(lint("We — may be late.\n", ignore=["S002"]))) == [("S001", 1), ("S003", 1)]
 
 
 def test_unknown_rule_is_toolerror(lint):
@@ -315,8 +315,8 @@ def test_directory_walk_md_and_txt_only(tmp_path, monkeypatch):
 # ------------------------------------------------------------------ §0.3 shape, sorting, counts
 def test_findings_sorted_across_files(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    write(tmp_path / "b.md", "Fine.\nIt may — work; we go.\n")
-    write(tmp_path / "a.md", "We go.\n\nIt may go.\n")
+    write(tmp_path / "b.md", "Fine.\nIt may be — late; we go.\n")
+    write(tmp_path / "a.md", "We go.\n\nIt may be late.\n")
     res = text("text_lint", paths=["b.md", "a.md"])
     assert_checker_shape(res)
     assert [(f["path"], f["line"], f["rule"]) for f in res["findings"]] == [

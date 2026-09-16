@@ -15,8 +15,8 @@ description: Draw architecture, pipeline and agent-workflow diagrams as SVG (and
 | the colours and the rules | `tundlekit palette show` | `palette_get` |
 
 `diagram render` also takes a Mermaid file directly (MCP: `mermaid_path` or inline `mermaid`). All of it is
-standard library only. PNG output needs `cairosvg`, `rsvg-convert` or `inkscape`; check with
-`tundlekit render backends` (`svg_to_png`). Add `--json` for machine-readable results.
+standard library only. PNG output needs `cairosvg`, `rsvg-convert` or `inkscape`, and falls back to pymupdf (the `pdf` extra) when none
+of those exists; check with `tundlekit render backends` (`svg_to_png` names the converter). Add `--json` for machine-readable results.
 
 ## The rules
 
@@ -84,6 +84,11 @@ Count the model sessions in the prose that describes a figure, then count the MO
 - `id`: letters, digits, `_`, `-`, starting with a letter or `_`; unique across nodes and groups.
 - `label`: non-empty; `\n` breaks lines. `sub`: an optional smaller second line.
 - `stage` (default `dispatch`), `actor` ∈ `model | code | record | external` (default `code`), `dashed` (bool).
+- `rank` (integer ≥ 0, optional): pins a node to a column (LR) or row (TB). Use it to line up nodes that belong
+  together, or to put a feedback target where the reader expects it; an edge that runs against pinned ranks is
+  drawn as a back edge.
+- `wrap` (integer ≥ 1, optional): at most this many ranks per row (LR) or column (TB). A long pipeline wraps
+  onto several rows instead of becoming a strip too wide to read on a slide; x restarts at each row.
 - `direction`: `LR` (default) or `TB`. `legend`: `"auto"` (default), `true`, `false`. `tags`: show MODEL/CODE tags
   (default true). `note`: small text at the bottom.
 - `edges`: `from`, `to` (existing ids, no self-loops), optional `label`, `dashed`. Back edges (loops) are allowed
@@ -167,6 +172,8 @@ data labels on, n in the category labels, and a bold takeaway line that states t
   "decimals": 1,
   "stage": "gates",
   "orientation": "horizontal",
+  "axis": true,
+  "highlight_color": "failed",
   "takeaway": "Tools that run cleanly still return wrong answers on unseen inputs"
 }
 ```
@@ -176,7 +183,9 @@ tundlekit chart bar chart.json -o fig-rot.svg
 ```
 
 - `categories` and `values` have the same length (and `n`, if given); values are ≥ 0.
-- `highlight`: an index or a category name. `max` fixes the axis (≥ every value). `decimals` defaults to 0 for
+- `highlight`: an index or a category name. `highlight_color` colours it with a stage or outcome name
+  (`passed`, `failed`, …) instead of `stage`. `axis: true` adds a value axis with gridlines and tick labels.
+  `\n` in a category label breaks it into lines. `max` fixes the axis (≥ every value). `decimals` defaults to 0 for
   whole numbers, else 1. `orientation`: `horizontal` (default) or `vertical`.
 - In a deck, prefer a native chart (`"kind": "chart"` in the deck spec, see the deck-builder skill) so it stays
   editable; use `chart bar` for reports and notes.

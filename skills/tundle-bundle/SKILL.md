@@ -24,6 +24,8 @@ Add `--json` to any command for a machine-readable result.
 | start a new tundle | `tundlekit bundle init [PATH]` | `bundle_init` |
 | names, junk, copies, setup tables, VERSION/CHANGELOG | `tundlekit bundle lint` | `bundle_lint` |
 | SOURCE.md checksums | `tundlekit bundle verify` | `bundle_verify` |
+| draft a SOURCE.md for an installer (hash, program, version guessed) | `tundlekit bundle source FILE [--url URL] [--install CMD] [--write] [--force]` | `bundle_source` |
+| add missing rows to a setup folder's README table | `tundlekit bundle setup-table DIR [--write]` | `bundle_setup_table` |
 
 ## Rules
 
@@ -135,13 +137,23 @@ compress, so `.git` grows by about the size of whatever changed. Keep **the newe
 Result: `ok`, `findings` (`rule`, `severity`, `path`, `line`, `message`), `counts`, `files`. Exit 1 on errors;
 `--strict` also fails on warnings. Options: `--max-path` (default 160), `--large-mb` (default 500).
 
+`--ignore` (repeatable, also on `verify`) drops accepted findings: `--ignore B011` drops a rule everywhere,
+`--ignore "B003:ai4research/versions/*"` drops it for paths matching the glob (relative, `/`-separated).
+Use it for findings that are deliberate, and say why in the tundle's README, rather than living with noise:
+
+```
+tundlekit bundle lint --ignore B011 --ignore "B009:setup/*"
+```
+
+Links (symlinks, junctions) are never followed: each counts as 1 entry.
+
 | Rule | Severity | Meaning and fix |
 |---|---|---|
 | B001 | error | name not portable (`: * ? " < > \|`, control chars, trailing space/dot, reserved name). Rename |
 | B002 | warning | relative path too long. Shorten folder or file names |
 | B003 | warning | copy/version marker in a name (`report v2.docx`, `x (1).pdf`, `y - Copy.txt`, `final`, `old`, `backup`) outside `versions/`. Replace the original instead |
 | B004 | info | several snapshots of 1 document in `versions/`. Older ones may be cleared; keep the newest |
-| B005 | warning | junk: `__pycache__`, `.pytest_cache`, `.venv`, `venv`, `node_modules`, `.ipynb_checkpoints`, `*.pyc`, `*.tmp`, `~$*`, `Thumbs.db`, `desktop.ini`, `.DS_Store`, `._*`. Delete |
+| B005 | warning | junk: `__pycache__`, `.pytest_cache`, `.venv`, `venv`, `node_modules`, `.ipynb_checkpoints`, `*.pyc`, `*.tmp`, `~$*`, `Thumbs.db`, `desktop.ini`, `.DS_Store`, `._*`. Delete. Reported as info when `.gitignore` already skips it: git ignores it, but a copied folder still carries it |
 | B006 | error | a file or folder in `setup/<dir>/` missing from that folder's `README.md` table. Add a row |
 | B007 | error | a `setup/<dir>/README.md` row naming something that does not exist. Fix or remove the row |
 | B008 | warning | top-level folder without `README.md` |
@@ -149,7 +161,8 @@ Result: `ok`, `findings` (`rule`, `severity`, `path`, `line`, `message`), `count
 | B010 | error | `VERSION` or `CHANGELOG.md` missing/malformed, or the newest entry does not match VERSION |
 | B011 | info | very large file. Consider whether it belongs, and clear history after replacing it |
 | B012 | error | `SOURCE.md` checksum mismatch |
-| B013 | warning | `SOURCE.md` whose hash or target file cannot be determined |
+| B013 | warning | `SOURCE.md` whose hash or target file cannot be determined, or whose `- File:` points outside the tundle |
+| B014 | info | number of installers under `setup/<dir>/` with no `SOURCE.md` next to them. Draft them with `bundle source` |
 
 ## setup/: installers, tables and SOURCE.md
 
@@ -161,7 +174,8 @@ setup/any/        runs on both: scripts, Python wheels, portable archives (creat
 
 - Put the installer straight in the OS folder, named with its version (`python-3.13.5-amd64.exe`). A program
   that needs several files gets a folder `<program>-<version>/`.
-- **List every file and subfolder in that folder's `README.md` table.** The first cell names the entry in
+- **List every file and subfolder in that folder's `README.md` table** (`tundlekit bundle setup-table DIR` drafts
+  the missing rows, see below). The first cell names the entry in
   backticks; a folder is written with a trailing slash:
   ```
   | File | Installs | Notes |
@@ -182,13 +196,32 @@ setup/any/        runs on both: scripts, Python wheels, portable archives (creat
   - File:       <file name, needed when the folder holds more than 1 file>
   - Install:    <steps, or the silent/unattended command>
   ```
-  Get the hash with `Get-FileHash <file>` (Windows) or `sha256sum <file>` (Linux). Then check it:
+  Draft it instead of typing the hash: `tundlekit bundle source FILE` prints the text (program and version guessed
+  from the file name, architecture tokens such as `x64` removed, SHA-256 and download date filled in); add
+  `--url URL --install "CMD" --write` to write it (`--force` to overwrite an existing one). Check the guessed program
+  and version, and replace any `<official download URL>` or `<steps>` placeholder. By hand, get the hash with
+  `Get-FileHash <file>` (Windows) or `sha256sum <file>` (Linux). Then check it:
   ```
   tundlekit bundle verify
   ```
   `verify` compares every recorded hash with the file (case-insensitive). Without a `- File:` line, the target
   is the only other file in the folder besides `README.md` and `SOURCE.md`. A placeholder like `<hash>` is
   reported as "no hash recorded" (B013).
+
+## Filling in a setup folder quickly
+
+```
+tundlekit bundle lint                                   # B006 lists unlisted files, B014 counts missing SOURCE.md
+tundlekit bundle setup-table setup/windows              # dry run: the rows it would add
+tundlekit bundle setup-table setup/windows --write      # append them to setup/windows/README.md
+tundlekit bundle source setup/windows/python-3.13.5-amd64.exe --url https://www.python.org/downloads/ --write
+tundlekit bundle verify
+```
+
+`setup-table` adds 1 row per unlisted entry (`` | `name` | {program} {version} | ``) after the last row of the
+first table, or creates the table; existing rows are untouched. Stub installers (a name with `Setup`, `Installer`,
+`Loader` or `latest` and no version) get "⚠ check: may download during install". Edit the guessed descriptions
+afterwards; they come from the file name only.
 
 ## Checklist before handing a copy on
 

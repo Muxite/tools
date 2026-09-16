@@ -179,13 +179,23 @@ def find_soffice() -> str | None:
     return None
 
 
+_INKSCAPE_PATHS = ("C:/Program Files/Inkscape/bin/inkscape.exe", "C:/Program Files (x86)/Inkscape/bin/inkscape.exe",
+                   "/Applications/Inkscape.app/Contents/MacOS/inkscape")
+
+
 def _svg_to_png() -> str | None:
+    """The SVG to PNG converter diagram_render would use, in its order (MANIFEST §14.6):
+    cairosvg, rsvg-convert, inkscape (paths for executables), then "pymupdf"."""
     if _has_module("cairosvg"):
         return "cairosvg"
-    for exe in ("rsvg-convert", "inkscape"):
-        hit = shutil.which(exe)
-        if hit:
-            return hit
+    hit = shutil.which("rsvg-convert")
+    if hit:
+        return hit
+    hit = shutil.which("inkscape") or next((p for p in _INKSCAPE_PATHS if os.path.isfile(p)), None)
+    if hit:
+        return hit
+    if _has_pymupdf():
+        return "pymupdf"
     return None
 
 
@@ -602,13 +612,48 @@ def _open_pptx(Presentation, path: Path):
         raise ToolError(f"cannot read {path.name} as a presentation: {exc}") from None
 
 
+def _iter_shapes(shapes):
+    """Shapes in order, descending into group shapes (as deck_inspect reads them)."""
+    for sh in shapes:
+        inner = getattr(sh, "shapes", None) if sh.__class__.__name__ == "GroupShape" else None
+        if inner is not None:
+            yield from _iter_shapes(inner)
+        else:
+            yield sh
+
+
+def _slide_frames(slide) -> tuple[list[str], int | None]:
+    """(text of every text frame in shape order, index of the title frame or None).
+
+    The title is the same as deck_inspect's (MANIFEST §14.9): the frame holding the non-blank run with the
+    largest font (first such frame on ties), else the first non-blank frame.
+    """
+    frames, best_size, title = [], -1, None
+    for sh in _iter_shapes(slide.shapes):
+        if not getattr(sh, "has_text_frame", False):
+            continue
+        tf = sh.text_frame
+        frames.append(tf.text)
+        for p in tf.paragraphs:
+            for r in p.runs:
+                size = r.font.size or p.font.size or 0
+                if r.text.strip() and size > best_size:
+                    best_size, title = size, len(frames) - 1
+    if title is None:
+        title = next((k for k, t in enumerate(frames) if t.strip()), None)
+    return frames, title
+
+
 def _text_deck(copy: Path, out: Path) -> tuple[int, list[str]]:
     Presentation = _import_pptx()
     prs = _open_pptx(Presentation, copy)
     files = []
     for n, slide in enumerate(prs.slides, 1):
-        frames = [sh.text_frame.text for sh in slide.shapes if sh.has_text_frame]
-        parts = ["TITLE: " + (frames[0] if frames else "")] + frames[1:]
+        frames, title = _slide_frames(slide)
+        if title is None:
+            parts = ["TITLE: "] + frames[1:] if frames else ["TITLE: "]
+        else:
+            parts = ["TITLE: " + frames[title]] + frames[:title] + frames[title + 1:]
         files.append(_write(out / f"slide-{n:02d}.txt", "\n\n".join(parts) + "\n"))
     files += _write_notes(copy, out)
     return len(prs.slides), files
