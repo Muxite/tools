@@ -196,7 +196,8 @@ def _check_count(obj: dict, key: str, where: str, minimum: int, problems: list) 
     if key not in obj:
         return
     value = obj[key]
-    ok = isinstance(value, int) and not isinstance(value, bool) and value >= minimum
+    integral = (isinstance(value, int) and not isinstance(value, bool)) or         (isinstance(value, float) and math.isfinite(value) and value.is_integer())      # 3.0 counts (§16.7)
+    ok = integral and value >= minimum
     if ok:
         try:
             ok = math.isfinite(float(value))
@@ -215,6 +216,20 @@ def _check_id(value, where: str, ids: dict, problems: list, node_ids: set | None
         ids[value] = where
         if node_ids is not None:
             node_ids.add(value)
+
+
+def _normalise(spec: dict) -> dict:
+    """A copy of a valid spec with integral float `rank` / `wrap` values turned into ints (§16.7)."""
+    out = dict(spec)
+    if isinstance(out.get("wrap"), float):
+        out["wrap"] = int(out["wrap"])
+    nodes = []
+    for n in out["nodes"]:
+        if isinstance(n.get("rank"), float):
+            n = dict(n, rank=int(n["rank"]))
+        nodes.append(n)
+    out["nodes"] = nodes
+    return out
 
 
 def _require_valid(spec) -> list[str]:
@@ -268,6 +283,8 @@ _MM_HEADER = re.compile(r"^(?:flowchart|graph)\b(?:\s+(\S+))?\s*$")
 _MM_DIRECTIONS = {"LR": "LR", "RL": "LR", "TB": "TB", "TD": "TB", "BT": "TB"}
 _MM_IGNORED = re.compile(r"^(classDef|class|style|linkStyle|click)\s")
 _MM_GROUP_STAGE = re.compile(r"^%%\s*group\s+(\S+)\s+stage\s+(\S+)\s*$")
+_MM_RANK = re.compile(r"^%%\s*rank\s+(\S+)\s+([0-9]+)\s*$")
+_MM_WRAP = re.compile(r"^%%\s*wrap\s+([0-9]+)\s*$")
 _MM_KEYWORDS = {"end", "subgraph", "graph", "flowchart", "style", "class", "classdef", "click", "linkstyle"}
 _MM_UNSAFE_ID = ("--", "-.", "==", "&")
 _MM_SUBGRAPH = re.compile(r"^subgraph\s+(\S+?)\s*(?:\[(.*)\])?\s*$")
@@ -330,6 +347,8 @@ class _MermaidParser:
         self.open_groups: list[tuple[dict, int]] = []
         self.warnings: list[str] = []
         self.group_stages: dict[str, tuple[str, int]] = {}
+        self.ranks: dict[str, tuple[int, int]] = {}
+        self.wrap: int | None = None
         self.lineno = 0
 
     def error(self, detail: str) -> _InputError:
@@ -341,6 +360,16 @@ class _MermaidParser:
             stage_comment = _MM_GROUP_STAGE.match(line)
             if stage_comment:
                 self.group_stages[stage_comment.group(1)] = (stage_comment.group(2), self.lineno)
+            rank_comment = _MM_RANK.match(line)
+            if rank_comment:
+                self.ranks[rank_comment.group(1)] = (int(rank_comment.group(2)), self.lineno)
+            wrap_comment = _MM_WRAP.match(line)
+            if wrap_comment:
+                value = int(wrap_comment.group(1))
+                if value >= 1:
+                    self.wrap = value
+                else:
+                    self.warnings.append(f"line {self.lineno}: wrap must be at least 1; the comment is ignored")
             if not line or line.startswith("%%"):
                 continue
             if line.endswith(";"):
@@ -365,8 +394,16 @@ class _MermaidParser:
             self.warnings.append(f"line {opened}: subgraph {group['id']!r} has no 'end'; closed at the end of input")
             self._close_group()
         self._apply_group_stages()
-        return {"direction": self.direction, "nodes": list(self.nodes.values()), "edges": self.edges,
+        for nid, (rank, lineno) in self.ranks.items():      # `%% rank <id> <n>` (§16.7)
+            if nid in self.nodes:
+                self.nodes[nid]["rank"] = rank
+            else:
+                self.warnings.append(f"line {lineno}: rank comment for unknown node {nid!r} is ignored")
+        spec = {"direction": self.direction, "nodes": list(self.nodes.values()), "edges": self.edges,
                 "groups": self.groups}
+        if self.wrap is not None:
+            spec["wrap"] = self.wrap
+        return spec
 
     def _apply_group_stages(self) -> None:
         """Apply `%% group <id> stage <stage>` comments (written by spec_to_mermaid, §13.6)."""
@@ -540,13 +577,18 @@ def spec_to_mermaid(spec: dict) -> str:
     A group's stage has no Mermaid syntax, so it is kept in a `%% group <id> stage <stage>` comment.
     """
     _check_mermaid_ids(spec)
+    spec = _normalise(spec)
     direction = spec.get("direction", DEFAULT_DIRECTION)
     lines = [f"flowchart {direction}"]
+    if spec.get("wrap") is not None:                 # rank and wrap have no Mermaid syntax (§16.7)
+        lines.append(f"    %% wrap {spec['wrap']}")
     opener = {"code": ("[", "]"), "model": ("(", ")"), "record": ("[(", ")]"), "external": ("{{", "}}")}
     for n in spec["nodes"]:
         label = n["label"] + ("\n" + n["sub"] if n.get("sub") else "")
         o, c = opener[n.get("actor", DEFAULT_ACTOR)]
         lines.append(f'    {n["id"]}{o}"{_mm_encode(label)}"{c}:::{n.get("stage", DEFAULT_STAGE)}')
+        if n.get("rank") is not None:
+            lines.append(f"    %% rank {n['id']} {n['rank']}")
     for g in spec.get("groups", []):
         if g.get("stage"):
             lines.append(f"    %% group {g['id']} stage {g['stage']}")
@@ -574,6 +616,7 @@ NODE_GAP = 22                  # between neighbours in the same rank
 RANK_GAP = {"LR": 56, "TB": 48}
 ROW_GAP = {"LR": 40, "TB": 48}         # the channel between wrapped rows (columns in TB)
 GROUP_PAD, GROUP_LABEL_H = 12, 18
+GROUP_GAP = 8                  # between the frames of 2 groups
 DUMMY = 8                      # cross-axis room for an edge passing through a rank
 
 
@@ -829,6 +872,7 @@ class _Layout:
         self.lr = self.direction == "LR"
         self.wrap = spec.get("wrap")
         self.nodes, self.edges, self.groups = _build_model(spec)
+        self.warnings: list[str] = []
         self.order = list(self.nodes)
         for n in self.nodes.values():
             _size_node(n)
@@ -870,13 +914,56 @@ class _Layout:
         return (n.x + n.w) if self.lr else (n.y + n.h)
 
     # -- steps
+    def _row_keys(self, ranks: list[int]) -> list[int]:
+        """Row index of each rank (§14.6, §16.7): rows of at most `wrap` ranks, aligned to multiples of wrap,
+        except that a group is never split. A group that would straddle a row break starts a new row; a group
+        wider than `wrap` ranks gets a row of its own that is as wide as the group."""
+        w = self.wrap
+        if not w:
+            return [0] * len(ranks)
+        intervals = [(r, r) for r in ranks]
+        for g in self.groups:
+            rs = [self.nodes[m].rank for m in g.members]
+            intervals.append((min(rs), max(rs)))
+        units: list[list[int]] = []
+        for lo, hi in sorted(intervals):
+            if units and lo <= units[-1][1]:
+                units[-1][1] = max(units[-1][1], hi)
+            else:
+                units.append([lo, hi])
+        rows: list[list] = []                 # [start, end, closed]
+        row_of_unit = []
+        for lo, hi in units:
+            cur = rows[-1] if rows else None
+            if cur is not None and not cur[2] and lo >= cur[0] and hi <= cur[1]:
+                row_of_unit.append(len(rows) - 1)
+                continue
+            if hi - lo + 1 > w:
+                rows.append([lo, hi, True])
+            else:
+                if cur is None or lo > cur[1]:
+                    start = lo - lo % w
+                    if cur is not None:
+                        start = max(start, cur[1] + 1)
+                    if hi > start + w - 1:
+                        start = lo
+                else:                         # the unit straddles the current row's break: a new row
+                    start = lo
+                rows.append([start, start + w - 1, False])
+            row_of_unit.append(len(rows) - 1)
+        keys = []
+        for r in ranks:
+            k = next(i for i, (lo, hi) in enumerate(units) if lo <= r <= hi)
+            keys.append(row_of_unit[k])
+        return keys
+
     def _make_levels(self) -> None:
         ranks = sorted({n.rank for n in self.nodes.values()})
         level_of = {r: i for i, r in enumerate(ranks)}
         for n in self.nodes.values():
             n.level = level_of[n.rank]
         self.n_levels = len(ranks)
-        keys = [r // self.wrap if self.wrap else 0 for r in ranks]
+        keys = self._row_keys(ranks)
         row_index = {k: i for i, k in enumerate(sorted(set(keys)))}
         self.row_of = [row_index[k] for k in keys]
         self.rows = []                   # [(first level, last level)]
@@ -913,7 +1000,31 @@ class _Layout:
                 start = self._level(part[0])
                 for i in range(len(part) - 1):
                     segments.append((start + i, part[i], part[i + 1]))
-        self.layers = _order_layers(layers, segments)
+        self.layers = [self._gather(layer) for layer in _order_layers(layers, segments)]
+
+    def _gather(self, layer: list) -> list:
+        """Keep each group's items contiguous in a layer, and groups in spec order (§16.7: frames never
+        overlap). A group's block takes the place of its first item; other items keep their order."""
+        rank = {g.id: k for k, g in enumerate(self.groups)}
+        blocks: dict = {}
+        slots = []
+        for item in layer:
+            g = self._group_of(item)
+            if g is None:
+                slots.append((False, item))
+            else:
+                if g not in blocks:
+                    blocks[g] = []
+                    slots.append((True, None))
+                blocks[g].append(item)
+        ordered = iter(sorted(blocks, key=lambda g: rank[g]))
+        out = []
+        for is_group, item in slots:
+            if is_group:
+                out += blocks[next(ordered)]
+            else:
+                out.append(item)
+        return out
 
     def _label_level(self, e: _Edge) -> int | None:
         """The level whose following gap holds the edge's label (None: the label sits in a row channel)."""
@@ -959,26 +1070,30 @@ class _Layout:
     def _place_cross_axis(self) -> None:
         self.cross_pos: dict = {}
         label_room = GROUP_LABEL_H if self.lr else 0
-        extents = []
+        loc, bounds = [], []
         for layer in self.layers:
             positions = []
             pos = 0.0
             prev_group = None
+            group_start = 0.0
             for i, item in enumerate(layer):
                 group = self._group_of(item)
                 if i:
                     pos += NODE_GAP
                 if group != prev_group:
                     if prev_group is not None:
-                        pos += GROUP_PAD
+                        pos = self._close_block(prev_group, pos, group_start)
                     if group is not None:
+                        group_start = pos
                         pos += GROUP_PAD + label_room
                 positions.append(pos)
                 pos += self._cross_size(item)
                 prev_group = group
             if prev_group is not None:
-                pos += GROUP_PAD
-            extents.append((positions, pos))
+                pos = self._close_block(prev_group, pos, group_start)
+            loc.append([p - pos / 2 for p in positions])
+            bounds.append([-pos / 2, pos / 2])
+        self._separate_groups(loc, bounds)
         # rows stack along the cross axis, with a channel between them for the edges that change rows
         channel = [float(ROW_GAP[self.direction])] * len(self.rows)
         for e in self.edges:
@@ -988,19 +1103,83 @@ class _Layout:
                 channel[row] = max(channel[row], (h if self.lr else w) + 16)
         offsets, self.channel_mid = [], []
         for k, (first, last) in enumerate(self.rows):
-            lo = min(-extents[r][1] / 2 for r in range(first, last + 1))
-            hi = max(extents[r][1] / 2 for r in range(first, last + 1))
+            lo = min(bounds[r][0] for r in range(first, last + 1))
+            hi = max(bounds[r][1] for r in range(first, last + 1))
             offset = 0.0 if not k else self.channel_mid[-1] + channel[k - 1] / 2 - lo
             offsets.append(offset)
             self.channel_mid.append(offset + hi + channel[k] / 2)
-        for level, (layer, (positions, total)) in enumerate(zip(self.layers, extents)):
-            for item, p in zip(layer, positions):
-                self.cross_pos[item] = p - total / 2 + offsets[self.row_of[level]]
+        for level, layer in enumerate(self.layers):
+            for item, p in zip(layer, loc[level]):
+                self.cross_pos[item] = p + offsets[self.row_of[level]]
         for n in self.nodes.values():
             if self.lr:
                 n.y = self.cross_pos[n.id]
             else:
                 n.x = self.cross_pos[n.id]
+
+    def _close_block(self, gid: str, pos: float, group_start: float) -> float:
+        """The cross position after a group's block: its padding, and in TB the room its label needs."""
+        pos += GROUP_PAD
+        if not self.lr:
+            g = next(g for g in self.groups if g.id == gid)
+            pos = max(pos, group_start + _text_width(g.label, GROUP_PX, bold=True) + 16)
+        return pos
+
+    def _frame(self, g: _Group, cross: dict) -> tuple[float, float, float, float]:
+        """(main lo, main hi, cross lo, cross hi) of a group frame, from main positions and `cross`."""
+        members = [self.nodes[m] for m in g.members]
+        label_w = _text_width(g.label, GROUP_PX, bold=True) + 16
+        main_lo = min(self._near(n) for n in members) - GROUP_PAD - (0 if self.lr else GROUP_LABEL_H)
+        main_hi = max(self._far(n) for n in members) + GROUP_PAD
+        cross_lo = min(cross[n.id] for n in members) - GROUP_PAD - (GROUP_LABEL_H if self.lr else 0)
+        cross_hi = max(cross[n.id] + self._cross_size(n.id) for n in members) + GROUP_PAD
+        if self.lr:
+            main_hi = max(main_hi, main_lo + label_w)
+        else:
+            cross_hi = max(cross_hi, cross_lo + label_w)
+        return main_lo, main_hi, cross_lo, cross_hi
+
+    def _separate_groups(self, loc: list, bounds: list) -> None:
+        """Move a later group down (along the cross axis) while its frame would overlap an earlier one."""
+        if len(self.groups) < 2:
+            return
+        where = {}
+        for level, layer in enumerate(self.layers):
+            for i, item in enumerate(layer):
+                if isinstance(item, str):
+                    where[item] = (level, i)
+        row = [self.row_of[self.nodes[g.members[0]].level] for g in self.groups]
+        moved = []
+        for _ in range(4 * len(self.groups) ** 2):
+            cross = {nid: loc[lv][i] for nid, (lv, i) in where.items()}
+            frames = [self._frame(g, cross) for g in self.groups]
+            hit = None
+            for a in range(len(self.groups)):
+                for b in range(a + 1, len(self.groups)):
+                    fa, fb = frames[a], frames[b]
+                    if row[a] == row[b] and fa[0] < fb[1] and fb[0] < fa[1] \
+                            and fa[2] < fb[3] + GROUP_GAP and fb[2] < fa[3] + GROUP_GAP:
+                        hit = (a, b)
+                        break
+                if hit:
+                    break
+            if hit is None:
+                break
+            a, b = hit
+            delta = frames[a][3] + GROUP_GAP - frames[b][2]
+            gid = self.groups[b].id
+            for lv in sorted({self.nodes[m].level for m in self.groups[b].members}):
+                first = min(i for i, item in enumerate(self.layers[lv])
+                            if isinstance(item, str) and self.nodes[item].group == gid)
+                for i in range(first, len(loc[lv])):
+                    loc[lv][i] += delta
+                bounds[lv][1] += delta
+            pair = (gid, self.groups[a].id)
+            if pair not in moved:
+                moved.append(pair)
+        for later, earlier in moved:
+            self.warnings.append(f"group {later!r} was moved down so that its frame does not overlap "
+                                 f"group {earlier!r}")
 
     def _cross_center(self, item) -> float:
         return self.cross_pos[item] + self._cross_size(item) / 2
@@ -1106,6 +1285,45 @@ class _Layout:
                 segments = [(kind, *reversed(points)) for kind, *points in reversed(segments)]
             e.path = [("M", [segments[0][1]])] + [(kind, list(points[1:])) for kind, *points in segments]
         self._spread_labels()
+        self._clear_labels()
+
+    def _clear_labels(self) -> None:
+        """Move a label that covers a node box along its spreading axis until it covers none (§16.7); when
+        that fails, keep it and warn, naming the edge."""
+        boxes = [(n.x, n.y, n.x + n.w, n.y + n.h) for n in self.nodes.values()]
+        placed: list[tuple] = []
+
+        def rect(cx, cy, w, h):
+            return (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+
+        def covers(r, others):
+            return any(r[0] < o[2] - 0.5 and o[0] < r[2] - 0.5 and r[1] < o[3] - 0.5 and o[1] < r[3] - 0.5
+                       for o in others)
+
+        for e in self.edges:
+            if not e.label_box:
+                continue
+            cx, cy, w, h = e.label_box
+            if covers(rect(cx, cy, w, h), boxes):
+                along_x = self.lr != (e.label_gap[0] == "gap")
+                found = None
+                for k in range(1, 121):
+                    for sign in (1, -1):
+                        d = sign * k * 4
+                        nx, ny = (cx + d, cy) if along_x else (cx, cy + d)
+                        r = rect(nx, ny, w, h)
+                        if not covers(r, boxes) and not covers(r, placed):
+                            found = (nx, ny)
+                            break
+                    if found:
+                        break
+                if found:
+                    cx, cy = found
+                    e.label_box = (cx, cy, w, h)
+                else:
+                    self.warnings.append(f"edge {e.src!r} -> {e.dst!r}: its label could not be placed clear "
+                                         "of the node boxes and crosses one")
+            placed.append(rect(cx, cy, w, h))
 
     def _spread_labels(self) -> None:
         """Move labels that share a gap apart along the cross axis, and labels that share a row channel apart
@@ -1337,9 +1555,13 @@ def _legend_svg(nodes: dict, entries: list[tuple], left: float, top: float) -> l
 LEGEND_H = 18
 
 
-def render_svg(spec: dict) -> tuple[str, int, int, dict]:
-    """Lay out and draw a valid spec. Returns (svg text, width, height, {id: geometry})."""
+def render_svg(spec: dict, warnings: list | None = None) -> tuple[str, int, int, dict]:
+    """Lay out and draw a valid spec. Returns (svg text, width, height, {id: geometry}); layout warnings
+    (moved groups, labels that cross a box) are appended to `warnings` when given."""
+    spec = _normalise(spec)
     lay = _Layout(spec)
+    if warnings is not None:
+        warnings += lay.warnings
     title = " ".join(_split(spec.get("title") or ""))
     note = spec.get("note") or ""
     note_lines = _split(note) if note else []
@@ -1454,30 +1676,241 @@ def _pymupdf_png(pymupdf, src: pathlib.Path, dst: pathlib.Path) -> None:
         doc.close()
 
 
+# -- SVG simplification for MuPDF, which ignores markers and stroke-dasharray (§16.7)
+_SVG_NS = "http://www.w3.org/2000/svg"
+_PATH_TOKEN = re.compile(r"[MLHVCZmlhvcz]|-?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][-+]?[0-9]+)?")
+CURVE_STEPS = 16
+
+
+def _flatten_path(d: str) -> list[list[tuple[float, float]]] | None:
+    """Subpaths of an absolute M/L/H/V/C/Z path as point lists (curves sampled); None if unsupported."""
+    tokens = _PATH_TOKEN.findall(d)
+    if "".join(tokens).replace(" ", "") != re.sub(r"[\s,]+", "", d):
+        return None
+    subpaths: list[list[tuple[float, float]]] = []
+    cur = None
+    cmd = None
+    i = 0
+
+    def num():
+        nonlocal i
+        value = float(tokens[i])
+        i += 1
+        return value
+
+    try:
+        while i < len(tokens):
+            if tokens[i].isalpha():
+                cmd = tokens[i]
+                i += 1
+                if cmd in "mlhvcz":
+                    return None
+                if cmd == "Z":
+                    if subpaths and subpaths[-1]:
+                        subpaths[-1].append(subpaths[-1][0])
+                        cur = subpaths[-1][0]
+                    continue
+            if cmd == "M":
+                cur = (num(), num())
+                subpaths.append([cur])
+                cmd = "L"
+            elif cmd == "L":
+                cur = (num(), num())
+                subpaths[-1].append(cur)
+            elif cmd == "H":
+                cur = (num(), cur[1])
+                subpaths[-1].append(cur)
+            elif cmd == "V":
+                cur = (cur[0], num())
+                subpaths[-1].append(cur)
+            elif cmd == "C":
+                c1, c2, end = (num(), num()), (num(), num()), (num(), num())
+                p0 = cur
+                for k in range(1, CURVE_STEPS + 1):
+                    t = k / CURVE_STEPS
+                    u = 1 - t
+                    subpaths[-1].append(tuple(u * u * u * p0[j] + 3 * u * u * t * c1[j] + 3 * u * t * t * c2[j]
+                                              + t * t * t * end[j] for j in (0, 1)))
+                cur = end
+            else:
+                return None
+    except (IndexError, ValueError, TypeError):
+        return None
+    return subpaths
+
+
+def _rect_points(el) -> list[tuple[float, float]]:
+    x, y = float(el.get("x", 0)), float(el.get("y", 0))
+    w, h = float(el.get("width", 0)), float(el.get("height", 0))
+    r = min(float(el.get("rx", 0) or 0), w / 2, h / 2)
+    if r <= 0:
+        return [(x, y), (x + w, y), (x + w, y + h), (x, y + h), (x, y)]
+    pts = []
+    for cx, cy, a0 in ((x + w - r, y + r, -90), (x + w - r, y + h - r, 0), (x + r, y + h - r, 90),
+                       (x + r, y + r, 180)):
+        for k in range(5):
+            a = math.radians(a0 + 90 * k / 4)
+            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    pts.append(pts[0])
+    return pts
+
+
+def _dashes(subpaths, pattern: list[float]) -> str:
+    """Path data drawing the dashes of `pattern` along the subpaths explicitly."""
+    parts = []
+    total = sum(pattern)
+    for pts in subpaths:
+        k, left, on = 0, pattern[0], True
+        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+            seg = math.hypot(x1 - x0, y1 - y0)
+            done = 0.0
+            while seg - done > 1e-9:
+                step = min(left, seg - done)
+                if on:
+                    t0, t1 = done / seg, (done + step) / seg
+                    parts.append(f"M{_fmt(x0 + (x1 - x0) * t0)},{_fmt(y0 + (y1 - y0) * t0)} "
+                                 f"L{_fmt(x0 + (x1 - x0) * t1)},{_fmt(y0 + (y1 - y0) * t1)}")
+                done += step
+                left -= step
+                if left <= 1e-9:
+                    k = (k + 1) % len(pattern)
+                    left, on = pattern[k], not on
+        if total <= 0:
+            break
+    return " ".join(parts)
+
+
+def _arrowhead(subpaths, size: float = 9.0) -> str | None:
+    """A filled triangle with its tip at the path's end, as the tk-arrow marker draws it."""
+    pts = [p for sub in subpaths for p in sub]
+    if len(pts) < 2:
+        return None
+    tip = pts[-1]
+    prev = next((p for p in reversed(pts[:-1]) if math.hypot(p[0] - tip[0], p[1] - tip[1]) > 1e-6), None)
+    if prev is None:
+        return None
+    dx, dy = tip[0] - prev[0], tip[1] - prev[1]
+    length = math.hypot(dx, dy)
+    ux, uy = dx / length, dy / length
+    bx, by = tip[0] - ux * size, tip[1] - uy * size
+    nx, ny = -uy * size / 2, ux * size / 2
+    return (f"M{_fmt(tip[0])},{_fmt(tip[1])} L{_fmt(bx + nx)},{_fmt(by + ny)} "
+            f"L{_fmt(bx - nx)},{_fmt(by - ny)} Z")
+
+
+def raster_svg(svg: str) -> tuple[str, list[str]]:
+    """The SVG rewritten for MuPDF: markers become drawn arrowheads and dashed strokes become explicit dash
+    segments (the stroke-dasharray attribute is kept). Returns (svg, warnings about anything lost)."""
+    import xml.etree.ElementTree as ET
+
+    ET.register_namespace("", _SVG_NS)
+    try:
+        root = ET.fromstring(svg)
+    except ET.ParseError as e:
+        return svg, [f"pymupdf: the SVG could not be simplified ({e}); arrowheads and dashes may be lost"]
+    q = f"{{{_SVG_NS}}}"
+    lost: list[str] = []
+    marker_fill = {}
+    for defs in root.findall(q + "defs"):
+        for marker in defs.findall(q + "marker"):
+            shape = marker.find(q + "path")
+            marker_fill[marker.get("id")] = shape.get("fill", "#000000") if shape is not None else "#000000"
+            defs.remove(marker)
+        if not len(defs):
+            root.remove(defs)
+    parents = {child: parent for parent in root.iter() for child in parent}
+    for el in list(root.iter()):
+        tag = el.tag[len(q):] if el.tag.startswith(q) else el.tag
+        marker = el.get("marker-end")
+        dash = el.get("stroke-dasharray")
+        if not marker and not dash:
+            continue
+        if tag == "path":
+            subpaths = _flatten_path(el.get("d", ""))
+        elif tag == "rect":
+            subpaths = [_rect_points(el)]
+        else:
+            subpaths = None
+        parent = parents.get(el)
+        if subpaths is None or parent is None:
+            if marker:
+                el.attrib.pop("marker-end")
+                lost.append("an arrowhead")
+            if dash:
+                lost.append("a dashed stroke")
+            continue
+        index = list(parent).index(el)
+        extra = []
+        if dash:
+            try:
+                pattern = [float(v) for v in re.split(r"[\s,]+", dash.strip()) if v]
+            except ValueError:
+                pattern = []
+            if pattern and all(v >= 0 for v in pattern) and sum(pattern) > 0:
+                if len(pattern) % 2:
+                    pattern = pattern * 2
+                attrs = {"d": _dashes(subpaths, pattern), "fill": "none",
+                         "stroke": el.get("stroke", "#000000"), "stroke-width": el.get("stroke-width", "1"),
+                         "stroke-dasharray": dash}
+                dashed = ET.Element(q + "path", attrs)
+                el.set("stroke", "none")          # the element keeps its fill; the dashes draw the stroke
+                el.attrib.pop("stroke-dasharray")
+                extra.append(dashed)
+            else:
+                lost.append("a dashed stroke")
+        if marker:
+            el.attrib.pop("marker-end")
+            m = re.fullmatch(r"url\(#([^)]+)\)", marker)
+            head = _arrowhead(subpaths)
+            if head is None or m is None:
+                lost.append("an arrowhead")
+            else:
+                extra.append(ET.Element(q + "path", {"class": "arrowhead", "d": head,
+                                                     "fill": marker_fill.get(m.group(1), "#000000")}))
+        for k, new in enumerate(extra, 1):
+            parent.insert(index + k, new)
+    warnings = []
+    for what in dict.fromkeys(lost):
+        warnings.append(f"pymupdf PNG: {what} could not be converted and is missing from the PNG")
+    return ET.tostring(root, encoding="unicode"), warnings
+
+
 def _run(argv: list[str]) -> None:
     cp = subprocess.run(argv, capture_output=True, text=True, timeout=180)
     if cp.returncode != 0:
         raise RuntimeError((cp.stderr or cp.stdout or f"exit code {cp.returncode}").strip()[:300])
 
 
-def _write_png(svg: str, png_path: str) -> None:
-    """Convert with the first converter that works. The target is replaced only by a complete PNG."""
+def _write_png(svg: str, png_path: str) -> list[str]:
+    """Convert with the first converter that works. The target is replaced only by a complete PNG, and its
+    directory is created only after a converter succeeded (§16.1). Returns warnings."""
     target = pathlib.Path(png_path)
-    target.parent.mkdir(parents=True, exist_ok=True)
     failures = []
     with tempfile.TemporaryDirectory(prefix="tundlekit-png-") as tmp:
         src = pathlib.Path(tmp) / "diagram.svg"
         src.write_text(svg, encoding="utf-8")
         for name, convert in _png_converters():
             dst = pathlib.Path(tmp) / f"out-{name}.png"
+            warnings: list[str] = []
+            source = src
+            if name == "pymupdf":
+                simple, warnings = raster_svg(svg)
+                source = pathlib.Path(tmp) / "diagram-raster.svg"
+                source.write_text(simple, encoding="utf-8")
             try:
-                convert(src, dst)
-                if dst.is_file() and dst.read_bytes()[:8] == PNG_MAGIC:
-                    shutil.move(str(dst), str(target))
-                    return
-                failures.append(f"{name}: produced no PNG")
+                convert(source, dst)
+                if not (dst.is_file() and dst.read_bytes()[:8] == PNG_MAGIC):
+                    failures.append(f"{name}: produced no PNG")
+                    continue
             except Exception as e:     # a broken converter: try the next one
                 failures.append(f"{name}: {e}")
+                continue
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(dst), str(target))
+            except OSError as e:
+                raise ToolError(f"cannot write {png_path}: {e}") from None
+            return warnings
     if not failures:
         raise ToolError("no SVG to PNG converter found: install the Python package cairosvg "
                         "(pip install cairosvg), rsvg-convert (librsvg), Inkscape, or pymupdf "
@@ -1519,7 +1952,7 @@ def diagram_render(spec: dict | None = None, spec_path: str | None = None, merma
     spec, warnings = _load_source(spec, spec_path, mermaid, mermaid_path)
     warnings = [w for w in warnings if not w.startswith("the imported spec is not valid")]
     warnings += _require_valid(spec)
-    svg, width, height, geometry = render_svg(spec)
+    svg, width, height, geometry = render_svg(spec, warnings)
     if out is not None:
         target = pathlib.Path(out)
         try:
@@ -1528,7 +1961,7 @@ def diagram_render(spec: dict | None = None, spec_path: str | None = None, merma
         except OSError as e:
             raise ToolError(f"cannot write {out}: {e}") from None
     if png is not None:
-        _write_png(svg, png)
+        warnings += _write_png(svg, png)
     return {"svg": svg if out is None else None, "path": out, "png": png, "width": width, "height": height,
             "nodes": geometry, "warnings": warnings}
 

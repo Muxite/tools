@@ -27,7 +27,11 @@ NEW_ID = re.compile(r"[0-9]{4}\.[0-9]{4,5}(v[0-9]+)?")
 OLD_ID = re.compile(r"[a-z-]+(\.[A-Z]{2})?/[0-9]{7}(v[0-9]+)?")
 OLD_STEM = re.compile(r"([a-z-]+(?:\.[A-Z]{2})?)_([0-9]{7}(?:v[0-9]+)?)")
 MARKER = re.compile(r"^===== page (\d+) =====[ \t]*$", re.M)
-REFERENCES = re.compile(r"^\s*(References|REFERENCES|Bibliography|BIBLIOGRAPHY)\s*$", re.M)
+# A line that is only a references heading, optionally numbered (`7 References`, `7. REFERENCES`) or
+# `References and Notes` (MANIFEST §9.2, §16.6).
+REFERENCES = re.compile(r"^[ \t]*(?:[0-9]{1,2}(?:\.[0-9]{1,2})*\.?[ \t]+)?"
+                        r"(References|REFERENCES|Bibliography|BIBLIOGRAPHY)"
+                        r"(?:[ \t]+(?:and|AND|And)[ \t]+(?:Notes|NOTES))?[ \t]*$", re.M)
 
 
 # ---------------------------------------------------------------------------------------------- ids and files
@@ -388,14 +392,27 @@ def _abstract(text: str, chars: int) -> str:
     return re.sub(r"(?<!\n)\n(?!\n)", " ", text[begin:begin + chars])
 
 
-def _cut(text: str, rx: re.Pattern, width: int) -> str:
-    """At most `width` characters of text, centred on the first match of rx (MANIFEST §14.7)."""
+def _cut(text: str, mid: int, width: int) -> str:
+    """At most `width` characters of text, centred on offset `mid` (MANIFEST §14.7, §16.6)."""
     if len(text) <= width:
         return text
-    m = rx.search(text)
-    mid = (m.start() + m.end()) // 2 if m else 0
     lo = max(0, min(mid - width // 2, len(text) - width))
     return text[lo:lo + width]
+
+
+def _hit_text(lines: list[str], i: int, lo: int, hi: int, m: re.Match, width: int | None) -> str:
+    """Lines lo..hi-1 stripped and joined; with width, cut around the match `m` found in line i itself."""
+    parts = [s.strip() for s in lines[lo:hi]]
+    joined = " ".join(parts)
+    if width is None:
+        return joined
+    offset = sum(len(p) + 1 for p in parts[:i - lo])
+    raw = lines[i]
+    lead = len(raw) - len(raw.lstrip())
+    own = len(parts[i - lo])
+    start = min(max(m.start() - lead, 0), own)
+    end = min(max(m.end() - lead, start), own)
+    return _cut(joined, offset + (start + end) // 2, width)
 
 
 def _grep(text: str, pattern: str, context: int, max_hits: int,
@@ -417,15 +434,13 @@ def _grep(text: str, pattern: str, context: int, max_hits: int,
             m = MARKER.match(line)
             if m:
                 page = int(m.group(1))
-        if rx.search(line):
+        m = rx.search(line)
+        if m:
             if len(hits) >= max_hits:
                 truncated = True
                 break
             lo, hi = max(0, i - context), min(len(lines), i + context + 1)
-            joined = " ".join(s.strip() for s in lines[lo:hi])
-            if width is not None:
-                joined = _cut(joined, rx, width)
-            hits.append({"page": page, "line": i + 1, "text": joined})
+            hits.append({"page": page, "line": i + 1, "text": _hit_text(lines, i, lo, hi, m, width)})
     return hits, truncated
 
 
@@ -521,19 +536,66 @@ SUMMARY_FILE = re.compile(r"(.+?) - .*\.md")
 INDEX_COUNT = re.compile(r"(\d+) summaries")
 
 
+VENUE_LINE = re.compile(r"(?i)^(published as|accepted (at|to)|under review|preprint|arxiv:|proceedings of|"
+                        r"workshop on)")
+TITLE_WORDS = 20
+# Author marks after a name: `Smith1,`, `Smith1 2`, `Smith* 1`, `Smith*1`, `Smith†`, superscript digits.
+_DIGIT_MARK = re.compile(r"[a-z][0-9]{1,2}(?:\s*,\s*[0-9]{1,2})*(?=\s*(?:[,*∗†‡§]|$|\s[A-Z0-9]))")
+_SYMBOL_MARK = re.compile(r"[A-Za-z]\s?[*∗†‡§]|[†‡]")
+_SUPERSCRIPT_MARK = re.compile(r"[A-Za-z.][¹²³⁴⁵⁶⁷⁸⁹⁰]")
+_CAPITALISED = re.compile(r"\b[A-Z][A-Za-z'’.-]*")
+_SECTION_START = re.compile(r"(?i)^(abstract|introduction|[0-9]+\.?\s+introduction)\b")
+_SMALL_CAPS = re.compile(r"(?<![A-Za-z])([A-Z]) ([A-Z]{2,})(?![a-z])")
+_SPACED_HYPHEN = re.compile(r"(?<![A-Za-z])([A-Z]{2,}) -(?=[A-Z])")
+
+
+def _author_line(line: str) -> bool:
+    """An author list: an e-mail `@`, author marks after names, or a comma list of 3+ capitalised words."""
+    if "@" in line or _SYMBOL_MARK.search(line) or _SUPERSCRIPT_MARK.search(line):
+        return True
+    marks = len(_DIGIT_MARK.findall(line))
+    if marks >= 2 or (marks and "," in line):
+        return True
+    if "," in line:
+        words = re.findall(r"[A-Za-z][A-Za-z'’.-]*", line)
+        caps = [w for w in words if w[0].isupper()]
+        if len(caps) >= 3 and len(caps) * 3 >= len(words) * 2:
+            return True
+    return False
+
+
+def rejoin_small_caps(text: str) -> str:
+    """`A LITA -G` -> `ALITA-G`, `D EEP R ESEARCH` -> `DEEP RESEARCH` (MANIFEST §16.6)."""
+    prev = None
+    while prev != text:
+        prev = text
+        text = _SMALL_CAPS.sub(r"\1\2", text)
+    return _SPACED_HYPHEN.sub(r"\1-", text)
+
+
 def _title_and_authors(page1: str) -> tuple[str, str]:
+    """Title and author line of a paper's first page (MANIFEST §15.8, §16.6)."""
     lines = page1.split("\n")
-    start = next((i for i, ln in enumerate(lines) if len(ln.split()) > 3), None)
+    start = None
+    for i, ln in enumerate(lines):
+        text = ln.strip()
+        if not text or VENUE_LINE.match(text):
+            continue
+        if len(text.split()) > 3:
+            start = i
+            break
     if start is None:
         return "", ""
-    parts, last = [lines[start]], start
+    parts, last = [lines[start].strip()], start
     for i in range(start + 1, len(lines)):
-        if lines[i][:1].islower():
-            parts.append(lines[i])
-            last = i
-        else:
+        text = lines[i].strip()
+        words = len(" ".join(parts).split())
+        if (not text or words >= TITLE_WORDS or _author_line(text) or VENUE_LINE.match(text)
+                or _SECTION_START.match(text)):
             break
-    title = " ".join(" ".join(parts).split())
+        parts.append(text)
+        last = i
+    title = rejoin_small_caps(" ".join(" ".join(parts).split()))
     authors = next((ln.strip() for ln in lines[last + 1:] if ln.strip()), "")
     return title, authors
 
@@ -577,19 +639,63 @@ def papers_summary(id: str, dir: str | None = None, short: str | None = None, wr
         "Read: <pages read>", "",
         "\n\n".join(SUMMARY_HEADINGS),
     ]) + "\n"
-    target = _paper_dir(dir) / "summaries" / f"{stored_name(id)} - {name}.md"
+    sdir = _paper_dir(dir) / "summaries"
+    target = sdir / f"{stored_name(id)} - {name}.md"
+    if os.path.lexists(sdir) and not sdir.is_dir():
+        raise ToolError(f"cannot write summaries: {sdir} exists and is a file, not a directory")
     if write:
-        if target.exists():
+        if os.path.lexists(target):
             raise ToolError(f"refusing to overwrite {target}")
         try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with open(target, "x", encoding="utf-8", newline="\n") as f:
-                f.write(text)
-        except FileExistsError:
-            raise ToolError(f"refusing to overwrite {target}") from None
+            sdir.mkdir(parents=True, exist_ok=True)
         except (OSError, ValueError) as exc:
-            raise ToolError(f"cannot write {target}: {exc}") from None
+            raise ToolError(f"cannot create the summaries directory {sdir}: {exc}") from None
+        _write_new_atomic(target, text.encode("utf-8"))
     return {"path": str(target), "text": text, "written": bool(write)}
+
+
+def _write_new_atomic(target: Path, data: bytes) -> None:
+    """Write a new file atomically: a temp file in the same directory, then moved into place without ever
+    replacing an existing file (MANIFEST §16.1)."""
+    import tempfile
+
+    try:
+        fd, tmp = tempfile.mkstemp(prefix=".tundlekit-", suffix=".tmp", dir=str(target.parent))
+    except (OSError, ValueError) as exc:
+        raise ToolError(f"cannot write {target}: {exc}") from None
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        try:
+            os.chmod(tmp, 0o666 & ~_umask())
+        except OSError:
+            pass
+        if os.name == "nt":
+            os.rename(tmp, target)                  # fails when the target exists
+        else:
+            try:
+                os.link(tmp, target)                # fails when the target exists
+            except FileExistsError:
+                raise
+            except OSError:                         # no hard links here: check, then replace
+                if os.path.lexists(target):
+                    raise FileExistsError(str(target)) from None
+                os.replace(tmp, target)
+    except FileExistsError:
+        raise ToolError(f"refusing to overwrite {target}") from None
+    except (OSError, ValueError) as exc:
+        raise ToolError(f"cannot write {target}: {exc}") from None
+    finally:
+        _remove(Path(tmp))
+
+
+def _umask() -> int:
+    try:
+        mask = os.umask(0o022)
+        os.umask(mask)
+        return mask
+    except (OSError, AttributeError):
+        return 0o022
 
 
 def _base_id(arxiv_id: str) -> str:
@@ -601,34 +707,168 @@ def _mentions(text: str, arxiv_id: str) -> bool:
     return any(re.search(r"(?<![\w.])" + re.escape(f) + r"(?![0-9])", text) for f in forms)
 
 
-def _finding(rule: str, path: str, line: int | None, message: str, excerpt: str = "") -> dict:
-    return {"rule": rule, "severity": "warning", "path": path.replace("\\", "/"), "line": line,
+def _finding(rule: str, path: str, line: int | None, message: str, excerpt: str = "",
+             severity: str = "warning") -> dict:
+    return {"rule": rule, "severity": severity, "path": path.replace("\\", "/"), "line": line,
             "message": message, "excerpt": excerpt}
+
+
+# Name-plus-id citations (MANIFEST §16.4, used by P005): a paragraph with a page locator that holds an arXiv id,
+# or names a paper that a table row of the report pairs with an id.
+PAGE_LOCATOR = re.compile(r"\(\s*pp?\.?\s*[0-9]+(?:\s*[,–-]\s*(?:pp?\.?\s*)?[0-9]+)*\s*\)"
+                          r"|(?<![A-Za-z])pp?\.\s*[0-9]+")
+BARE_ID = re.compile(r"(?<![0-9.])([0-9]{4}\.[0-9]{4,5})(?:v[0-9]+)?(?![0-9]|\.[0-9])")
+_TABLE_RULE = re.compile(r"^\s*\|?\s*:?-{3,}")
+_LIST_START = re.compile(r"^[ \t]*(?:[-*+•]|[0-9]{1,9}[.)])(?:[ \t]+|$)")
+_MD_MARKUP = re.compile(r"\[([^\]]*)\]\([^)]*\)|[*_`]+")
+
+
+def _ids_in(text: str) -> list[str]:
+    """arXiv ids in text: `arXiv:` forms and bare new-style ids, in order, without versions."""
+    found = [(m.start(), m.group(1)) for m in ARXIV_REF.finditer(text)]
+    found += [(m.start(), m.group(1)) for m in BARE_ID.finditer(text)]
+    out: list[str] = []
+    for _, i in sorted(found):
+        if i not in out:
+            out.append(i)
+    return out
+
+
+def _table_cells(line: str) -> list[str]:
+    body = line.strip()
+    if body.startswith("|"):
+        body = body[1:]
+    if body.endswith("|"):
+        body = body[:-1]
+    return [c.strip() for c in re.split(r"(?<!\\)\|", body)]
+
+
+def _plain_cell(cell: str) -> str:
+    return " ".join(_MD_MARKUP.sub(lambda m: m.group(1) or "", cell).split())
+
+
+def _blocks(lines: list[str]) -> list[list[int]]:
+    """Paragraphs as lists of 0-based line indexes; each list item and each table row is its own block."""
+    blocks: list[list[int]] = []
+    current: list[int] = []
+    for k, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("|") or not stripped or MD_HEADING.match(line):
+            if current:
+                blocks.append(current)
+            current = []
+            if stripped.startswith("|") and not _TABLE_RULE.match(line):
+                blocks.append([k])
+            continue
+        if _LIST_START.match(line) and current:
+            blocks.append(current)
+            current = []
+        current.append(k)
+    if current:
+        blocks.append(current)
+    return blocks
+
+
+def named_citations(lines: list[str]) -> list[tuple[int, str]]:
+    """(1-based line, arXiv id) for every name-plus-id citation with a page locator (MANIFEST §16.4).
+
+    `lines` should already have fenced code blanked. Table rows that pair a name with 1 id define names; a
+    paragraph (or table row) with a locator cites every id it holds and every paper it names."""
+    names: dict[str, str] = {}
+    for line in lines:
+        if not line.lstrip().startswith("|") or _TABLE_RULE.match(line):
+            continue
+        cells = _table_cells(line)
+        ids = {i for c in cells for i in _ids_in(c)}
+        if len(ids) != 1:
+            continue
+        (only,) = ids
+        for cell in cells:
+            plain = _plain_cell(cell)
+            if _ids_in(plain) or not re.search(r"[A-Za-z]{2}", plain) or len(plain) > 60:
+                continue
+            names.setdefault(plain, only)
+    name_rx = [(re.compile(r"(?<!\w)" + re.escape(n) + r"(?!\w)"), i) for n, i in names.items()]
+
+    cited: list[tuple[int, str]] = []
+    for block in _blocks(lines):
+        text = "\n".join(lines[k] for k in block)
+        if not PAGE_LOCATOR.search(text):
+            continue
+        for k in block:
+            cited += [(k + 1, i) for i in _ids_in(lines[k])]
+            cited += [(k + 1, i) for rx, i in name_rx if rx.search(lines[k])]
+    return cited
+
+
+def _blank_fences(lines: list[str]) -> list[str]:
+    out, fence = [], None
+    for line in lines:
+        m = _FENCE.match(line)
+        if fence is not None:
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence):
+                fence = None
+            out.append("")
+        elif m:
+            fence = m.group(1)
+            out.append("")
+        else:
+            out.append(line)
+    return out
+
+
+def _has_heading(lines: list[str], heading: str) -> bool:
+    """A heading counts when a line starts with it; `## How it works` also accepts any `## How ` heading."""
+    if any(ln.startswith(heading) for ln in lines):
+        return True
+    if heading.strip() == "## How it works":
+        return any(ln.startswith("## How ") for ln in lines)
+    return False
+
+
+def _check_profile(profile) -> dict[str, list[str]]:
+    if profile is None:
+        return {}
+    if not isinstance(profile, dict):
+        raise ToolError("profile must be an object mapping summary ids to lists of headings")
+    out = {}
+    for key, value in profile.items():
+        if not isinstance(value, list) or not all(isinstance(h, str) and h.strip() for h in value):
+            raise ToolError(f"profile[{key!r}] must be a list of non-empty heading strings")
+        arxiv_id = id_from_stem(str(key)) or str(key)
+        out[_base_id(arxiv_id)] = value
+    return out
 
 
 @tool(
     "papers_index_check",
     "Check a papers folder against its summaries: P001 a paper with no summaries/{id} - *.md, P002 a summary "
     "not mentioned in INDEX.md, P003 an INDEX.md 'N summaries' count that is wrong, P004 a summary missing one "
-    "of the Summary / How it works / Results / Limitations / Relevance headings, and, with report, P005 an "
-    "arXiv id cited in the report's references with no summary.",
+    "of the Summary / How ... / Results / Limitations / Relevance headings (profile maps a summary id to its "
+    "own heading list), P006 no INDEX.md; with report, P005 an arXiv id cited in the report (references, or "
+    "name + id with a page locator) that has no summary, and P007 (info) a report with no resolvable citations.",
     {"type": "object",
      "properties": {
          "dir": {"type": "string", "description": "papers directory (default: current directory)"},
          "index": {"type": "string", "description": "INDEX.md path (default {dir}/summaries/INDEX.md)"},
-         "report": {"type": "string", "description": "a Markdown report whose references are checked"},
+         "report": {"type": "string", "description": "a Markdown report whose citations are checked"},
+         "profile": {"type": "object",
+                     "additionalProperties": {"type": "array", "items": {"type": "string"}},
+                     "description": "summary id -> required headings, overriding the default list"},
      },
      "additionalProperties": False},
     readOnlyHint=True,
 )
-def papers_index_check(dir: str | None = None, index: str | None = None, report: str | None = None) -> dict:
+def papers_index_check(dir: str | None = None, index: str | None = None, report: str | None = None,
+                       profile: dict | None = None) -> dict:
     root = _paper_dir(dir)
     if not root.is_dir():
         raise ToolError(f"no such directory: {root}")
+    profiles = _check_profile(profile)
     index_path = index if index is not None else str(root / "summaries" / "INDEX.md")
-    index_text = read_input(index_path, "index")
-    report_text = read_input(report, "report") if report is not None else None
     index_shown = index if index is not None else "summaries/INDEX.md"
+    index_text = read_input(index_path, "index") if os.path.lexists(index_path) else None
+    report_text = read_input(report, "report") if report is not None else None
 
     papers = {}
     for p in sorted(root.iterdir()):
@@ -646,41 +886,51 @@ def papers_index_check(dir: str | None = None, index: str | None = None, report:
     summarised = {_base_id(i) for _, i in summaries}
 
     findings = []
+    if index_text is None:
+        findings.append(_finding("P006", index_shown, None,
+                                 f"{index_shown} is missing: the summaries have no index"))
     for arxiv_id, name in papers.items():
         if _base_id(arxiv_id) not in summarised:
             findings.append(_finding("P001", name, None, f"{arxiv_id} has no summary in summaries/"))
     for name, arxiv_id in summaries:
         shown = f"summaries/{name}"
-        if not _mentions(index_text, arxiv_id):
+        if index_text is not None and not _mentions(index_text, arxiv_id):
             findings.append(_finding("P002", shown, None, f"{arxiv_id} is not mentioned in {index_shown}"))
         try:
             lines = _read(sdir / name).split("\n")
         except OSError as exc:
             raise ToolError(f"cannot read {sdir / name}: {exc}") from None
-        missing = [h for h in SUMMARY_HEADINGS if not any(ln.startswith(h) for ln in lines)]
+        required = profiles.get(_base_id(arxiv_id), SUMMARY_HEADINGS)
+        missing = [h for h in required if not _has_heading(lines, h)]
         if missing:
             findings.append(_finding("P004", shown, None, f"{arxiv_id} summary lacks " + ", ".join(missing)))
-    for n, line in enumerate(index_text.split("\n"), 1):
+    for n, line in enumerate((index_text or "").split("\n"), 1):
         for m in INDEX_COUNT.finditer(line):
             if int(m.group(1)) != len(summaries):
                 findings.append(_finding("P003", index_shown, n, f"{index_shown} says {m.group(1)} summaries, "
                                          f"but there are {len(summaries)} summary files", line.strip()[:80]))
     if report_text is not None:
-        lines = report_text.split("\n")
-        seen = set()
+        lines = _blank_fences(report_text.split("\n"))
+        cited: list[tuple[int, str]] = []
         for n, (line, bucket) in enumerate(zip(lines, heading_buckets(lines)), 1):
-            if bucket != "references":
+            if bucket == "references":
+                cited += [(n, m.group(1)) for m in ARXIV_REF.finditer(line)]
+        cited += named_citations(lines)
+        seen = set()
+        for n, arxiv_id in sorted(cited):
+            base = _base_id(arxiv_id)
+            if base in seen or base in summarised:
                 continue
-            for m in ARXIV_REF.finditer(line):
-                arxiv_id = m.group(1)
-                if arxiv_id in seen or arxiv_id in summarised:
-                    continue
-                seen.add(arxiv_id)
-                findings.append(_finding("P005", report, n, f"{arxiv_id} is cited in the report but has no summary",
-                                         line.strip()[:80]))
+            seen.add(base)
+            findings.append(_finding("P005", report, n, f"{arxiv_id} is cited in the report but has no summary",
+                                     lines[n - 1].strip()[:80]))
+        if not cited:
+            findings.append(_finding("P007", report, None, "no resolvable citations in the report: P005 needs "
+                                     "[n] references with arXiv ids, or name + id citations with (pN) locators",
+                                     severity="info"))
     findings.sort(key=lambda f: (f["path"], f["line"] or 0, f["rule"]))
-    counts = {"error": 0, "warning": len(findings), "info": 0}
-    return {"ok": True, "findings": findings, "counts": counts, "papers": len(papers),
+    counts = {sev: sum(1 for f in findings if f["severity"] == sev) for sev in ("error", "warning", "info")}
+    return {"ok": counts["error"] == 0, "findings": findings, "counts": counts, "papers": len(papers),
             "summaries": len(summaries)}
 
 
@@ -743,6 +993,8 @@ def add_cli(groups) -> None:
     c.add_argument("--dir")
     c.add_argument("--index")
     c.add_argument("--report")
+    c.add_argument("--profile", metavar="JSON",
+                   help="JSON object (or a file holding it): summary id -> list of required headings")
     common_flags(c, checker=True)
     c.set_defaults(handler=_cli_index_check)
 
@@ -754,7 +1006,18 @@ def _cli_summary(args) -> CliResult:
 
 
 def _cli_index_check(args) -> CliResult:
-    return CliResult(papers_index_check(dir=args.dir, index=args.index, report=args.report))
+    profile = None
+    if args.profile is not None:
+        import json
+
+        text = args.profile
+        if not text.lstrip().startswith("{") and Path(text).is_file():
+            text = read_input(text, "profile")
+        try:
+            profile = json.loads(text)
+        except ValueError as exc:
+            raise ToolError(f"--profile is not valid JSON: {exc}") from None
+    return CliResult(papers_index_check(dir=args.dir, index=args.index, report=args.report, profile=profile))
 
 
 def _cli_fetch(args) -> CliResult:

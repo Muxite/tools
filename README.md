@@ -49,15 +49,16 @@ errors or the tool failed, 2 usage error. Checkers accept `--strict` (warnings f
 
 | Group | Commands | What for |
 |---|---|---|
-| `tundlekit bundle ...` | `status`, `release`, `compare`, `prune`, `init`, `lint`, `verify`, `source`, `setup-table` | keep a tundle: versioned releases, copy comparison, history clearing, portable names, setup tables, SOURCE.md files and checksums |
-| `tundlekit deck ...` | `build`, `lint`, `inspect`, `diff` | PowerPoint decks from a JSON spec; timing and speaker-note rules; hand edits carried back |
-| `tundlekit diagram ...` | `render`, `validate`, `from-mermaid`, `to-mermaid` | SVG/PNG diagrams (colour = stage, style = actor) from a spec or Mermaid |
+| `tundlekit bundle ...` | `status`, `release`, `compare`, `prune`, `init`, `lint`, `verify`, `source`, `setup-table` | keep a tundle: versioned releases, copy comparison, history clearing, portable names, setup tables, SOURCE.md files (1 file, or a whole folder with `source DIR --all`) and checksums |
+| `tundlekit deck ...` | `build`, `lint`, `inspect`, `diff` | PowerPoint decks from a JSON spec (native single- and multi-series charts, monospace table columns); timing and speaker-note rules, several decks against 1 times file (`lint --ids`); hand edits, cuts, moves and renumbering carried back |
+| `tundlekit diagram ...` | `render`, `validate`, `from-mermaid`, `to-mermaid` | SVG/PNG diagrams (colour = stage, style = actor) from a spec or Mermaid, with group-aware wrapping |
 | `tundlekit chart ...` | `bar` | SVG bar charts with a highlighted bar and a takeaway |
 | `tundlekit palette ...` | `show` | the stage and outcome colours and the diagram rules |
-| `tundlekit text ...` | `lint`, `fignums`, `wordcount`, `xref`, `apply-edits`, `docx-diff` | report style lint, figure/table numbering, words per section, cross-references and renumbering, anchored edits, .docx hand edits |
+| `tundlekit text ...` | `lint`, `fignums`, `wordcount`, `xref`, `apply-edits`, `docx-diff` | report style lint, figure/table numbering, words per section, cross-references and renumbering (each file paired with its own report), anchored edits across files, .docx hand edits (`docx-diff --emit-edits` drafts the edits file) |
 | `tundlekit review coverage` | `coverage` | does the deck cover the report, section by section and rule by rule |
 | `tundlekit claims trace` | `trace` | is every cited number on a page of the cited paper |
 | `tundlekit render ...` | `pdf`, `sheet`, `office`, `backends` | render PDFs and Office files to PNG, contact sheets |
+| `tundlekit office check` | `check` | are Word, PowerPoint or Excel running? Run it before any build or render (exit 1 while they are; `--wait` polls) |
 | `tundlekit papers ...` | `fetch`, `list`, `abs`, `grep`, `body`, `summary`, `index-check` | download arXiv papers, read them page by page, keep summaries and their index complete |
 | `tundlekit translate ...` | `check`, `resources`, `terms` | zh ↔ en translation checks, term carry-over, rules, glossary and prompts |
 
@@ -66,6 +67,8 @@ Examples:
 ```
 tundlekit bundle status
 tundlekit bundle release "Added the September report"
+tundlekit bundle source setup --all
+tundlekit office check --wait 60
 tundlekit deck lint examples/deck.json
 tundlekit deck build examples/deck.json -o build/example.pptx
 tundlekit diagram render examples/diagram.json -o build/diagram.svg
@@ -79,6 +82,9 @@ tundlekit translate check all source.zh.md translation.en.md --dir zh-en
 tundlekit review coverage report.md build/example.pptx
 tundlekit claims trace report.md --papers papers
 tundlekit deck diff build/example.pptx edited/example.pptx --search examples
+tundlekit text docx-diff report.md edited/report.docx --search . --emit-edits edits.json
+tundlekit text apply-edits edits.json report.md --write
+tundlekit text xref report.md --in build_deck.py=report.md notes --exclude "*/versions/*"
 ```
 
 Any registered tool can also be run by name with JSON arguments:
@@ -93,28 +99,29 @@ tundlekit call palette_get --args '{}'
 | Command | Speeds up / improves | Needs | Writes files? |
 |---|---|---|---|
 | `bundle status`, `compare`, `lint`, `verify` | checking a copy before editing or copying it; catching unportable names, junk, stale PDFs, bad checksums | Python, `git` | no |
-| `bundle source`, `bundle setup-table` | drafting SOURCE.md files and setup README rows from file names and hashes instead of typing them (dry run by default) | Python | with `--write` |
+| `bundle source`, `bundle setup-table` | drafting SOURCE.md files and setup README rows from file names, existing README rows and hashes instead of typing them (dry run by default); `bundle source DIR --all` drafts every missing SOURCE.md in a folder tree | Python | with `--write` |
 | `bundle release`, `init` | 1-command versioned release with a CHANGELOG entry | Python, `git`, a git identity | yes (commit) |
 | `bundle prune` | clearing old history safely (dry run by default) | Python, `git` | yes (**rewrites history**; needs `--yes`) |
-| `deck build`, `deck inspect` | building a timed, rule-following deck from JSON; reading any deck's text and notes | `office` extra | build: yes |
-| `deck lint` | speaker-note timing, meta/defensive notes, insert-slide rules; several decks against 1 shared times file | spec: nothing; `.pptx`: `office` extra | no |
-| `deck diff` | finding a person's edits in a built deck and the source lines to change, instead of comparing slides by eye | `office` extra | no |
+| `deck build`, `deck inspect` | building a timed, rule-following deck from JSON, including native `series` charts (multi-series bar and line, with a legend), `mono_cols` tables and strip-overlap warnings; reading any deck's text and notes | `office` extra | build: yes |
+| `deck lint` | speaker-note timing, meta/defensive notes, insert-slide rules; several decks against 1 shared times file (`--ids` when its keys are not the file stems) | spec: nothing; `.pptx`: `office` extra | no |
+| `deck diff` | finding a person's edits, cuts, moves and renumbering in a built deck and the source lines to change, instead of comparing slides by eye | `office` extra | no |
+| `office check` | knowing Word, PowerPoint and Excel are closed before a build or render writes an Office file (`--wait SECONDS` polls) | Windows: `tasklist`; elsewhere `ps` (looks for LibreOffice) | no |
 | `review coverage` | report ↔ deck coverage and rule-name check in seconds, instead of a side-by-side read | spec: nothing; `.pptx`: `office` extra | no |
-| `claims trace` | locating every cited number on a page of its paper, instead of opening each paper by hand | papers' `.txt` files | no |
-| `diagram render` / `validate` / `from-mermaid` / `to-mermaid` | consistent stage/actor diagrams with auto layout | nothing (PNG: `cairosvg`, `rsvg-convert` or Inkscape) | render: yes |
+| `claims trace` | locating every cited number on a page of its paper, instead of opening each paper by hand | papers' `.txt` files; `[n]` references or name + `(pN)` locators in the report | no |
+| `diagram render` / `validate` / `from-mermaid` / `to-mermaid` | consistent stage/actor diagrams with auto layout, group-aware wrapping, `%% rank` / `%% wrap` in Mermaid | nothing (PNG: `cairosvg`, `rsvg-convert` or Inkscape; pymupdf as a limited fallback) | render: yes |
 | `chart bar` | a highlighted bar chart with data labels and a takeaway | nothing | with `-o` |
 | `palette show` | the shared colour rules | nothing | no |
 | `text lint`, `fignums`, `wordcount` | style-card prose checks, numbering, per-section and per-bucket word counts | nothing (`--baseline`: `git`) | no |
-| `text xref` | checking § / App. / Fig. / Table references in scripts and notes, and renumbering them all at once | nothing | with `--write` |
-| `text apply-edits` | applying review edits as anchored replacements (fails instead of silently missing), also inside .docx | nothing | with `--write` |
-| `text docx-diff` | carrying hand edits in a .docx back into the Markdown source, with source line hints | nothing | no |
+| `text xref` | checking § / App. / Fig. / Table references in scripts and notes, each against the report it slices (`--in FILE=REPORT`, `--exclude`), and renumbering them all at once | nothing | with `--write` |
+| `text apply-edits` | applying review edits as anchored replacements (fails instead of silently missing), also inside .docx, and a list of per-file edits all or nothing | nothing | with `--write` |
+| `text docx-diff` | carrying hand edits in a .docx back into the Markdown source, with source line hints; `--emit-edits` writes them as an edits file for `text apply-edits` | nothing | only the `--emit-edits` file |
 | `render pdf`, `render sheet` | page PNGs and contact sheets for eyeballing a deliverable | `pdf` extra / `office` extra | yes |
 | `render office` | render a .pptx/.docx from a copy, never the original | text backend: nothing (`.pptx` needs `office`); PNG: PowerPoint + pywin32 on Windows, or LibreOffice | yes (only into a new, empty or earlier render folder) |
 | `papers fetch` | download arXiv PDFs and extract page-marked text | network; `pdf` extra or `pdftotext` for text | yes |
 | `papers list`, `abs`, `grep`, `body` | reading a paper and tracing a number to its page; flags 2-column layout text | nothing | no |
 | `papers summary`, `papers index-check` | summary skeletons with title, authors and pages filled in; finding missing summaries and index rows | nothing | summary: with `--write` |
 | `translate check`, `resources` | mechanical zh ↔ en checks; the glossary, rules and prompts | nothing | `--repair` only |
-| `translate terms` | spotting technical terms dropped between a source and its translations | nothing | no |
+| `translate terms` | spotting technical terms dropped between a source and its translations, across Chinese hops (`--compare same-language`, glossary renderings as L003, `--no-glossary`) | nothing | no |
 
 ## Safety notes
 
@@ -137,18 +144,36 @@ tundlekit call palette_get --args '{}'
   headings and slides without a footer are matched only by title, so cite the report section in every footer.
 - `claims trace` finds numbers as written (plus percent ↔ decimal). A number the paper states in another form
   (a fraction, a rounded value, a figure read off a plot) shows as untraced until it has a ledger row, and a located
-  number may still be the wrong quantity. Only references with an arXiv id are traced.
-- `bundle source` and `bundle setup-table` guess program names and versions from file names; check them.
+  number may still be the wrong quantity. Only references with an arXiv id are traced, and only `[n]` references
+  or a paper name with its id plus a `(pN)` locator count as citations. A report with neither gives 0 claims and a
+  T004 warning: that is not a pass. Small integers and numbers found on many pages are marked `weak` (T003 when no
+  stated page or table matches) and need a check by hand.
+- `text xref` resolves a build script's slice source only from string literals and `__file__`-based anchors;
+  anything else gives X003 (info) and that marker is not checked. References to another document whose name does
+  not end in "report" are still checked against the paired report.
+- `deck diff` pairs slides only while their titles stay at least 0.4 similar; a slide retitled beyond that shows as
+  `removed` plus `added`.
+- `deck build` overflow warnings come from a characters-per-line estimate; the rendered slide decides.
+- The pymupdf PNG fallback of `diagram render` keeps arrowheads (drawn as paths) and dashes, and names anything
+  else it cannot reproduce in `warnings`. Use `cairosvg`, `rsvg-convert` or Inkscape for exact PNGs.
+- `office check` sees Word, PowerPoint and Excel (LibreOffice outside Windows) only; it does not detect other
+  programs holding a file open, and on non-Windows systems without LibreOffice running it always reports `ok`.
+- `bundle source` and `bundle setup-table` guess program names and versions from file names (or reuse an existing
+  README row); check them. Junk files and names with a backtick or `|` are listed as `skipped`, never added.
 - `translate check` and `translate terms` find mechanical damage only. Faithfulness needs the critic step
-  (`zh-en-translation` skill).
+  (`zh-en-translation` skill). `translate terms` downgrades a missing term to L003 only when the glossary has an
+  approved Chinese rendering and the file is mostly Chinese.
 - `text apply-edits` on a .docx edits text within 1 paragraph; it does not add or remove paragraphs.
+  `docx-diff --emit-edits` covers only `replace` changes with exactly 1 source location.
+- Every checker's output is a starting list to confirm. Each skill lists the known remaining false positives
+  (noise) of the tools it runs.
 
 ## How the tools are built
 
 [MANIFEST.md](MANIFEST.md) is the contract. For each change, one agent writes tests from the manifest: a visible
 suite (in `tests/`) and a held-out suite that the implementer never sees. A separate agent implements from the
 manifest and the visible tests only. The change is accepted when both suites pass. Adversarial reviews then look
-for defects and usefulness gaps on real material, and their findings become new manifest sections (§13, §14),
+for defects and usefulness gaps on real material, and their findings become new manifest sections (§13 to §16),
 with tests first. The [`held-out-build-gate`](skills/held-out-build-gate/SKILL.md) skill describes the method.
 
 ## MCP server

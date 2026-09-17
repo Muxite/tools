@@ -1398,3 +1398,252 @@ Read-only annotations: `review_coverage`, `claims_trace`, `deck_diff`, `docx_dif
 `translate_terms` are read-only. The tools with a `write` flag are not. The skills that cover these areas
 (deck-builder, report-writing, deliverable-review, paper-reading, tundle-bundle, zh-en-translation) mention the new
 commands, and `review-prompts` is added to the required-skills table of §11.
+
+---
+
+## 16. Round 4 (reviews of round 3)
+
+An adversarial review and a usefulness review ran on round 3 with the real material. Where the rules below conflict
+with earlier sections, this section wins.
+
+### 16.1 Safety and robustness (every tool)
+- **XML-safe text.**
+  - Text written into a `.docx`, `.pptx` or SVG must not contain characters that are illegal in XML 1.0 (control
+    characters other than tab, newline and carriage return, lone surrogates, U+FFFE, U+FFFF).
+  - `text_apply_edits` validates every `replace` (and every `find`) against this, and against lone surrogates for
+    text files. A violation is a `ToolError` that names the edit index. Nothing is written.
+- **Case-insensitive names.** Names such as `SOURCE.md` and `README.md` are compared case-insensitively everywhere
+  (bundle_source input refusal, bundle_setup_table, B006/B007 exemptions, B014).
+- **bundle_setup_table skips.** It never adds rows for junk files (§2.7 B005 list) or for names containing a backtick
+  or `|`. Those are reported in a new result list `"skipped": [{"name", "reason"}]`. A `|` line inside a fenced code
+  block is never taken as a table.
+- **Defensive .pptx reading.** Every tool that reads a `.pptx` (`deck_inspect`, `deck_lint`, `deck_diff`,
+  `review_coverage`, `render_office` text backend) treats these as ordinary content, never as a crash:
+  - a notes slide without a notes placeholder counts as empty notes;
+  - a shape of unrecognised type is skipped for its geometry but its text is still read.
+- **Corrupt packages.** A corrupt `.docx` or `.pptx` (including a bad deflate stream in any part) is a `ToolError`.
+  `docx_diff` and `text_apply_edits` decompress only the parts they need; other parts are copied as raw zip entries.
+- **Rewrites keep the file.** `text_apply_edits`, `text_xref`, `bundle_source`, `bundle_setup_table` and
+  `papers_summary`:
+  - write atomically (a temp file in the same directory, then replace);
+  - keep the original file's permission bits;
+  - write through a symlink to its target rather than replacing the link.
+- **Overflow.** Deck times and ledger sums that are not finite, and geometry values (`x`, `y`, `w`, `h`) that are
+  not in `0 ≤ v ≤ 1000` inches (with `w`, `h` ≥ 0.01), are validation problems. Excerpt boxes never get a
+  negative height: a caption that doesn't fit is a warning and the caption is omitted. Chart axis ticks handle any
+  positive maximum, including subnormal floats.
+- **Deduplicated inputs.** Walked inputs (`files`, `search`) are deduplicated by resolved path. Paths given as
+  `C:/x`, `C:\x` and `/c/x` (Git Bash) that name the same file are the same input, including for fignums
+  `FILE=REPORT`.
+- **Broken pipes.** The CLI exits quietly (exit 0 for the output already written) on a broken stdout pipe.
+- **Directory errors.** `papers_summary` with `{dir}/summaries` being a file gives a `ToolError` that says so.
+  `diagram_render` creates the PNG's parent directory only after a converter succeeds.
+
+### 16.2 deck_diff
+- **Pairing order.**
+  1. Exact title match, then title similarity ≥ 0.8 (both after whitespace collapse and case folding). Among several
+     candidates, prefer the same number text, then the nearest position.
+  2. Then same number text, but only when the title similarity is ≥ 0.4.
+  3. Then the remaining slides by position, only when title similarity is ≥ 0.4.
+  4. Everything else is `removed` / `added`.
+- **`moved`.** A paired slide whose position changed relative to the other pairs (not explained by insertions or
+  removals: it lies outside a longest increasing subsequence of the pairs) gives `moved`, with `old` and `new` as
+  1-based positions. A renumber alone (number text changed) gives a `number` change: `{"field": "number", "old",
+  "new"}`.
+- **Tables.** Each table gives at most 1 `text` change, whose `diff` is a unified diff of its rows (cells joined
+  with ` | `).
+- **`slide` field.** Always a string: the new slide's number text, or `"#<position>"` when it has none (the old
+  slide's, for `removed`).
+
+### 16.3 docx_diff and text_apply_edits
+- **Markdown reduction for docx comparison.**
+  - Image markup is stripped even when the alt text contains brackets (the alt text is kept).
+  - A leading list number `N.` or `N)` is kept as text on both sides when the docx paragraph starts with it; otherwise
+    removed on both sides.
+  - Lines consisting only of a LaTeX-style command (`\pagebreak`, `\newpage`, `\clearpage`) or a template
+    placeholder `{{...}}` are dropped.
+  - A fenced code block is 1 paragraph, its lines joined with `\n`. Docx line breaks (`<w:br/>`) are `\n` too.
+  - Result: an in-sync pair gives `changes: []`.
+- **`emit_edits`.** `docx_diff` gains `emit_edits` (CLI `--emit-edits PATH`). It writes a JSON edits file for
+  `text_apply_edits` covering every `replace` change that has exactly 1 hint location, as
+  `{"path": <hint file>, "edits": [{"find": old, "replace": new, "count": 1}]}`. There is 1 object per target file,
+  in a list. The result gains `"edits_written": n`. `text_apply_edits` accepts that list form: a list of objects with
+  `path` applies each to its own file, all-or-nothing across files.
+- **Failure detail.** `text_apply_edits` failures gain `"lines": [line numbers of each occurrence]` (for `.docx`,
+  paragraph indices). For `.py` files, when a `find` has 0 occurrences but would match after removing Python
+  string-literal splits (`"a "\n    "b"` or `'a ' 'b'`), the failure gains `"hint": "spans a string-literal split at
+  line N"`.
+- **Docx paragraph text.** For `find` matching, `<w:tab/>` is `\t` and `<w:br/>` is `\n`. Text in
+  `mc:Fallback` is ignored, so text boxes count once.
+
+### 16.4 claims_trace
+- **Citation styles.** Besides `[n]` reference lists (`[n] ...` and `- [n] ...` entries), a claim is also
+  recognised when its paragraph names a paper whose arXiv id appears in the same paragraph, or in a table row of the
+  report that pairs that name with an id, and gives a page locator `(pN)` or `(pN, pM)` or `p. N`. That paper is the
+  claim's source, and the stated pages are its `stated_pages`.
+- **Scope.** The citation scope is the paragraph: numbers in a paragraph use every citation in that paragraph when
+  their own sentence has none. Appendix table rows are checked too when the table's caption or header row cites a
+  paper.
+- **Exclusions.** Numbers after `Section`, `Sec.`, `Eq.`, `Equation`, `Step`, `Phase`, `Level`, `R`, `C`, `S`
+  (rule ids) are excluded, as are list markers.
+- **Percentages.** `P%` also matches `P/100` written with trailing zeros (`50%` ↔ `0.50`, `0.5`).
+- **Weak locations.** A `located` number that is an integer below 1000 without `%`, or that matches on 5 or more
+  pages, gets `"weak": true`. When a locator (`[n, Table k]`, `[n, p. 4]`, `(p4)`) is present, the pages are ranked
+  by it: a match on the stated page, or on a page containing `Table k`/`Fig. k`, sets `"locator_match": true`.
+  A weak location without a locator match gives **T003** (info).
+- **Empty result.** When the report yields 0 claims, the result has a **T004** warning ("no citations found; this
+  tool needs [n] references or name + (pN) locators") and `ok` stays true.
+
+### 16.5 text_xref and review_coverage
+- **text_xref files and reports.**
+  - `files` entries may be `FILE=REPORT`, pairing that file (or directory) with its own report. `report` may then be
+    omitted.
+  - `exclude` (list of globs, CLI `--exclude`) drops walked files.
+  - References inside a citation bracket that starts with a number (`[5, App. H]`) are skipped.
+  - A reference preceded in the same line by the words `general report`, `capsule report` or `other report` (any
+    words ending in `report` other than the paired report's own name) is skipped.
+- **Slice sources.** For X002, a `between(...)`/`section(...)` call with keyword `src=NAME`, or a positional third
+  argument `NAME`, is checked against the file that `NAME` is bound to at module level (an assignment whose value
+  contains a string literal ending in `.md`, resolved relative to the script's directory, and to its parents up to
+  4 levels). If that cannot be resolved, the marker is skipped with an info finding **X003**.
+  - The module-level default source (the first such `.md` literal bound to a name used as the default `src`) is used
+    for calls without `src` when it resolves. Otherwise the report is used.
+  - `section('N', second)` builds `### N ` only from the first argument. The second is used as written.
+- **Renumbering safety.**
+  - Fenced code in the report is never renumbered and holds no targets.
+  - Renumbering keeps each reference's original spelling apart from the number (`Fig.9` stays `Fig.10`, `§ 4.2` stays
+    `§ 4.3`). Leading zeros stay as written.
+  - When renumbering changes a heading, slice markers in `files` that quote that heading text are renumbered too, and
+    listed in `edits`.
+- **review_coverage.**
+  - Rule names are the text up to the first `:`, `.`, `;` or ` — ` (at most 12 words). Deck rule lines are joined with
+    their continuation lines (following lines of the same text frame that don't start a new rule) before this cut.
+  - `**R1.**`, `| **R1** |` and `R1:` forms are recognised.
+  - C005 uses this short name.
+  - A footer citing `App. X[.n]` or `Appendix X` counts as covering that appendix. A slide that cites only appendices
+    is not a C002.
+  - A footer `§N.M.K` that names an existing deeper heading covers its level-3 ancestor and is not a C003.
+
+**16.4–16.5 pinned details**
+- **The paired report's own name.** It is the report's H1 title, lower-cased, when that title ends in `report`
+  (`# General Report` gives `general report`). Otherwise it is the parent directory name with `report-X` read as
+  `X report`. Mentions of that name are checked normally, and other `... report` names are skipped.
+- **Module-level sources.** When the assigned value contains several string literals (as in
+  `HERE.parents[1] / "report-capsules" / "REPORT-annotated.md"`), they are joined as path parts in order. Only
+  `HERE`/`ROOT`-style anchors (a name bound to a path of `__file__`, with `.parent`/`.parents[k]`) are followed.
+  Anything else is unresolvable, which gives X003.
+- **Markers and edits.**
+  - A heading renumber also renames `section("N")` arguments equal to the old number.
+  - Edits carry `old`/`new` as written in the file (spelling preserved).
+  - Zero padding is kept at its width (`Table 07` becomes `Table 08`).
+  - X003 is reported on the `.py` file and the call line.
+- **claims_trace fields.**
+  - Every claim carries `weak` and `locator_match` as booleans.
+  - `stated_pages` is always present (possibly empty).
+  - `pages` is sorted ascending.
+  - A bare arXiv-style id in parentheses (`Kosmos (2511.02824)`) is a citation, and its digits are never claim numbers.
+
+### 16.6 papers, translate, bundle naming
+- **papers_summary.**
+  - Lines matching `(?i)^(published as|accepted (at|to)|under review|preprint|arxiv:|proceedings of|workshop on)` are
+    skipped before the title.
+  - A title continues onto following lines while they are not empty, contain no `@`, digit-superscript author marks
+    or commas-with-3+-capitalised-words (an author list), and the title so far is shorter than 20 words.
+  - Letter runs split by a single space inside an upper-case word (`A LITA -G`) are rejoined (`ALITA-G`): a single
+    capital letter followed by a space and 2+ capitals is joined, and a space before `-` is removed.
+  - The references page search also accepts `References` headings with a number prefix (`7 References`,
+    `REFERENCES AND NOTES`).
+- **papers_index_check.**
+  - P004 accepts any heading that starts with `## How ` for "How it works".
+  - `profile` (map of summary id → list of required headings, CLI `--profile JSON`) overrides the list per summary.
+  - A missing INDEX.md is a P006 warning, not a `ToolError`.
+  - P005 also resolves name-plus-id citations (§16.4) and reports **P007** (info) when the report has no resolvable
+    citations at all.
+- **papers_peek grep `width`.** The cut is centred on the match found in the hit's own line (not the joined text), so
+  anchored patterns keep the match inside the snippet.
+- **translate_terms.**
+  - Path and URL masking use ASCII-only classes and stop at the first non-ASCII character.
+  - Terms with an internal `/` (`TCP/IP`, `CI/CD`) are terms.
+  - List markers are stripped from run terms.
+  - A term that is a proper substring of a longer term found at the same place is not counted separately.
+  - An English-only line (no non-ASCII letters) contributes no run terms.
+  - New argument `glossary` (bool, default true; CLI `--no-glossary`): when a target file is mostly CJK (more than
+    30% of letters) and the tundlekit glossary has an approved `zh` rendering for the term, the L001 is downgraded to
+    info **L003** ("rendered as <zh>") when that rendering appears.
+  - New argument `compare` (`previous` default, or `same-language`): `same-language` compares each file with the
+    nearest earlier file of the same dominant script (CJK vs Latin), which catches English drift across a Chinese hop.
+- **bundle naming (§15.7).**
+  - A trailing `Setup`, `UserSetup`, `Installer` or `Install` token (CamelCase part or separate word) is removed from
+    `program` when a version was found.
+  - A token `R20\d\d[ab]` is a version (MATLAB style).
+  - A final 3-digit group after the program and architecture (`winrar-x64-723`) is a compact version `7.23`, and a
+    4-digit group (`7z2603`) is `26.03`, only when the name has no dotted version.
+  - When the directory's README.md table already lists the file, its "What it is" cell provides `program` and
+    `version`: the text before the first `,` or `⚠`, split at the first token that starts with a digit.
+- **bundle_source batch.** `bundle_source` accepts a directory as `file` (CLI `bundle source DIR --all`). It then
+  writes (or returns) a SOURCE.md for every file B014 would count in that directory tree that has none, skipping ones
+  that already exist. The result is `{"results": [<single results>]}`.
+- **B003 and names.** A `v<digits>` marker attached with a hyphen directly to a letter (`AI Scientist-v2`) is part of
+  a name and does not fire. `report -v2`, `report_v2`, `report v2`, `report.v2` and `report (v2)` still fire.
+  The other markers (`final`, `new`, `old`, `copy`, `backup`) are unchanged.
+
+**16.6 pinned details**
+- An author line is also recognised by marks such as `* 1`, `*1`, `†` or superscript digits after names. It ends the
+  title.
+- The trailing `Setup` / `UserSetup` / `Installer` / `Install` tokens match case-insensitively, as a separate word
+  or a CamelCase part. So `tailscale-setup-1.102.4` gives `tailscale`.
+- A compact version may follow the program directly, with no architecture token: `7z2409` gives `7z` / `24.09`.
+- Small-caps rejoining applies to each word: `D EEP R ESEARCH` gives `DEEP RESEARCH`.
+- With `compare: same-language`, a file with no earlier file of its script gives no findings.
+- Sub-term deduplication applies to target counts as well.
+
+### 16.7 deck, diagram, chart, office
+- **deck lint CLI.** `--ids ID...` is available. When an id is missing from the times file, the D013 message names the
+  keys that are present and suggests `--ids`.
+- **Strip overlap.** deck_build warns when a positioned block overlaps a strip (DEMONSTRATED BY, IN/OUT or THUS), or
+  when a stacked block overlaps a positioned one.
+- **Charts.**
+  - Chart blocks gain `series`: a list of `{"name", "values"}` for multi-series bar and line charts, with a legend.
+    `values` and `series` are mutually exclusive.
+  - `highlight_color` `pending` is refused for highlights.
+- **Monospace columns.** Table blocks gain `mono_cols` (list of 0-based column indices) as in deckkit.
+- **Group-aware wrap.** With `wrap` and groups, row breaks never split a group. A group's members are placed in the
+  same row, starting a new row when needed.
+  - A group wider than `wrap` ranks gets a row of its own and extends it.
+  - Group frames never overlap. If they would, the layout moves the later group down and adds a warning.
+  - Edge labels are placed so that they cross no node box; when that's impossible, a warning names the edge.
+- **PNG fallback quality.** The pymupdf fallback converts markers to drawn arrowheads (`<path>`) before
+  rasterising, and dashed strokes are kept. When it cannot preserve something, `warnings` says what was lost.
+- **Mermaid export.** `diagram_to_mermaid` writes `rank` and `wrap` as `%% rank <id> <n>` and `%% wrap <n>`
+  comments, and `diagram_from_mermaid` reads them back.
+- **Integral floats.** `rank: 1.0` and `wrap: 3.0` are accepted as integers.
+- **New tool `office_check`** (`tundlekit office check [--wait SECONDS]`, module `render`):
+  - returns `{"running": [names], "ok": bool}` for Word, PowerPoint and Excel (Windows `tasklist`; on other systems
+    `ps` for `soffice`, and `ok` true when nothing is found);
+  - with `wait`, polls every 2 seconds until nothing is running or the time is up;
+  - the CLI exits 1 when `ok` is false.
+  - Build scripts can import `tundlekit.render.office_running()` for the same check.
+  - `office_check` is read-only.
+
+### 16.8 text_lint
+- **Permission `may`.** `may` followed by `be` + a past participle (a word ending in `ed`, `en`, or in a short
+  irregular list: `bound`, `built`, `chained`, `kept`, `made`, `run`, `set`, `shown`, `split`, `used`, `written`)
+  is not a hedge. `may not` is not a hedge.
+- **Quotes.** S003 skips text inside double quotes (`"…"`, `“…”`).
+- **Ask lists.** S007 skips list items whose list is introduced by a line ending in `:` that contains `ask`
+  (case-insensitive).
+- **Captions.** S005 skips caption lines (§7.2 caption forms) and blockquote lines.
+
+### 16.9 Docs
+The skills cover these points:
+- **report-writing:** claims trace needs `[n]` references or name + `(pN)` locators, and 0 claims (T004) is not a
+  pass. Weak locations must still be checked by hand.
+- **report-writing, deliverable-review:** text xref pairs build scripts with the report they actually slice
+  (`FILE=REPORT`, `--exclude`). Annotated report variants.
+- **deck-builder:** deck diff after cuts and reorders (moved and number changes). `--ids` for times files.
+- **zh-en-translation:** L001 vs L003 on Chinese hops. `--compare same-language`.
+- **diagram-maker:** wrap with groups. PNG fallback limits.
+- **deliverable-review:** `tundlekit office check` before any build or render (`office_check`).
+- **tundle-bundle:** `bundle source DIR --all`, and README names reused.
+- **All skills:** checker output is a starting list for a human or agent to confirm, and the known remaining noise is
+  listed per tool.

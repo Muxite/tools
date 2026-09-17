@@ -27,6 +27,8 @@ SMALL_PNG = 10_240      # renders under this many bytes are suspicious (blank sl
 DOC_DPI = 110
 SLIDE_SIZE = (1600, 900)
 OFFICE_PROCESSES = ("POWERPNT.EXE", "WINWORD.EXE")
+OFFICE_EXTRA = ("EXCEL.EXE",)
+OFFICE_POLL = 2.0       # seconds between office_check polls
 BACKENDS = ("auto", "powerpoint", "libreoffice", "text")
 
 
@@ -106,14 +108,16 @@ def _import_pptx():
 
 # ---------------------------------------------------------------------------------------------- backend discovery
 
-def office_running() -> list[str]:
+def office_running(all_apps: bool = False) -> list[str]:
     """Names of running Office processes (POWERPNT.EXE, WINWORD.EXE) that COM automation would attach to.
 
-    Always [] off Windows. On Windows, if tasklist cannot be run, the state is unknown, so this raises
-    ToolError rather than report "nothing running".
+    With all_apps (office_check, MANIFEST §16.7), EXCEL.EXE is reported too, and off Windows the running
+    LibreOffice processes (`soffice`, from `ps`) are reported. Without it, the result is always [] off Windows.
+    On Windows, if tasklist cannot be run, the state is unknown, so this raises ToolError rather than report
+    "nothing running".
     """
     if sys.platform != "win32":
-        return []
+        return _soffice_running() if all_apps else []
     try:
         proc = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True,
                               errors="replace", timeout=60)
@@ -124,7 +128,23 @@ def office_running() -> list[str]:
         first = line.split(",", 1)[0].strip().strip('"').upper()
         if first:
             images.add(first)
-    return [name for name in OFFICE_PROCESSES if name in images]
+    names = OFFICE_PROCESSES + (OFFICE_EXTRA if all_apps else ())
+    return [name for name in names if name in images]
+
+
+def _soffice_running() -> list[str]:
+    """Distinct LibreOffice process names from `ps` (`soffice`, `soffice.bin`); [] when ps is unavailable."""
+    try:
+        proc = subprocess.run(["ps", "-A", "-o", "comm="], capture_output=True, text=True, errors="replace",
+                              timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    found = []
+    for line in proc.stdout.splitlines():
+        name = os.path.basename(line.strip())
+        if name.lower().startswith("soffice") and name not in found:
+            found.append(name)
+    return found
 
 
 def _com_registered(progid: str) -> bool:
@@ -216,6 +236,39 @@ def render_backends() -> dict:
         "pptx": _has_module("pptx"),
         "svg_to_png": _svg_to_png(),
     }
+
+
+@tool(
+    "office_check",
+    "Check whether Word, PowerPoint or Excel is running (Windows tasklist; elsewhere LibreOffice soffice "
+    "via ps). Run it before any build or render that automates Office: COM attaches to the open instance. "
+    "With wait (seconds), polls every 2 s until nothing is running or the time is up. Returns the running "
+    "process names and ok (true when nothing is running).",
+    {"type": "object",
+     "properties": {
+         "wait": {"type": "number", "minimum": 0,
+                  "description": "seconds to keep polling while something is running (default 0)"},
+     },
+     "additionalProperties": False},
+    readOnlyHint=True,
+)
+def office_check(wait: float | None = None) -> dict:
+    import math
+    import time
+
+    if wait is None:
+        wait = 0
+    if isinstance(wait, bool) or not isinstance(wait, (int, float)) or not math.isfinite(wait) or wait < 0:
+        raise ToolError(f"wait must be a finite number of seconds >= 0, got {wait!r}")
+    deadline = time.monotonic() + wait
+    running = list(office_running(all_apps=True))
+    while running:
+        left = deadline - time.monotonic()
+        if left <= 0:
+            break
+        time.sleep(min(OFFICE_POLL, left))
+        running = list(office_running(all_apps=True))
+    return {"running": running, "ok": not running}
 
 
 # ---------------------------------------------------------------------------------------------- PDF pages
@@ -596,13 +649,39 @@ def _write(path: Path, text: str) -> str:
     return str(path)
 
 
-def _write_notes(copy: Path, out: Path) -> list[str]:
-    Presentation = _import_pptx()
+def _notes_text(slide) -> str:
+    """A slide's notes text; a missing notes slide or notes placeholder counts as empty notes (§16.1)."""
+    try:
+        if not slide.has_notes_slide:
+            return ""
+        tf = slide.notes_slide.notes_text_frame
+        return tf.text if tf is not None else ""
+    except Exception:  # damaged or unusual notes parts read as empty notes, never a crash
+        return ""
+
+
+def _write_notes(copy: Path, out: Path, prs=None) -> list[str]:
+    if prs is None:
+        prs = _open_pptx(_import_pptx(), copy)
     files = []
-    for n, slide in enumerate(_open_pptx(Presentation, copy).slides, 1):
-        notes = slide.notes_slide.notes_text_frame.text if slide.has_notes_slide else ""
-        files.append(_write(out / f"notes-{n:02d}.txt", notes))
+    for n, slide in enumerate(prs.slides, 1):
+        files.append(_write(out / f"notes-{n:02d}.txt", _notes_text(slide)))
     return files
+
+
+def _check_package(path: Path, what: str) -> None:
+    """ToolError unless every entry of the zip package decompresses cleanly (§16.1 corrupt packages)."""
+    import zlib
+
+    try:
+        with zipfile.ZipFile(path) as z:
+            for info in z.infolist():
+                with z.open(info) as f:
+                    while f.read(1 << 20):
+                        pass
+    except (zipfile.BadZipFile, zipfile.LargeZipFile, zlib.error, EOFError, OSError, NotImplementedError,
+            RuntimeError, ValueError) as exc:
+        raise ToolError(f"cannot read {path.name} as a {what}: corrupt package ({exc})") from None
 
 
 def _open_pptx(Presentation, path: Path):
@@ -612,14 +691,116 @@ def _open_pptx(Presentation, path: Path):
         raise ToolError(f"cannot read {path.name} as a presentation: {exc}") from None
 
 
+class _RawShape:
+    """A shape element python-pptx cannot wrap (p:contentPart, mc:AlternateContent, unknown tags)."""
+    has_text_frame = False
+
+    def __init__(self, element):
+        self._element = element
+
+
+_P = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+_TREE_PROPS = {_P + "nvGrpSpPr", _P + "grpSpPr", _P + "extLst"}
+
+
+def _shape_items(shapes) -> list:
+    """Every child shape of a shape tree, wrapped by python-pptx where it can, else as a _RawShape."""
+    tree = getattr(shapes, "_spTree", None)
+    factory = getattr(shapes, "_shape_factory", None)
+    if tree is None or factory is None:
+        try:
+            return list(shapes)
+        except Exception:  # an unreadable shape tree gives no shapes rather than a crash
+            return []
+    items = []
+    for el in tree:
+        if not isinstance(el.tag, str) or el.tag in _TREE_PROPS:
+            continue
+        try:
+            items.append(factory(el))
+        except Exception:
+            items.append(_RawShape(el))
+    return items
+
+
 def _iter_shapes(shapes):
     """Shapes in order, descending into group shapes (as deck_inspect reads them)."""
-    for sh in shapes:
-        inner = getattr(sh, "shapes", None) if sh.__class__.__name__ == "GroupShape" else None
+    for sh in _shape_items(shapes):
+        inner = None
+        if sh.__class__.__name__ == "GroupShape":
+            try:
+                inner = sh.shapes
+            except Exception:
+                inner = None
         if inner is not None:
             yield from _iter_shapes(inner)
         else:
             yield sh
+
+
+_A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+_MC_FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
+
+
+def _xml_text(element) -> str:
+    """Paragraph text of any shape element (a:p / a:t), ignoring mc:Fallback copies."""
+    paras = []
+
+    def walk(el, inside):
+        tag = getattr(el, "tag", None)
+        if not isinstance(tag, str) or tag == _MC_FALLBACK:
+            return
+        if tag == _A + "p" and not inside:
+            parts = []
+            for sub in el.iter():
+                if sub.tag == _A + "t":
+                    parts.append(sub.text or "")
+                elif sub.tag == _A + "br":
+                    parts.append("\v")
+            paras.append("".join(parts))
+            return
+        for child in el:
+            walk(child, inside)
+
+    try:
+        walk(element, False)
+    except Exception:
+        return ""
+    return "\n".join(paras)
+
+
+def _shape_text(sh) -> tuple[str | None, list]:
+    """(text, [(run text, size)]) for a shape with text, or (None, []) when it holds no text frame.
+
+    Recognised shapes are read through python-pptx; anything else (unrecognised types such as p:contentPart,
+    or a shape python-pptx cannot read) is read from its XML, so its text still counts (§16.1)."""
+    try:
+        if getattr(sh, "has_text_frame", False):
+            tf = sh.text_frame
+            runs = []
+            for p in tf.paragraphs:
+                for r in p.runs:
+                    try:
+                        size = r.font.size or p.font.size or 0
+                    except Exception:
+                        size = 0
+                    runs.append((r.text, size))
+            return tf.text, runs
+        if type(sh).__name__ not in ("_RawShape", "BaseShape"):
+            return None, []           # pictures, tables, connectors: no text frame, as before
+    except Exception:
+        pass
+    element = getattr(sh, "_element", None)
+    if element is None:
+        return None, []
+    try:
+        has_body = any(el.tag == _A + "p" for el in element.iter())
+    except Exception:
+        return None, []
+    if not has_body:
+        return None, []
+    text = _xml_text(element)
+    return text, [(text, 0)]
 
 
 def _slide_frames(slide) -> tuple[list[str], int | None]:
@@ -630,15 +811,13 @@ def _slide_frames(slide) -> tuple[list[str], int | None]:
     """
     frames, best_size, title = [], -1, None
     for sh in _iter_shapes(slide.shapes):
-        if not getattr(sh, "has_text_frame", False):
+        text, runs = _shape_text(sh)
+        if text is None:
             continue
-        tf = sh.text_frame
-        frames.append(tf.text)
-        for p in tf.paragraphs:
-            for r in p.runs:
-                size = r.font.size or p.font.size or 0
-                if r.text.strip() and size > best_size:
-                    best_size, title = size, len(frames) - 1
+        frames.append(text)
+        for run_text, size in runs:
+            if run_text.strip() and size > best_size:
+                best_size, title = size, len(frames) - 1
     if title is None:
         title = next((k for k, t in enumerate(frames) if t.strip()), None)
     return frames, title
@@ -655,7 +834,7 @@ def _text_deck(copy: Path, out: Path) -> tuple[int, list[str]]:
         else:
             parts = ["TITLE: " + frames[title]] + frames[:title] + frames[title + 1:]
         files.append(_write(out / f"slide-{n:02d}.txt", "\n\n".join(parts) + "\n"))
-    files += _write_notes(copy, out)
+    files += _write_notes(copy, out, prs)
     return len(prs.slides), files
 
 
@@ -667,8 +846,11 @@ def _text_docx(copy: Path, out: Path) -> tuple[int, list[str]]:
         with zipfile.ZipFile(copy) as z:
             xml = z.read("word/document.xml")
         root = ElementTree.fromstring(xml)
-    except (zipfile.BadZipFile, KeyError, ElementTree.ParseError, OSError) as exc:
+    except (zipfile.BadZipFile, KeyError, ElementTree.ParseError, OSError, EOFError, ValueError,
+            NotImplementedError, RuntimeError) as exc:
         raise ToolError(f"cannot read {copy.name} as a Word document: {exc}") from None
+    except Exception as exc:  # zlib.error and other decompression failures
+        raise ToolError(f"cannot read {copy.name} as a Word document: corrupt package ({exc})") from None
     lines = []
     for p in root.iter(_W + "p"):
         style = p.find(f"{_W}pPr/{_W}pStyle")
@@ -817,6 +999,7 @@ def render_office(src: str, out_dir: str, backend: str = "auto") -> dict:
         shutil.copy2(source, copy)
     except OSError as exc:
         raise ToolError(f"cannot copy {src} to {copy}: {exc}") from None
+    _check_package(copy, "presentation" if deck else "Word document")
 
     warnings: list[str] = []
     sheets: list[str] = []
@@ -877,6 +1060,20 @@ def add_cli(groups) -> None:
     c = cmds.add_parser("backends", help="show which render backends are available")
     common_flags(c)
     c.set_defaults(handler=_cli_backends)
+
+    p = groups.add_parser("office", help="check for running Office applications")
+    cmds = p.add_subparsers(dest="command", required=True)
+    c = cmds.add_parser("check", help="list running Word/PowerPoint/Excel; exit 1 when any is running")
+    c.add_argument("--wait", type=float, default=0, metavar="SECONDS",
+                   help="poll every 2 s for up to SECONDS until nothing is running")
+    common_flags(c)
+    c.set_defaults(handler=_cli_office_check)
+
+
+def _cli_office_check(args) -> CliResult:
+    r = office_check(wait=args.wait)
+    text = "ok: no Office application is running" if r["ok"] else "running: " + ", ".join(r["running"])
+    return CliResult(r, text, exit_code=0 if r["ok"] else 1)
 
 
 def _cli_pdf(args) -> CliResult:

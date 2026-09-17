@@ -10,8 +10,10 @@ Each module in tundlekit.MODULES contributes its group through add_cli(groups) (
 from __future__ import annotations
 
 import argparse
+import errno
 import importlib
 import json
+import os
 import sys
 import traceback
 
@@ -198,9 +200,43 @@ def main(argv: list[str] | None = None) -> int:
     return emit(res, as_json, strict)
 
 
+def _is_broken_pipe(exc: BaseException) -> bool:
+    """A write to a closed stdout pipe: BrokenPipeError, or OSError EINVAL as Windows reports it."""
+    if isinstance(exc, BrokenPipeError):
+        return True
+    return isinstance(exc, OSError) and exc.errno in (errno.EPIPE, errno.EINVAL)
+
+
+def _silence_stdout() -> None:
+    """Point stdout at the null device so the interpreter's final flush has nowhere to fail (§16.1)."""
+    try:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        try:
+            os.dup2(devnull, sys.stdout.fileno())
+        finally:
+            os.close(devnull)
+    except (OSError, ValueError, AttributeError):
+        pass
+    try:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    except OSError:
+        pass
+
+
 def console() -> None:
-    """Console-script entry point."""
-    sys.exit(main())
+    """Console-script entry point. A broken stdout pipe ends the command quietly with exit 0 (§16.1)."""
+    try:
+        try:
+            code = main()
+        except SystemExit as e:  # argparse usage errors and --help
+            code = e.code
+        sys.stdout.flush()
+    except OSError as e:
+        if not _is_broken_pipe(e):
+            raise
+        _silence_stdout()
+        code = 0
+    sys.exit(code)
 
 
 if __name__ == "__main__":

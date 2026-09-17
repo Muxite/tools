@@ -84,11 +84,12 @@ Count the model sessions in the prose that describes a figure, then count the MO
 - `id`: letters, digits, `_`, `-`, starting with a letter or `_`; unique across nodes and groups.
 - `label`: non-empty; `\n` breaks lines. `sub`: an optional smaller second line.
 - `stage` (default `dispatch`), `actor` ∈ `model | code | record | external` (default `code`), `dashed` (bool).
-- `rank` (integer ≥ 0, optional): pins a node to a column (LR) or row (TB). Use it to line up nodes that belong
+- `rank` (integer ≥ 0, optional; `1.0` counts as `1`): pins a node to a column (LR) or row (TB). Use it to line up nodes that belong
   together, or to put a feedback target where the reader expects it; an edge that runs against pinned ranks is
   drawn as a back edge.
-- `wrap` (integer ≥ 1, optional): at most this many ranks per row (LR) or column (TB). A long pipeline wraps
-  onto several rows instead of becoming a strip too wide to read on a slide; x restarts at each row.
+- `wrap` (integer ≥ 1, optional; `3.0` counts as `3`): at most this many ranks per row (LR) or column (TB). A
+  long pipeline wraps onto several rows instead of becoming a strip too wide to read on a slide; x restarts at
+  each row. Wrap and groups work together (see "Wrapping with groups" below).
 - `direction`: `LR` (default) or `TB`. `legend`: `"auto"` (default), `true`, `false`. `tags`: show MODEL/CODE tags
   (default true). `note`: small text at the bottom.
 - `edges`: `from`, `to` (existing ids, no self-loops), optional `label`, `dashed`. Back edges (loops) are allowed
@@ -99,6 +100,33 @@ Count the model sessions in the prose that describes a figure, then count the MO
 Layout is automatic and deterministic: rank = longest path from a source, boxes widen to fit their longest line,
 nothing overlaps. The result gives each node's box (`x`, `y`, `w`, `h`, `rank`) and any `warnings`.
 The same spec gives byte-identical SVG, so commit the spec and regenerate the figure.
+
+### Wrapping with groups
+
+With `wrap` and `groups` together, a row break never splits a group:
+
+- A group's members stay in 1 row. When a group does not fit in what is left of the current row, it starts a new
+  row.
+- A group wider than `wrap` ranks gets a row of its own, and that row is extended to hold it.
+- Group frames never overlap. When 2 frames would, the later group is moved down and `warnings` says so.
+- Edge labels are placed so they cross no node box. When that is impossible, a warning names the edge: shorten
+  the label or move a node with `rank`.
+
+So wrap a long pipeline with its phases as groups (`"wrap": 4` plus 1 group per phase) and each phase stays
+readable as 1 framed block. Read the `warnings` after every render.
+
+### PNG output and its limits
+
+`--png` uses the first converter found: `cairosvg`, `rsvg-convert` or `inkscape`, which draw the SVG faithfully.
+Without them it falls back to pymupdf (the `pdf` extra), which has limits:
+
+- arrowhead markers are converted to drawn arrowheads (`<path>`) before rasterising, so arrows keep their heads;
+- dashed strokes are kept;
+- anything else it cannot reproduce (for example a font or an effect it does not support) is named in
+  `warnings`. Read them, and look at the PNG before using it.
+
+For a deck or a report, prefer the SVG, or install a real converter when the PNG must be exact. The PNG's folder
+is created only after a converter succeeds.
 
 ## Mermaid subset
 
@@ -139,6 +167,8 @@ flowchart LR
 | `A --> B --> C`, `A & B --> C` | chains and fan-in give 1 edge per pair |
 | `subgraph id [label]` … `end` | a group of the nodes first defined or referenced inside it |
 | `classDef`, `class`, `style`, `linkStyle`, `click` | ignored with a warning |
+| `%% rank <id> <n>` | sets `rank` of node `<id>` (other `%%` lines are comments) |
+| `%% wrap <n>` | sets `wrap` for the diagram |
 
 Anything else is an error naming the line number. Node ids are ASCII only. Workflow:
 
@@ -152,8 +182,9 @@ tundlekit diagram to-mermaid fig-build.json
 `from-mermaid` returns `{"spec": ..., "warnings": [...]}`; save the `spec` value as `fig-build.json` to keep
 editing the figure as a spec.
 
-Converting spec → Mermaid → spec keeps nodes, edges, groups and direction; `sub` is folded into the label as a
-second line.
+Converting spec → Mermaid → spec keeps nodes, edges, groups and direction, and `rank` and `wrap` (written as
+`%% rank <id> <n>` and `%% wrap <n>` comment lines, which other Mermaid tools ignore); `sub` is folded into the
+label as a second line.
 
 ## Bar charts
 
@@ -187,8 +218,21 @@ tundlekit chart bar chart.json -o fig-rot.svg
   (`passed`, `failed`, …) instead of `stage`. `axis: true` adds a value axis with gridlines and tick labels.
   `\n` in a category label breaks it into lines. `max` fixes the axis (≥ every value). `decimals` defaults to 0 for
   whole numbers, else 1. `orientation`: `horizontal` (default) or `vertical`.
-- In a deck, prefer a native chart (`"kind": "chart"` in the deck spec, see the deck-builder skill) so it stays
-  editable; use `chart bar` for reports and notes.
+- `chart bar` draws 1 series. In a deck, prefer a native chart (`"kind": "chart"` in the deck spec, see the
+  deck-builder skill) so it stays editable; deck chart blocks also take `series` (a list of `{"name", "values"}`)
+  for multi-series bar and line charts with a legend. Use `chart bar` for reports and notes.
+
+## Known noise
+
+`diagram validate`, `diagram render` and `chart bar` report problems and layout warnings, a starting list to look
+at, not a verdict. The remaining false positives:
+
+- `diagram render`: a "group moved down" or edge-label warning can appear on a layout that still reads well; look
+  at the figure before changing the spec. Unsupported-feature warnings from the pymupdf PNG fallback do not affect
+  the SVG.
+- `diagram from-mermaid`: a warning for every ignored `classDef`/`style` line, even when the spec's stages already
+  give the intended colours.
+- `chart bar`: none known.
 
 ## Checklist
 

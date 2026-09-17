@@ -170,17 +170,39 @@ def _textw(s: str, size=LABEL_SIZE) -> float:
     return max(len(line) for line in s.split("\n")) * CHAR_W * size / LABEL_SIZE
 
 
-def _ticks(axis_max: float) -> tuple[list[float], int]:
-    """Round tick values from 0 up to axis_max (3 to 6 steps), and the decimals they need."""
-    raw = axis_max / 6
-    mag = 10 ** math.floor(math.log10(raw))
-    step = next(m * mag for m in (1, 2, 2.5, 5, 10) if m * mag >= raw * (1 - 1e-9))
-    count = int(math.floor(axis_max / step + 1e-9))
-    ticks = [round(k * step, 10) for k in range(count + 1)]
-    decimals = 0
-    while decimals < 10 and any(abs(round(t, decimals) - t) > 1e-9 for t in ticks):
-        decimals += 1
-    return ticks, decimals
+def _ticks(axis_max: float) -> list[tuple[float, str]]:
+    """Round ticks from 0 up to axis_max (3 to 6 steps) as (fraction of axis_max, label without unit).
+
+    Worked in decimal arithmetic, so any positive finite maximum works, from subnormal floats to 1.7e308
+    (§16.1). Labels use fixed notation for ordinary magnitudes and scientific notation otherwise."""
+    from decimal import Decimal, localcontext
+
+    with localcontext() as ctx:
+        ctx.prec = 40
+        top = Decimal(axis_max)
+        raw = top / 6
+        mag = Decimal(1).scaleb(raw.adjusted())          # 10 ** floor(log10(raw))
+        step = next(m * mag for m in (Decimal(1), Decimal(2), Decimal("2.5"), Decimal(5), Decimal(10))
+                    if m * mag >= raw)
+        count = int(top // step)
+        ticks = [k * step for k in range(count + 1)]
+        exps = [t.normalize().as_tuple().exponent for t in ticks if t]
+        decimals = max([0] + [-e for e in exps])
+        big = step * count >= Decimal("1e15")
+        out = []
+        for t in ticks:
+            frac = float(t / top)
+            if decimals <= 6 and not big:
+                label = f"{t:.{decimals}f}"
+            elif t == 0:
+                label = "0"
+            else:
+                label = f"{t.normalize():.3e}".replace("E", "e")
+                mant, _, exp = label.partition("e")
+                mant = mant.rstrip("0").rstrip(".")
+                label = f"{mant}e{int(exp)}"
+            out.append((frac, label))
+    return out
 
 
 def _raw_value(v) -> str:
@@ -257,8 +279,7 @@ def _render(spec: dict):
 
     axis = None
     if spec.get("axis"):
-        ticks, tick_decimals = _ticks(axis_max)
-        axis = [(t, f"{t:.{tick_decimals}f}{unit}") for t in ticks]
+        axis = [(frac, label + unit) for frac, label in _ticks(axis_max)]
     layout = _vertical if spec.get("orientation", "horizontal") == "vertical" else _horizontal
     body, width, body_h, bars = layout(cats, labels, vals, value_texts, axis_max, hi_index, colour, axis)
 
@@ -324,7 +345,7 @@ def _horizontal(cats, labels, vals, value_texts, axis_max, hi_index, colour, axi
     if axis:
         g = []
         for t, label in axis:
-            x = x0 + t / axis_max * PLOT_LONG
+            x = x0 + t * PLOT_LONG
             g.append(f'<line class="grid" x1="{_x(x)}" y1="-4" x2="{_x(x)}" y2="{_x(axis_h + 4)}" '
                      f'stroke="{PALE}" stroke-width="1"/>')
             g.append(_text(x, axis_h + 6 + LABEL_SIZE, label, anchor="middle", cls="tick", fill=GREY))
@@ -358,7 +379,7 @@ def _vertical(cats, labels, vals, value_texts, axis_max, hi_index, colour, axis=
     if axis:
         g = []
         for t, label in axis:
-            y = base - t / axis_max * plot_h
+            y = base - t * plot_h
             g.append(f'<line class="grid" x1="{_x(left)}" y1="{_x(y)}" x2="{_x(right)}" y2="{_x(y)}" '
                      f'stroke="{PALE}" stroke-width="1"/>')
             g.append(_text(left - 6, y + LABEL_SIZE * 0.35, label, anchor="end", cls="tick", fill=GREY))

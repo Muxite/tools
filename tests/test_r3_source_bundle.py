@@ -34,11 +34,11 @@ def test_registered_in_bundle_not_read_only(name):
     ("CrystalDiskInfo9_8_0.exe", "CrystalDiskInfo", "9.8.0"),
     ("Git-2.55.0.5-64-bit.exe", "Git", "2.55.0.5"),
     ("jetbrains-toolbox-2.5.2.35332.exe", "jetbrains toolbox", "2.5.2.35332"),
-    ("VSCodeUserSetup-x64-1.94.2.exe", "VSCodeUserSetup", "1.94.2"),
+    ("VSCodeUserSetup-x64-1.94.2.exe", "VSCode", "1.94.2"),  # §16.6: trailing UserSetup removed
     ("ChromeSetup.exe", "ChromeSetup", ""),
     ("tsetup-x64.6.8.1.exe", "tsetup", "6.8.1"),
     ("NVIDIA-Linux-x86_64-570.169.run", "NVIDIA Linux", "570.169"),
-    ("7z2603-x64.exe", "7z2603", ""),
+    ("7z2603-x64.exe", "7z", "26.03"),  # §16.6: compact 4-digit version
     ("comet_installer_latest.exe", "comet installer latest", ""),
 ])
 def test_program_and_version_guess(tmp_path, name, program, version):
@@ -184,7 +184,7 @@ def test_setup_table_write_inserts_after_last_row(tmp_path):
     expected = WIN_README.replace(
         "| `ChromeSetup.exe` | Google Chrome ⚠ downloads during install |\n",
         "| `ChromeSetup.exe` | Google Chrome ⚠ downloads during install |\n"
-        "| `tailscale-setup-1.102.4.exe` | tailscale setup 1.102.4 |\n")
+        "| `tailscale-setup-1.102.4.exe` | tailscale 1.102.4 |\n")
     assert text == expected
     assert r3.b006_paths(root) == []
 
@@ -199,7 +199,7 @@ def test_setup_table_creates_readme(tmp_path):
     assert "| File | What it is |" in lines
     i = lines.index("| File | What it is |")
     assert lines[i + 1] == "|---|---|"
-    assert r3.row_cells(lines[i + 2]) == ["`7z2603-x64.exe`", "7z2603"]
+    assert r3.row_cells(lines[i + 2]) == ["`7z2603-x64.exe`", "7z 26.03"]  # §16.6
     assert lines[i + 3] == "| `CrystalDiskInfo9_8_0.exe` | CrystalDiskInfo 9.8.0 |"
     assert r3.b006_paths(root) == []
 
@@ -215,7 +215,7 @@ def test_stub_installers_flagged(tmp_path):
     assert rows["`comet_installer_latest.exe`"].endswith(note + " |")
     assert rows["`DiscordSetup.exe`"].endswith(note + " |")
     assert "⚠" not in rows["`VSCodeUserSetup-x64-1.94.2.exe`"]
-    assert rows["`VSCodeUserSetup-x64-1.94.2.exe`"] == "| `VSCodeUserSetup-x64-1.94.2.exe` | VSCodeUserSetup 1.94.2 |"
+    assert rows["`VSCodeUserSetup-x64-1.94.2.exe`"] == "| `VSCodeUserSetup-x64-1.94.2.exe` | VSCode 1.94.2 |"  # §16.6
     assert "⚠" not in rows["`winrar-x64-723.exe`"]
 
 

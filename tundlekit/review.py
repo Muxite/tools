@@ -17,9 +17,14 @@ from tundlekit.registry import ToolError, tool
 
 SECTION_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 NUMBERED_RE = re.compile(r"^(\d+(?:\.\d+)?)\.?\s+(.*)$")
+DEEP_NUMBERED_RE = re.compile(r"^(\d+(?:\.\d+){2,})\.?(?:\s+(.*))?$")
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
-RULE_LINE_RE = re.compile(r"^\s*[-*•]?\s*R(\d+)\b[.:)]?\s+(.*)")
-RULE_CELL_RE = re.compile(r"R(\d+)")
+RULE_LINE_RE = re.compile(r"^\s*[-*•]?\s*(?:\*\*|__)?R(\d+)\b[.:)]?(?:\*\*|__)?[.:)]?\s+(.*)")
+RULE_CELL_RE = re.compile(r"(?:\*\*|__)?R(\d+)[.:)]?(?:\*\*|__)?")
+RULE_NAME_CUT_RE = re.compile(r"[:;]|\.(?=\s|$)|\s—\s")
+RULE_NAME_WORDS = 12
+APPENDIX_REF_RE = re.compile(r"\bApp\.\s?([A-Z](?:\.\d+)*)(?![A-Za-z0-9])"
+                             r"|\bAppendix\s+([A-Z](?:\.\d+)*)(?![A-Za-z0-9])")
 SECTION_REF_RE = re.compile(r"§\s*(\d+(?:\.\d+)*)")
 PAPER_CONTEXT_RE = re.compile(r"arxiv|\bpaper\b", re.I)
 CUT_SECTION_RE = re.compile(r"^§\s*(\d+(?:\.\d+)*)\.?$")
@@ -68,7 +73,24 @@ def read_report(text: str) -> tuple[list[dict], dict[str, tuple[int, str]]]:
     sections: [{"section", "heading", "line", "level"}] for numbered level-2/3 headings.
     rules: {n: (line, name)} for the first occurrence of each rule.
     """
+    sections, rules, _ = read_report_full(text)
+    return sections, rules
+
+
+def short_rule_name(text: str) -> str:
+    """§16.5: the text up to the first ':', '.', ';' or ' — ', at most 12 words."""
+    cut = RULE_NAME_CUT_RE.search(text)
+    head = text[:cut.start()] if cut else text
+    head = re.sub(r"[*_`]+", "", head)
+    return " ".join(head.split()[:RULE_NAME_WORDS])
+
+
+def read_report_full(text: str):
+    """(sections, rules, deeper) where deeper maps a numbered heading of level 4 or more in the body to the
+    level-3 (or level-2) section that contains it (§16.5)."""
     sections, rules = [], {}
+    deeper: dict[str, str | None] = {}
+    last2 = last3 = None
     bucket, in_fence = "body", False
     for no, line in enumerate(text.splitlines(), 1):
         if FENCE_RE.match(line):
@@ -90,9 +112,17 @@ def read_report(text: str) -> tuple[list[dict], dict[str, tuple[int, str]]]:
                     bucket = "body"
             if bucket == "body" and level in (2, 3):
                 num = NUMBERED_RE.match(heading)
+                if level == 2:
+                    last2, last3 = (num.group(1) if num else None), None
+                else:
+                    last3 = num.group(1) if num else None
                 if num:
                     sections.append({"section": num.group(1), "heading": num.group(2).strip(),
                                      "line": no, "level": level})
+            elif bucket == "body" and level >= 4:
+                num = DEEP_NUMBERED_RE.match(heading)
+                if num:
+                    deeper.setdefault(num.group(1), last3 or last2)
             continue
         if bucket != "body":
             continue
@@ -103,8 +133,8 @@ def read_report(text: str) -> tuple[list[dict], dict[str, tuple[int, str]]]:
             if cm and len(cells) > 1:
                 n, name = _rule_id(cm.group(1)), cells[1]
         if n is not None and n not in rules:
-            rules[n] = (no, name)
-    return sections, rules
+            rules[n] = (no, short_rule_name(name))
+    return sections, rules, deeper
 
 
 def _rule_id(digits: str) -> str:
@@ -120,24 +150,33 @@ def _rule_in_line(line: str):
 
 
 # ------------------------------------------------------------------ deck
-def _rules_from(lines: list[str], table_rows: list[list[str]]) -> dict[str, str]:
-    """{n: name} of the rules on 1 slide, first occurrence wins."""
+def _rules_from(frames: list[list[str]], table_rows: list[list[str]]) -> dict[str, str]:
+    """{n: short name} of the rules on 1 slide, first occurrence wins. A rule line is joined with the lines
+    of its text frame that follow it and don't start a new rule (§16.5)."""
     found = {}
-    for line in lines:
-        n, name = _rule_in_line(line)
-        if n is not None:
-            found.setdefault(n, name)
+    for frame in frames:
+        k = 0
+        while k < len(frame):
+            n, name = _rule_in_line(frame[k])
+            k += 1
+            if n is None:
+                continue
+            parts = [name]
+            while k < len(frame) and frame[k].strip() and _rule_in_line(frame[k])[0] is None:
+                parts.append(frame[k].strip())
+                k += 1
+            found.setdefault(n, short_rule_name(" ".join(parts)))
     for row in table_rows:
         if not row:
             continue
         first = row[0].strip()
         cm = RULE_CELL_RE.fullmatch(first)
         if cm and len(row) > 1:
-            found.setdefault(_rule_id(cm.group(1)), row[1].strip())
+            found.setdefault(_rule_id(cm.group(1)), short_rule_name(row[1].strip()))
             continue
         n, name = _rule_in_line(first)
         if n is not None:
-            found.setdefault(n, name)
+            found.setdefault(n, short_rule_name(name))
     return found
 
 
@@ -158,28 +197,30 @@ def _spec_slides(path: str) -> list[dict]:
         if sl["type"] != "content":
             continue
         s = sl["spec"]
-        lines, rows = [], []
+        frames, rows = [], []
         for key in ("title", "eyebrow", "source", "thus"):
             if isinstance(s.get(key), str):
-                lines.extend(s[key].split("\n"))
-        lines.extend(deck._strip_texts(s))
+                frames.append(s[key].split("\n"))
+        frames.extend(str(t).split("\n") for t in deck._strip_texts(s))
         for block in _spec_blocks(s.get("body")):
             kind = block.get("kind")
             if kind in ("bullets", "lines"):
+                frame = []
                 for item in block.get("items") or []:
-                    lines.extend(str(item).split("\n"))
+                    frame.extend(str(item).split("\n"))
+                frames.append(frame)
             elif kind == "table":
-                rows.extend([str(c) for c in r] for r in block.get("rows") or [])
+                rows.extend([str(c) for c in r] for r in block.get("rows") or [] if isinstance(r, list))
             elif kind in ("excerpt", "point"):
-                lines.extend(str(block.get("text", "")).split("\n"))
+                frames.append(str(block.get("text", "")).split("\n"))
                 if block.get("caption"):
-                    lines.extend(str(block["caption"]).split("\n"))
+                    frames.append(str(block["caption"]).split("\n"))
             elif kind == "chart":
-                lines.extend(str(c) for c in block.get("categories") or [])
+                frames.extend([str(c)] for c in block.get("categories") or [])
                 if block.get("takeaway"):
-                    lines.append(str(block["takeaway"]))
+                    frames.append([str(block["takeaway"])])
         slides.append({"position": sl["position"], "number": sl["number"], "title": sl["title"],
-                       "footer": s.get("source") or "", "rules": _rules_from(lines, rows)})
+                       "footer": s.get("source") or "", "rules": _rules_from(frames, rows)})
     return slides
 
 
@@ -192,11 +233,11 @@ def _pptx_slides(path: str) -> list[dict]:
         info = deck.read_slide(slide, pos)
         if info["number"] is None:
             continue
-        lines, rows, footer = [], [], []
+        frames, rows, footer = [], [], []
         for sh in deck._iter_shapes(slide.shapes):
             if getattr(sh, "has_text_frame", False) and sh.has_text_frame:
                 text = sh.text_frame.text.replace("\x0b", "\n").replace("\r", "\n")
-                lines.extend(text.split("\n"))
+                frames.append(text.split("\n"))
                 top = sh.top
                 stripped = text.strip()
                 if (top is not None and top >= FOOTER_TOP_IN * EMU_PER_INCH and stripped
@@ -205,7 +246,7 @@ def _pptx_slides(path: str) -> list[dict]:
             if getattr(sh, "has_table", False) and sh.has_table:
                 rows.extend([c.text for c in r.cells] for r in sh.table.rows)
         slides.append({"position": pos, "number": info["number"], "title": info["title"],
-                       "footer": " ; ".join(footer), "rules": _rules_from(lines, rows)})
+                       "footer": " ; ".join(footer), "rules": _rules_from(frames, rows)})
     return slides
 
 
@@ -218,6 +259,19 @@ def footer_citations(footer: str) -> list[str]:
                 continue
             if m.group(1) not in cited:
                 cited.append(m.group(1))
+    return cited
+
+
+def footer_appendices(footer: str) -> list[str]:
+    """Appendices a footer cites (`App. X[.n]`, `Appendix X`), skipping paper segments (§16.5)."""
+    cited = []
+    for segment in re.split(r"[;·]", footer):
+        for m in APPENDIX_REF_RE.finditer(segment):
+            if PAPER_CONTEXT_RE.search(segment[:m.start()]):
+                continue
+            ident = m.group(1) or m.group(2)
+            if ident not in cited:
+                cited.append(ident)
     return cited
 
 
@@ -261,7 +315,7 @@ def read_cuts(path: str) -> tuple[set[str], set[str]]:
 def review_coverage(report: str, deck: str, cuts: str | None = None, threshold: float = 0.6) -> dict:
     if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not math.isfinite(threshold):
         raise ToolError("threshold must be a finite number")
-    sections, report_rules = read_report(_read_text(report, "report"))
+    sections, report_rules, deeper = read_report_full(_read_text(report, "report"))
     if not pathlib.Path(deck).is_file():
         raise ToolError(f"deck not found: {deck}")
     if deck.lower().endswith(".pptx"):
@@ -286,8 +340,12 @@ def review_coverage(report: str, deck: str, cuts: str | None = None, threshold: 
         for ref in footer_citations(sl["footer"]):
             if ref in known:
                 covers.add(ref)
+            elif ref in deeper:
+                if deeper[ref] in known:
+                    covers.add(deeper[ref])
             elif ref not in missing:
                 missing.append(ref)
+        appendices = footer_appendices(sl["footer"])
         for s in sections:
             if similarity(s["heading"], sl["title"]) >= threshold:
                 covers.add(s["section"])
@@ -298,8 +356,9 @@ def review_coverage(report: str, deck: str, cuts: str | None = None, threshold: 
         for sec in ordered:
             if sl["number"] not in covered_by[sec]:
                 covered_by[sec].append(sl["number"])
-        slide_entries.append({"number": sl["number"], "title": sl["title"], "sections": ordered})
-        if not ordered and sl["number"] not in cut_slides:
+        slide_entries.append({"number": sl["number"], "title": sl["title"], "sections": ordered,
+                              "appendices": appendices})
+        if not ordered and not appendices and sl["number"] not in cut_slides:
             add("C002", "warning", deck_path, sl["position"],
                 f"slide {sl['number']} covers no report section", sl["title"])
 

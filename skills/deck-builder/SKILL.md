@@ -13,7 +13,8 @@ Building needs the `office` extra (`pip install -e ".[office]"` in the tundlekit
 | Task | CLI | MCP tool |
 |---|---|---|
 | build a .pptx from a spec | `tundlekit deck build SPEC.json -o OUT.pptx [--inserts shown\|hidden\|off] [--times-file PATH]` | `deck_build` |
-| check a spec or a built deck | `tundlekit deck lint SPEC.json` or `tundlekit deck lint DECK.pptx` | `deck_lint` |
+| check a spec or a built deck | `tundlekit deck lint SPEC.json` or `tundlekit deck lint DECK.pptx [--times-file PATH --ids ID...]` | `deck_lint` |
+| is PowerPoint (or Word, Excel) running? exit 1 if so | `tundlekit office check [--wait SECONDS]` | `office_check` |
 | read back any .pptx (texts, notes, times) | `tundlekit deck inspect DECK.pptx` | `deck_inspect` |
 | what changed between 2 decks, with where the old text lives in the sources | `tundlekit deck diff OLD.pptx NEW.pptx [--search PATH...]` | `deck_diff` |
 | does the deck cover the report, section by section, rule by rule | `tundlekit review coverage REPORT.md DECK.pptx [--cuts cuts.txt]` | `review_coverage` |
@@ -34,7 +35,8 @@ Add `--json` for a machine-readable result. Through MCP, pass `spec_path` (a fil
    a report; then run the deliverable-review skill (render every
    slide, contact sheets, adversarial pass).
 
-Close PowerPoint before building (an open file can be locked or clobbered) and back up the previous
+Close PowerPoint before building (an open file can be locked or clobbered): `tundlekit office check` exits 1
+while Word, PowerPoint or Excel is running, and `--wait 120` waits for them to close. Back up the previous
 deliverable to `versions/<name> (before <change> <date>).pptx` first.
 
 ## Spec format
@@ -97,11 +99,25 @@ Field reference:
   equal lengths; optional `widths` in inches, 1 per column), `figure` (`path` to an existing PNG/JPEG, fitted to
   11.8 × 5.3 in), `excerpt` (`text`, optional `caption`; monospace), `chart` (`categories`, `values`, optional
   `highlight` index or category, `unit`, `takeaway`, `"chart_type": "bar"` (default) or `"line"`, `highlight_color` a
-  stage or outcome name, default `gates`; a native editable chart, grey bars, 1 highlighted bar, data labels on),
-  `point` (`text`: 1 bold 20 pt line, the takeaway under a table or figure).
+  stage or outcome name other than `pending`, default `gates`; a native editable chart, grey bars, 1 highlighted
+  bar, data labels on), `point` (`text`: 1 bold 20 pt line, the takeaway under a table or figure).
+- **Multi-series charts**: instead of `values`, give `series`, a list of `{"name", "values"}` (each as long as
+  `categories`). The chart gets 1 series per entry and a legend; `values` and `series` are mutually exclusive.
+  Works for `bar` and `line`:
+
+  ```json
+  {"kind": "chart", "chart_type": "bar", "categories": ["One-Shot", "ToolMaker-style", "CREATOR-style"],
+   "series": [{"name": "kept", "values": [119, 19, 84]}, {"name": "passed held-out", "values": [0, 0, 7]}],
+   "takeaway": "Almost no kept tool passes its held-out tests"}
+  ```
+- **Monospace columns**: a `table` block takes `mono_cols`, a list of 0-based column indices set in monospace
+  (file paths, ids, commands).
 - `body` is 1 block or a **list of blocks**. Blocks stack top to bottom in the body area unless a block gives
   `x`, `y`, `w`, `h` (inches); `size` (pt) overrides the text size. Overflow warnings apply per block. A figure
-  without `h` shrinks to fit above the THUS strip, so it never runs off the slide.
+  without `h` shrinks to fit above the THUS strip, so it never runs off the slide. Geometry values must lie in
+  0-1000 inches (`w`, `h` at least 0.01). The build warns when a positioned block overlaps a strip (DEMONSTRATED
+  BY, IN/OUT or THUS) or a stacked block overlaps a positioned one: move or shrink the block. An excerpt caption
+  that does not fit is dropped with a warning.
 - Example of a multi-block body (a table with its takeaway, then a figure beside it):
 
   ```json
@@ -223,9 +239,14 @@ is about 140 wpm, minus time for pointing and pauses.
   ```
   tundlekit deck lint workflow.pptx capsule.pptx --times-file deck-times.json
   ```
-  Each deck's id is its file stem (or give `ids` through `tundlekit call deck_lint`). D013 flags a deck whose
-  measured core time differs from its entry; D008 then checks the **combined** core time of all decks against
-  the budget.
+  Each deck's id is its file stem. When the times file uses other keys (the spec's `meta.id`), give them in deck
+  order with `--ids`:
+  ```
+  tundlekit deck lint build/workflow-v3.pptx build/capsule-final.pptx --times-file deck-times.json --ids workflow capsule
+  ```
+  D013 flags a deck whose measured core time differs from its entry. When an id is missing from the file, the
+  D013 message lists the keys that are present and suggests `--ids`. D008 then checks the **combined** core time
+  of all decks against the budget.
 - Over budget: hide or drop insertion slides first, then cut in the order above.
 
 ## Insertion slides
@@ -276,11 +297,26 @@ When the owner edited a built deck, never rebuild over it until their edits are 
 tundlekit deck diff build/deck.pptx edited/deck.pptx --search deck-src
 ```
 
-Each change names the slide, the field (`title`, `text`, `notes`, `hidden`, `added`, `removed`, `moved`), the old
-and new text with a unified diff, and `hint`: up to 3 `path:line` places under `--search` where the old text
-occurs, which is usually the line of the spec to edit. Apply every change to the spec (for many small text edits,
-`tundlekit text apply-edits EDITS.json deck.json` applies anchored replacements and fails if an anchor is not
-unique), rebuild, and diff again: the result should list only changes you chose not to carry.
+Each change names the slide, the field (`title`, `text`, `notes`, `hidden`, `number`, `added`, `removed`,
+`moved`), the old and new text with a unified diff, and `hint`: up to 3 `path:line` places under `--search` where
+the old text occurs, which is usually the line of the spec to edit. Apply every change to the spec (for many small
+text edits, `tundlekit text apply-edits EDITS.json deck.json` applies anchored replacements and fails if an anchor
+is not unique), rebuild, and diff again: the result should list only changes you chose not to carry.
+
+**After cuts and reorders.** The owner often deletes, inserts and reorders slides, which renumbers everything
+after them. Deck diff pairs slides by title first (exact, then similarity ≥ 0.8), then by number text, then by
+position (both only when titles are still ≥ 0.4 similar), so a renumbered or moved slide is still paired with its
+old self:
+
+- `slide` is always a string label: the new slide's number text (`"7"`, `"4a"`), or `"#3"` (its position) when
+  the slide shows no number. For `removed` it is the old slide's label.
+- `number` (`old`, `new` are number texts): the same slide now shows another number. Usually a side effect of a
+  cut or insertion before it; nothing to carry unless the spec numbers slides by hand.
+- `moved` (`old`, `new` are 1-based positions): the slide changed order relative to the others, beyond what
+  insertions and removals explain. Reorder the spec's `slides` list to match.
+- `removed` / `added`: cut or new slides. A cut goes into the spec (and into `cuts.txt` for `review coverage`);
+  a heavily retitled slide can also show up as a `removed` plus `added` pair, so compare the 2 before deleting.
+- A table gives at most 1 `text` change, with a row-by-row diff (cells joined with ` | `).
 
 ## Lint rules (`tundlekit deck lint`)
 
@@ -303,3 +339,17 @@ unique), rebuild, and diff again: the result should list only changes you chose 
 
 Tool arguments `words_per_second`, `target` and `max` override the spec meta; `--strict` makes warnings fail too. A spec run and a .pptx run
 should both be clean before review.
+
+## Known noise
+
+Lint and diff output is a starting list to confirm. The remaining false positives per tool:
+
+- `deck lint`: D005 on a listed phrase used in a real statement ("I'll show the numbers from the second run" can be
+  fine; rephrase if in doubt); D009 on built decks whose footer sits high on the slide; D013 when deck ids are not
+  the file stems (pass `--ids`); D002 on short core slides that are deliberately brief (a quote slide).
+- `deck build`: overflow warnings use a characters-per-line estimate, so a warning on text that visibly fits (or
+  none on text that does not) is possible; the rendered slide decides.
+- `deck diff`: a heavily retitled slide shows as `removed` plus `added`; `hint` may point at a spec line holding the
+  same text on another slide.
+- `review coverage`: slides without a `§` footer are matched by title only, so a reworded title gives a false
+  C001/C002 pair.

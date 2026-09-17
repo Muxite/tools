@@ -189,8 +189,8 @@ def test_threshold_is_inclusive(cov, threshold, covered):
 # ------------------------------------------------------------------ C002, C003, cuts
 
 def test_c002_slide_covering_nothing(cov):
-    """§15.1: C002 warning, path = deck, line = slide position; an `App.` citation is not a section."""
-    slides = base_slides() + [r3.content("Walrus meridian", "Capsule report App. A.1")]
+    """§15.1: C002 warning, path = deck, line = slide position (a slide with no footer and no similar heading)."""
+    slides = base_slides() + [r3.content("Walrus meridian")]   # §16.5: an App.-only footer is not a C002
     res = cov(slides)
     found = r3.of(res, "C002")
     assert [(f["severity"], f["path"], f["line"]) for f in found] == [("warning", "deck.json", 4)]
@@ -246,7 +246,7 @@ def test_paper_word_skips_segment(cov):
 
 def test_cuts_file_suppresses_c001_and_c002(cov):
     """§15.1 + pinned details: cuts `§1.1` and `slide 4` suppress those findings; `#` starts a comment anywhere."""
-    slides = base_slides() + [r3.content("Walrus meridian", "Capsule report App. A.1")]
+    slides = base_slides() + [r3.content("Walrus meridian")]
     cuts = "# agreed cuts with the reviewer\n§1.1   # cut in review\n\nslide 4  # merged\n# §1.2 stays\n"
     res = cov(slides, cuts=cuts)
     assert c001_sections(res) == [13]

@@ -1,12 +1,13 @@
 ---
 name: deliverable-review
-description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes to anyone - build from the script, render every page and slide to PNG with tundlekit render, make contact sheets, read the slides alone, run an adversarial pass over a fixed table of flaw classes, propagate every fix to all other instances, and record the review. Includes the hard rules (Office closed, back up first, no markers in deliverables, never overwrite hand edits). Use after building or changing any deliverable document or presentation, before sending or presenting it, or when asked to check, proofread or QA one.
+description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes to anyone - build from the script, render every page and slide to PNG with tundlekit render, make contact sheets, read the slides alone, run an adversarial pass over a fixed table of flaw classes, propagate every fix to all other instances, and record the review. Includes the hard rules (Office closed, checked with tundlekit office check before any build or render, back up first, no markers in deliverables, never overwrite hand edits). Use after building or changing any deliverable document or presentation, before sending or presenting it, or when asked to check, proofread or QA one.
 ---
 
 # Reviewing a deliverable
 
 | Task | CLI | MCP tool |
 |---|---|---|
+| are Word, PowerPoint or Excel running? (exit 1 if so; `--wait` polls every 2 s) | `tundlekit office check [--wait SECONDS]` | `office_check` |
 | what can render here (PowerPoint, LibreOffice, pymupdf, Pillow, SVG→PNG) | `tundlekit render backends` | `render_backends` |
 | render a .pptx/.docx to PNGs (+ notes, contact sheets) | `tundlekit render office FILE.pptx -o DIR [--backend auto\|powerpoint\|libreoffice\|text]` | `render_office` |
 | render PDF pages to PNG | `tundlekit render pdf FILE.pdf -o DIR [--dpi 110] [--first N] [--last M]` | `render_pdf` |
@@ -17,20 +18,26 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
 | report ↔ deck coverage, section by section and rule by rule | `tundlekit review coverage REPORT.md DECK.pptx [--cuts cuts.txt]` | `review_coverage` |
 | every cited number located on a page of its paper | `tundlekit claims trace REPORT.md --papers papers [--ledger LEDGER.md] [--in NOTES.md]` | `claims_trace` |
 | hand edits in a built deck, with where the old text lives | `tundlekit deck diff BUILT.pptx EDITED.pptx --search deck-src` | `deck_diff` |
-| hand edits in a built .docx vs its source | `tundlekit text docx-diff REPORT.md EDITED.docx --search report-src` | `docx_diff` |
-| stale § / Fig. / Table references in scripts and notes | `tundlekit text xref REPORT.md --in FILE...` | `text_xref` |
+| hand edits in a built .docx vs its source, as an edits file | `tundlekit text docx-diff REPORT.md EDITED.docx --search report-src --emit-edits edits.json` | `docx_diff` |
+| apply those edits (dry run, then `--write`) | `tundlekit text apply-edits edits.json REPORT.md` | `text_apply_edits` |
+| stale § / Fig. / Table references in scripts and notes, each against the report it slices | `tundlekit text xref REPORT.md --in FILE[=REPORT]... [--exclude GLOB...]` | `text_xref` |
 
 ## Hard rules
 
 - **Office closed.** Word and PowerPoint must not be running while any script writes or renders an Office file
-  (lock files `~$*` are unreliable on synced folders). `render office` with the `powerpoint` backend refuses when
-  PowerPoint or Word is open. Check first (Windows: `Get-Process WINWORD,POWERPNT -ErrorAction SilentlyContinue`).
+  (lock files `~$*` are unreliable on synced folders). Run `tundlekit office check` (MCP `office_check`) before
+  **every** build and render. It lists running Word, PowerPoint and Excel processes (on Linux and macOS: LibreOffice),
+  exits 1 when any is running, and never touches them. Ask the owner to close them and save their work, then
+  `tundlekit office check --wait 120` polls every 2 seconds until they are closed or the time is up. Build scripts
+  can call `tundlekit.render.office_running()` for the same check. `render office` with the `powerpoint` backend
+  also refuses when PowerPoint or Word is open.
 - **Back up first.** Before any change, copy the current deliverable to
   `versions/<name> (before <change> <date>).<ext>`.
 - **Build from the script only.** Never hand-edit a built file and then regenerate over it. If the owner edited
   the built file, diff it (`tundlekit deck diff BUILT.pptx EDITED.pptx --search deck-src`, or
-  `tundlekit text docx-diff REPORT.md EDITED.docx --search report-src`), carry every change into the source, then
-  regenerate and diff again.
+  `tundlekit text docx-diff REPORT.md EDITED.docx --search report-src --emit-edits edits.json`), carry every change
+  into the source (`tundlekit text apply-edits edits.json REPORT.md` applies the list of per-file edits it wrote,
+  all or nothing; `insert`, `delete` and ambiguous changes stay manual), then regenerate and diff again.
 - **Render into a scratch folder**, never into the source folder, the repository root or the home folder.
   `render office` refuses those, never opens the original (it renders a copy) and empties its output folder
   first, so stale renders never survive.
@@ -41,10 +48,22 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
 
 ## Procedure
 
+0. **Office closed**: `tundlekit office check` must exit 0 (use `--wait SECONDS` while the owner closes files).
+   Repeat it before every later build or render.
 1. **Build** the deck and report from their scripts or specs (`tundlekit deck build SPEC.json -o OUT.pptx`).
-   Fix every build warning (overflow, table past the bottom, strip too long, over budget).
+   Fix every build warning (overflow, table past the bottom, strip too long, a block overlapping a strip, over
+   budget).
 2. **Lint** mechanically: `tundlekit deck lint OUT.pptx`, `tundlekit text lint REPORT.md`,
-   `tundlekit text fignums REPORT.md --refs NOTES.md`, `tundlekit text xref REPORT.md --in deck-src/deck.json NOTES.md`.
+   `tundlekit text fignums REPORT.md --refs NOTES.md`, and `text xref` with each script paired with the report it
+   actually slices:
+   ```
+   tundlekit text xref REPORT.md --in deck-src/deck.json NOTES.md build_deck.py=REPORT.md build_capsule.py=capsule/REPORT-annotated.md --exclude "*/versions/*"
+   ```
+   Each `--in` entry may be written `FILE=REPORT` (a file or folder paired with its own report, for example
+   `--in build/=REPORT-annotated.md`); `--exclude GLOB...` drops walked files that belong to another report.
+   A build script that slices an annotated variant (`REPORT-annotated.md`) must be checked against that variant,
+   or every marker looks missing. X003 (info) means the script's slice source could not be resolved and the
+   marker was not checked: check it by hand.
    Also search the report text for em dashes, first person and markers; nothing may remain.
    Then the 2 checks that replace most of a manual cross-read:
    ```
@@ -54,9 +73,12 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
    `review coverage` lists report sections with no slide (C001), slides with no section (C002), footers citing
    missing sections (C003) and rule names that differ between the 2 (C004-C006); agreed cuts go in `cuts.txt`.
    `claims trace` marks every cited number as located (with pages), derived, ledgered, untraced or no_source;
-   every untraced number is a must-fix until its page is found.
+   every untraced number is a must-fix until its page is found. A T004 warning (0 claims: the report uses neither
+   `[n]` references nor name + `(pN)` locators) means nothing was traced, not that everything passed. Every weak
+   location (T003) needs a look at its page.
 3. **Render** every slide and page:
    ```
+   tundlekit office check
    tundlekit render backends
    tundlekit render office build/deck.pptx -o .review/deck
    tundlekit render office build/report.docx -o .review/report
@@ -120,6 +142,25 @@ ready-made instruction for it, with a fixed `Element · So what · Verdict` tabl
 
 Apply the accepted edits with `tundlekit text apply-edits EDITS.json FILE` (dry run, then `--write`), so every
 replacement is anchored and a missing anchor fails instead of silently doing nothing.
+
+## Known noise
+
+The checkers give a starting list for a person or agent to confirm. The remaining false positives per tool:
+
+- `review coverage`: unnumbered headings and slides without a `§` footer are matched by title only, so a
+  reworded title gives a false C001/C002 pair. Cite the section in the footer, or record the cut in `cuts.txt`.
+- `claims trace`: T001 on counts and setup details that are not paper results, and on numbers the paper writes in
+  another form; weak locations (T003) may be coincidences; T004 means nothing was checked.
+- `text xref`: X001 on references into another document whose name does not end in "report"; X003 is a skipped
+  check, not noise.
+- `deck lint`: D005 on a meta phrase used in a real statement; D009 on built decks whose footer sits high on the
+  slide; D013 when deck ids are not the file stems (pass `--ids`).
+- `deck diff`: a slide whose title was rewritten beyond recognition (similarity below 0.4) shows as `removed` plus
+  `added`, not as a title change.
+- `text docx-diff`: template text in the .docx (title page, table of contents) shows as `insert`.
+- `render office`: the "renders under 10 KB" warning can also fire on genuinely sparse slides; look before acting.
+- `office check`: it sees only Word, PowerPoint and Excel (LibreOffice elsewhere); another program holding the
+  file open is not detected.
 
 ## Past mistakes not to repeat
 

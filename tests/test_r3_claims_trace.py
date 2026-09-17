@@ -27,7 +27,7 @@ REPORT = [
     "A detector-scored DGM version reached 1,124.7 points [5].",                              # 10
     "The census found 606 passing tests [2].",                                                # 11
     "Mean routing candidates are 2.75 per role [2].",                                         # 12
-    "No citation here, although 777 is a number.",                                            # 13
+    "No citation here, and no figure either.",  # 13 (§16.4: an uncited number would use the paragraph's citations)
     "The survey reports 314 systems [7].",                                                    # 14
     "An unknown entry reports 315 systems [9].",                                              # 15
     "Both papers report 1024 runs [2, 3].",                                                   # 16
@@ -174,7 +174,7 @@ def test_excluded_numbers(trace):
 
 
 def test_only_cited_body_sentences(trace):
-    """§15.3/§14.2: uncited sentences, the references bucket and the appendix bucket give no claims."""
+    """§15.3/§14.2: a sentence without numbers, the references bucket and appendix prose give no claims."""
     lines = {line for (line, _) in by_key(trace())}
     assert 13 not in lines
     assert not any(line >= 18 for line in lines)
@@ -289,7 +289,7 @@ def test_digit_boundaries(tmp_path, trace):
 
 def test_extra_files_use_report_references(tmp_path, trace):
     """§15.3: `files` are checked the same way, with the report's reference list."""
-    r3.write(tmp_path / "talk.md", "The distinct share falls to 51% [2].\nNothing to see in 99 here.\n")
+    r3.write(tmp_path / "talk.md", "The distinct share falls to 51% [2].\n\nNothing to see in 99 here.\n")  # §16.4: own paragraph
     res = trace(files=["talk.md"])
     extra = [c for c in res["claims"] if c["path"] == "talk.md"]
     assert [(c["line"], str(c["number"]), c["status"], c["pages"]) for c in extra] == [

@@ -127,11 +127,26 @@ tundlekit papers index-check --dir papers --report report.md
 | P001 | a paper with no summary file | write one (`papers summary`) or remove the paper |
 | P002 | a summary not mentioned in INDEX.md | add its row |
 | P003 | INDEX.md's "N summaries" count is wrong | update the count |
-| P004 | a summary missing `## Summary`, `## How it works`, `## Results`, `## Limitations` or `## Relevance` | add the section |
-| P005 | an arXiv id in the report's references with no summary | read the paper and summarise it before citing it |
+| P004 | a summary missing `## Summary`, `## How it works` (any `## How ...` heading counts), `## Results`, `## Limitations` or `## Relevance` | add the section, or give that summary its own heading list with `--profile` |
+| P005 | an arXiv id cited in the report (a reference list entry, or a paper name with its id) with no summary | read the paper and summarise it before citing it |
+| P006 | no INDEX.md (a warning) | create it |
+| P007 | (info) the report has no citations the tool can resolve | P005 checked nothing: cite as `[n]` with `arXiv:ID`, or name + id |
+
+`--profile JSON` maps a summary id to its required headings, for summaries of a different kind (a benchmark or a
+survey).
 
 To check that each number a report cites is on a page of its source, use `tundlekit claims trace REPORT.md --papers papers`
-(report-writing skill).
+(report-writing skill). It needs `[n]` references or name + `(pN)` locators; 0 claims (T004) is not a pass.
+
+## Known noise
+
+`papers index-check` and the text tools give a starting list to confirm. The remaining false positives:
+
+- `papers index-check`: P002 when INDEX.md names a paper by a title variant without its id; P004 on a summary that
+  deliberately uses other headings (use `--profile`).
+- `papers summary`: the title can still pick up a venue line or stop early on an unusual first page, and small-caps
+  names may be split oddly; check the title and authors before `--write`.
+- `papers body`, `papers list`: the `layout_text` flag on a 1-column paper with wide tables.
 
 ## Numbers ledger
 

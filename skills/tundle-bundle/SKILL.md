@@ -25,6 +25,7 @@ Add `--json` to any command for a machine-readable result.
 | names, junk, copies, setup tables, VERSION/CHANGELOG | `tundlekit bundle lint` | `bundle_lint` |
 | SOURCE.md checksums | `tundlekit bundle verify` | `bundle_verify` |
 | draft a SOURCE.md for an installer (hash, program, version guessed) | `tundlekit bundle source FILE [--url URL] [--install CMD] [--write] [--force]` | `bundle_source` |
+| draft SOURCE.md for every installer in a folder tree that has none | `tundlekit bundle source DIR --all [--write]` | `bundle_source` (`file` = a directory) |
 | add missing rows to a setup folder's README table | `tundlekit bundle setup-table DIR [--write]` | `bundle_setup_table` |
 
 ## Rules
@@ -197,9 +198,12 @@ setup/any/        runs on both: scripts, Python wheels, portable archives (creat
   - Install:    <steps, or the silent/unattended command>
   ```
   Draft it instead of typing the hash: `tundlekit bundle source FILE` prints the text (program and version guessed
-  from the file name, architecture tokens such as `x64` removed, SHA-256 and download date filled in); add
-  `--url URL --install "CMD" --write` to write it (`--force` to overwrite an existing one). Check the guessed program
-  and version, and replace any `<official download URL>` or `<steps>` placeholder. By hand, get the hash with
+  from the file name, architecture tokens such as `x64` and trailing `Setup`/`Installer` words removed, SHA-256 and
+  download date filled in); add `--url URL --install "CMD" --write` to write it (`--force` to overwrite an existing
+  one). When the folder's `README.md` table already lists the file, its "What it is" cell supplies the program and
+  version instead of the file name (the text before the first `,` or `⚠`, split at the first token that starts with
+  a digit), so a good README row is reused. Check the guessed program and version, and replace any
+  `<official download URL>` or `<steps>` placeholder. By hand, get the hash with
   `Get-FileHash <file>` (Windows) or `sha256sum <file>` (Linux). Then check it:
   ```
   tundlekit bundle verify
@@ -215,13 +219,40 @@ tundlekit bundle lint                                   # B006 lists unlisted fi
 tundlekit bundle setup-table setup/windows              # dry run: the rows it would add
 tundlekit bundle setup-table setup/windows --write      # append them to setup/windows/README.md
 tundlekit bundle source setup/windows/python-3.13.5-amd64.exe --url https://www.python.org/downloads/ --write
+tundlekit bundle source setup --all                     # dry run: a SOURCE.md draft for every installer without one
+tundlekit bundle source setup --all --write             # write them; existing SOURCE.md files are skipped
 tundlekit bundle verify
 ```
+
+`bundle source DIR --all` covers every file that B014 would count in that tree and has no SOURCE.md yet; the
+result is `{"results": [...]}`, 1 entry per file. It never overwrites an existing SOURCE.md. Fill in the URL and
+install steps of each draft afterwards.
 
 `setup-table` adds 1 row per unlisted entry (`` | `name` | {program} {version} | ``) after the last row of the
 first table, or creates the table; existing rows are untouched. Stub installers (a name with `Setup`, `Installer`,
 `Loader` or `latest` and no version) get "⚠ check: may download during install". Edit the guessed descriptions
-afterwards; they come from the file name only.
+afterwards; they come from the file name only. It never adds rows for junk files (the B005 list) or for names
+containing a backtick or `|`: those are listed under `skipped`, each with its `name` and `reason`. Rename such a
+file, or list it by hand. A `|` line inside a fenced code block in the README is never taken for the table.
+
+`SOURCE.md` and `README.md` are matched case-insensitively everywhere (`Source.md` and `readme.md` count), in
+`bundle source`, `bundle setup-table` and the lint rules.
+
+Name guessing handles common patterns: `tailscale-setup-1.102.4.exe` gives `tailscale` 1.102.4, `7z2409.exe`
+gives `7z` 24.09, `winrar-x64-723.exe` gives `winrar` 7.23, and `R2025a` is a MATLAB-style version.
+
+## Known noise
+
+Lint and the drafting commands give a starting list to confirm. The remaining false positives:
+
+- `bundle lint`: B003 on a name where `final`, `new`, `old`, `copy` or `backup` is a real part of the name (a
+  product called "Final Draft"), not a copy marker. A `v2` attached to a word with a hyphen
+  (`AI Scientist-v2`) no longer fires. Accept a deliberate one with `--ignore "B003:path/glob"` and say why in the
+  README. B011 (very large file) and B004 are information, not problems.
+- `bundle source`, `bundle setup-table`: program names and versions guessed from unusual file names are often
+  wrong (a build number taken for a version, a vendor prefix kept). Check every draft; a README row that already
+  describes the file is used instead of the guess.
+- `bundle verify`: B013 on a SOURCE.md that deliberately records no hash (a web installer that changes daily).
 
 ## Checklist before handing a copy on
 

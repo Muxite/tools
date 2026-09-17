@@ -67,6 +67,7 @@ COPY_MARKERS = [
     re.compile(r"\s\(\d+\)$", re.I),
     re.compile(r" - copy(?: \(\d+\))?$", re.I),
 ]
+NAME_VERSION = re.compile(r"(?<=[^\W\d_])-v\d+$", re.I)
 VERSION_RE = re.compile(r"([0-9]{4})\.([0-9]{2})\.([0-9]{2})\.([0-9]+)")
 HASH_LINE = re.compile(r"^\s*-\s*SHA-256:\s*(.*)$")
 FILE_LINE = re.compile(r"^\s*-\s*File:\s*(.*)$")
@@ -655,7 +656,7 @@ def _verify_source(top: Path, source: Path, findings: list[dict], checked: list[
             break
     if file_line is None:
         candidates = sorted(p for p in folder.iterdir()
-                            if p.is_file() and not p.is_symlink() and p.name not in ("README.md", "SOURCE.md"))
+                            if p.is_file() and not p.is_symlink() and not _is_special(p.name))
         if len(candidates) == 1:
             target = candidates[0]
         else:
@@ -714,8 +715,9 @@ def _target_problem(top: Path, folder: Path, name: str) -> str | None:
 def _verify(top: Path) -> tuple[list[dict], list[dict]]:
     findings, checked = [], []
     for dirpath, _, filenames, _ in walk(top):
-        if "SOURCE.md" in filenames:
-            _verify_source(top, Path(dirpath) / "SOURCE.md", findings, checked)
+        for name in filenames:
+            if name.lower() == "source.md":
+                _verify_source(top, Path(dirpath) / name, findings, checked)
     checked.sort(key=lambda c: c["source"])
     return findings, checked
 
@@ -745,24 +747,72 @@ def _name_problem(name: str) -> str | None:
     return None
 
 
+def _copy_marker(stem: str) -> bool:
+    """B003: the stem ends in a copy/version marker. `Name-v2` (hyphen right after a letter) is a name (§16.6)."""
+    if not any(p.search(stem) for p in COPY_MARKERS):
+        return False
+    return not NAME_VERSION.search(stem)
+
+
 def _is_junk_file(name: str) -> bool:
     return any(fnmatch.fnmatchcase(name, pat) for pat in JUNK_FILES)
 
 
+SPECIAL_NAMES = ("readme.md", "source.md")
+FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+
+
+def _is_special(name: str) -> bool:
+    """README.md or SOURCE.md, in any letter case (§16.1)."""
+    return name.lower() in SPECIAL_NAMES
+
+
+def _find_ci(folder: str | os.PathLike, name: str) -> str | None:
+    """The entry of folder whose name equals name case-insensitively (the exact spelling first), or None."""
+    try:
+        entries = sorted(os.listdir(folder))
+    except OSError:
+        return None
+    if name in entries:
+        return name
+    return next((e for e in entries if e.lower() == name.lower()), None)
+
+
+def _fenced(lines: list[str]) -> list[bool]:
+    """For each line, whether it is part of a fenced code block (fence lines included)."""
+    out, fence = [], None
+    for line in lines:
+        if fence is None:
+            m = FENCE_OPEN.match(line)
+            if m:
+                fence = m.group(1)
+            out.append(fence is not None)
+        else:
+            out.append(True)
+            m = FENCE_OPEN.match(line)
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and \
+                    not line.strip()[len(m.group(1)):].strip():
+                fence = None
+    return out
+
+
 def _table_rows(text: str):
-    """(line number, first-cell names) for each body row of the Markdown tables in text."""
+    """(line number, first-cell names, line) for each body row of the Markdown tables in text (fences skipped)."""
     lines = text.splitlines()
-    is_sep = [ln.startswith("|") and "-" in ln and set(ln.strip()) <= set("|-: ") for ln in lines]
+    fenced = _fenced(lines)
+    is_row = [ln.startswith("|") and not f for ln, f in zip(lines, fenced)]
+    is_sep = [row and "-" in ln and set(ln.strip()) <= set("|-: ") for ln, row in zip(lines, is_row)]
     for i, line in enumerate(lines):
-        if not line.startswith("|") or is_sep[i]:
+        if not is_row[i] or is_sep[i]:
             continue
         if i + 1 < len(lines) and is_sep[i + 1]:
             continue  # header row
         yield i + 1, _first_cell_names(line), line
 
 
-def _first_cell_names(line: str) -> list[str]:
-    cell, in_code, i = [], False, 1
+def _cells(line: str) -> list[str]:
+    """The cells of a table row; `|` inside backtick spans and `\\|` don't split."""
+    cells, cell, in_code, i = [], [], False, 1 if line.startswith("|") else 0
     while i < len(line):
         c = line[i]
         if c == "`":
@@ -772,14 +822,68 @@ def _first_cell_names(line: str) -> list[str]:
             i += 2
             continue
         elif c == "|" and not in_code:
-            break
+            cells.append("".join(cell).strip())
+            cell = []
+            i += 1
+            continue
         cell.append(c)
         i += 1
-    return [span.strip() for span in re.findall(r"`([^`]*)`", "".join(cell)) if span.strip()]
+    if "".join(cell).strip():
+        cells.append("".join(cell).strip())
+    return cells
+
+
+def _first_cell_names(line: str) -> list[str]:
+    cells = _cells(line)
+    if not cells:
+        return []
+    return [span.strip() for span in re.findall(r"`([^`]*)`", cells[0]) if span.strip()]
+
+
+def _atomic_write(path: str | os.PathLike, data: bytes) -> None:
+    """Write data to path atomically (§16.1): a temp file next to the target, then replace.
+
+    A symlink is written through to its target, and an existing file keeps its permission bits.
+    """
+    target = os.path.realpath(path) if os.path.islink(path) else os.path.abspath(path)
+    try:
+        mode = _stat.S_IMODE(os.stat(target).st_mode)
+    except OSError:
+        mode = None
+    folder, base = os.path.split(target)
+    tmp = None
+    try:
+        for n in range(100):
+            candidate = os.path.join(folder, f".{base}.{os.getpid()}.{n}.tundlekit-tmp")
+            try:
+                fd = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o666)
+            except FileExistsError:
+                continue
+            tmp = candidate
+            break
+        else:
+            raise OSError(f"cannot create a temporary file in {folder}")
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        if mode is not None:
+            os.chmod(tmp, mode)
+        os.replace(tmp, target)
+        tmp = None
+    finally:
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+
+def _readme_path(folder: Path) -> Path:
+    """folder's README.md in whatever letter case it has, or folder/README.md when there is none."""
+    return folder / (_find_ci(folder, "README.md") or "README.md")
 
 
 def _lint_setup_dir(top: Path, folder: Path, findings: list[dict]) -> None:
-    readme = folder / "README.md"
+    readme = _readme_path(folder)
     listed: set[str] = set()
     if readme.is_file():
         rel_readme = _rel(top, readme)
@@ -804,7 +908,7 @@ def _lint_setup_dir(top: Path, folder: Path, findings: list[dict]) -> None:
 
 def _listed_names(folder: Path) -> set[str]:
     """Entry names (without a trailing `/`) named in the first cells of folder/README.md's tables."""
-    readme = folder / "README.md"
+    readme = _readme_path(folder)
     if not readme.is_file():
         return set()
     return {name.rstrip("/") for _, names, _ in _table_rows(_read_text(readme)) for name in names}
@@ -813,7 +917,7 @@ def _listed_names(folder: Path) -> set[str]:
 def _unlisted(folder: Path, listed: set[str]) -> list[str]:
     """Entries of a setup/<dir>/ folder that B006 reports, sorted."""
     return [entry for entry in sorted(os.listdir(folder))  # links count as entries too
-            if entry not in (".git", "README.md", "SOURCE.md") and entry not in listed]
+            if entry != ".git" and not _is_special(entry) and entry not in listed]
 
 
 def _lint_changelog(top: Path, findings: list[dict]) -> None:
@@ -900,12 +1004,12 @@ def bundle_lint(root: str | None = None, max_path: int = 160, large_mb: float = 
             full = folder / name
             _lint_name(rel, name, max_path, findings)
             stem, ext = os.path.splitext(name)
-            if not in_versions and any(p.search(stem) for p in COPY_MARKERS):
+            if not in_versions and _copy_marker(stem):
                 findings.append(_finding("B003", "warning", rel,
                                          "looks like a copy or old version: replace the file instead"))
             if _is_junk_file(name):
                 junk.append((rel, False))
-            elif (len(parts) >= 2 and parts[0] == "setup" and name not in ("README.md", "SOURCE.md")
+            elif (len(parts) >= 2 and parts[0] == "setup" and not _is_special(name)
                   and not _source_covers(top, parts)):
                 uncovered += 1
             try:
@@ -943,9 +1047,16 @@ def bundle_lint(root: str | None = None, max_path: int = 160, large_mb: float = 
 
 def _source_covers(top: Path, parts: list[str]) -> bool:
     """A file in setup/<dir>/... is covered by a SOURCE.md in its own folder or its setup/<dir>/<sub>/ folder."""
-    if (top.joinpath(*parts) / "SOURCE.md").is_file():
-        return True
-    return len(parts) >= 3 and (top.joinpath(*parts[:3]) / "SOURCE.md").is_file()
+    return _covered(top.joinpath(*parts), top.joinpath(*parts[:3]) if len(parts) >= 3 else None)
+
+
+def _has_source(folder: Path) -> bool:
+    name = _find_ci(folder, "SOURCE.md")
+    return name is not None and (folder / name).is_file()
+
+
+def _covered(folder: Path, sub: Path | None) -> bool:
+    return _has_source(folder) or (sub is not None and _has_source(sub))
 
 
 def _git_ignored(top: Path, entries: list[tuple[str, bool]]) -> set[str]:
@@ -1007,6 +1118,14 @@ SEPARATORS = "-_. "
 COMPOUND_EXTS = (".tar.gz", ".tar.xz", ".tar.bz2", ".tar.zst")
 STUB_WORDS = re.compile(r"setup|installer|loader|latest", re.I)
 STUB_NOTE = " ⚠ check: may download during install"
+MATLAB_VERSION = re.compile(r"(?<![^-_. ])(R20[0-9]{2}[ab])(?![^-_. ])")
+COMPACT_VERSION = re.compile(r"(?<![0-9])([0-9]{3,4})[-_. ]*$")
+SETUP_TOKENS = (
+    re.compile(r"(?:^|[-_. ])(?:user ?)?(?:setup|installer|install)$", re.I),               # separate word
+    # CamelCase part: starts with a capital letter, the rest in any case
+    re.compile(r"(?<=[^\W_])(?:U(?i:ser)(?i:s)|(?:U(?i:ser))?S)(?i:etup)$"),
+    re.compile(r"(?<=[^\W_])(?:U(?i:ser)(?i:i)|(?:U(?i:ser))?I)(?i:nstall(?:er)?)$"),
+)
 
 
 def strip_arch(stem: str) -> str:
@@ -1034,21 +1153,75 @@ def installer_stem(name: str) -> str:
     return os.path.splitext(name)[0]
 
 
-def guess_program(name: str, is_dir: bool = False) -> tuple[str, str]:
-    """(program, version) guessed from an installer's file name (§15.7)."""
-    original = name if is_dir else installer_stem(name)
-    stem = strip_arch(original)
+def _find_version(stem: str) -> tuple[str, str] | None:
+    """(version, text before it) from an architecture-stripped stem, or None (§15.7, §16.6)."""
     m = VERSION_GUESS.search(stem)
     if m:
-        version, program = m.group(1).replace("_", "."), stem[:m.start(1)]
-    else:
-        version, program = "", stem
-    program = re.sub(r" +", " ", program.replace("_", " ").replace("-", " "))
+        return m.group(1).replace("_", "."), stem[:m.start(1)]
+    m = MATLAB_VERSION.search(stem)
+    if m:
+        return m.group(1), stem[:m.start(1)]
+    m = COMPACT_VERSION.search(stem)
+    if m:
+        digits, before = m.group(1), stem[:m.start(1)]
+        attached = before and before[-1] not in SEPARATORS
+        if before.strip(SEPARATORS) and (not attached or len(before) >= 2):
+            cut = len(digits) - 2
+            return f"{digits[:cut]}.{digits[cut:]}", before
+    return None
+
+
+def _clean_program(text: str) -> str:
+    program = re.sub(r" +", " ", text.replace("_", " ").replace("-", " "))
     program = program.rstrip(SEPARATORS)
-    program = re.sub(r"(?:^| )v$", "", program).rstrip(SEPARATORS).strip()
+    return re.sub(r"(?:^| )v$", "", program).rstrip(SEPARATORS).strip()
+
+
+def _drop_setup_token(program: str) -> str:
+    """Remove 1 trailing Setup/UserSetup/Installer/Install token, a separate word or a CamelCase part (§16.6)."""
+    for pattern in SETUP_TOKENS:
+        m = pattern.search(program)
+        if m and program[:m.start()].strip(SEPARATORS):
+            return _clean_program(program[:m.start()])
+    return program
+
+
+def guess_program(name: str, is_dir: bool = False) -> tuple[str, str]:
+    """(program, version) guessed from an installer's file name (§15.7, §16.6)."""
+    original = name if is_dir else installer_stem(name)
+    stem = strip_arch(original)
+    found = _find_version(stem)
+    version, program = found if found else ("", stem)
+    program = _clean_program(program)
+    if version:
+        program = _drop_setup_token(program)
     if not program and not version:  # the name was nothing but architecture tokens
         program = re.sub(r" +", " ", original.replace("_", " ").replace("-", " ")).strip(SEPARATORS)
     return program, version
+
+
+def _readme_guess(folder: Path, name: str) -> tuple[str, str] | None:
+    """(program, version) from the "What it is" cell of the folder's README row for name (§16.6), or None."""
+    readme = _find_ci(folder, "README.md")
+    if readme is None:
+        return None
+    try:
+        text = _read_text(folder / readme)
+    except OSError:
+        return None
+    for _, names, line in _table_rows(text):
+        if name not in names:
+            continue
+        cells = _cells(line)
+        if len(cells) < 2:
+            continue
+        what = re.split(r"[,⚠]", cells[1], maxsplit=1)[0].strip()
+        tokens = what.split()
+        at = next((i for i, t in enumerate(tokens) if t[:1].isdigit()), len(tokens))
+        program, version = " ".join(tokens[:at]), " ".join(tokens[at:])
+        if program or version:
+            return program, version
+    return None
 
 
 def _heading(program: str, version: str) -> str:
@@ -1065,10 +1238,13 @@ def _sha256_file(path: str | os.PathLike) -> str:
 
 @tool("bundle_source",
       "Draft (or with write=true, write) the SOURCE.md next to an installer: program and version guessed from the "
-      "file name, download URL, file date, SHA-256 and install steps. A written SOURCE.md passes bundle_verify. "
-      "An existing SOURCE.md is only replaced with force=true.",
+      "file name (or taken from the folder's README.md row), download URL, file date, SHA-256 and install steps. "
+      "A written SOURCE.md passes bundle_verify. An existing SOURCE.md is only replaced with force=true. With a "
+      "directory as `file`, does this for every installer under setup/<dir>/ that has no SOURCE.md (existing ones "
+      "are skipped) and returns {results: [...]}.",
       {"type": "object",
-       "properties": {"file": {"type": "string", "description": "the installer file"},
+       "properties": {"file": {"type": "string",
+                               "description": "the installer file, or a directory to cover every installer in it"},
                       "url": {"type": "string", "description": "official download URL"},
                       "install": {"type": "string", "description": "install steps or silent install command"},
                       "write": {"type": "boolean", "description": "write SOURCE.md (default: return the text only)",
@@ -1079,20 +1255,32 @@ def _sha256_file(path: str | os.PathLike) -> str:
       readOnlyHint=False, destructiveHint=False)
 def bundle_source(file: str, url: str | None = None, install: str | None = None, write: bool = False,
                   force: bool = False) -> dict:
-    if not os.path.isfile(file):
-        raise ToolError(f"not a file: {file}")
-    name = os.path.basename(os.path.abspath(file))
-    if name in ("SOURCE.md", "README.md"):
-        raise ToolError(f"{name} describes an installer; pass the installer file itself")
     for label, value in (("url", url), ("install", install)):
         if value is not None and ("\n" in value or "\r" in value):
             raise ToolError(f"{label} must be 1 line")
+    if os.path.isdir(file):
+        return {"results": [_source_one(path, url, install, write, force=False)
+                            for path in _uncovered_installers(Path(os.path.abspath(file)))]}
+    if not os.path.isfile(file):
+        raise ToolError(f"not a file or directory: {file}")
+    name = os.path.basename(os.path.abspath(file))
+    if _is_special(name):
+        raise ToolError(f"{name} describes an installer; pass the installer file itself")
+    return _source_one(file, url, install, write, force, strict=True)
+
+
+def _source_one(file: str | os.PathLike, url: str | None, install: str | None, write: bool, force: bool,
+                strict: bool = False) -> dict:
+    """The single-file bundle_source. Without strict, an existing SOURCE.md is skipped (written false)."""
+    file = os.fspath(file)
+    name = os.path.basename(os.path.abspath(file))
     try:
         digest = _sha256_file(file)
         mtime = os.stat(file).st_mtime
     except OSError as e:
         raise ToolError(f"cannot read {file}: {e.strerror or e}") from None
-    program, version = guess_program(name)
+    folder = os.path.dirname(file)
+    program, version = _readme_guess(Path(os.path.abspath(folder or ".")), name) or guess_program(name)
     text = "\n".join([
         f"# {_heading(program, version)}",
         "",
@@ -1102,24 +1290,75 @@ def bundle_source(file: str, url: str | None = None, install: str | None = None,
         f"- SHA-256:    {digest}",
         f"- Install:    {install if install is not None else '<steps>'}",
     ]) + "\n"
-    path = os.path.join(os.path.dirname(file), "SOURCE.md")
-    if write:
-        if os.path.lexists(path) and not force:
+    existing = _find_ci(folder or ".", "SOURCE.md")
+    path = os.path.join(folder, existing or "SOURCE.md")
+    result = {"path": path, "text": text, "sha256": digest, "program": program, "version": version,
+              "written": False}
+    if existing is not None and not force:
+        if not strict:
+            result["skipped"] = "SOURCE.md already exists"
+            return result
+        if write:
             raise ToolError(f"{path} already exists: pass force to replace it")
+    if write:
         try:
-            with open(path, "wb") as f:
-                f.write(text.encode("utf-8"))
+            _atomic_write(path, text.encode("utf-8"))
         except OSError as e:
             raise ToolError(f"cannot write {path}: {e.strerror or e}") from None
-    return {"path": path, "text": text, "sha256": digest, "program": program, "version": version,
-            "written": bool(write)}
+        result["written"] = True
+    return result
+
+
+def _setup_base(folder: Path) -> Path | None:
+    """The `setup` folder whose B014 rules apply to a bundle_source directory; None: folder is a setup/<dir>/."""
+    for candidate in (folder, *folder.parents):
+        if _is_tundle(candidate):
+            return candidate / "setup"
+    for candidate in (folder, *folder.parents):
+        if candidate.name == "setup":
+            return candidate
+    if (folder / "setup").is_dir():
+        return folder / "setup"
+    return None
+
+
+def _uncovered_installers(folder: Path) -> list[Path]:
+    """Files under folder that B014 counts (installers under setup/<dir>/ without a SOURCE.md), 1 per folder."""
+    base = _setup_base(folder)
+    if base is None:  # a plain folder: treat it as a setup/<dir>/ folder of its own
+        base, start = folder.parent, folder
+    elif _inside(os.path.abspath(base), os.path.abspath(folder)):
+        start = folder
+    elif _inside(os.path.abspath(folder), os.path.abspath(base)):
+        start = base
+    else:
+        return []
+    found = []
+    for dirpath, dirnames, filenames, _ in walk(start):
+        dirnames[:] = [d for d in dirnames if d not in JUNK_DIRS]
+        here = Path(dirpath)
+        parts = Path(os.path.relpath(here, base)).parts
+        if not parts or parts[0] in (os.curdir, os.pardir):
+            continue  # files directly in setup/ are not counted
+        sub = base.joinpath(*parts[:2]) if len(parts) >= 2 else None
+        if _covered(here, sub):
+            continue
+        installers = [n for n in filenames if not _is_special(n) and not _is_junk_file(n)]
+        if installers:
+            found.append(here / installers[0])  # 1 SOURCE.md per folder: the first installer in sorted order
+    return found
 
 
 def _insert_rows(text: str, rows: list[str], title: str) -> str:
-    """README text with rows added after the last row of its first table, or with a new table appended."""
+    """README text with rows added after the last row of its first table, or with a new table appended.
+
+    Lines inside fenced code blocks never count as a table (§16.1).
+    """
     newline = "\r\n" if "\r\n" in text else "\n"
     lines = text.splitlines(keepends=True)
-    first = next((i for i, ln in enumerate(lines) if ln.startswith("|")), None)
+    fenced = _fenced([ln.rstrip("\r\n") for ln in lines])
+    is_row = [ln.startswith("|") and not f for ln, f in zip(lines, fenced)]
+    first = next((i for i, row in enumerate(is_row) if row), None)
     if first is None:
         body = "".join(f"{r}{newline}" for r in rows)
         table = f"| File | What it is |{newline}|---|---|{newline}{body}"
@@ -1129,7 +1368,7 @@ def _insert_rows(text: str, rows: list[str], title: str) -> str:
             text += newline
         return text + newline + table
     last = first
-    while last + 1 < len(lines) and lines[last + 1].startswith("|"):
+    while last + 1 < len(lines) and is_row[last + 1]:
         last += 1
     if not lines[last].endswith(("\n", "\r")):
         lines[last] += newline
@@ -1140,6 +1379,7 @@ def _insert_rows(text: str, rows: list[str], title: str) -> str:
 @tool("bundle_setup_table",
       "Add a README.md table row for every entry of a setup/<dir>/ folder that the table doesn't list yet (the "
       "B006 findings), with the program and version guessed from the name; stub installers get a warning note. "
+      "Junk files and names with a backtick or | are never added; they are listed in `skipped`. "
       "Returns the rows; write=true adds them to README.md.",
       {"type": "object",
        "properties": {"dir": {"type": "string", "description": "the setup/<dir>/ folder"},
@@ -1151,9 +1391,20 @@ def bundle_setup_table(dir: str, write: bool = False) -> dict:
     folder = Path(os.path.abspath(dir))
     if not folder.is_dir():
         raise ToolError(f"not a directory: {dir}")
-    rows = []
-    for entry in _unlisted(folder, _listed_names(folder)):
+    rows, skipped = [], []
+    try:
+        entries = _unlisted(folder, _listed_names(folder))
+    except OSError as e:
+        raise ToolError(f"cannot read {dir}: {e.strerror or e}") from None
+    for entry in entries:
         is_dir = (folder / entry).is_dir()
+        if (is_dir and entry in JUNK_DIRS) or (not is_dir and _is_junk_file(entry)):
+            skipped.append({"name": entry, "reason": "junk (bundle lint B005): delete it instead of listing it"})
+            continue
+        if "`" in entry or "|" in entry:
+            skipped.append({"name": entry, "reason": "the name contains a backtick or |, which a table row "
+                                                     "cannot hold: rename it"})
+            continue
         program, version = guess_program(entry, is_dir=is_dir)
         what = _heading(program, version)
         if not version and STUB_WORDS.search(entry):
@@ -1162,17 +1413,17 @@ def bundle_setup_table(dir: str, write: bool = False) -> dict:
         rows.append(f"| `{shown}` | {what} |")
     written = False
     if write and rows:
-        readme = folder / "README.md"
+        readme = _readme_path(folder)
         try:
-            text = readme.read_bytes().decode("utf-8") if readme.exists() else ""
+            text = readme.read_bytes().decode("utf-8") if os.path.exists(readme) else ""
         except (OSError, UnicodeDecodeError) as e:
             raise ToolError(f"cannot read {readme}: {e}") from None
         try:
-            readme.write_bytes(_insert_rows(text, rows, folder.name).encode("utf-8"))
+            _atomic_write(readme, _insert_rows(text, rows, folder.name).encode("utf-8"))
         except OSError as e:
             raise ToolError(f"cannot write {readme}: {e.strerror or e}") from None
         written = True
-    return {"added": rows, "written": written}
+    return {"added": rows, "skipped": skipped, "written": written}
 
 
 # ---------------------------------------------------------------- CLI
@@ -1207,7 +1458,9 @@ def add_cli(groups) -> None:
     c.add_argument("--large-mb", type=float, default=500, help="report files larger than this, MiB (default 500)")
     c.add_argument("--ignore", action="append", metavar="RULE[:GLOB]", help="drop findings (repeatable)")
     c = command("source", "draft or write the SOURCE.md next to an installer", _cli_source, root=False)
-    c.add_argument("file", metavar="FILE", help="the installer file")
+    c.add_argument("file", metavar="FILE", help="the installer file (a directory with --all)")
+    c.add_argument("--all", action="store_true",
+                   help="FILE is a directory: draft or write a SOURCE.md for every installer that has none")
     c.add_argument("--url", help="official download URL")
     c.add_argument("--install", metavar="CMD", help="install steps or silent install command")
     c.add_argument("--write", action="store_true", help="write SOURCE.md")
@@ -1305,7 +1558,23 @@ def _cli_lint(args):
 def _cli_source(args):
     from tundlekit.cli_support import CliResult
 
+    is_dir = os.path.isdir(args.file)
+    if args.all and not is_dir:
+        raise ToolError(f"--all needs a directory: {args.file}")
+    if is_dir and not args.all:
+        raise ToolError(f"{args.file} is a directory: add --all to cover every installer in it")
     r = bundle_source(file=args.file, url=args.url, install=args.install, write=args.write, force=args.force)
+    if args.all:
+        lines = []
+        for one in r["results"]:
+            state = ("skipped (SOURCE.md exists)" if one.get("skipped")
+                     else "wrote" if one["written"] else "would write")
+            lines.append(f"{state} {one['path']}: {_heading(one['program'], one['version'])}")
+        if not lines:
+            lines.append("every installer already has a SOURCE.md")
+        elif not args.write:
+            lines.append("(dry run: add --write to create the SOURCE.md files)")
+        return CliResult(r, "\n".join(lines))
     text = r["text"].rstrip("\n")
     text += f"\n\nwrote {r['path']}" if r["written"] else "\n\n(dry run: add --write to create SOURCE.md)"
     return CliResult(r, text)
@@ -1316,6 +1585,7 @@ def _cli_setup_table(args):
 
     r = bundle_setup_table(dir=args.dir, write=args.write)
     lines = list(r["added"]) or ["every entry is already listed"]
+    lines += [f"skipped {s['name']}: {s['reason']}" for s in r.get("skipped", [])]
     if r["added"]:
         lines.append("added to README.md" if r["written"] else "(dry run: add --write to update README.md)")
     return CliResult(r, "\n".join(lines))

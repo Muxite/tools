@@ -61,6 +61,13 @@ Also give each reviewer:
 ## After the reviews
 
 1. Apply must-fix items, then should-fix items, through the build script or spec (never by hand in the built file).
+   Collect exact edits in an edits file and apply them with `tundlekit text apply-edits EDITS.json FILE` (dry run,
+   then `--write`). When the owner edited the built .docx, `tundlekit text docx-diff REPORT.md EDITED.docx --search
+   report-src --emit-edits edits.json` drafts that file. Run `tundlekit office check` before rebuilding.
 2. Propagate every fix (above), rebuild, re-render, re-run `tundlekit review coverage` and `tundlekit claims trace`.
-3. Record: 1 table per review in the plan or handoff notes (`Flaw class · Found · Fix` or the brief's own table),
+3. Tool output given to reviewers is a starting list, not a verdict. Tell them the known noise: `claims trace`
+   weak locations (T003) may be coincidences and T004 means nothing was traced; `review coverage` matches
+   footer-less slides by title only, so a false C001/C002 pair is possible; `text lint` findings are already
+   handled and out of scope. The deliverable-review skill lists the false positives per tool.
+4. Record: 1 table per review in the plan or handoff notes (`Flaw class · Found · Fix` or the brief's own table),
    what was applied, what was declined and why, and what is left for the owner.

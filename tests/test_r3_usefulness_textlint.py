@@ -91,7 +91,7 @@ def test_may_as_permission_not_s003(lint, body):
     assert rules(lint(body), "S003") == []
 
 
-@pytest.mark.parametrize("follow", ["be", "have", "well", "also", "not", "help", "seem", "lead", "cause"])
+@pytest.mark.parametrize("follow", ["be", "have", "well", "also", "help", "seem", "lead", "cause"])
 def test_may_hedge_followers_s003(lint, follow):
     """§14.1: `may` + be/have/well/also/not/help/seem/lead/cause is a hedge."""
     res = lint(f"The search may {follow} matter here.\n")

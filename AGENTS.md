@@ -48,8 +48,8 @@ tundlekit diagram render examples/diagram.json -o build/diagram.svg --json
 
 **MCP** (agents that speak the Model Context Protocol): run `tundlekit-mcp` as a stdio server. Tools have the same
 names and arguments as `tundlekit call` (`bundle_status`, `deck_build`, `diagram_render`, `chart_bar`,
-`palette_get`, `text_lint`, `render_office`, `review_coverage`, `claims_trace`, `papers_fetch`, `translate_check`,
-…). Results come back as JSON text
+`palette_get`, `text_lint`, `render_office`, `office_check`, `review_coverage`, `claims_trace`, `papers_fetch`,
+`translate_check`, …). Results come back as JSON text
 plus `structuredContent`; failures come back with `isError: true` and a message.
 
 **Python**: `import tundlekit.registry as reg; reg.load_all(); reg.call("palette_get", {})`.
@@ -57,6 +57,15 @@ plus `structuredContent`; failures come back with `isError: true` and a message.
 Paths in arguments are relative to the working directory of the process (for the MCP server, the directory it was
 started in). `bundle_prune` with `yes` rewrites git history and is marked destructive: run the dry run first and
 follow the tundle-bundle skill.
+
+Before any tool builds or renders an Office file (`deck build`, `render office`, a report build script), run
+`tundlekit office check` (MCP `office_check`, read-only). It exits 1 while Word, PowerPoint or Excel is running;
+ask the owner to close them, then `tundlekit office check --wait 120` waits for them. Never close them yourself.
+
+Checker output (`text lint`, `deck lint`, `claims trace`, `review coverage`, `translate terms`, `bundle lint`, …)
+is a starting list to confirm, not a verdict. Each skill has a "Known noise" section listing the remaining false
+positives of the tools it runs. A result with nothing checked (for example `claims trace` with 0 claims and a
+T004 warning) is not a pass.
 
 ## 3. Connecting the MCP server
 

@@ -17,7 +17,7 @@ glossary and a separate critic matter far more than which model translates.
 | protected spans intact (code, inline code, URLs, paths, numbers) | `tundlekit translate check spans SRC.md OUT.md` | `translate_check` (`mode` = spans) |
 | glossary conformance (approved and banned renderings) | `tundlekit translate check glossary SRC.md OUT.md --dir zh-en` | `translate_check` (`mode` = glossary) |
 | all mechanical checks on a pair | `tundlekit translate check all SRC.md OUT.md --dir zh-en` | `translate_check` (`mode` = all) |
-| technical terms (CamelCase, acronyms, English runs in Chinese text) carried into each version | `tundlekit translate terms SRC.md OUT.md [MORE.md...]` | `translate_terms` |
+| technical terms (CamelCase, acronyms, English runs in Chinese text) carried into each version | `tundlekit translate terms SRC.md OUT.md [MORE.md...] [--compare same-language] [--no-glossary]` | `translate_terms` |
 | list the rules, traps, glossary and prompts | `tundlekit translate resources` | `translate_resources` |
 | print one of them | `tundlekit translate resources --name data/RULES.md` | `translate_resources` (`name`) |
 
@@ -63,7 +63,7 @@ tundlekit translate check encoding SRC.md                       # 1. garbled? re
 tundlekit translate check glossary-slice SRC.md --dir zh-en     # 2. terms relevant to this source
 tundlekit translate resources --name prompts/zh-to-en.md        # 3. translator brief: fill slots, paste the slice; save output as OUT.md
 tundlekit translate check all SRC.md OUT.md --dir zh-en         # 4. mechanical checks
-tundlekit translate terms SRC.md OUT.md                         # 4b. terms dropped (L001) or changed in count (L002)
+tundlekit translate terms SRC.md OUT.md                         # 4b. terms dropped (L001), changed in count (L002), or rendered per the glossary (L003)
 tundlekit translate resources --name prompts/critic.md          # 5. critic brief, FRESH session: source, translation, step-4 output
 ```
 
@@ -124,18 +124,50 @@ additions, omissions, scope, causality, actors and status are the critic's job.
 
 ## Term carry-over (`translate terms`)
 
-`tundlekit translate terms SRC TGT [TGT...]` finds the technical terms in the source (CamelCase words, words of 2+
-capitals such as `MCP`, and runs of 2-4 ASCII words embedded in Chinese text; inline code, URLs and paths
-excluded) and counts each one, case-insensitively, in every following file. Each file is compared with the one
-before it, so a chain `SRC DRAFT FINAL` shows where a term was lost.
+`tundlekit translate terms SRC TGT [TGT...] [--compare previous|same-language] [--no-glossary]` finds the
+technical terms in the source (CamelCase words, words of 2+ capitals such as `MCP`, terms with an inner slash
+such as `CI/CD`, and runs of 2-4 ASCII words embedded in Chinese text; inline code, URLs, paths, list markers and
+English-only lines excluded) and counts each one, case-insensitively, in every following file. A term inside a
+longer term at the same place is not counted separately.
 
 - **L001** (warning): a term present before and absent now. Usually a dropped clause or a term translated away;
   check it against the glossary, and restore it or record why it is gone.
 - **L002** (info): the count changed. Often harmless (a pronoun replaced a repeat), sometimes a dropped or added
   mention; look at each.
+- **L003** (info): the term is absent, but the target is mostly Chinese (over 30% CJK letters) and the tundlekit
+  glossary's approved Chinese rendering appears instead ("rendered as ..."). This is the expected result of a
+  correct en→zh hop, not a loss.
+
+**Chinese hops.** In a chain `EN.md ZH.md EN2.md`, English terms legitimately disappear in the Chinese file.
+With the glossary on (the default), a term with an approved `zh` rendering that appears there gives L003, not
+L001. An L001 on a Chinese file therefore means either the term has no approved rendering yet (check the rendering
+used, then add a `pending` glossary row) or the term really was dropped. `--no-glossary` turns this off and reports
+every missing term as L001, which is the strict view for a file that must keep the English terms (a zh doc that
+quotes identifiers).
+
+**Comparing across the hop.** By default (`--compare previous`) each file is compared with the one before it, so
+a chain `SRC DRAFT FINAL` shows where a term was lost. With `--compare same-language`, each file is compared with
+the nearest earlier file of the same dominant script (Chinese vs Latin), which catches English drift across a
+Chinese hop (`EN.md` → `ZH.md` → `EN2.md`: `EN2.md` is compared with `EN.md`). A file with no earlier file of its
+script gives no findings.
+
+```
+tundlekit translate terms spec.en.md spec.zh.md spec.en2.md
+tundlekit translate terms spec.en.md spec.zh.md spec.en2.md --compare same-language
+```
 
 It complements `check all`: that checks protected spans and the glossary, this checks identifiers and English terms
 that no glossary row lists. Neither judges faithfulness; the critic does.
+
+## Known noise
+
+The checks give a starting list to confirm, never a verdict. The remaining false positives per tool:
+
+- `translate terms`: L001 on a term correctly translated into Chinese when the glossary has no approved `zh` row
+  for it (or with `--no-glossary`); L002 when a pronoun or a heading change alters a count; 2-4 word English runs
+  in Chinese text that are ordinary words, not terms (a product tagline).
+- `translate check`: number and untranslated-leftover warnings on value-preserving changes (三 → 3, a product name
+  kept in English); glossary findings from project conventions on unrelated text (use `--domains general`).
 
 ## Quoting convention (notes, reports, decks)
 

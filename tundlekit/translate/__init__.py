@@ -107,19 +107,34 @@ def translate_check(mode: str, src: str, tgt: str | None = None, direction: str 
 _AW = "A-Za-z0-9"                                   # ASCII word characters: CJK never counts as a boundary word
 CAMEL = re.compile(rf"(?<![{_AW}])(?:[A-Z][a-z]+[A-Z][{_AW}]*|[a-z]+[A-Z][{_AW}]*)(?![{_AW}])")
 CAPS = re.compile(rf"(?<![{_AW}])[A-Z]{{2,}}[{_AW}]*(?![{_AW}])")
+_SLASH_PART = rf"(?:[A-Z]{{2,}}[{_AW}]*|[A-Z][a-z]+[A-Z][{_AW}]*|[a-z]+[A-Z][{_AW}]*|[A-Z][0-9]*)"
+SLASH = re.compile(rf"(?<![{_AW}/])(?:{_SLASH_PART})(?:/{_SLASH_PART})+(?![{_AW}/])")
 ASCII_RUN = re.compile(r"[A-Za-z0-9-]+(?: [A-Za-z0-9-]+)*")
+LIST_MARKER = re.compile(r"^[ \t]*(?:[-*+•]|[0-9]{1,9}[.)])[ \t]+")
 FENCED = re.compile(r"^[ \t]*(`{3,}|~{3,})[^\n]*\n.*?^[ \t]*\1[ \t]*$", re.M | re.S)
 INLINE_CODE = re.compile(r"(`+)(?!`).+?(?<!`)\1(?!`)", re.S)
-URL = re.compile(r"(?:https?|ftp)://\S+|www\.\S+")
-FILE_PATH = re.compile(r"[\w.~-]*[/\\][\w./\\~-]*|\b[\w-]+\.(?:py|md|json|jsonl|txt|tsv|csv|ya?ml|toml|js|ts|"
-                       r"sh|ps1|bat|pptx|docx|xlsx|pdf|png|jpe?g|svg|html?|xml|ipynb|cfg|ini|log)\b")
+# ASCII-only classes: a URL or path stops at the first non-ASCII character (MANIFEST §16.6).
+URL = re.compile(r"(?:https?|ftp)://[!-~]+|(?<![A-Za-z0-9_.-])www\.[!-~]+")
+_PATH_CHARS = r"A-Za-z0-9_.~\-"
+FILE_PATH = re.compile(rf"(?<![{_PATH_CHARS}/\\])(?:[A-Za-z]:)?[{_PATH_CHARS}]*(?:[/\\][{_PATH_CHARS}]+)+[/\\]?"
+                       r"|(?<![A-Za-z0-9_.-])[A-Za-z0-9_-]+\.(?:py|md|json|jsonl|txt|tsv|csv|ya?ml|toml|js|ts|"
+                       r"sh|ps1|bat|pptx|docx|xlsx|pdf|png|jpe?g|svg|html?|xml|ipynb|cfg|ini|log)(?![A-Za-z0-9_])")
+CJK = re.compile(r"[㐀-䶿一-鿿豈-﫿぀-ヿ가-힯\U00020000-\U0002ffff]")
+CJK_SHARE = 0.30
+COMPARES = ("previous", "same-language")
+
+
+def _blank(m: re.Match) -> str:
+    return re.sub(r"[^\n]", " ", m.group(0))
 
 
 def _terms_text(text: str) -> str:
-    """Text with fenced code, inline code, URLs and file paths blanked out (newlines kept)."""
-    for rx in (FENCED, INLINE_CODE, URL, FILE_PATH):
-        text = rx.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
-    return text
+    """Text with fenced code, inline code, URLs and file paths blanked out (newlines kept).
+
+    Slash terms such as `TCP/IP` look like paths but are kept."""
+    for rx in (FENCED, INLINE_CODE, URL):
+        text = rx.sub(_blank, text)
+    return FILE_PATH.sub(lambda m: m.group(0) if SLASH.fullmatch(m.group(0)) else _blank(m), text)
 
 
 def _borders_ok(line: str, start: int, end: int) -> bool:
@@ -130,59 +145,143 @@ def _borders_ok(line: str, start: int, end: int) -> bool:
     after = line[end:]
     if after.startswith(" "):
         after = after[1:]
-    return (before == "" or ord(before[-1]) > 127) and (after == "" or ord(after[0]) > 127)
+    return (before.strip() == "" or ord(before[-1]) > 127) and (after == "" or ord(after[0]) > 127)
+
+
+def _has_non_ascii_letter(line: str) -> bool:
+    return any(ord(c) > 127 and c.isalpha() for c in line)
+
+
+def _outermost(spans: list[tuple[int, int, str]]) -> list[tuple[int, int, str]]:
+    """Spans not properly contained in a longer span (a sub-term at the same place is not counted)."""
+    spans = sorted(spans, key=lambda s: (s[0], -s[1]))
+    kept, max_end, max_span = [], -1, None
+    for s, e, t in spans:
+        if max_span is not None and max_end >= e and max_span != (s, e):
+            continue
+        kept.append((s, e, t))
+        if e > max_end:
+            max_end, max_span = e, (s, e)
+    return kept
+
+
+def _line_terms(line: str) -> list[tuple[int, int, str]]:
+    spans = [(m.start(), m.end(), m.group(0)) for rx in (SLASH, CAMEL, CAPS) for m in rx.finditer(line)]
+    if _has_non_ascii_letter(line):                 # English-only lines give no run terms (§16.6)
+        marker = LIST_MARKER.match(line)
+        body = (" " * marker.end() + line[marker.end():]) if marker else line
+        for m in ASCII_RUN.finditer(body):
+            run = m.group(0)
+            if 2 <= len(run.split(" ")) <= 4 and re.search("[A-Za-z]", run) \
+                    and _borders_ok(body, m.start(), m.end()):
+                spans.append((m.start(), m.end(), run))
+    return _outermost(spans)
 
 
 def find_terms(text: str) -> list[str]:
-    """Technical terms in text, as first written, in order of first appearance (MANIFEST §15.6)."""
+    """Technical terms in text, as first written, in order of first appearance (MANIFEST §15.6, §16.6)."""
     found: dict[str, tuple[int, str]] = {}
-
-    def add(pos: int, term: str) -> None:
-        key = term.lower()
-        if key not in found or pos < found[key][0]:
-            found[key] = (pos, term)
-
     offset = 0
     for line in _terms_text(text).split("\n"):
-        for rx in (CAMEL, CAPS):
-            for m in rx.finditer(line):
-                add(offset + m.start(), m.group(0))
-        for m in ASCII_RUN.finditer(line):
-            run = m.group(0)
-            if 2 <= len(run.split(" ")) <= 4 and re.search("[A-Za-z]", run) \
-                    and _borders_ok(line, m.start(), m.end()):
-                add(offset + m.start(), run)
+        for s, _, term in _line_terms(line):
+            key = term.lower()
+            if key not in found or offset + s < found[key][0]:
+                found[key] = (offset + s, term)
         offset += len(line) + 1
     return [term for _, term in sorted(found.values())]
 
 
-def _count(text: str, term: str) -> int:
+def _term_rx(term: str) -> re.Pattern:
     words = [re.escape(w) for w in term.split()]
-    rx = re.compile(rf"(?<![{_AW}])" + r"\s+".join(words) + rf"(?![{_AW}])", re.I)
-    return len(rx.findall(text))
+    return re.compile(rf"(?<![{_AW}])" + r"\s+".join(words) + rf"(?![{_AW}])", re.I)
+
+
+def _count_all(text: str, terms: list[str]) -> dict[str, int]:
+    """Whole-word, case-insensitive counts; an occurrence inside a longer term's occurrence is not counted."""
+    spans = [(m.start(), m.end(), t) for t in terms for m in _term_rx(t).finditer(text)]
+    counts = dict.fromkeys(terms, 0)
+    for _, _, t in _outermost(spans):
+        counts[t] += 1
+    return counts
+
+
+def _count(text: str, term: str) -> int:
+    return len(_term_rx(term).findall(text))
+
+
+def _cjk_share(text: str) -> float:
+    letters = [c for c in text if c.isalpha()]
+    if not letters:
+        return 0.0
+    return sum(1 for c in letters if CJK.match(c)) / len(letters)
+
+
+def _script(text: str) -> str:
+    """The dominant script (CJK vs Latin). Technical-term tokens (CamelCase, acronyms, slash terms) are kept
+    verbatim in translations, so they are left out: `RetryBudget已设置。` is a Chinese file."""
+    for rx in (SLASH, CAMEL, CAPS):
+        text = rx.sub(" ", text)
+    return "cjk" if _cjk_share(text) > CJK_SHARE else "latin"
+
+
+def _approved_zh() -> dict[str, list[str]]:
+    """{lower-case en alternative: approved zh renderings} from the vendored glossary."""
+    table: dict[str, list[str]] = {}
+    try:
+        lines = Path(tcheck.DEFAULT_GLOSSARY).read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError, AttributeError):
+        return table
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        cols = line.split("\t")
+        if len(cols) < 6 or cols[0].strip() == "en" or cols[5].strip() != "approved":
+            continue
+        zh = [z.strip() for z in cols[1].split("|") if z.strip()]
+        for en in cols[0].split("|"):
+            key = " ".join(en.split()).lower()
+            if key and zh:
+                table.setdefault(key, [])
+                table[key] += [z for z in zh if z not in table[key]]
+    return table
+
+
+def _finding(rule: str, severity: str, path: str, message: str, term: str) -> dict:
+    return {"rule": rule, "severity": severity, "path": path.replace("\\", "/"), "line": None,
+            "message": message, "excerpt": term}
 
 
 @tool(
     "translate_terms",
     "Check that technical terms carry over between a source text and its translations: finds terms in src "
-    "(CamelCase words, capitalised acronyms such as MCP, and runs of 2-4 English words set in Chinese text; "
-    "code, URLs and file paths excluded), counts each in every file, and compares each target with the "
-    "previous file. L001 (warning): a term that disappeared. L002 (info): a term whose count changed.",
+    "(CamelCase words, acronyms such as MCP, slash terms such as TCP/IP, runs of 2-4 English words set in "
+    "Chinese text; code, URLs and file paths excluded), counts each in every file, and compares each target "
+    "with the previous file (compare same-language: the nearest earlier file in the same script). L001 "
+    "(warning): a term that disappeared. L002 (info): its count changed. L003 (info): gone, but a mostly "
+    "Chinese target uses the glossary's approved rendering (glossary false turns this off).",
     {"type": "object",
      "properties": {
          "src": {"type": "string", "description": "source file"},
          "targets": {"type": "array", "items": {"type": "string"}, "minItems": 1,
                      "description": "translated files, compared in order"},
+         "glossary": {"type": "boolean",
+                      "description": "downgrade L001 to L003 when an approved zh rendering is used (default true)"},
+         "compare": {"type": "string", "enum": list(COMPARES),
+                     "description": "previous (default): each file against the one before it; same-language: "
+                                    "against the nearest earlier file of the same script (CJK vs Latin)"},
      },
      "required": ["src", "targets"],
      "additionalProperties": False},
     readOnlyHint=True,
 )
-def translate_terms(src: str, targets: list[str]) -> dict:
+def translate_terms(src: str, targets: list[str], glossary: bool = True, compare: str = "previous") -> dict:
     if not targets:
         raise ToolError("give at least 1 target file")
+    if compare not in COMPARES:
+        raise ToolError(f"compare must be previous or same-language, got {compare!r}")
+    paths = [src, *targets]
     texts = []
-    for path in [src, *targets]:
+    for path in paths:
         p = Path(path)
         if not p.is_file():
             raise ToolError(f"file not found: {path}")
@@ -192,21 +291,41 @@ def translate_terms(src: str, targets: list[str]) -> dict:
             raise ToolError(f"cannot read {path}: {exc}") from None
         texts.append(_terms_text(raw.replace("\r\n", "\n").replace("\r", "\n")))
     terms = find_terms(texts[0])
-    table = {t: [_count(text, t) for text in texts] for t in terms}
+    per_file = [_count_all(text, terms) for text in texts]
+    table = {t: [c[t] for c in per_file] for t in terms}
+    scripts = [_script(text) for text in texts]
+    renderings = _approved_zh() if glossary else {}
+
     findings = []
-    for i, target in enumerate(targets, 1):
-        shown = target.replace("\\", "/")
-        previous = src if i == 1 else targets[i - 2]
+    for i in range(1, len(paths)):
+        target = paths[i]
+        if compare == "previous":
+            prev = i - 1
+        else:
+            prev = next((k for k in range(i - 1, -1, -1) if scripts[k] == scripts[i]), None)
+            if prev is None:
+                continue
+        previous = paths[prev]
+        mostly_cjk = _cjk_share(texts[i]) > CJK_SHARE
         for term, counts in table.items():
-            before, now = counts[i - 1], counts[i]
+            before, now = counts[prev], counts[i]
             if before > 0 and now == 0:
-                findings.append({"rule": "L001", "severity": "warning", "path": shown, "line": None,
-                                 "message": f"'{term}' appears {before} time(s) in {previous} and not in {target}",
-                                 "excerpt": term})
+                used = None
+                if mostly_cjk:
+                    used = next((z for z in renderings.get(" ".join(term.split()).lower(), [])
+                                 if z in texts[i]), None)
+                if used is not None:
+                    findings.append(_finding("L003", "info", target,
+                                             f"'{term}' appears {before} time(s) in {previous} and not in "
+                                             f"{target}: rendered as {used} (approved glossary rendering)", term))
+                else:
+                    findings.append(_finding("L001", "warning", target,
+                                             f"'{term}' appears {before} time(s) in {previous} and not in "
+                                             f"{target}", term))
             elif before != now and before and now:
-                findings.append({"rule": "L002", "severity": "info", "path": shown, "line": None,
-                                 "message": f"'{term}' appears {before} time(s) in {previous} and {now} in {target}",
-                                 "excerpt": term})
+                findings.append(_finding("L002", "info", target,
+                                         f"'{term}' appears {before} time(s) in {previous} and {now} in {target}",
+                                         term))
     findings.sort(key=lambda f: (f["path"], f["line"] or 0, f["rule"]))
     counts = {"error": 0, "warning": sum(f["severity"] == "warning" for f in findings),
               "info": sum(f["severity"] == "info" for f in findings)}
@@ -270,12 +389,17 @@ def add_cli(groups) -> None:
     c = cmds.add_parser("terms", help="check that technical terms carry over into translations")
     c.add_argument("src")
     c.add_argument("targets", nargs="+", metavar="TGT")
+    c.add_argument("--no-glossary", dest="glossary", action="store_false",
+                   help="never downgrade L001 to L003 for approved glossary renderings")
+    c.add_argument("--compare", choices=COMPARES, default="previous",
+                   help="compare each file with the previous one, or with the nearest earlier file in the same "
+                        "script")
     common_flags(c, checker=True)
     c.set_defaults(handler=_cli_terms)
 
 
 def _cli_terms(args) -> CliResult:
-    return CliResult(translate_terms(args.src, args.targets))
+    return CliResult(translate_terms(args.src, args.targets, glossary=args.glossary, compare=args.compare))
 
 
 def _cli_check(args) -> CliResult:

@@ -10,10 +10,10 @@ description: Draft and check technical report prose in a fixed house voice (the 
 | style lint (voice, markers, sentence length) | `tundlekit text lint REPORT.md [--rules S001,S002] [--ignore S003] [--max-words 42]` | `text_lint` |
 | figure and table numbering, dangling references | `tundlekit text fignums REPORT.md [--refs DECK-NOTES.md]` | `text_fignums` |
 | words per section and bucket, change since a git ref or a file | `tundlekit text wordcount REPORT.md [--baseline HEAD~1] [--baseline-file OLD.md] [--no-tables]` | `text_wordcount` |
-| § / App. / Fig. / Table references in other files; renumbering | `tundlekit text xref REPORT.md --in FILE... [--renumber OLD=NEW] [--write]` | `text_xref` |
+| § / App. / Fig. / Table references in other files; renumbering | `tundlekit text xref REPORT.md --in FILE[=REPORT]... [--exclude GLOB...] [--renumber OLD=NEW] [--write]` | `text_xref` |
 | every cited number located on a page of its paper | `tundlekit claims trace REPORT.md --papers DIR [--ledger LEDGER.md] [--in FILE...]` | `claims_trace` |
 | apply exact review edits (dry run first) | `tundlekit text apply-edits EDITS.json FILE [--write]` | `text_apply_edits` |
-| hand edits in a .docx vs the source | `tundlekit text docx-diff OLD NEW [--search PATH...]` | `docx_diff` |
+| hand edits in a .docx vs the source, optionally as an edits file | `tundlekit text docx-diff OLD NEW [--search PATH...] [--emit-edits EDITS.json]` | `docx_diff` |
 
 Paths may be files or folders (folders are walked for `*.md` and `*.txt`). Add `--json` for machine-readable
 results, `--strict` to fail on warnings. Write Markdown; convert to .docx only at the end.
@@ -121,7 +121,7 @@ Check that rule numbering and names match between deck and report (same count, s
 ```
 tundlekit text lint report.md --band 15,25
 tundlekit text fignums report.md --refs deck-notes.md=report.md
-tundlekit text xref report.md --in deck-src/deck.json notes/presenter-pack.md
+tundlekit text xref report.md --in deck-src/deck.json notes/presenter-pack.md --exclude "*/versions/*"
 tundlekit claims trace report.md --papers papers --ledger notes/LEDGER.md
 tundlekit text wordcount report.md --baseline HEAD
 ```
@@ -167,13 +167,55 @@ tundlekit text xref report.md --in deck-src/deck.json --renumber "§4.2=§4.3" -
 ```
 
 Without `--write` it lists the planned edits (path, line, old, new). With it, the report's headings and captions
-and every file under `--in` are rewritten.
+and every file under `--in` are rewritten. A heading renumber also renumbers the slice markers that quote it
+(`between("### 4.2 ...")`, `section("4.2")`), and each reference keeps its spelling (`Fig.9` becomes `Fig.10`,
+`Table 07` becomes `Table 08`). Fenced code in the report is never renumbered.
+
+### Pair each file with the report it actually slices
+
+A folder often holds several reports (a general report, a capsule report, an annotated variant), and each build
+script or notes file uses 1 of them. Checking every file against 1 report floods the result with false X001s.
+Pair each file (or folder) with its own report as `FILE=REPORT`, and drop walked files that belong elsewhere with
+`--exclude`:
+
+```
+tundlekit text xref report.md --in build_deck.py=report.md build_capsule.py=report-capsules/REPORT-annotated.md notes --exclude "*/versions/*" "*.bak.md"
+```
+
+When every `--in` entry is paired, the positional report may be left out. Other points:
+
+- **Annotated variants.** A build script often slices an annotated copy (`REPORT-annotated.md`) rather than the
+  clean report. X002 checks each `between(...)`/`section(...)` marker against the file the call actually reads: a
+  `src=NAME` keyword or third argument, or the module-level `.md` path bound to a name (such as
+  `SRC = HERE.parents[1] / "report-capsules" / "REPORT-annotated.md"`). Only paths built from string literals and
+  `__file__` anchors (`HERE`, `ROOT` with `.parent`/`.parents[k]`) are followed.
+- **X003** (info) means the slice source could not be resolved, so that marker was not checked. It is not a pass:
+  open the script, find the file it slices, and check the marker by hand (or pair the script with that file).
+- References preceded on the same line by another report's name (`see the capsule report §3`) and citation
+  brackets that start with a number (`[5, App. H]`) are skipped. The report's own name (its H1 title when that
+  ends in "report", else its folder name) is checked normally.
 
 ## Tracing numbers to pages (`claims trace`)
 
-`tundlekit claims trace REPORT.md --papers DIR [--ledger LEDGER.md] [--in FILE...]` takes every body sentence that
-cites `[n]` and contains a number, maps `[n]` to an arXiv id through the reference list (`arXiv:ID` in the entry),
-and searches that paper's text page by page (`51%` also matches `0.51`). Each number gets a status:
+`tundlekit claims trace REPORT.md --papers DIR [--ledger LEDGER.md] [--in FILE...]` takes every body paragraph that
+cites a paper and contains a number, maps the citation to an arXiv id, and searches that paper's text page by page
+(`51%` also matches `0.51` and `0.510`). It recognises 2 citation styles only:
+
+- **`[n]` references**: `[3]` or `[3, Table 5]` in the text, with a reference list entry `[3] ... arXiv:2604.00392`
+  (or `- [3] ...`).
+- **Name + `(pN)` locators**: the paper's name with its arXiv id in the same paragraph, or in a report table row
+  that pairs that name with the id, plus a page locator `(pN)`, `(pN, pM)` or `p. N`:
+  "Beyond Task Completion (2604.00392) reports 96.8% (p7)".
+
+A number without a citation in its own sentence uses every citation in its paragraph. Numbers after `§`, `Fig.`,
+`Table`, `App.`, `Section`, `Eq.`, `Step`, `Phase`, `Level` and rule ids (`R3`), list markers, years and single
+digits are not claims. Appendix table rows are checked when the table's caption or header row cites a paper.
+
+**0 claims is not a pass.** If the report uses neither style (author-year citations, bare titles, footnotes),
+the result has 0 claims, `ok` stays true, and a **T004** warning says "no citations found". Treat T004 as
+"nothing was checked": rewrite the citations into 1 of the 2 styles, or trace the numbers by hand.
+
+Each number gets a status:
 
 | Status | Meaning | Action |
 |---|---|---|
@@ -182,6 +224,17 @@ and searches that paper's text page by page (`51%` also matches `0.51`). Each nu
 | ledgered | not in the paper, but in a ledger row | the ledger row must give its source |
 | untraced | not found in the cited papers (T001) | find the page, fix the number, or cite the right source |
 | no_source | no cited paper has a text file (T002) | fetch the paper (`tundlekit papers fetch`) and re-run |
+
+Each claim also carries `pages` (ascending), `stated_pages` (the pages the text gives, possibly empty), `weak` and
+`locator_match`:
+
+- **`weak: true`**: an integer below 1000 without `%`, or a number found on 5 or more pages. It was located, but
+  it may be there by coincidence (a `12` occurs on most pages). When the text gives a locator (`[3, Table 5]`,
+  `[3, p. 4]`, `(p4)`), a match on that page, or on a page holding that table or figure, sets
+  `locator_match: true`.
+- **T003** (info): a weak location with no locator match. **Check every weak location by hand**: open the page
+  and confirm the number means what the sentence says. A weak location with a locator match still deserves a
+  glance.
 
 `--in` checks deck notes or presenter packs with the report's reference list. A located number can still be the
 wrong quantity; the fact-check brief (review-prompts skill) covers meaning.
@@ -216,7 +269,26 @@ tundlekit text docx-diff report.md edited/report.docx --search report-src
 ```
 
 Changes are paragraph-level `replace`, `insert` and `delete` operations with a `hint` (`path:line`) where the old
-text lives. Carry each into the source, rebuild, and diff again.
+text lives. An in-sync pair gives `changes: []` (image markup, list numbers, `\pagebreak`-style lines and
+`{{...}}` placeholders are reduced on both sides first).
+
+Let the tool draft the edits instead of retyping them:
+
+```
+tundlekit text docx-diff report.md edited/report.docx --search report-src --emit-edits edits.json
+tundlekit text apply-edits edits.json report.md
+tundlekit text apply-edits edits.json report.md --write
+```
+
+`--emit-edits` writes every `replace` change that has exactly 1 hint location, as a list of
+`{"path": <hint file>, "edits": [{"find", "replace", "count": 1}]}` objects, 1 per target file; the result's
+`edits_written` gives the count. `text apply-edits` accepts that list form and applies each object to its own
+`path`, all or nothing across files. Carry `insert` and `delete` changes, and replacements with 0 or several
+hints, by hand. Then rebuild and diff again.
+
+When an edit fails, the failure lists the `lines` of every occurrence (paragraph indices in a .docx), and for a
+`.py` file a `hint` when the text spans a string-literal split (`"a "` and `"b"` on 2 lines): edit those lines by
+hand. A `find` or `replace` holding characters that are illegal in XML is refused before anything is written.
 
 ## Word counts (`text wordcount`)
 
@@ -226,13 +298,33 @@ the appendices. `--baseline GITREF` compares with a git revision and `--baseline
 (not both); each section gets its change (`"new"` for new headings). `--no-tables` leaves table rows out. Use it to
 keep sections balanced and to report what an edit grew or shrank.
 
+## Known noise
+
+Checker output is a starting list to confirm, not a verdict. The remaining false positives per tool:
+
+- `text lint`: S003 still fires on permission "may be" + a participle outside the short irregular list ("may be
+  read", "may be sent"); S009 on long definitional sentences that read fine; S011 on "pp" inside quoted text.
+- `text fignums`: F005 on a mention of another document's figure or table that is not preceded by "arXiv" or
+  "paper" ("the capsule deck's Fig. 2"). Reword it, or resolve the file with `--refs NOTES.md=REPORT.md`.
+- `text xref`: X001 on references into another document whose name does not end in "report" ("the design note
+  §3"). X003 is a skipped check, never noise to ignore.
+- `claims trace`: T001 on numbers that are counts or setup details rather than paper results ("12 slides"), and
+  on numbers the paper writes in another form (a fraction, a rounded value, a plot reading); add a ledger row.
+  Weak locations (T003) may be coincidences. T004 means nothing was checked.
+- `text docx-diff`: template text in the .docx (title page, table of contents) shows as `insert`.
+- `text wordcount`: no known false positives; headings below level 3 count toward their parent.
+
 ## Before handing over
 
 - [ ] `tundlekit text lint` clean (no errors; every warning fixed or explained)
 - [ ] `tundlekit text fignums` clean, with the deck notes passed as `--refs`
-- [ ] `tundlekit text xref` clean for the deck script and notes; `tundlekit claims trace` has no untraced numbers
+- [ ] `tundlekit text xref` clean for the deck script and notes, each paired with the report it slices, and every
+  X003 checked by hand
+- [ ] `tundlekit claims trace` has no untraced numbers and no T004, and every weak location (T003) is checked by
+  hand
 - [ ] every paper named by title in each section that uses it; every number traced to a page, table or file:line
 - [ ] every claim bounded by a labelled limitations list where it needs one; status stated in plain words
 - [ ] coverage matches the deck (`tundlekit review coverage REPORT.md DECK.pptx`); rule names and counts match
-- [ ] previous version backed up to `versions/` before overwriting; the rendered document reviewed page by page
+- [ ] `tundlekit office check` passes before the .docx is built; previous version backed up to `versions/` before
+  overwriting; the rendered document reviewed page by page
   (deliverable-review skill)

@@ -61,13 +61,13 @@ DECK = [
     "from deckkit import Deck",                                                                     # 1
     "",                                                                                             # 2
     'd = Deck("capsule")',                                                                          # 3
-    's = d.slide("1 Goal", "The goal", "Capsule report §1, §1.1, Fig. 1", stage="build")',          # 4
-    's = d.slide("2", "Evidence", "Capsule report §2.3, App. A.1, App. A.2 Table A2 · '
+    's = d.slide("1 Goal", "The goal", "Source: §1, §1.1, Fig. 1", stage="build")',          # 4
+    's = d.slide("2", "Evidence", "Source: §2.3, App. A.1, App. A.2 Table A2 · '
     'Alita-G (arXiv 2510.23601) Tables 1 and 6, §3.3")',                                            # 5
-    's = d.slide("3", "Admission", "Capsule report §4.3, Fig. 9, App. C; other fields in App. C")',  # 6
-    's = d.slide("4", "Picking", "Capsule report §4.4, Fig. 10; Table 1")',                         # 7
-    's = d.slide("5", "Plugins", "Capsule report App. D.4; Fig. 12")',                              # 8
-    's = d.slide("6", "Repeats", "Capsule report §4.2 and §4.21")',                                 # 9
+    's = d.slide("3", "Admission", "Source: §4.3, Fig. 9, App. C; other fields in App. C")',  # 6
+    's = d.slide("4", "Picking", "Source: §4.4, Fig. 10; Table 1")',                         # 7
+    's = d.slide("5", "Plugins", "Source: App. D.4; Fig. 12")',                              # 8
+    's = d.slide("6", "Repeats", "Source: §4.2 and §4.21")',                                 # 9
     "",
 ]
 
@@ -146,7 +146,7 @@ def test_existing_targets_resolve(ws):
 
 def test_several_references_on_one_line_checked_separately(ws):
     """§15.2: `§1.1, Fig. 7, Table 3` gives 2 findings (Fig. 7 and Table 3) on the same line."""
-    ws(deck=DECK[:3] + ['x = "Capsule report §1.1, Fig. 7, Table 3"'])
+    ws(deck=DECK[:3] + ['x = "Source: §1.1, Fig. 7, Table 3"'])
     res = run()
     assert [f["line"] for f in r3.of(res, "X001")] == [4, 4]
 
@@ -210,7 +210,7 @@ def test_whole_section_references_only(ws, tmp_path):
         ("REPORT.md", 11, "§4.2", "§4.5"), ("build_deck.py", 9, "§4.2", "§4.5")]
     deck = r3.read(tmp_path / "build_deck.py").split("\n")
     report = r3.read(tmp_path / "REPORT.md").split("\n")
-    assert deck[8] == 's = d.slide("6", "Repeats", "Capsule report §4.5 and §4.21")'
+    assert deck[8] == 's = d.slide("6", "Repeats", "Source: §4.5 and §4.21")'
     assert report[10] == "### 4.5 Count repeats per sprint"
     assert report[20] == REPORT[20]
 
@@ -220,7 +220,7 @@ def test_appendix_renumber(ws, tmp_path):
     run(renumber=["App. D.4=App. D.5"], write=True)
     deck = r3.read(tmp_path / "build_deck.py").split("\n")
     report = r3.read(tmp_path / "REPORT.md").split("\n")
-    assert deck[7] == 's = d.slide("5", "Plugins", "Capsule report App. D.5; Fig. 12")'
+    assert deck[7] == 's = d.slide("5", "Plugins", "Source: App. D.5; Fig. 12")'
     assert report[38] == "### D.5 Plugins unload cleanly"
 
 
