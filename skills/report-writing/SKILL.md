@@ -15,9 +15,12 @@ description: Draft and check technical report prose in a fixed house voice (the 
 | apply exact review edits (dry run first) | `tundlekit text apply-edits EDITS.json FILE [--write]` | `text_apply_edits` |
 | hand edits in a .docx vs the source, optionally as an edits file | `tundlekit text docx-diff OLD NEW [--search PATH...] [--emit-edits EDITS.json]` | `docx_diff` |
 | snapshot a file into `versions/` before writing it | `tundlekit bundle backup FILE... --reason "CHANGE"` | `bundle_backup` |
+| build the .docx from the Markdown (house style, stdlib only) | `tundlekit report build REPORT.md -o OUT.docx [--excerpts DIR] [--author NAME] [--overwrite] [--force-office]` | `report_build` |
+| HTML page of the summaries of the papers the report cites | `tundlekit papers page REPORT.md -o paper-summaries.html [--dir PAPERS] [--index INDEX.md] [--title TEXT]` | `papers_page` |
 
 Paths may be files or folders (folders are walked for `*.md` and `*.txt`). Add `--json` for machine-readable
-results, `--strict` to fail on warnings. Write Markdown; convert to .docx only at the end.
+results, `--strict` to fail on warnings. Write Markdown; build the .docx with `tundlekit report build` only at the
+end.
 
 ## The style card (the house voice)
 
@@ -333,6 +336,89 @@ When an edit fails, the failure lists the `lines` of every occurrence (paragraph
 `.py` file a `hint` when the text spans a string-literal split (`"a "` and `"b"` on 2 lines): edit those lines by
 hand. A `find` or `replace` holding characters that are illegal in XML is refused before anything is written.
 
+## Building the .docx (`report build`)
+
+`tundlekit report build REPORT.md -o OUT.docx` (`report_build`) writes the house-style `.docx`: US Letter, Calibri
+11 pt, Heading1-3, Caption, Quote, Code, ListBullet and ListNumber styles, bordered tables with a shaded header
+row, figures 6.5 in wide, and a page-number footer. It needs the standard library only (no python-docx, no Pillow).
+
+```powershell
+tundlekit office check
+tundlekit bundle backup "build/Report.docx" --reason "rebuild"
+tundlekit report build REPORT.md -o "build/Report.docx"
+tundlekit text docx-diff REPORT.md "build/Report.docx"
+```
+
+- **Office closed.** The build is refused while Word or PowerPoint is running. `--force-office` overrides that,
+  but closing Office is the rule.
+- **Back up first.** Snapshot the previous build with `tundlekit bundle backup` before every rebuild.
+- **Nothing is written until the whole report parses.** Every problem is listed at once as `line N: …`: a missing
+  or non-PNG/JPEG figure, a remote image, a missing excerpt, an unknown `{{…}}` placeholder, an unterminated
+  fence, a level 4-6 heading, a stray `|` line, a table row with too many cells, list or heading syntax inside a
+  quote. Fix the Markdown; these are errors, never noise.
+- **Hand-edit guard.** When OUT.docx exists, it is compared with the report first (as `text docx-diff` does). If
+  the owner edited it (any change, or an unreadable file), the build stops, names `--overwrite` and gives the
+  number of changes. Carry the edits back first (`text docx-diff … --emit-edits`, see above), then rebuild.
+  Use `--overwrite` only when the edits are carried or meant to be dropped. An in-sync file is replaced without
+  asking.
+- **Excerpts.** A whole line `{{excerpt:name|Caption text}}` becomes the text of `EXCERPTS/name.txt` as a small
+  code block plus a caption. The folder defaults to `<report dir>/excerpts`, then `<report dir>/build/excerpts`;
+  pass `--excerpts DIR` otherwise (the capsule report uses the general report's `build/excerpts`).
+- **Author.** `--author NAME`, else the `TUNDLEKIT_AUTHOR` environment variable, else `git config user.name` in the
+  report's folder, else empty. The title is the first level-1 heading.
+- **Supported Markdown**: headings 1-3, paragraphs, `-`/`*`/`+` and `1.` lists (2 levels), `>` quotes (plain
+  text), fenced code, pipe tables, whole-line PNG/JPEG figures `![Caption](fig.png)` (the alt text is the
+  caption), paragraphs `*Table N. …*` as captions, `\pagebreak`, bold, italic and inline code. Links become
+  plain text, HTML comments and front matter are dropped, and raw HTML stays literal text. Footnotes, math,
+  level 4-6 headings, merged cells and alignment are not supported.
+- **Warnings** (the build still succeeds): `inline image not embedded` and `table columns squeezed below their
+  longest word`.
+
+**Acceptance check.** `tundlekit text docx-diff REPORT.md OUT.docx` gives `changes: []` for a report without
+excerpts; with excerpts, only `insert` changes for the excerpt text and its caption. The build does not check
+layout (page count, line breaks, figure placement): render it with `tundlekit render office` and read the pages
+(deliverable-review skill).
+
+## Reading pages
+
+Private HTML reading pages (a sliced, single-file view of the report per audience) follow the `build_reading.py`
+pattern. No tundlekit command builds them: the script keeps its own Markdown renderer, and the pages do not
+depend on tundlekit.
+
+- **Source.** Slice the annotated report variant (`REPORT-annotated.md`, the one that keeps anchors and code
+  locations), never a copy of it.
+- **Fail loudly.** Slice with `between(start, end, src=…)` and `section(num, next)` helpers that exit non-zero and
+  name the marker when it is missing. Never publish a stale or half-sliced page. Check counts that must hold
+  ("5 gap items") the same way.
+- **1 file.** Inline every figure as a `data:image/png;base64,…` URI, and stop when a figure file is missing.
+  Expand `{{excerpt:name|caption}}` as a fenced block plus an italic caption.
+- **Catch moved markers before building.** Pair the build folder (or the script) with the report it slices, and
+  bind the slice source at module level (`SRC = HERE.parent / "REPORT-annotated.md"`), so the check reads the
+  right file. Pass the pair to `tundlekit text xref` as `--in FILE=REPORT` (FILE is the script or its folder,
+  REPORT the file it slices). PowerShell, from the report's folder:
+
+  ```powershell
+  tundlekit text xref --in build\=REPORT-annotated.md
+  ```
+
+  X002 means a marker moved or is duplicated: fix the marker or the heading before building. X003 means the
+  slice source could not be resolved: check that marker by hand. In Git Bash, write
+  `"build/=REPORT-annotated.md"` (quoted, forward slashes; see the Git Bash note above).
+- **Rebuild after every report edit**, together with the other outputs: the `.docx` with
+  `tundlekit report build` (`report_build`) and the paper-summaries page with `tundlekit papers page`
+  (`papers_page`):
+
+  ```powershell
+  tundlekit report build REPORT.md -o "build/Report.docx"
+  tundlekit papers page REPORT.md -o "build/paper-summaries.html" --dir papers
+  python build/build_reading.py
+  ```
+
+`papers page` gives 1 card per cited arXiv id that has a `papers/summaries/{id} - *.md` file, grouped by the
+numbered sections of `summaries/INDEX.md`, with an "In the report" line from the report's `Used for` table column.
+Cited ids without a summary are listed on the page and warned about (`--strict` makes that exit 1): write those
+summaries (paper-reading skill).
+
 ## Word counts (`text wordcount`)
 
 `text wordcount` lists words per heading (levels 1-3), the total, and `buckets`: `body`, `appendix` (from a level-2
@@ -356,6 +442,7 @@ Checker output is a starting list to confirm, not a verdict. The remaining false
   Weak locations (T003) may be coincidences. T004 means nothing was checked.
 - `text docx-diff`: template text in the .docx (title page, table of contents) shows as `insert`.
 - `text wordcount`: no known false positives; headings below level 3 count toward their parent.
+- `report build`: none known. Markdown outside the supported list is an error, not noise.
 
 ## Before handing over
 
@@ -368,6 +455,8 @@ Checker output is a starting list to confirm, not a verdict. The remaining false
 - [ ] every paper named by title in each section that uses it; every number traced to a page, table or file:line
 - [ ] every claim bounded by a labelled limitations list where it needs one; status stated in plain words
 - [ ] coverage matches the deck (`tundlekit review coverage REPORT.md DECK.pptx`); rule names and counts match
+- [ ] the .docx built with `tundlekit report build`, and `tundlekit text docx-diff REPORT.md OUT.docx` gives
+  `changes: []` (only excerpt inserts); reading pages and `tundlekit papers page` rebuilt after the last edit
 - [ ] `tundlekit office check` passes before the .docx is built; previous version backed up with
   `tundlekit bundle backup REPORT.docx --reason "CHANGE"` before every write; the rendered document reviewed page by page
   (deliverable-review skill)

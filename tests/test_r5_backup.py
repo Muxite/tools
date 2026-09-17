@@ -11,6 +11,8 @@ import pytest
 import helpers_r5b as h
 
 REPORT = "AI4Research General Report - Muk"
+# §19.2: the file sits in general/, below the versions/ parent, so snapshot stems carry the label "general".
+SNAP = f"general {REPORT}"
 
 
 @pytest.fixture(autouse=True)
@@ -50,7 +52,7 @@ def test_copies_to_nearest_versions_dir(tmp_path):
     the TUNDLEKIT_NOW date; result `backups` with source, path, bytes."""
     root, versions, doc = layout(tmp_path)
     res = h.backup(doc, "last-quarter cut")
-    name = h.snapshot_name(REPORT, "last-quarter cut", ".docx")
+    name = h.snapshot_name(SNAP, "last-quarter cut", ".docx")
     assert (versions / name).read_bytes() == b"PK docx v1"
     assert len(res["backups"]) == 1
     b = res["backups"][0]
@@ -95,7 +97,7 @@ def test_mtime_kept(tmp_path):
     """§17.3: the copy keeps the modification time."""
     root, versions, doc = layout(tmp_path)
     h.backup(doc, "clarity pass")
-    copy = versions / h.snapshot_name(REPORT, "clarity pass", ".docx")
+    copy = versions / h.snapshot_name(SNAP, "clarity pass", ".docx")
     assert abs(os.stat(copy).st_mtime - os.stat(doc).st_mtime) < 2
 
 
@@ -105,7 +107,8 @@ def test_several_files(tmp_path):
     py = h.write(root / "ai4research" / "general" / "build_reading.py", "print(1)\n")
     res = h.backup([doc, py], "v0.6 markers")
     assert [os.path.basename(b["path"]) for b in res["backups"]] == [
-        h.snapshot_name(REPORT, "v0.6 markers", ".docx"), h.snapshot_name("build_reading", "v0.6 markers", ".py")]
+        h.snapshot_name(SNAP, "v0.6 markers", ".docx"),
+        h.snapshot_name("general build_reading", "v0.6 markers", ".py")]
     assert sorted(os.listdir(versions)) == sorted(os.path.basename(b["path"]) for b in res["backups"])
 
 
@@ -131,7 +134,7 @@ def test_missing_file_refused_nothing_copied(tmp_path):
 def test_existing_target_needs_overwrite(tmp_path):
     """§17.3: an existing snapshot is refused unless overwrite; with it, the copy is replaced."""
     root, versions, doc = layout(tmp_path)
-    name = h.snapshot_name(REPORT, "cut", ".docx")
+    name = h.snapshot_name(SNAP, "cut", ".docx")
     h.write(versions / name, "older snapshot")
     with pytest.raises(h.tool_error()):
         h.backup(doc, "cut")
@@ -155,12 +158,12 @@ def test_office_running_refused_unless_forced(tmp_path, monkeypatch):
 
 # ------------------------------------------------------------------------------------ superseded and prune
 def seed_versions(versions):
-    old = h.snapshot_name(REPORT, "last-quarter cut", ".docx", "2026-09-15")
-    older = h.snapshot_name(REPORT, "first pass", ".docx", "2026-09-01")
-    keep = [f"{REPORT} (annotated, code locations, 2026-09-15).docx",       # not a (before ...) snapshot
-            h.snapshot_name(REPORT, "last-quarter cut", ".pdf", "2026-09-15"),  # other extension
+    old = h.snapshot_name(SNAP, "last-quarter cut", ".docx", "2026-09-15")
+    older = h.snapshot_name(SNAP, "first pass", ".docx", "2026-09-01")
+    keep = [f"{SNAP} (annotated, code locations, 2026-09-15).docx",       # not a (before ...) snapshot
+            h.snapshot_name(SNAP, "last-quarter cut", ".pdf", "2026-09-15"),  # other extension
             h.snapshot_name("AI4Research General Presentation - Muk", "clarity pass", ".pptx", "2026-09-15"),
-            h.snapshot_name(f"{REPORT} v2", "cut", ".docx", "2026-09-15")]    # other stem
+            h.snapshot_name(f"{SNAP} v2", "cut", ".docx", "2026-09-15")]    # other stem
     for n in [old, older, *keep]:
         h.write(versions / n, n)
     return [old, older], keep
@@ -183,13 +186,13 @@ def test_prune_deletes_only_superseded(tmp_path):
     old, keep = seed_versions(versions)
     res = h.backup(doc, "review", prune=True)
     assert sorted(os.path.basename(p) for p in res["superseded"]) == sorted(old)
-    assert sorted(os.listdir(versions)) == sorted(keep + [h.snapshot_name(REPORT, "review", ".docx")])
+    assert sorted(os.listdir(versions)) == sorted(keep + [h.snapshot_name(SNAP, "review", ".docx")])
 
 
 def test_annotated_only_never_superseded(tmp_path):
     """§17.3: snapshots whose parentheses don't start with `before ` are never superseded, even with prune."""
     root, versions, doc = layout(tmp_path)
-    ann = f"{REPORT} (annotated 2026-09-15).docx"
+    ann = f"{SNAP} (annotated 2026-09-15).docx"
     h.write(versions / ann, "a")
     res = h.backup(doc, "cut", prune=True)
     assert res["superseded"] == []
@@ -204,7 +207,7 @@ def test_cli_backup_json(tmp_path, capsys):
     code, data, out, err = h.run_cli(capsys, ["bundle", "backup", doc, md, "--reason", "cut", "--json"])
     assert code == 0, err + out
     assert [os.path.basename(b["path"]) for b in data["backups"]] == [
-        h.snapshot_name(REPORT, "cut", ".docx"), h.snapshot_name("notes", "cut", ".md")]
+        h.snapshot_name(SNAP, "cut", ".docx"), h.snapshot_name("general notes", "cut", ".md")]
     assert data["superseded"] == []
 
 

@@ -92,15 +92,23 @@ tundlekit bundle backup deck/talk.pptx deck/talk.pdf --reason "reorder slides" -
 - **Name.** `<stem> (before <reason> <YYYY-MM-DD>)<ext>`, e.g. `final-report (before cut section 4 2026-09-17).docx`.
   The date is today (or `TUNDLEKIT_NOW` when set). The copy is atomic and keeps the file's modification time.
   These names are what lint's B003/B004 expect in `versions/`.
+- **Folder label.** When the file is not in the folder that holds the chosen `versions/` (it sits deeper), the
+  snapshot name starts with a label: the file's folder relative to the `versions/` parent, with separators
+  replaced by `-`. `notes/report-capsules/REPORT.md` backed up into the root `versions/` becomes
+  `notes-report-capsules REPORT (before cut section 4 2026-09-17).md`, so 2 files with the same name in different
+  folders (a general and a capsule `REPORT.md`) never collide.
 - **Reason.** Required, short, says what you are about to change. It must not be empty or contain any of
   `( ) / \ : * ? " < > |`.
 - **Refused, with nothing copied**, when any file is missing, when a target name already exists (pass
   `--overwrite` to replace it, e.g. a second backup the same day for the same reason), or while PowerPoint, Word
   or Excel is running. Close Office first; `--force-office` exists, but closing Office is the rule, because an
   open document may not be saved to disk yet and Office may write it again after the snapshot.
-- **Result.** `{"backups": [{"source", "path", "bytes"}], "superseded": [...]}`. `superseded` lists the older
-  `(before ...)` snapshots of the same stem and extension in that `versions/` folder. With `--prune` they are
-  deleted, so only the newest snapshot stays (approved clearing, see below). Snapshots named any other way, such as
+- **Result.** `{"backups": [{"source", "path", "bytes"}], "superseded": [...], "pruned": [...], "not_pruned":
+  [{"path", "error"}]}`. `superseded` lists the older `(before ...)` snapshots of the same label, stem and
+  extension in that `versions/` folder (a same-named file from another folder never matches). With `--prune` they
+  are deleted, so only the newest snapshot stays (approved clearing, see below): `pruned` lists the deleted paths
+  (empty without `--prune`). A snapshot that could not be deleted (locked, read-only) is listed only under
+  `not_pruned` with its error, and the CLI exits 1: close whatever holds it and prune again. Snapshots named any other way, such as
   `talk (annotated 2026-09-01).pptx`, are never superseded or pruned.
 
 Back up before **every** write to an Office file, not once per session. Then `release` as usual.
@@ -293,8 +301,8 @@ Lint and the drafting commands give a starting list to confirm. The remaining fa
 - `bundle source`, `bundle setup-table`: program names and versions guessed from unusual file names are often
   wrong (a build number taken for a version, a vendor prefix kept). Check every draft; a README row that already
   describes the file is used instead of the guess.
-- `bundle backup`: `superseded` is by stem and extension only; a snapshot of a different document that happens to
-  share the stem is listed too. Read the list before passing `--prune`.
+- `bundle backup`: `superseded` is by folder label, stem and extension; a snapshot of a different document in the
+  same folder that happens to share the stem is listed too. Read the list before passing `--prune`.
 - `bundle verify`: B013 on a SOURCE.md that deliberately records no hash (a web installer that changes daily).
 
 ## Checklist before handing a copy on

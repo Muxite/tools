@@ -1966,6 +1966,10 @@ _SPEC_HELP = (
       readOnlyHint=False, destructiveHint=False, idempotentHint=True)
 def diagram_render(spec: dict | None = None, spec_path: str | None = None, mermaid: str | None = None,
                    mermaid_path: str | None = None, out: str | None = None, png: str | None = None) -> dict:
+    if out is not None:
+        from tundlekit.render import check_path_string
+
+        check_path_string(out, "out")
     if png is not None:
         _check_png_target(png)
     spec, warnings = _load_source(spec, spec_path, mermaid, mermaid_path)

@@ -13,6 +13,7 @@ description: Fetch arXiv papers, extract their text, and read them efficiently w
 | lines matching a regex, with page numbers | `tundlekit papers grep 2604.00392 "silent rot" [--context 2] [--max-hits 12] [--width 200]` | `papers_peek` (`mode` = grep) |
 | the main body, page-marked, up to the references (`--appendix`: to the last page) | `tundlekit papers body 2604.00392 [--start 1] [--end 7] [--max-chars 90000] [--appendix]` | `papers_body` |
 | a summary file skeleton (title, authors, pages filled in) | `tundlekit papers summary 2604.00392 [--short NAME] [--write]` | `papers_summary` |
+| an HTML page with 1 card per paper the report cites, from the summaries | `tundlekit papers page REPORT.md -o paper-summaries.html [--dir papers] [--index INDEX.md] [--title TEXT]` | `papers_page` |
 | summaries vs papers vs INDEX.md vs a report's references | `tundlekit papers index-check [--index PATH] [--report REPORT.md]` | `papers_index_check` |
 
 Files live in 1 folder (`--dir`, default the current directory): `{id}.pdf`, `{id}.txt`, and summaries in
@@ -138,14 +139,35 @@ survey).
 To check that each number a report cites is on a page of its source, use `tundlekit claims trace REPORT.md --papers papers`
 (report-writing skill). It needs `[n]` references or name + `(pN)` locators; 0 claims (T004) is not a pass.
 
+## Paper-summaries page (`papers page`)
+
+```
+tundlekit papers page report.md -o build/paper-summaries.html --dir papers
+```
+
+`papers page` (`papers_page`) builds 1 self-contained HTML file (no external requests, light and dark, a search
+box) with 1 card per arXiv id the report cites, in citation order:
+
+- The card is the paper's `summaries/{id} - *.md` file: its heading and meta lines, the Summary section, then
+  How it works, Results (open), Limitations and Relevance as expandable sections, then any other sections.
+- Cards are grouped by the numbered `## N. Name` sections of `summaries/INDEX.md` (`--index` for another path);
+  cited papers not in the index go under "Other". Without an INDEX.md every card goes under "Other", with a warning.
+- An "In the report" line comes from the report's table with a `Used for` column.
+- A cited id with no summary gets no card: it is listed at the top of the page and in `missing`, with a warning
+  (`--strict` exits 1). Write the summary, then rebuild.
+
+The output is a build artifact: it is overwritten on every run and is byte-identical for the same inputs. Rebuild
+it after every report or summary edit.
+
 ## Known noise
 
 `papers index-check` and the text tools give a starting list to confirm. The remaining false positives:
 
 - `papers index-check`: P002 when INDEX.md names a paper by a title variant without its id; P004 on a summary that
   deliberately uses other headings (use `--profile`).
-- `papers summary`: the title can still pick up a venue line or stop early on an unusual first page, and small-caps
-  names may be split oddly; check the title and authors before `--write`.
+- `papers summary`: a scaffold, not a summary. The title can still pick up a venue line or stop early on an
+  unusual first page, and small-caps names may be split oddly; check the title and authors before `--write`, and
+  write every section by hand from the pages read.
 - `papers body`, `papers list`: the `layout_text` flag on a 1-column paper with wide tables.
 
 ## Numbers ledger

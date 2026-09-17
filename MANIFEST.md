@@ -1801,3 +1801,658 @@ sections, this section wins.
 - **Suffix affiliation words (§17.4).** When the first affiliation word is a suffix word (`Inc.`, `Ltd.`, `Corp.`,
   `Lab`, `Labs`, `LLC`), the cut also removes the organisation name before it, back to the last author mark or
   comma. So `Bo Li∗ Acme Inc.` gives `Bo Li`.
+## 18. Round 6 (new tools)
+
+This round ports 3 build scripts from the tundle material into tools, widens the Office guard, and adds 2 doc-only
+patterns. The sources are `notes/report-general/build/build_report.py` (with its capsule wrapper
+`notes/report-capsules/deck-src/build_report.py`, which runs the same file through `runpy`),
+`notes/report-general/build/build_summaries.py`, `notes/report-general/build/build_reading.py` and the presenter packs
+`notes/overnight/PRESENTER-PACK-{capsule,workflow}.md`. The conventions of §0 and the safety rules of §16.1 and §17.1
+apply. Where this section conflicts with earlier sections, this section wins.
+
+### 18.1 `report_build` / `tundlekit report build REPORT.md -o OUT.docx [--excerpts DIR] [--author NAME] [--overwrite] [--force-office]`
+
+Builds a `.docx` from a Markdown report, in the house style of `build_report.py`. **Standard library only**: the
+package is written with `zipfile` and XML strings. python-docx is never imported, and Pillow is not needed (image
+sizes are read from the PNG/JPEG headers).
+
+Arguments: `report` (path, required), `out` (path, required), `excerpts` (directory), `author` (string; default: the
+environment variable `TUNDLEKIT_AUTHOR`, else `git config user.name` run in the report's directory, else `""`), `overwrite` (bool, default false), `force_office` (bool, default false).
+
+**Order of checks.** Nothing is written until all of these pass.
+1. `report` must be an existing file, readable as UTF-8 (a BOM is allowed and dropped). Otherwise: `ToolError`.
+2. `out` must end in `.docx` (any case). It must not be the same file as `report`, must not be a directory, and its
+   parent directory must exist. Otherwise: `ToolError`.
+3. Office guard: while `render.office_running()` is non-empty and `force_office` is false, `ToolError` containing
+   `refusing` and the process names (§18.4).
+4. The whole report is parsed. Every problem is collected, then 1 `ToolError` is raised whose message lists each
+   problem as `line N: <message>`, in line order (the deck-spec pattern of §3.1).
+5. Hand-edit guard: when `out` exists and `overwrite` is false, `docx_diff(report, out)` is computed. If it has any
+   change, or `out` cannot be read as a `.docx`, the result is a `ToolError` containing `overwrite` and the number
+   of changes, and `out` is untouched. When it has no changes, `out` is replaced without asking.
+6. The file is written atomically (§16.1: temp file in the same directory, then replace; a read-only target is
+   refused up front; a symlink is written through).
+
+#### 18.1.1 Supported Markdown
+
+Before parsing, `\r\n` and `\r` become `\n`. HTML comments (`<!-- … -->`, possibly over several lines) are removed,
+keeping the line count. A YAML front-matter block (a `---` line at line 1 up to the next `---` or `...` line) is
+skipped. Then each line is classified by the first rule below that matches. "Stripped" means leading and trailing
+whitespace removed.
+
+| # | Construct | Recognised by | Output |
+|---|---|---|---|
+| 1 | Fenced code | a line matching textlint's fence opener (```` ``` ```` or `~~~`, any indent), up to the matching closing fence | 1 `Code` paragraph (below) |
+| 2 | Table | a stripped line starting with `\|` whose next line is a separator row (§15.4: only `\|`, `-`, `:` and spaces, with at least 1 `\|` and 1 `-`) | a table (§18.1.3) |
+| 3 | Excerpt | a stripped line matching `\{\{excerpt:(\w+)\|(.+)\}\}` | an excerpt paragraph, then a caption |
+| 4 | Figure | a stripped line that is exactly 1 image, `![ALT](TARGET)` (alt text may hold brackets, as in §16.3) | a `Figure` paragraph, then a caption with ALT |
+| 5 | Page break | a stripped line matching `\\(pagebreak\|newpage\|clearpage)(\{\})?` | a paragraph holding only `<w:br w:type="page"/>` |
+| 6 | Thematic break | `---`, `***`, `___` (spaced forms too, textlint's rule) | nothing |
+| 7 | Heading | 0-3 spaces, 1-3 `#`, a space, text (trailing `#`s removed) | `Heading1` … `Heading3` |
+| 8 | Block quote | consecutive lines starting with `>` (any depth, `>>` is read as `>`) | 1 `Quote` paragraph, the line contents joined with single spaces |
+| 9 | List item | `-`, `*` or `+` (bullet) or `N.` / `N)` (numbered, N up to 9 digits), then a space | 1 paragraph per item (below) |
+| 10 | Blank line | whitespace only | nothing (it ends the current paragraph) |
+| 11 | Paragraph | anything else | consecutive lines joined with single spaces, up to a blank line or a line that rules 1-9 would start |
+
+- **Paragraph captions.** A joined paragraph that starts with `*Table ` and ends with a single `*` (not `**`) is a
+  `Caption` paragraph holding the text between the asterisks. No other paragraph is a caption.
+- **Code.** Lines are kept as written, with trailing whitespace removed. Leading and trailing blank lines are
+  dropped, and an empty block writes nothing. Lines are joined with `<w:br/>`, tabs are `<w:tab/>`, and there is no
+  inline parsing.
+- **Excerpts.** The text is `{excerpts}/{name}.txt` (UTF-8, line endings normalised, trailing newlines removed,
+  lines kept as written). It becomes 1 paragraph in style `Code` at 8.5 pt with a 0.2 in left indent and
+  keep-with-next, lines joined as for code. The caption is group 2.
+  - `excerpts` defaults to the first existing directory of `<report dir>/excerpts` and `<report dir>/build/excerpts`.
+    A report with no placeholder never needs it.
+  - The capsule report used the general report's `build/excerpts` (its wrapper runs the general script). It passes
+    `--excerpts` explicitly.
+- **Figures.** TARGET is taken up to the first whitespace, with surrounding `<…>` removed. It resolves against the
+  report's directory. If that file does not exist, the percent-decoded form is tried.
+  - The image is embedded at 6.5 in wide (5,943,600 EMU), with height `round(5943600 × h / w)` from the pixel size.
+  - An empty ALT writes no caption.
+  - An image that is not a whole line (inline in a paragraph) is not embedded. Its alt text stays in the paragraph,
+    and the result warns `line N: inline image not embedded`.
+- **Lists.**
+  - A bullet item is a `ListBullet` paragraph (a real bullet from `word/numbering.xml`). It is `ListBullet2` when
+    the marker is indented by 2 or more columns (a tab counts 4).
+  - A numbered item is a `ListNumber` (or `ListNumber2`) paragraph whose text is the marker as written, 2 spaces,
+    then the item text (`1.  Catalog snapshot…`). Word numbering is not used, so every list starts at its own first
+    number, as in the source.
+  - The item text continues over following non-blank lines that start with whitespace and that rules 1-9 would not
+    start. Those lines are stripped and joined with single spaces.
+- **Inline markup** in headings, paragraphs, captions, quotes, list items and table cells:
+  - `**x**` and `__x__` are bold; `*x*` and `_x_` are italic (`_` only at word edges, so `snake_case` is text);
+    `***x***` is bold italic.
+  - `` `x` `` is Consolas at the paragraph size minus 1 pt.
+  - `[text](url)`, reference links and autolinks write their text only (no hyperlink). Image markup writes its alt
+    text.
+  - Backslash escapes (`\-`, `\|`, `\*` …) write the character.
+  - **Pinned invariant:** for every paragraph, the concatenated run text, after `docx_diff`'s normalisation (§15.4),
+    equals the normalised §15.4 inline reduction of the source text (the function `docx_diff` uses). Formatting is
+    pinned only for the simple, well-nested cases above.
+- **Base formatting.** Headings are bold. Captions are italic, grey `595959`, at 9.5 pt. Quotes are italic.
+  Table header cells are bold.
+
+**Problems** (each a `line N: …` entry of the `ToolError`):
+- a figure file that doesn't exist, or that is neither PNG nor JPEG (by signature), or a TARGET starting with
+  `http:`, `https:` or `//`;
+- an excerpt placeholder when no excerpts directory exists (the message names `excerpts`), or a missing excerpt file;
+- a stripped line of the form `{{…}}` that is not a valid excerpt placeholder (`unknown placeholder`);
+- an unterminated code fence (reported on the opening line);
+- a heading of level 4-6, or a heading with no text;
+- a stripped line starting with `|` that does not belong to a table (no separator row under the first row);
+- a separator row under a header row that does not start with `|`;
+- a table row with more cells than the header row (shorter rows are padded with empty cells);
+- a block-quote line whose content starts a list item, heading, fence, table or figure (only plain text is
+  supported in quotes);
+- an empty list item;
+- characters that are illegal in XML 1.0 (§16.1), in the report or in an excerpt.
+
+#### 18.1.2 Page and styles
+
+| Item | Value |
+|---|---|
+| Page | US Letter, 8.5 × 11 in (`w:pgSz` 12240 × 15840), portrait, 1 section |
+| Margins | top and bottom 0.8 in (1152), left and right 0.9 in (1296) |
+| Footer | 1 centred paragraph holding a `PAGE` field (`fldChar begin`, `instrText " PAGE "`, `fldChar end`), 9.5 pt, grey `595959` |
+| `Normal` | Calibri 11 pt, black, space after 5 pt, line spacing 1.08 (`w:line="259"`, auto) |
+| `Heading1` / `Heading2` / `Heading3` | Calibri bold black, 22 / 16 / 13 pt, space before 0 / 16 / 12 pt and after 6 / 6 / 4 pt, keep with next |
+| `ListBullet` | 11 pt, space after 3 pt, bullet numbering. `ListBullet2`: the same, indented 0.25 in further |
+| `ListNumber` | 11 pt, left indent 0.5 in, hanging 0.25 in, space after 3 pt, no numbering. `ListNumber2`: indented 0.25 in further |
+| `Quote` | italic, left and right indent 0.4 in |
+| `Caption` | 9.5 pt italic grey `595959`, space before 2 pt, after 8 pt |
+| `Code` | Consolas 9 pt, left indent 0.3 in, space before 4 pt |
+| `Figure` | centred, space before 6 pt, after 2 pt, keep with next |
+| Table cells | 9.5 pt, space after 1 pt, table style `TableGrid` (single borders) |
+
+The paragraph style ids are exactly these names, so `render_office --backend text` (§8.3) prints them as
+`[Heading1] …`, `[Caption] …`, and so on. Body text paragraphs have no `w:pStyle` (they print as `[Normal]`).
+
+**Core properties** (`docProps/core.xml`):
+- `dc:title` is the visible text of the first level-1 heading, or empty;
+- `dc:creator` and `cp:lastModifiedBy` are `author`;
+- `dcterms:created` and `dcterms:modified` are `TUNDLEKIT_NOW` (§2.1) written as `YYYY-MM-DDTHH:MM:SSZ` without
+  zone conversion, or else the current UTC time.
+
+`docProps/app.xml` names `tundlekit` as the application.
+
+**Package.** The package holds at least `[Content_Types].xml`, `_rels/.rels`, `docProps/core.xml`,
+`docProps/app.xml`, `word/document.xml`, `word/styles.xml`, `word/settings.xml`, `word/numbering.xml`,
+`word/footer1.xml`, `word/_rels/document.xml.rels`, and `word/media/imageN.png|jpeg` (N from 1 in order of
+appearance).
+
+**Not fixed** (tests must not assert these): theme and font tables, `docDefaults`, compatibility settings, the exact
+`numbering.xml` definitions, bullet glyph and indents beyond the table above, relationship id spelling, where lines
+and pages break, the page count, and anything visible only after rendering.
+
+#### 18.1.3 Tables
+
+- 1 Word table per Markdown table. The first row is the header: every header cell has shading `w:fill="EDEDED"`,
+  bold text, and the row is marked `w:tblHeader` (repeats on each page). Every row has `w:cantSplit`. The table is
+  centred with a fixed layout.
+- Column widths port `add_table`. For column j, over its raw cell texts (after splitting, before inline
+  reduction):
+  - `floor_j = 0.075 × (longest whitespace-separated word, backticks removed; 0 when empty) + 0.15`;
+  - `need_j = max(min(len(cell), 70))`;
+  - `spare = max(6.7 − Σ floor, 0)`;
+  - `w_j = floor_j + spare × need_j / Σ need` (just `floor_j` when `Σ need` is 0);
+  - then all widths are scaled so that `Σ w = 6.7` in.
+- Widths are written in twips (`round(w × 1440)`) to both `w:gridCol` and every cell's `w:tcW`. Tests may assert
+  that the grid sums to 9648 ± the column count, and that a column of long text is wider than a column of short
+  words.
+- When `Σ floor > 6.7`, the result warns `line N: table columns squeezed below their longest word`.
+- Column alignment markers (`:---:`) are ignored.
+
+#### 18.1.4 Result and acceptance
+
+```json
+{"out": "...", "title": "...", "author": "", "paragraphs": 312, "tables": 22, "figures": 10, "excerpts": 0,
+ "page_breaks": 1, "words": 9876, "replaced": false, "warnings": ["line 40: ..."]}
+```
+
+- `paragraphs` counts the `w:p` elements that are direct children of `w:body`.
+- `words` counts whitespace tokens in their visible text, so table cells are not counted.
+- `replaced` is true when an existing `out` was replaced.
+- Every warning starts with `line N: `.
+
+Acceptance properties (test gates):
+- **A1 round trip.** Take a source that uses only §18.1.1 constructs, has no excerpt placeholders, and has a blank
+  line (or the file edge) before and after each block quote and whole-line figure. For it,
+  `docx_diff(report, out)` gives `changes: []`.
+- **A2 excerpts.** With placeholders (whose texts appear nowhere else), every `docx_diff` change is an `insert`. The
+  `new` lists of all changes, concatenated in order, are `[excerpt text, caption]` for each placeholder in turn.
+- **A3 determinism.** Building the same inputs twice gives byte-identical `word/document.xml`: no rsids, no random
+  ids, sequential `wp:docPr` ids, and deterministic relationship ids. With `TUNDLEKIT_NOW` set, the whole `.docx` is
+  byte-identical: the zip entry order is fixed and every entry's timestamp is 1980-01-01 00:00:00.
+- **A4 styles.** The text backend of `render_office` shows the style ids of §18.1.2 for the matching constructs.
+- **A5 readers.** The file opens with `zipfile`, and its `word/document.xml` parses as XML. When python-docx is
+  installed, `docx.Document(out)` opens it (the test skips otherwise).
+
+Manual acceptance (not a test gate):
+- The current `report-general/REPORT.md` and `report-capsules/REPORT.md` build with 0 problems and give
+  `changes: []` against their builds, as the original builder's outputs do today (`text docx-diff` on
+  `REPORT.md` against `general/AI4Research General Report - Muk.docx`, and the capsule pair, both give
+  `changes: []`).
+- The builds open without repair in Word and LibreOffice.
+
+### 18.2 `deck_pack` / `tundlekit deck pack DECK.pptx [-o PACK.md] [--force] [--check PACK.md]`
+
+A presenter-pack skeleton from a built deck, and a staleness check of an existing pack against the deck. Needs
+python-pptx (it uses `deck_inspect`).
+
+Arguments: `pptx_path` (required), `out` (path), `force` (bool), `check` (path). `out` and `check` together:
+`ToolError`.
+
+**Slide keys.** Both modes name slides by a key, computed in deck order:
+- A slide is an insert when `deck_inspect` says so (notes start with `INSERT:`).
+- A non-insert slide with number text uses it as its key and sets the counter to its integer part. A non-insert
+  slide without one (a title or divider) takes the counter + 1 and sets the counter to that value. The counter
+  starts at 0.
+- An insert slide with number text uses it. Without one, it takes the counter followed by the next letter (`a`,
+  `b`, …; letters restart after every non-insert slide).
+
+This is deck_build's numbering (§3.2) read back. In the current capsule deck, the title is `1`, the dividers are `5`
+and `17`, and the inserts are `9a` and `13a`.
+
+**Times.**
+- `core_time` sums the TIME of non-insert slides, and `total_time` adds the inserts, both `M:SS`.
+- A slide without TIME counts 0, and the result warns `slide KEY: no TIME`.
+- Hidden slides are counted like the others.
+
+#### 18.2.1 Generate mode (no `check`)
+
+The pack text is exactly:
+
+```
+# Presenter pack: {title of slide 1, or the deck file stem when it is empty}
+
+Deck: `{deck file name}` · {n} slides ({c} core, {i} inserts) · core {core_time} · with inserts {total_time}
+
+## Crib
+
+- slide {key}{flags}: {title}
+…
+
+## If asked
+
+### slide {key}: {title}
+
+- {bullet}
+…
+
+## Timing
+
+| Slide | Title | Time | Core cumulative |
+|---|---|---|---|
+| {key} | {title} | {time or -} | {running core time, empty for inserts} |
+…
+|  | **Core total** | {core_time} |  |
+|  | **Inserts** | {insert time} |  |
+```
+
+- `{flags}` is empty, ` (insert)`, ` (hidden)` or ` (insert, hidden)`.
+- Titles have whitespace runs collapsed to 1 space. In table cells, `|` is written `\|`.
+- The crib has 1 line per slide, in deck order.
+- `## If asked` lists, in deck order, only slides with at least 1 bullet. When no slide has one, the section is
+  `## If asked` followed by a blank line and `(none)`.
+- **IF ASKED bullets** come from the notes lines after a line starting `IF ASKED:`, up to the next line starting
+  `TIME`, `SAY:`, `INSERT:` or `MUST HIT:`, or the end.
+  - Text after `IF ASKED:` on its own line is a bullet.
+  - A line starting `- ` starts a bullet.
+  - Any other non-empty line continues the previous bullet, joined with 1 space.
+- The text ends with exactly 1 newline, and sections are separated by 1 blank line.
+- Without `out`, nothing is written.
+- With `out`, the text is written atomically. An existing `out` is refused (`ToolError`) unless `force` is true.
+  `out`'s parent directory must exist.
+
+Result:
+
+```json
+{"deck": "...", "text": "...", "path": null, "written": false, "core_time": "18:05", "total_time": "19:35",
+ "slides": [{"key": "1", "position": 1, "title": "...", "insert": false, "hidden": false, "seconds": 20,
+             "asked": ["..."]}],
+ "warnings": []}
+```
+
+`path` is `out` when it was written, otherwise null.
+
+#### 18.2.2 Check mode (`check`)
+
+Reads the pack (UTF-8) and compares it with the deck. The result has the checker shape (§0.3), with findings on
+the pack path, plus:
+
+```json
+{"pack": "...", "form": "generated" | "hand", "stated": {"slides": 26, "times": ["20:15"]},
+ "deck": {"slides": 25, "core": 23, "inserts": 2, "core_time": "18:05", "total_time": "19:35"},
+ "crib": [{"key": "19", "line": 40, "text": "...", "slide": 20, "score": 0.11}]}
+```
+
+**Pack structure.**
+- The **header** is the lines after the first `# ` line and before the first `## ` heading.
+- The **stated count** is the first match of `\b(\d+) slides?\b` in the header, or null.
+- The **stated times** are every match of `(?<![\d:])\d{1,3}:\d{2}(?![\d:])` in the header.
+- The **crib section** is the first level-2 heading whose text contains the word `crib` (case-insensitive), up to
+  the next level-2 heading.
+  - `form` is `generated` when that heading's text is exactly `Crib`, and `hand` otherwise.
+  - Both existing packs are hand form: `## 2. One crib line per slide`.
+- A **crib line** matches `^\s*[-*]\s+(?:slide\s+)?(\d+[a-z]?)\s*(?:\([^)]*\))?\s*:\s*(.*)$` (`slide`
+  case-insensitive). Both `- slide 9: …` and the workflow pack's `- 9: …` count. Other lines in the section are
+  ignored.
+- `crib[].slide` is the matched slide's 1-based position, or null.
+
+**Crib match score.** This is used for K005, and for the best-match hints of K002 and K005.
+- Tokens are `re.findall(r"[a-z0-9]+(?:[.%-][a-z0-9]+)*%?", text.lower())`.
+- The **key words** of a crib text are its distinct tokens that contain a digit, or that are at least 4 characters
+  long and not in this stop list: `that this with from what when only each then than they their there into once
+  never every same which while`.
+- A slide's words are the tokens of its title, all its `texts` and its notes.
+- `score` is (key words found among the slide's words) ÷ (number of key words), rounded to 2 decimals in the
+  result. It is null when the crib text has fewer than 2 key words.
+- The **best match** of a crib line is the slide, other than its own, with the highest score (the first in deck
+  order on ties). It is named in a message only when its score is ≥ 2/3.
+- Thresholds are compared exactly, in integers, with `f` key words found out of `k`: "below 1/3" means
+  `3f < k`, and "≥ 2/3" means `3f ≥ 2k`.
+
+| Rule | Severity | Finding |
+|---|---|---|
+| K001 | error | the stated count equals neither the deck's slide count nor its core (non-insert) count. `line`: the header line |
+| K002 | error | a crib line whose key names no slide in the deck, or repeats an earlier crib key. The message names the best match, if any. A pack with no crib section gives 1 K002 with `line` null and no K003 |
+| K003 | warning | a deck slide with no crib line. The message gives the key, the title, and `insert` / `hidden` when they apply. `line`: the crib heading |
+| K004 | warning | generated form only: the crib text, cut at the first ` · ` (so a presenter can append a note), differs from the slide's current title after whitespace collapse. The message gives both. When the old text equals another slide's current title, it adds `now slide KEY` |
+| K005 | warning | hand form only: a crib line with a score below 1/3. The message names the best match, if any |
+| K006 | warning | a stated time that equals neither `core_time` nor `total_time`. `line`: the header line |
+
+- A pack written by generate mode and checked against the same deck gives `findings: []`.
+- Changing 1 slide title in the deck and checking again gives exactly 1 K004 for that slide.
+
+**Grounding (real material).** In the current material, `PRESENTER-PACK-capsule.md` was written for the deck
+before the last-quarter cut. The current capsule deck has 25 slides: 23 core, including the title and 2 dividers,
+plus inserts `9a` and `13a`. Its core time is 18:05, and 19:35 with inserts. Checking that pack against the current
+deck is expected to report:
+- K001 on line 3 (states 26 slides) and K006 on line 3 (states 20:15);
+- K002 on lines 45-47, for crib keys 24, 25 and 26. The best matches are slide 22 for 24 and slide 23 for 26;
+  25 has none ≥ 2/3;
+- K003 for `9a` and `13a` (inserts, never in the pack);
+- K005 on lines 40-44, for crib keys 19-23, scoring 0.11-0.20. The best matches are 18 for 19, 19 for 21, 20 for
+  22 and 21 for 23: after slide 18, the pack is 2 slides ahead of the deck;
+- `ok` false.
+
+Crib lines 1-18 score 0.50 or more and are not reported. The workflow pack against the current general deck (25
+slides, 20 core plus inserts `7a`, `15a`, `17a`, `17b`, `17c`; 16:45 core) gives:
+- no K001 (it states 20, the core count);
+- K006 (15:25);
+- 5 × K003;
+- K005 for crib keys 15, 16 and 18 (best matches 17, 18 and 15);
+- `ok` true.
+
+These expectations were computed from the slide XML with the title taken as the largest-font text frame. The
+held-out tests use synthetic decks, not these files.
+
+### 18.3 `papers_page` / `tundlekit papers page REPORT.md -o paper-summaries.html [--dir PAPERS] [--index INDEX.md] [--title TEXT]`
+
+A self-contained HTML page with 1 card per paper that a report cites, built from the summary files (port of
+`build_summaries.py`). Standard library only.
+
+Arguments: `report` (required), `out` (required), `dir` (papers directory as in §9, default the current
+directory), `index` (default `{dir}/summaries/INDEX.md`), `title` (default `Paper summaries`).
+
+**Cited ids.** These are the arXiv ids in the whole report text, deduplicated, in first-seen order:
+- new-style ids matching `(?<![\d.])(\d{2}(?:0[1-9]|1[0-2])\.\d{4,5})(?:v\d+)?(?!\d)`, with the version dropped
+  (group 1);
+- old-style ids (§9) only directly after `arXiv:` or `arXiv `.
+
+The original's `\b2[3-6]\d{2}\.\d{5}\b` misses ids followed by a version suffix. On the current capsule report it
+finds 6 ids where this rule finds 9. On the general report, both find the same 17.
+
+**Summary files.**
+- A paper's summary is the first, by sorted name, of `{dir}/summaries/{id} - *.md` (old-style ids with `_`, as in
+  §9.4).
+- A cited id with no summary gets no card. It is listed in `missing`, in the notice, and in a warning
+  `no summary for {id}`.
+- A missing `report` or `dir` is a `ToolError`.
+
+**Card content.** The summary text has `⭐ ` and `⭐` removed first.
+- `heading` is line 1 with leading `#`s and spaces stripped, and a leading `{id}` plus optional spaces, 1 of
+  `·`, `:`, `-`, and spaces removed.
+- `meta` is the non-empty lines between line 1 and the first `## ` heading, stripped and joined with 1 space.
+- The sections are the `## ` headings. The label is the heading text as written. The canonical key is matched
+  case-insensitively on the label's start:
+  - `summary` gives Summary;
+  - `how ` gives How it works;
+  - `results` gives Results;
+  - `limitations` or `critical notes` gives Limitations;
+  - `relevance` gives Relevance.
+  - Any other label is an extra section.
+- **In the report.** The report's pipe tables whose header row has a cell equal to `Used for` (case-insensitive,
+  stripped) are read. In each body row, every other cell is split at `,`, and each part matching
+  `^\s*{ID}\s+\S` gives that id the row's `Used for` cell. The first occurrence wins.
+  - The current general report's table is `| Role | Source | Used for |`.
+  - The original's 2-column regex no longer matches anything in it, so its cards lost this line. This port reads
+    the header instead.
+- **Block Markdown** inside sections and `meta`:
+  - paragraphs become `<p>`;
+  - `-` / `*` bullets, nested by indent, become `<ul><li>`;
+  - pipe tables become `<div class="tbl"><table><thead>…</thead><tbody>…</tbody></table></div>`;
+  - inline `**x**` becomes `<strong>` and `` `x` `` becomes `<code>`;
+  - all other text is HTML-escaped.
+
+**Grouping.**
+- The INDEX sections are the headings matching `^##\s+\d+\.\s+(.*)$`. The name is group 1 with a trailing
+  `(…)` removed and stripped.
+- Sections are ordered by first appearance, and repeated names merge. INDEX.md has `## 10.` 3 times, with 3
+  different names, which gives 3 groups.
+- An unnumbered `## ` heading ends the current section.
+- A table row (a line starting with `|`) inside a numbered section assigns its first id to that section. The
+  first assignment wins, and `⭐ ` / `† ` prefixes are allowed.
+- Cited papers not in any section go to a final group `Other`.
+- Cards within a group follow cited order. Empty groups are omitted.
+- A missing INDEX file is not an error: every card goes to `Other`, and the result warns `no index: {path}`.
+
+**HTML structure** (tests check these, never styling):
+
+```
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title><style>…</style></head>
+<body><div class="wrap">
+<h1>{title}</h1>
+<p class="lede">{n} papers cited in {report file name}, 1 card each, grouped as in the summary index.</p>
+<div class="notice" id="missing">…{missing ids, comma-separated, cited order}…</div>     (only when some are missing)
+<div class="controls"><input id="q" type="search" …><span class="count" id="count"></span>
+<nav><a href="#s-{slug}">{name} <span class="n">{count}</span></a>…</nav></div>
+<section class="group" id="s-{slug}"><h2>{name}</h2>
+<article class="paper" id="p-{id with . and / as -}">
+  <h3><span class="id">{id}</span> {heading}</h3>
+  <p class="eyebrow">In the report: {used for}</p>          (when known)
+  <p class="meta">{meta}</p>                                 (when non-empty)
+  <div class="summary">…</div>                               (1 per Summary section)
+  <details open?><summary>{label}</summary>…</details>       (How it works, Results, Limitations, Relevance, in this order; then extras in file order)
+</article>…
+</section>…
+</div><script>…</script></body></html>
+```
+
+- `{slug}` is the name lower-cased, with runs of characters other than `[a-z0-9]` turned into `-` and stripped.
+  A repeated slug gets `-2`, `-3`, ….
+- Only Results sections carry `open`.
+- The CSS defines colours as custom properties on `:root`, redefines them under
+  `@media (prefers-color-scheme: dark)` with `:root:not([data-theme="light"])`, and again under
+  `:root[data-theme="dark"]`.
+- **Self-contained.** There is no `<link>`, and no `src` or `href` attribute points outside the page: every `href`
+  starts with `#`, and there is no `src` at all. The only script is 1 inline filter, which hides cards and empty
+  groups that don't contain the query (`#q`) and updates `#count`.
+- **Deterministic.** The same inputs give byte-identical output (no timestamps). The file is UTF-8, written
+  atomically. An existing `out` is overwritten (it is a build artifact), and its parent directory must exist.
+
+Result:
+
+```json
+{"out": "...", "papers": 17, "cited": ["2507.01903", "..."], "missing": [],
+ "sections": [{"name": "Frame and surveys", "id": "s-frame-and-surveys", "papers": ["2507.01903"]}],
+ "warnings": []}
+```
+
+The CLI exits 0 even with warnings, and exits 1 with `--strict` when any warning exists.
+
+### 18.4 Office guard: Excel and LibreOffice
+
+- `render.office_running(all_apps=False)` keeps its signature and behaviour. Without `all_apps`, it reports
+  `POWERPNT.EXE` and `WINWORD.EXE` on Windows, and `[]` elsewhere.
+- With `all_apps=True`, it reports `EXCEL.EXE` as well. On Windows it also reports `soffice.exe` and `soffice.bin`
+  from `tasklist`. Elsewhere it reports the `soffice` processes from `ps` (§16.7). Unknown state follows §17.6.
+- A guard whose targets include a `.xlsx` file calls `office_running(all_apps=True)`. Otherwise it calls
+  `office_running()`. This applies to:
+  - `text_apply_edits` with `write` (§17.1);
+  - `bundle_backup` (§17.3; the guard still applies to every file type there);
+  - any later tool that writes Office files.
+- `report_build` writes `.docx` only, so it uses `office_running()`. `office_check` is unchanged (it always uses
+  `all_apps=True`).
+- Tests replace `tundlekit.render.office_running` with a stub and assert the `all_apps` value it receives. A `.xlsx`
+  target with only `EXCEL.EXE` running is refused. A `.docx` target with only `EXCEL.EXE` running is not.
+
+### 18.5 Docs
+
+**report-writing: a `## Reading pages` section.** It describes the `build_reading.py` pattern for private HTML
+reading pages built from the report. Tools are not added for it. The section says:
+- **Source.** Slice the annotated report variant (the one that keeps anchors and code locations), never a copy.
+- **Fail loudly.** Slice with `between(start, end, src=…)` and `section(num, next)` helpers that stop with a
+  non-zero exit naming the marker when it is missing, and never publish a stale page. Check counts that must hold
+  (for example "5 gap items") the same way.
+- **1 file.** Inline figures as `data:image/png;base64,…` URIs, and stop when a figure is missing. Expand
+  `{{excerpt:name|caption}}` as a fenced block plus an italic caption.
+- **Catch moved markers before building.** Run `tundlekit text xref` with the script paired with the report it
+  slices (`FILE=REPORT`, PowerShell form, with the Git Bash note of §17.7). X002 means a marker moved or is
+  duplicated. X003 means a slice source could not be resolved and must be checked by hand. Bind the slice source
+  at module level (§16.5) so the check reads the right file.
+- **Rebuild.** Rebuild the pages after every report edit. The paper-summaries page comes from
+  `tundlekit papers page` (`papers_page`), and the `.docx` from `tundlekit report build` (`report_build`).
+- **Not tundlekit.** The pages depend on the script's own Markdown renderer, not on tundlekit.
+
+**deck-builder: a `## Deck scaffold` section.** It gives a template, not a command. The skill never writes
+`tundlekit deck scaffold` (§11: every command shown must exist). The section says:
+- Turn the report outline into spec stubs:
+  - a title slide;
+  - a divider per argument block of the structure template;
+  - 1 content stub per level-2 or level-3 section, whose `title` is the section's claim sentence and whose
+    `source` is `Report §N` or `Report §N.M`.
+- Give each stub a `notes.time` so that the times sum to the budget target.
+- A JSON example of 1 stub:
+  `{"type": "content", "title": "…", "source": "Report §2.3", "body": {"kind": "bullets", "items": ["…"]}, "notes": {"time": "0:45", "say": "…"}}`.
+- Then run `tundlekit deck lint` on the spec, and `tundlekit review coverage` (exact coverage, because every
+  footer cites `§N`).
+- After building, `tundlekit deck pack DECK.pptx -o PACK.md` drafts the presenter pack.
+  `tundlekit deck pack DECK.pptx --check PACK.md` is run after every cut or reorder.
+
+**Other skills.**
+- deliverable-review adds `report build` to the build step and `deck pack --check` to the pre-handover list.
+- paper-reading mentions `papers page`.
+- Each skill mentions the MCP names `report_build`, `deck_pack` and `papers_page` where it uses them.
+- Known noise:
+  - `deck pack --check`: K005 on crib lines that paraphrase a slide with few shared words (divider slides
+    especially).
+  - `report build`: none known. Constructs outside §18.1.1 are errors, not noise.
+
+### 18.6 Registration
+
+- `MODULES` becomes `["bundle", "deck", "diagram", "chart", "palette", "textlint", "review", "claims", "report",
+  "render", "papers", "translate"]`: `report` goes after `claims`. §0.1's layout gains
+  `tundlekit/report.py §18.1`.
+- `report` registers `report_build`, with CLI group `report` and command `build`. Its argument names are those of
+  §18.1.
+- `deck_pack` goes in `deck` (CLI `deck pack`). Its arguments are `pptx_path`, `out`, `force` and `check`.
+- `papers_page` goes in `papers` (CLI `papers page`). Its arguments are `report`, `out`, `dir`, `index` and
+  `title`.
+- **Annotations.**
+  - `report_build`, `deck_pack` and `papers_page` carry `readOnlyHint: false`, because each can write a file.
+  - None carries `destructiveHint`: `report_build` replaces only an output with no hand edits, or with
+    `overwrite`; `deck_pack` never replaces without `force`; `papers_page` output is a build artifact.
+- **CLI.**
+  - `deck pack --check` is a checker command: it accepts `--strict`, exits 1 on errors, and with `--strict` exits
+    1 on warnings too.
+  - Generate mode exits 0.
+  - `report build` exits 0 on success, even with warnings.
+- `tundlekit tools` lists `report_build` after `claims_trace`.
+- README.md and AGENTS.md list the 3 new commands. pyproject is unchanged: `report` is stdlib only, and `deck pack`
+  uses the existing `office` extra.
+
+### 18.7 Not in scope
+
+- Layout checks of the built `.docx`: page count, line breaks, figure placement. Use `render_office` and read the
+  pages.
+- Markdown outside §18.1.1:
+  - headings of level 4-6, and setext headings;
+  - footnotes, math, task lists and definition lists;
+  - raw HTML (it is written as literal text; only comments are removed);
+  - hyperlinks (links become plain text);
+  - nested block structure inside quotes;
+  - merged table cells and column alignment;
+  - images other than PNG/JPEG, and remote images.
+- A title page, table of contents, headers, reference-docx templates, and `.docx` → Markdown conversion.
+- A tool for `build_reading.py` pages, and a `deck scaffold` command (both are doc-only in §18.5).
+- deck_pack checks of the "Hard questions", "Numbers to have ready" and "Things not to say" sections, and of
+  IF ASKED drift between the pack and the notes.
+- papers_page search behaviour beyond the elements of §18.3, web fonts, and theming beyond the colour tokens.
+- Writing `.xlsx` files. `claims_trace` stays out of scope (§17).
+
+---
+
+## 19. Round 6 fixes (review of round 5)
+
+Where this section conflicts with earlier sections, this section wins.
+
+### 19.1 Emitted edits into code
+- **Escaping.** When an emitted edit targets a Python or JSON string literal, `replace` is escaped for that literal
+  so the file stays valid:
+  - **Python:** backslashes, the literal's own quote character and newlines are escaped (`\`, `\"` or `\'`, `\n`).
+    Triple-quoted literals only escape backslashes and a run of 3 quotes.
+  - **JSON:** use `json.dumps` escaping without the outer quotes.
+- **Not emitted.** A paragraph is listed in `not_emitted` (reason `unsafe literal`) instead of being emitted when:
+  - the literal is a raw string (`r"..."`), a bytes literal, or an f-string (`f"..."`) and the new text needs
+    escaping or contains `{` or `}`;
+  - after `apply_edits`, the target file would no longer parse (`ast.parse` for `.py`, `json.loads` for `.json`).
+- **Existing target file.**
+  - `emit_edits` refuses (`ToolError`) to overwrite an existing file unless that file is a JSON list (a previous
+    emitted-edits file).
+  - `docx_diff` is annotated `readOnlyHint: false`.
+- **Hint needles.** A hint needle (§17.2) must be at least 8 characters and contain a letter. Needles that are only
+  a time (`1:30`) or a number are skipped.
+- **Empty edits list.** An empty edits list returns `ok: true` even when `path` names a missing file.
+
+### 19.2 bundle_backup naming
+- **Directory label.** When the file's directory is not the directory that contains the chosen `versions/`, the
+  snapshot stem is prefixed with a label and a space: `<label> <stem> (before <reason> <date>)<ext>`.
+  - The label is the file's directory path relative to the `versions/` parent, with separators replaced by `-`.
+  - Example: `notes/report-capsules/REPORT.md` → `notes-report-capsules REPORT (before x 2026-09-17).md`.
+- **Matching.** `superseded`, `prune` and `overwrite` match only on that full label-plus-stem, so 2 files with the
+  same name in different folders never touch each other's snapshots.
+- **Prune failures.** When a snapshot cannot be deleted, it is listed only under `not_pruned`, never under
+  `pruned`, and the CLI exits 1.
+
+### 19.3 Device names and output paths
+- **Checked arguments.** Every tool argument that names an output file (`out`, `png`, `emit_edits`,
+  `render_*` output dirs, `report_build` `out`, `deck_pack` `out`, `papers_page` `out`) is checked with
+  `render.check_path_string`. On Windows, device names (`CON`, `NUL`, `AUX`, `PRN`, `COM0`–`COM9`,
+  `LPT0`–`LPT9`, with any extension) and `\.\` paths are a `ToolError`.
+- **CLI stdout.** The CLI never writes a file when output is meant for stdout.
+- **Tests.** Tests never write into the repository root (the test suites use `tmp_path`).
+
+### 19.4 bundle coverage edge cases
+- **Junk files.** They are never "other files" for SOURCE.md coverage.
+- **Ambiguous SOURCE.md.** In a directory with 2 or more installers, a `SOURCE.md` without a `- File:` line covers
+  none of them. B014 counts them, and B013 says "SOURCE.md has no - File: line".
+  - `bundle source DIR --all` does not write per-file stubs in such a directory.
+  - It lists those installers in `skipped` with reason `SOURCE.md has no - File: line; add one`.
+
+### 19.5 text_xref renumbering
+- **Paired files.** A file paired with several reports is renumbered for every report whose plans apply, whatever
+  the argument order.
+- **Refused combinations.** A `ToolError` is raised when:
+  - 2 renumber entries map different sources onto the same target;
+  - one call both renames an appendix letter and renumbers a subsection or item under the old letter.
+
+### 19.6 docx edits
+- **Where the replacement goes.** A replacement is applied to the minimal changed span only when that span lies
+  inside 1 run. Otherwise the §15.5 rule applies: the whole replacement goes into the first affected run.
+- **Clean-up.** Runs left empty are removed.
+- **Tracked changes.** Text in `w:del` (tracked deletions) is not text, and is never edited.
+- **Attributes.** File attributes are preserved on Windows (Hidden, System), as on POSIX.
+- **Interrupts.** Restoring after a failure also happens on `KeyboardInterrupt`.
+
+### 19.7 papers_summary, more real-paper rules
+The goal is a better scaffold, not perfection. The summary is always edited by a person.
+- **Skipped before the title:**
+  - running headers matching `^[A-Z][\w-]+ et al\. \(\d{4}\)`, which are removed from the title start;
+  - date-only lines (a month name with an optional day and a year);
+  - `June 2026`-style lines.
+- **Title clean-up:**
+  - A trailing `(Full)`, `⋆`, `∗` or `*` is removed.
+  - `Com- mercial` and `Alloca - Tion` style breaks (a hyphen with spaces, followed by a lower-case or title-case
+    fragment) are rejoined.
+- **Small caps.**
+  - Letters include non-ASCII capitals (`G ÖDEL` → `GÖDEL`).
+  - The join also happens when `XR` (the joined word) is in the common-word list, even if `R` is too
+    (`S HOW` → `SHOW`, `U SING` → `USING`, `O PEN` → `OPEN`).
+  - A run `R` of 2 letters joins when `XR` is a common word (`T HE` → `THE`, `W EB` → `WEB`).
+- **ALL-CAPS titles.**
+  - A token is kept upper-case only if it is 2–5 letters, not a common word, and appears upper-case in the later
+    text.
+  - A token that appears in the later text in mixed case (`MetaGPT`, `DSPy`, `ScienceAgentBench`, `AFlow`) takes
+    that casing.
+- **Author lines.**
+  - These also count as author lines:
+    - lines with `·`-separated names;
+    - lines ending the title that contain 2 or more hyphenated or plain capitalised name pairs separated by commas
+      or `and`;
+    - lines containing `Team`, `Co.`, `Technologies` or `Laboratory`.
+  - The `authors` field skips a leading email-only line when a name line follows within 2 lines, and never
+    returns `Abstract`.
+
+### 19.8 Other
+- **translate_terms location.** Findings gain `"compared": <path of the file whose line is given>`.
+- **Install.** The repository's dev setup installs the package (`pip install -e .[dev]`), and AGENTS.md says to
+  run tools from any directory only after installing.
+
+### 19.9 Pinned details
+- **bundle_backup result.** It has `"pruned": [paths deleted]` (empty when `prune` is false) and
+  `"not_pruned": [{"path", "error"}]` (present, possibly empty).
+- **§19.4 skipped entries.** They are `{"file", "reason"}`.

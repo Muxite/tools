@@ -600,6 +600,13 @@ worker world worry would write writer wrong yard yeah year yes yet you young you
 aware based benchmark benchmarks efficient evaluation framework frameworks generative graph improving large
 learn learned methods modeling neural novel open optimization planning reasoning reinforcement retrieval review
 robust scalable self study survey systematic tool tools toward towards understanding using vision
+scientific discovery autonomous agentic automated automatic research researcher researchers assistant
+assistants scientist scientists semantic metrics convergence verification specification enforcement
+reliable reliability trustworthy safe safety secure securing security scaling coding code software
+engineering execution runtime workflow workflows pipeline pipelines evidence claims citation citations
+harness harnesses benchmarking evaluating measuring towards generalist collaborative collaboration
+multimodal interactive interpretability hypothesis generation driven deterministic formal provable
+web are was were has had been does did done any can how its new two use via not may who why
 """.split())
 
 VENUE_LINE = re.compile(
@@ -622,12 +629,30 @@ _AUTHOR_MARK = re.compile(r"[∗*†‡§¹²³⁴⁵⁶⁷⁸⁹⁰,]|(?<=[A-Za
 _ADDRESS_ONLY = re.compile(r"(?i)^<?(?:https?://|www\.)\S+>?$|^[\w.-]+\.(?:com|org|net|io|edu|ai|dev)(?:/\S*)?$"
                            r"|^<?[^\s@]*@\S+>?$")
 _SECTION_START = re.compile(r"(?i)^(abstract|introduction|[0-9]+\.?\s+introduction)\b")
-_SMALL_CAPS = re.compile(r"(?<![A-Za-z0-9])([A-Z]) ([A-Z]{3,})(?![a-z0-9])")
+_UPPER = "".join(chr(c) for c in range(65, 0x250) if chr(c).isupper() and chr(c).isalpha())
+_LOWER = "".join(chr(c) for c in range(97, 0x250) if chr(c).islower() and chr(c).isalpha())
+_SMALL_CAPS = re.compile(rf"(?<![{_UPPER}{_LOWER}0-9])([{_UPPER}]) ([{_UPPER}]{{2,}})(?![{_LOWER}0-9])")
+_RUNNING_HEADER = re.compile(r"^[A-Z][\w-]+ et al\. \(\d{4}\)\s*")
+_MONTH = (r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sept?(?:ember)?"
+          r"|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?")
+_DATE_LINE = re.compile(rf"(?i)^(?:{_MONTH}\s+(?:\d{{1,2}}(?:st|nd|rd|th)?,?\s+)?\d{{4}}"
+                        rf"|\d{{1,2}}\s+{_MONTH},?\s+\d{{4}})$")
+_TRAILING_MARKS = re.compile(r"(?:\s*(?:\(Full\)|[⋆∗*]))+$")
+_SPACED_BREAK = re.compile(r"([A-Za-z]+)(-\s+| - )([A-Z]?[a-z]+)\b")
+_ORG_LINE = re.compile(r"\bTeam\b(?=\s*(?:$|[&,(]))|\bCo\.(?=[\s,]|$)|\bTechnologies\b|\bLaborator(?:y|ies)\b")
+_SPACED_MARKS = re.compile(r"[a-z] [0-9]{1,2}(?= [A-Z]|$)")
+_PAIR = r"[A-Z][a-z]+(?:-[A-Z]?[a-z]+)?"
+_NAME_PAIRS = re.compile(rf"^{_PAIR}(?: {_PAIR}){{1,2}}(?:(?:\s*,\s*(?:and\s+)?|\s+and\s+){_PAIR}(?: {_PAIR}){{1,2}})+,?$")
 _SPACED_HYPHEN = re.compile(r"(?<![A-Za-z])([A-Z]{2,}) -(?=[A-Z])")
 _NAME_WORD = re.compile(r"(?:[A-Z][a-z]+['’]?(?:[-'’][A-Za-z][a-z]*)*|[A-Z]\.)")
-_ENDS_WITH_CONNECTOR = re.compile(r"(?i)(?:[&\-–]|\b(?:and|of|for|the|with|to|in|on|a|an|via|from))$")
+_ENDS_WITH_CONNECTOR = re.compile(r"(?i)(?:[&\-–]|(?<![&/])\b(?:and|of|for|the|with|to|in|on|a|an|via|from))$")
 _PUNCT_END = re.compile(r"[^\w\s]$")
 _MINOR_WORDS = frozenset("a an the and but or nor for of in on at to by as via vs with from into onto upon per".split())
+
+
+def _common(word: str) -> bool:
+    w = word.lower().rstrip(".")
+    return w in COMMON_WORDS or (len(w) > 3 and w.endswith("s") and w[:-1] in COMMON_WORDS)
 
 
 def _name_line(line: str) -> bool:
@@ -643,31 +668,45 @@ def _name_line(line: str) -> bool:
     return any(len(w) > 2 for w in words)
 
 
+def _name_pairs_line(line: str) -> bool:
+    """2 or more capitalised name pairs separated by commas or `and` (MANIFEST §19.7)."""
+    if not _NAME_PAIRS.match(line):
+        return False
+    return not any(_common(w) for w in re.findall(r"[A-Za-z]+", line) if w != "and")
+
+
 def _author_line(line: str) -> bool:
     """An author or affiliation line: e-mail, author marks after names, a comma list of 3+ capitalised words,
-    a single name line, or an affiliation word (MANIFEST §16.6, §17.4)."""
+    a single name line, or an affiliation word (MANIFEST §16.6, §17.4, §19.7)."""
     if "@" in line or _SYMBOL_MARK.search(line) or _SUPERSCRIPT_MARK.search(line) or _SINGLE_MARK.search(line):
         return True
-    if _AFFILIATION.search(line):
+    if _AFFILIATION.search(line) or _ORG_LINE.search(line):
+        return True
+    if "·" in line and re.search(r"[A-Z][a-z]+ [A-Z][a-z]+", line):
         return True
     marks = len(_DIGIT_MARK.findall(line))
-    if marks >= 2 or (marks and "," in line):
+    if marks >= 2 or (marks and "," in line) or len(_SPACED_MARKS.findall(line)) >= 2:
         return True
     if "," in line:
         words = re.findall(r"[A-Za-z][A-Za-z'’.-]*", line)
-        caps = [w for w in words if w[0].isupper()]
+        caps = [w for w in words if w[0].isupper() and not w.isupper()]
         if len(caps) >= 3 and len(caps) * 3 >= len(words) * 2:
             return True
-    return _name_line(line)
+    return _name_line(line) or _name_pairs_line(line)
 
 
 def rejoin_small_caps(text: str) -> str:
-    """`A LITA -G` -> `ALITA-G`, `D EEP R ESEARCH` -> `DEEP RESEARCH`, but `A SURVEY` stays (MANIFEST §17.4)."""
+    """`A LITA -G` -> `ALITA-G`, `D EEP R ESEARCH` -> `DEEP RESEARCH`, `U SING` -> `USING`, `T HE` -> `THE`,
+    but `A SURVEY` stays (MANIFEST §17.4, §19.7)."""
     text = _SPACED_HYPHEN.sub(r"\1-", text)
 
     def join(m: re.Match) -> str:
         x, r = m.group(1), m.group(2)
-        if r.lower() in COMMON_WORDS or (x in "AIO" and len(r) < 4):
+        joined = (x + r).lower()
+        common_r = r.lower() in COMMON_WORDS
+        if _common(joined) and not (x in "AIO" and common_r):
+            return x + r
+        if len(r) < 3 or common_r or (x in "AIO" and len(r) < 4):
             return m.group(0)
         return x + r
 
@@ -679,40 +718,71 @@ def _acronym_like(token: str) -> bool:
     return 2 <= len(letters) <= 5 and sum(c.isupper() for c in letters) >= 2 and token.isalnum()
 
 
+def _later_casing(word: str, later: str, hyphen: bool = False) -> str | None:
+    """The most frequent mixed casing (`MetaGPT`, `DSPy`, `MLE-bench`, `AFlow`) of `word` in the later text,
+    even when the upper-case spelling is more frequent (small caps in the PDF)."""
+    edge = r"[\w-]" if hyphen else r"[^\W_]"
+    counts: dict[str, int] = {}
+    for m in re.finditer(rf"(?<!{edge}){re.escape(word)}(?!{edge})", later, re.I):
+        found = m.group(0)
+        if any(c.islower() for c in found) and any(c.isupper() for c in found[1:]):
+            counts[found] = counts.get(found, 0) + 1
+    return max(counts, key=lambda k: counts[k]) if counts else None
+
+
 def _title_case(title: str, later: str) -> str:
-    """An ALL-CAPS title in title case, keeping acronyms that the paper uses later (MANIFEST §17.4)."""
+    """An ALL-CAPS title in title case, keeping acronyms that the paper uses later and taking mixed casings
+    (`MetaGPT`) from the later text (MANIFEST §17.4, §19.7)."""
     cache: dict[str, bool] = {}
+    mixed_cache: dict[tuple[str, bool], str | None] = {}
+
+    def mixed(word: str, hyphen: bool = False) -> str | None:
+        if (word, hyphen) not in mixed_cache:
+            mixed_cache[(word, hyphen)] = _later_casing(word, later, hyphen) if len(word) > 1 else None
+        return mixed_cache[(word, hyphen)]
 
     def kept(part: str) -> bool:
         if part not in cache:
-            cache[part] = (_acronym_like(part) and part.lower() not in COMMON_WORDS
-                           and re.search(rf"(?<![A-Za-z0-9]){re.escape(part)}(?![A-Za-z0-9])", later) is not None)
+            cache[part] = (_acronym_like(part) and not _common(part)
+                           and re.search(rf"(?<![\w-]){re.escape(part)}(?![\w-])", later) is not None)
         return cache[part]
 
-    tokens = re.findall(r"[A-Za-z0-9]+", title)
+    # running headers that repeat the title are not "later text"
+    title_words = {w.lower() for w in re.findall(r"[^\W_]+", title)}
+    later = "\n".join(ln for ln in later.split("\n")
+                      if not (len(re.findall(r"[^\W_]+", ln)) >= 2
+                              and {w.lower() for w in re.findall(r"[^\W_]+", ln)} <= title_words))
+    tokens = re.findall(r"[^\W_]+", title)
     if not any(re.search("[A-Za-z]", t) for t in tokens if not kept(t)):
         return title
     if any(re.search("[a-z]", t) for t in tokens if not kept(t)):
         return title
-    # keep a whole hyphenated token (`ALITA-G`) when the paper writes it that way
     out, first = [], True
     for piece in re.split(r"(\s+)", title):
         if not piece or piece.isspace():
             out.append(piece)
             continue
         core = piece.strip(":;,.!?()[]\"'")
-        if "-" in core and re.search(rf"(?<![\w-]){re.escape(core)}(?![\w-])", later):
+        casing = mixed(core, True) if "-" in core else None
+        if casing:
+            out.append(piece.replace(core, casing, 1))
+        elif ("-" in core and not any(_common(w) for w in core.split("-"))
+              and re.search(rf"(?<![\w-]){re.escape(core)}(?![\w-])", later)):
+            # keep a whole hyphenated token (`ALITA-G`) when the paper writes it that way
             out.append(piece)
         else:
             parts = re.split(r"([-/])", piece)
             done = []
             for k, part in enumerate(parts):
-                m = re.match(r"^([^A-Za-z0-9]*)([A-Za-z0-9]+)(.*)$", part)
+                m = re.match(r"^([\W_]*)([^\W_]+)(.*)$", part)
                 if not m:
                     done.append(part)
                     continue
                 pre, word, post = m.groups()
-                if kept(word):
+                casing = mixed(word)
+                if casing:
+                    new = casing
+                elif kept(word):
                     new = word
                 elif word.lower() in _MINOR_WORDS and not first and k == 0:
                     new = word.lower()
@@ -721,7 +791,47 @@ def _title_case(title: str, later: str) -> str:
                 done.append(pre + new + post)
             out.append("".join(done))
         first = piece.rstrip().endswith(":")
-    return "".join(out)
+    result = "".join(out)
+
+    # `Alloc Bench` -> `AllocBench` when the paper writes the joined word
+    def glue(m: re.Match) -> str:
+        casing = mixed(m.group(1) + m.group(2))
+        return casing if casing else m.group(0)
+
+    return re.sub(r"(?<![\w-])([A-Z][a-z]+) ([A-Z][a-z]+)(?![\w-])", glue, result)
+
+
+def _rejoin_breaks(title: str, later: str) -> str:
+    """`Com- mercial` -> `Commercial`, `Alloca - Tion` -> `Allocation` (MANIFEST §19.7)."""
+    low = later.lower()
+
+    def seen(word: str) -> bool:
+        return re.search(rf"(?<![\w-]){re.escape(word.lower())}(?![\w-])", low) is not None
+
+    def fix(m: re.Match) -> str:
+        left, sep, right = m.groups()
+        title_case = right[:1].isupper()
+        glued = left + (right.lower() if title_case else right)
+        hyphened = f"{left}-{right}"
+        if seen(hyphened) and not seen(glued):
+            return hyphened
+        if seen(glued):
+            return glued
+        if sep == " - ":
+            return glued if not _common(right) or _common(glued) else m.group(0)
+        if title_case:
+            return hyphened
+        if _common(right) and (left.isupper() or _common(left)) and not _common(glued):
+            return hyphened
+        return glued
+
+    return _SPACED_BREAK.sub(fix, title)
+
+
+def _clean_title(title: str) -> str:
+    title = _RUNNING_HEADER.sub("", title)
+    title = re.sub(r"\s+([:;,])", r"\1", title)
+    return _TRAILING_MARKS.sub("", title).strip()
 
 
 def _clean_authors(line: str) -> str:
@@ -738,7 +848,8 @@ def _clean_authors(line: str) -> str:
             if marks:
                 cut = marks[-1]
         line = line[:cut]
-    line = re.sub(r"[∗*†‡§¹²³⁴⁵⁶⁷⁸⁹⁰]", " ", line)
+    line = line.replace("·", ",")
+    line = re.sub(r"[∗*†‡§⋆⋄¹²³⁴⁵⁶⁷⁸⁹⁰]", " ", line)
     line = re.sub(r"(?<=[A-Za-z.])[0-9]{1,2}(?:\s*,\s*[0-9]{1,2})*(?![0-9])", " ", line)
     line = re.sub(r"(?<![A-Za-z0-9])[0-9]{1,2}(?:\s*,\s*[0-9]{1,2})*(?![0-9A-Za-z])", " ", line)
     line = re.sub(r"\s*,(?:\s*,)*", ", ", line)
@@ -750,30 +861,56 @@ def _run_line(text: str) -> bool:
     return 1 <= len(text.split()) <= 2
 
 
+def _pick_authors(lines: list[str]) -> str:
+    """The author line after the title: skips date lines and a leading e-mail line when a name line follows
+    within 2 lines; never a section heading such as `Abstract` (MANIFEST §19.7)."""
+    rest = [ln for ln in lines if ln and not _DATE_LINE.match(ln)]
+    if not rest or _SECTION_START.match(rest[0]):
+        return ""
+    if _ADDRESS_ONLY.match(rest[0]):
+        for ln in rest[1:3]:
+            if _SECTION_START.match(ln):
+                break
+            clean = _clean_authors(ln)
+            if "@" not in ln and clean and (_name_line(clean) or _name_pairs_line(clean)
+                                            or (_author_line(ln) and not _AFFILIATION.search(ln))):
+                return clean
+    return _clean_authors(rest[0])
+
+
 def _title_and_authors(page1: str, later: str = "") -> tuple[str, str]:
-    """Title and author line of a paper's first page (MANIFEST §15.8, §16.6, §17.4)."""
-    lines = [ln.strip() for ln in page1.split("\n")]
+    """Title and author line of a paper's first page (MANIFEST §15.8, §16.6, §17.4, §19.7)."""
+    lines = [_RUNNING_HEADER.sub("", ln.strip()) if _RUNNING_HEADER.match(ln.strip()) else ln.strip()
+             for ln in page1.split("\n")]
+
+    def skipped(text: str) -> bool:
+        return not text or bool(VENUE_LINE.search(text) or _DATE_LINE.match(text))
 
     def cont(j: int, parts: list[str], words_limit: int = TITLE_WORDS) -> bool:
         if j >= len(lines):
             return False
         text = lines[j]
-        if not text or VENUE_LINE.search(text) or _SECTION_START.match(text):
+        if not text or VENUE_LINE.search(text) or _SECTION_START.match(text) or _DATE_LINE.match(text):
             return False
         if len(" ".join(parts).split()) >= words_limit:
             return False
         if _author_line(text):
             joined = " ".join(parts)
-            dangling = _ENDS_WITH_CONNECTOR.search(joined) and not (
-                "@" in text or _AFFILIATION.search(text) or _SYMBOL_MARK.search(text)
-                or _SINGLE_MARK.search(text) or _DIGIT_MARK.search(text) or "," in text)
-            return bool(dangling)
+            strong = ("@" in text or _AFFILIATION.search(text) or _ORG_LINE.search(text)
+                      or _SYMBOL_MARK.search(text) or _SINGLE_MARK.search(text) or _DIGIT_MARK.search(text)
+                      or _SUPERSCRIPT_MARK.search(text) or "·" in text
+                      or len(_SPACED_MARKS.findall(text)) >= 2)
+            if strong:
+                return False
+            if joined.endswith(":") and not _name_line(text):
+                return True
+            return bool(_ENDS_WITH_CONNECTOR.search(joined) or joined.endswith(","))
         return True
 
     start = None
     run = False
     for i, text in enumerate(lines):
-        if not text or VENUE_LINE.search(text):
+        if skipped(text):
             continue
         n = len(text.split())
         if n > 3:
@@ -804,11 +941,10 @@ def _title_and_authors(page1: str, later: str = "") -> tuple[str, str]:
         parts.append(lines[j])
         last = j
         j += 1
-    title = rejoin_small_caps(" ".join(" ".join(parts).split()))
+    title = _clean_title(rejoin_small_caps(" ".join(" ".join(parts).split())))
     rest = "\n".join(lines[last + 1:]) + "\n" + later
-    title = _title_case(title, rest)
-    authors = next((ln for ln in lines[last + 1:] if ln), "")
-    return title, _clean_authors(authors)
+    title = _clean_title(_rejoin_breaks(_title_case(title, rest), rest))
+    return title, _pick_authors(lines[last + 1:])
 
 
 def _clean_short(short: str) -> str:
@@ -1146,6 +1282,430 @@ def papers_index_check(dir: str | None = None, index: str | None = None, report:
             "summaries": len(summaries)}
 
 
+# ---------------------------------------------------------------------------------------------- paper page
+
+# Cited ids (MANIFEST §18.3): new-style with a valid month, version dropped; old-style only after `arXiv:`/`arXiv `.
+PAGE_NEW_ID = re.compile(r"(?<![0-9.])([0-9]{2}(?:0[1-9]|1[0-2])\.[0-9]{4,5})(?:v[0-9]+)?(?![0-9])")
+PAGE_OLD_ID = re.compile(r"arXiv(?::[ \t]*| )([a-z-]+(?:\.[A-Z]{2})?/[0-9]{7})(?:v[0-9]+)?(?![0-9])")
+# Ids in INDEX rows and report tables: new-style as above, old-style bare (or stored with `_`).
+_ROW_OLD_ID = re.compile(r"(?<![\w/.-])([a-z-]+(?:\.[A-Z]{2})?)[/_]([0-9]{7})(?:v[0-9]+)?(?![0-9])")
+_USED_FOR_PART = re.compile(r"\s*(?:([0-9]{2}(?:0[1-9]|1[0-2])\.[0-9]{4,5})"
+                            r"|([a-z-]+(?:\.[A-Z]{2})?/[0-9]{7}))(?:v[0-9]+)?\s+\S")
+INDEX_SECTION = re.compile(r"^##\s+\d+\.\s+(.*)$")
+_INLINE = re.compile(r"(\*\*.+?\*\*|`[^`]+`)")
+_BULLET = re.compile(r"^(\s*)[-*]\s+(.*)$")
+_PAGE_CANON = (("summary", "Summary"), ("how ", "How it works"), ("results", "Results"),
+               ("limitations", "Limitations"), ("critical notes", "Limitations"), ("relevance", "Relevance"))
+PAGE_TITLE = "Paper summaries"
+
+
+def page_cited_ids(text: str) -> list[str]:
+    """arXiv ids cited anywhere in text, first-seen order, deduplicated, versions dropped (MANIFEST §18.3)."""
+    found = [(m.start(1), m.group(1)) for m in PAGE_NEW_ID.finditer(text)]
+    found += [(m.start(1), m.group(1)) for m in PAGE_OLD_ID.finditer(text)]
+    out: list[str] = []
+    for _, i in sorted(found):
+        if i not in out:
+            out.append(i)
+    return out
+
+
+def _first_row_id(line: str) -> str | None:
+    found = [(m.start(1), m.group(1)) for m in PAGE_NEW_ID.finditer(line)]
+    found += [(m.start(), f"{m.group(1)}/{m.group(2)}") for m in _ROW_OLD_ID.finditer(line)]
+    return min(found)[1] if found else None
+
+
+def _esc(text: str) -> str:
+    import html
+
+    return html.escape(text)
+
+
+def _inline_html(text: str) -> str:
+    out = []
+    for part in _INLINE.split(text):
+        if not part:
+            continue
+        if len(part) > 4 and part.startswith("**") and part.endswith("**"):
+            out.append("<strong>" + _esc(part[2:-2]) + "</strong>")
+        elif len(part) > 2 and part.startswith("`") and part.endswith("`"):
+            out.append("<code>" + _esc(part[1:-1]) + "</code>")
+        else:
+            out.append(_esc(part))
+    return "".join(out)
+
+
+def _page_cells(line: str) -> list[str]:
+    return [c.replace("\\|", "|") for c in _table_cells(line)]
+
+
+def _md_block(lines: list[str]) -> str:
+    """Paragraphs, nested `-`/`*` bullets and pipe tables as HTML (MANIFEST §18.3)."""
+    out: list[str] = []
+    para: list[str] = []
+    stack: list[int] = []                       # indents of the open <ul>s
+
+    def flush_para():
+        if para:
+            out.append("<p>" + _inline_html(" ".join(para)) + "</p>")
+            para.clear()
+
+    def close_lists():
+        while stack:
+            out.append("</li></ul>")
+            stack.pop()
+
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        if (raw.strip().startswith("|") and i + 1 < len(lines) and lines[i + 1].strip().startswith(("|", ":", "-"))
+                and re.fullmatch(r"\|?[\s:|-]+\|?", lines[i + 1].strip()) and "-" in lines[i + 1]):
+            flush_para()
+            close_lists()
+            head = _page_cells(raw)
+            j = i + 2
+            body = []
+            while j < len(lines) and lines[j].strip().startswith("|"):
+                body.append(_page_cells(lines[j]))
+                j += 1
+            out.append('<div class="tbl"><table><thead><tr>'
+                       + "".join(f"<th>{_inline_html(c)}</th>" for c in head) + "</tr></thead><tbody>")
+            for row in body:
+                out.append("<tr>" + "".join(f"<td>{_inline_html(c)}</td>" for c in row) + "</tr>")
+            out.append("</tbody></table></div>")
+            i = j
+            continue
+        i += 1
+        m = _BULLET.match(raw)
+        if m:
+            flush_para()
+            indent = len(m.group(1).expandtabs(4))
+            if not stack or indent > stack[-1]:
+                out.append("<ul><li>")
+                stack.append(indent)
+            else:
+                while len(stack) > 1 and indent < stack[-1]:
+                    out.append("</li></ul>")
+                    stack.pop()
+                out.append("</li><li>")
+            out.append(_inline_html(m.group(2).strip()))
+        elif not raw.strip():
+            flush_para()
+            close_lists()
+        elif stack and raw[:1] in (" ", "\t"):
+            out.append(" " + _inline_html(raw.strip()))
+        else:
+            close_lists()
+            para.append(raw.strip())
+    flush_para()
+    close_lists()
+    return "".join(out)
+
+
+def _parse_summary(text: str, arxiv_id: str) -> dict:
+    lines = text.replace("⭐ ", "").replace("⭐", "").split("\n")
+    first = lines[0].lstrip("# ").strip() if lines else ""
+    heading = re.sub(r"^" + re.escape(arxiv_id) + r"\s*[·:-]\s*", "", first)
+    meta: list[str] = []
+    sections: list[tuple[str, list[str]]] = []
+    for line in lines[1:]:
+        if line.startswith("## "):
+            sections.append((line[3:].strip(), []))
+        elif sections:
+            sections[-1][1].append(line)
+        elif line.strip():
+            meta.append(line.strip())
+    keyed: dict[str, list[tuple[str, list[str]]]] = {}
+    extra = []
+    for label, body in sections:
+        key = next((canon for prefix, canon in _PAGE_CANON if label.lower().startswith(prefix)), None)
+        if key:
+            keyed.setdefault(key, []).append((label, body))
+        else:
+            extra.append((label, body))
+    return {"heading": heading, "meta": " ".join(meta), "keyed": keyed, "extra": extra}
+
+
+def _card_html(arxiv_id: str, text: str, used_for: str | None) -> str:
+    s = _parse_summary(text, arxiv_id)
+    parts = [f'<article class="paper" id="p-{re.sub(r"[./]", "-", arxiv_id)}">',
+             f'<h3><span class="id">{_esc(arxiv_id)}</span> {_esc(s["heading"])}</h3>']
+    if used_for is not None:
+        parts.append(f'<p class="eyebrow">In the report: {_inline_html(used_for)}</p>')
+    if s["meta"]:
+        parts.append(f'<p class="meta">{_inline_html(s["meta"])}</p>')
+    for _, body in s["keyed"].get("Summary", []):
+        parts.append('<div class="summary">' + _md_block(body) + "</div>")
+    for key in ("How it works", "Results", "Limitations", "Relevance"):
+        opened = " open" if key == "Results" else ""
+        for label, body in s["keyed"].get(key, []):
+            parts.append(f"<details{opened}><summary>{_esc(label)}</summary>{_md_block(body)}</details>")
+    for label, body in s["extra"]:
+        parts.append(f"<details><summary>{_esc(label)}</summary>{_md_block(body)}</details>")
+    parts.append("</article>")
+    return "\n".join(parts)
+
+
+def _used_for(report_lines: list[str]) -> dict[str, str]:
+    """{id: Used for cell} from the report's pipe tables with a `Used for` header cell; first occurrence wins."""
+    lines = _blank_fences(report_lines)
+    out: dict[str, str] = {}
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if not (line.lstrip().startswith("|") and i + 1 < len(lines) and _TABLE_RULE.match(lines[i + 1])):
+            i += 1
+            continue
+        header = [c.lower() for c in _page_cells(line)]
+        col = header.index("used for") if "used for" in header else None
+        j = i + 2
+        while j < len(lines) and lines[j].lstrip().startswith("|"):
+            cells = _page_cells(lines[j])
+            if col is not None and col < len(cells):
+                for k, cell in enumerate(cells):
+                    if k == col:
+                        continue
+                    for part in cell.split(","):
+                        m = _USED_FOR_PART.match(part)
+                        if m:
+                            out.setdefault(m.group(1) or m.group(2), cells[col])
+            j += 1
+        i = j
+    return out
+
+
+def _index_sections(index_text: str) -> tuple[list[str], dict[str, str]]:
+    """(section names in first-appearance order, {id: section name}) from INDEX.md (MANIFEST §18.3)."""
+    order: list[str] = []
+    section_of: dict[str, str] = {}
+    current = None
+    for line in _blank_fences(index_text.split("\n")):
+        m = INDEX_SECTION.match(line)
+        if m:
+            current = re.sub(r"\s*\([^()]*\)\s*$", "", m.group(1)).strip()
+            if current not in order:
+                order.append(current)
+            continue
+        if re.match(r"^##\s", line):
+            current = None
+            continue
+        if current is not None and line.startswith("|"):
+            found = _first_row_id(line)
+            if found and found not in section_of:
+                section_of[found] = current
+    return order, section_of
+
+
+def _slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "group"
+
+
+def _write_replace_atomic(target: Path, data: bytes) -> None:
+    """Write target atomically, replacing an existing file (a build artifact)."""
+    import tempfile
+
+    try:
+        fd, tmp = tempfile.mkstemp(prefix=".tundlekit-", suffix=".tmp", dir=str(target.parent))
+    except (OSError, ValueError) as exc:
+        raise ToolError(f"cannot write {target}: {exc}") from None
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        try:
+            os.chmod(tmp, 0o666 & ~_umask())
+        except OSError:
+            pass
+        os.replace(tmp, target)
+    except (OSError, ValueError) as exc:
+        raise ToolError(f"cannot write {target}: {exc}") from None
+    finally:
+        _remove(Path(tmp))
+
+
+PAGE_CSS = """
+:root{
+  --bg:#f7f6f3; --ink:#1c1b19; --ink-2:#4d4b47; --mute:#807d77; --rule:#cfccc5;
+  --card:#ffffff; --code:#eeece6; --hi:#e6e3dc;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#181817; --ink:#e8e6e1; --ink-2:#c1beb7; --mute:#8f8c85; --rule:#3a3936;
+    --card:#20201e; --code:#2a2a27; --hi:#2f2e2b;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#181817; --ink:#e8e6e1; --ink-2:#c1beb7; --mute:#8f8c85; --rule:#3a3936;
+  --card:#20201e; --code:#2a2a27; --hi:#2f2e2b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Source Sans 3","Segoe UI",system-ui,Helvetica,Arial,sans-serif;
+  font-size:15.5px;line-height:1.5;padding-block:32px 64px;padding-inline:clamp(16px,4vw,48px)}
+.wrap{max-width:860px;margin:0 auto}
+h1,h2,h3{font-family:"Source Serif 4",Georgia,"Times New Roman",serif;font-weight:600;text-wrap:balance;margin:0}
+h1{font-size:2rem;line-height:1.15}
+.lede{color:var(--ink-2);margin:8px 0 20px;max-width:65ch}
+.controls{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:12px 0;margin-bottom:28px}
+input#q{flex:1 1 220px;min-width:0;font:inherit;padding:8px 10px;border:1px solid var(--rule);
+  background:var(--card);color:var(--ink)}
+input#q:focus{outline:2px solid var(--ink);outline-offset:1px}
+nav{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.9rem}
+nav a{color:var(--ink-2);text-decoration:none;border-bottom:1px solid transparent}
+nav a:hover,nav a:focus{border-bottom-color:var(--ink);color:var(--ink);outline:none}
+nav .n{color:var(--mute);font-variant-numeric:tabular-nums}
+.count{color:var(--mute);font-size:.9rem;font-variant-numeric:tabular-nums}
+section.group{margin-top:36px}
+section.group h2{font-size:1.25rem;letter-spacing:.01em;padding-bottom:6px;border-bottom:2px solid var(--ink);
+  margin-bottom:16px}
+.paper{background:var(--card);border:1px solid var(--rule);padding:18px 20px;margin-bottom:14px;overflow-wrap:anywhere}
+.paper h3{font-size:1.1rem;line-height:1.3}
+.paper .id{font-family:"JetBrains Mono",Consolas,ui-monospace,monospace;font-weight:500;
+  font-size:.8em;color:var(--mute);font-variant-numeric:tabular-nums;margin-right:4px}
+.eyebrow{margin:6px 0 0;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
+.meta{margin:6px 0 10px;color:var(--ink-2);font-size:.9rem}
+.summary p{margin:0 0 8px}
+.summary ul{margin:0 0 8px}
+details{border-top:1px solid var(--rule);padding:8px 0 4px}
+details:last-child{padding-bottom:0}
+summary{cursor:pointer;font-weight:600;font-size:.92rem;letter-spacing:.02em;color:var(--ink-2);list-style:none;
+  display:flex;gap:8px;align-items:baseline}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"+";font-family:ui-monospace,monospace;width:1em;color:var(--mute)}
+details[open]>summary::before{content:"\\2013"}
+summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+details p{margin:8px 0}
+details ul,.summary ul{padding-left:1.2em}
+details li,.summary li{margin:3px 0}
+code{font-family:"JetBrains Mono",Consolas,ui-monospace,monospace;font-size:.86em;background:var(--code);padding:0 3px}
+strong{font-weight:600}
+.notice{border:1px solid var(--ink);padding:10px 14px;margin-bottom:20px}
+.tbl{overflow-x:auto;margin:8px 0}
+table{border-collapse:collapse;font-size:.9rem;font-variant-numeric:tabular-nums}
+th,td{border:1px solid var(--rule);padding:4px 8px;text-align:left;vertical-align:top}
+th{background:var(--hi);font-weight:600}
+.hide{display:none}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:480px){body{font-size:15px}.paper{padding:14px}}
+"""
+
+PAGE_JS = """
+(function(){
+  var q=document.getElementById('q'), count=document.getElementById('count'),
+      papers=[].slice.call(document.querySelectorAll('article.paper')),
+      groups=[].slice.call(document.querySelectorAll('section.group'));
+  var texts=papers.map(function(p){return p.textContent.toLowerCase();});
+  function run(){
+    var v=q.value.trim().toLowerCase(), shown=0;
+    papers.forEach(function(p,i){var ok=!v||texts[i].indexOf(v)>-1;p.classList.toggle('hide',!ok);if(ok)shown++;});
+    groups.forEach(function(s){s.classList.toggle('hide',!s.querySelector('article.paper:not(.hide)'));});
+    count.textContent=v?(shown+' of '+papers.length+' shown'):(papers.length+' papers');
+  }
+  q.addEventListener('input',run); run();
+})();
+"""
+
+
+@tool(
+    "papers_page",
+    "Build a self-contained HTML page (no external requests, light/dark, inline filter) with 1 card per arXiv "
+    "paper the report cites, from dir/summaries/{id} - *.md, grouped by the numbered sections of INDEX.md "
+    "(others under 'Other'), with an 'In the report' line from the report's 'Used for' table column. Cited ids "
+    "without a summary are listed and warned about. Overwrites out (a build artifact); output is deterministic.",
+    {"type": "object",
+     "properties": {
+         "report": {"type": "string", "description": "the Markdown report whose cited papers get cards"},
+         "out": {"type": "string", "description": "output HTML file (its directory must exist)"},
+         "dir": {"type": "string", "description": "papers directory holding summaries/ (default: current directory)"},
+         "index": {"type": "string", "description": "INDEX.md path (default {dir}/summaries/INDEX.md)"},
+         "title": {"type": "string", "description": "page title (default 'Paper summaries')"},
+     },
+     "required": ["report", "out"],
+     "additionalProperties": False},
+    readOnlyHint=False,
+)
+def papers_page(report: str, out: str, dir: str | None = None, index: str | None = None,
+                title: str | None = None) -> dict:
+    from tundlekit.render import check_path_string
+
+    check_path_string(out, "out")
+    report_text = read_input(report, "report")
+    root = _paper_dir(dir)
+    if not root.is_dir():
+        raise ToolError(f"no such directory: {root}")
+    target = Path(out)
+    if not target.parent.is_dir():
+        raise ToolError(f"the directory of out does not exist: {target.parent}")
+    if target.is_dir():
+        raise ToolError(f"out is a directory: {out}")
+    title = PAGE_TITLE if title is None else title
+    warnings: list[str] = []
+
+    index_path = index if index is not None else str(root / "summaries" / "INDEX.md")
+    if Path(index_path).is_file():
+        order, section_of = _index_sections(read_input(index_path, "index"))
+    else:
+        order, section_of = [], {}
+        warnings.append(f"no index: {index_path}")
+
+    cited = page_cited_ids(report_text)
+    used_for = _used_for(report_text.split("\n"))
+    sdir = root / "summaries"
+    cards: dict[str, str] = {}
+    missing: list[str] = []
+    for arxiv_id in cited:
+        found = (sorted(sdir.glob(glob_escape(stored_name(arxiv_id)) + " - *.md"), key=lambda p: p.name)
+                 if sdir.is_dir() else [])
+        found = [p for p in found if p.is_file()]
+        if not found:
+            missing.append(arxiv_id)
+            warnings.append(f"no summary for {arxiv_id}")
+            continue
+        cards[arxiv_id] = _card_html(arxiv_id, read_input(str(found[0]), "summary"), used_for.get(arxiv_id))
+
+    grouped: dict[str, list[str]] = {}
+    for arxiv_id in cards:
+        grouped.setdefault(section_of.get(arxiv_id, "Other"), []).append(arxiv_id)
+    names = [n for n in order if n != "Other"] + ["Other"]
+    sections, nav, body = [], [], []
+    used_slugs: dict[str, int] = {}
+    for name in names:
+        ids = grouped.get(name)
+        if not ids:
+            continue
+        slug = _slug(name)
+        used_slugs[slug] = used_slugs.get(slug, 0) + 1
+        sid = "s-" + (slug if used_slugs[slug] == 1 else f"{slug}-{used_slugs[slug]}")
+        sections.append({"name": name, "id": sid, "papers": list(ids)})
+        nav.append(f'<a href="#{sid}">{_esc(name)} <span class="n">{len(ids)}</span></a>')
+        body.append(f'<section class="group" id="{sid}"><h2>{_esc(name)}</h2>\n'
+                    + "\n".join(cards[i] for i in ids) + "\n</section>")
+
+    n = len(cards)
+    lines = ["<!doctype html>",
+             '<html lang="en"><head><meta charset="utf-8">'
+             '<meta name="viewport" content="width=device-width, initial-scale=1">',
+             f"<title>{_esc(title)}</title><style>{PAGE_CSS}</style></head>",
+             '<body><div class="wrap">',
+             f"<h1>{_esc(title)}</h1>",
+             f'<p class="lede">{n} papers cited in {_esc(Path(report).name)}, 1 card each, '
+             f"grouped as in the summary index.</p>"]
+    if missing:
+        lines.append('<div class="notice" id="missing"><strong>No summary on file for:</strong> '
+                     + _esc(", ".join(missing)) + ". These are cited in the report but not summarised, "
+                     "so they have no card.</div>")
+    lines += ['<div class="controls"><label class="sr-only" for="q">Filter</label>'
+              '<input id="q" type="search" placeholder="filter by any word, number or id" autocomplete="off">'
+              '<span class="count" id="count"></span>',
+              "<nav>" + "".join(nav) + "</nav></div>"]
+    lines += body
+    lines.append(f"</div><script>{PAGE_JS}</script></body></html>")
+    _write_replace_atomic(target, ("\n".join(lines) + "\n").encode("utf-8"))
+    return {"out": out, "papers": n, "cited": cited, "missing": missing, "sections": sections,
+            "warnings": warnings}
+
+
 # ---------------------------------------------------------------------------------------------- CLI
 
 def add_cli(groups) -> None:
@@ -1209,6 +1769,22 @@ def add_cli(groups) -> None:
                    help="JSON object (or a file holding it): summary id -> list of required headings")
     common_flags(c, checker=True)
     c.set_defaults(handler=_cli_index_check)
+
+    c = cmds.add_parser("page", help="build an HTML page of the summaries of the papers a report cites")
+    c.add_argument("report", metavar="REPORT.md")
+    c.add_argument("-o", "--out", required=True, metavar="OUT.html")
+    c.add_argument("--dir")
+    c.add_argument("--index")
+    c.add_argument("--title")
+    common_flags(c, checker=True)
+    c.set_defaults(handler=_cli_page)
+
+
+def _cli_page(args) -> CliResult:
+    r = papers_page(args.report, args.out, dir=args.dir, index=args.index, title=args.title)
+    lines = [f"wrote {r['out']}: {r['papers']} papers in {len(r['sections'])} sections"]
+    lines += [f"warning: {w}" for w in r["warnings"]]
+    return CliResult(r, "\n".join(lines), exit_code=1 if args.strict and r["warnings"] else 0)
 
 
 def _cli_summary(args) -> CliResult:

@@ -5,4 +5,4 @@ See MANIFEST.md for the contract every module implements.
 __version__ = "0.1.0"
 
 # Modules that register tools (tundlekit.<name>). Order is the order of `tundlekit tools`.
-MODULES = ["bundle", "deck", "diagram", "chart", "palette", "textlint", "review", "claims", "render", "papers", "translate"]
+MODULES = ["bundle", "deck", "diagram", "chart", "palette", "textlint", "review", "claims", "report", "render", "papers", "translate"]

@@ -233,6 +233,9 @@ def chart_bar(spec: dict | None = None, spec_path: str | None = None, out: str |
         raise ToolError("invalid chart spec:\n" + "\n".join(f"- {p}" for p in problems))
     out_path = None
     if out is not None:
+        from tundlekit.render import check_path_string
+
+        check_path_string(out, "out")
         try:
             out_path = pathlib.Path(out).resolve()
             parent_ok = out_path.parent.is_dir()

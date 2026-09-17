@@ -501,10 +501,12 @@ def check_path_string(value, what: str = "out_dir") -> None:
     if not _WINDOWS:
         return
     body = value.replace("/", "\\")
-    for prefix in ("\\\\?\\", "\\\\.\\"):
-        if body.startswith(prefix):
-            body = body[len(prefix):]
-            break
+    if body.startswith("\\\\.\\") or body.lower().startswith("\\\\?\\globalroot"):
+        raise ToolError(f"{what} is not a valid path (it names a device): {value!r}")
+    if body.startswith("\\\\?\\"):
+        body = body[4:]
+        if body[:4].lower() == "unc\\":
+            body = "\\\\" + body[4:]
     rest = os.path.splitdrive(body)[1]
     if ":" in rest or any(c in _WIN_BAD_CHARS or ord(c) < 32 for c in rest):
         raise ToolError(f"{what} is not a valid path: {value!r}")

@@ -164,9 +164,10 @@ tundlekit translate terms spec.en.md spec.zh.md spec.en2.md --compare same-langu
 tundlekit translate terms spec.en.md draft.en.md final.en.md          # same-language chain: the default is fine
 ```
 
-**Line numbers.** L001, L002 and L003 carry `line`: the first line where the term occurs in the file it was
-compared with (the previous file, or the earlier same-language file). Open that line to see the context the term
-came from, then look for the matching place in the flagged file.
+**Line numbers.** L001, L002 and L003 carry `line` and `compared`: `path` is the flagged file, `compared` is the
+file it was compared with (the previous file, or the earlier same-language file), and `line` is the first line
+where the term occurs in `compared`. Open `compared` at that line to see the context the term came from, then
+look for the matching place in `path`.
 
 It complements `check all`: that checks protected spans and the glossary, this checks identifiers and English terms
 that no glossary row lists. Neither judges faithfulness; the critic does.

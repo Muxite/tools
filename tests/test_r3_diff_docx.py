@@ -30,9 +30,9 @@ def diff(old, new, **kw):
 
 
 def test_registered_in_textlint_read_only():
-    """§15.10: docx_diff is registered by tundlekit.textlint and is read-only."""
+    """§15.10: docx_diff is registered by tundlekit.textlint; §19.1: it writes emit_edits, so not read-only."""
     t = r3.get_tool("docx_diff")
-    assert t.annotations.get("readOnlyHint") is True
+    assert t.annotations.get("readOnlyHint") is False
     assert t.input_schema.get("additionalProperties") is False
     assert {"old", "new", "search"} <= set(t.input_schema["properties"])
 

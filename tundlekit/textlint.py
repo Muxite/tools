@@ -24,6 +24,7 @@ import stat
 import struct
 import subprocess
 import tempfile
+import warnings
 import zipfile
 import zlib
 from dataclasses import dataclass, field
@@ -1148,14 +1149,16 @@ def replace_files(items: list[tuple[str, bytes]]) -> None:
         for (path, target, _, _, st), tmp in zip(plan, staged):
             try:
                 backup = target.read_bytes() if st is not None else None
-                os.replace(tmp, target)
-            except OSError as e:
+                _replace_keeping_attributes(tmp, target, st)
+            except BaseException as e:              # §19.6: also on KeyboardInterrupt
                 restored, lost = _restore(done)
                 note = f"; restored {', '.join(restored)}" if restored else ""
                 if lost:
                     note += f"; could not restore {', '.join(lost)}"
                 if not done:
                     note += "; nothing was written"
+                if not isinstance(e, OSError):
+                    raise
                 raise ToolError(f"cannot write {path}: {e}{note}") from None
             done.append((path, target, backup, st))
     finally:
@@ -1173,7 +1176,7 @@ def _restore(done: list) -> tuple[list[str], list[str]]:
             else:
                 tmp = _stage(target, backup, stat.S_IMODE(st.st_mode))
                 try:
-                    os.replace(tmp, target)
+                    _replace_keeping_attributes(tmp, target, st)
                 finally:
                     if os.path.exists(tmp):
                         _unlink_quietly(tmp)
@@ -1182,6 +1185,36 @@ def _restore(done: list) -> tuple[list[str], list[str]]:
         except OSError:
             lost.append(str(path))
     return restored[::-1], lost[::-1]
+
+
+_KEPT_ATTRIBUTES = 0x2 | 0x4                        # FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM
+
+
+def _set_attributes(path, attrs: int) -> bool:
+    import ctypes
+
+    return bool(ctypes.windll.kernel32.SetFileAttributesW(str(path), attrs))
+
+
+def _replace_keeping_attributes(tmp: str, target: pathlib.Path, st) -> None:
+    """os.replace(tmp, target); on Windows the target's Hidden and System attributes are kept (§19.6).
+
+    Windows refuses to replace a hidden or system file, so those attributes are cleared first, set on the new
+    file afterwards, and put back on the old file if the replace fails.
+    """
+    attrs = getattr(st, "st_file_attributes", 0) if st is not None else 0
+    kept = attrs & _KEPT_ATTRIBUTES
+    if os.name != "nt" or not kept:
+        os.replace(tmp, target)
+        return
+    _set_attributes(target, (attrs & ~_KEPT_ATTRIBUTES) or 0x80)
+    try:
+        os.replace(tmp, target)
+    except BaseException:
+        _set_attributes(target, attrs)
+        raise
+    new = os.stat(target).st_file_attributes
+    _set_attributes(target, new | kept)
 
 
 def replace_file(path: str, data: bytes) -> None:
@@ -1678,7 +1711,19 @@ def _parse_renumber(entries: list[str]) -> dict:
             raise ToolError(f"renumber: {raw!r} changes the kind of reference")
         if old in mapping:
             raise ToolError(f"renumber: {ref_label(old)} is renumbered twice")
+        if old != new:
+            clash = next((k for k, v in mapping.items() if v == new and k != old), None)
+            if clash is not None:                   # §19.5: 2 sources onto 1 target
+                raise ToolError(f"renumber: {ref_label(clash)} and {ref_label(old)} are both renumbered to "
+                                f"{ref_label(new)}")
         mapping[old] = new
+    letters = {old[1]: new[1] for old, new in mapping.items() if old[0] == "App" and "." not in old[1]
+               and old != new}
+    for old in mapping:
+        if old[0] in ("App", "Fig", "Table") and old[1][:1] in letters and old[1] != old[1][:1]:
+            letter = old[1][:1]
+            raise ToolError(f"renumber: Appendix {letter} is renamed to {letters[letter]} and {ref_label(old)} "
+                            f"under it is renumbered in the same call; rename the letter in a separate call")
     return mapping
 
 
@@ -1841,13 +1886,17 @@ def _marker_spans(source: str, headings: list) -> dict[int, list[_Span]]:
     return out
 
 
-def _renumber_file(text: str, mapping: _Renumber, own: str, headings: list,
+def _renumber_file(text: str, plans: list[tuple[_Renumber, str, list]],
                    is_python: bool) -> tuple[str, list[tuple[int, str, str]]]:
-    markers = _marker_spans(text, headings) if is_python else {}
+    """Renumber a paired file for every (plan, own report name, changed headings) at once (§19.5): all spans
+    are found in the original text, so the result does not depend on the order of the plans' reports."""
+    markers = [_marker_spans(text, headings) if is_python else {} for _, _, headings in plans]
     out, edits = [], []
     for lineno, line in enumerate(_lines_keepends(text), 1):
         body, ending = _split_ending(line)
-        spans = _reference_spans(body, mapping, own) + markers.get(lineno, [])
+        spans = []
+        for (mapping, own, _), marks in zip(plans, markers):
+            spans += _reference_spans(body, mapping, own) + marks.get(lineno, [])
         new_body, line_edits = _apply_spans(body, spans)
         out.append(new_body + ending)
         edits += [(lineno, old, new) for old, new in line_edits]
@@ -2064,6 +2113,8 @@ class _Segment:
     editable: bool
     original: str = ""
     prefix: str = "w"
+    run: int = -1                                   # index into DocxText.runs (-1: not inside a run)
+    end: int = 0                                    # end of the whole element
 
 
 def _run_content(prefix: str, text: str) -> str:
@@ -2141,6 +2192,9 @@ class DocxText:
             rf"(?P<fe><{m_}:Fallback(?=[\s/])[^>]*/>)"
             rf"|(?P<fo><{m_}:Fallback(?=[\s>])[^>]*>)"
             rf"|(?P<fc></{m_}:Fallback\s*>)"
+            rf"|(?P<de><{w}:del(?=[\s/])[^>]*/>)"
+            rf"|(?P<do><{w}:del(?=[\s>])[^>]*>)"
+            rf"|(?P<dc></{w}:del\s*>)"
             rf"|(?P<pe><(?P<pp>{w}):p(?=[\s/])[^>]*/>)"
             rf"|(?P<po><{w}:p(?=[\s>])[^>]*>)"
             rf"|(?P<pc></{w}:p\s*>)"
@@ -2155,8 +2209,18 @@ class DocxText:
             rf"|(?P<br><(?P<bp>{w}):(?:br|cr)(?=[\s/])[^>]*/>)", re.S)
         paragraphs: list[list[_Segment]] = []
         stack: list[int] = []
-        fallback = ppr = runs = 0
+        fallback = ppr = runs = deleted = 0
+        self.runs: list[list[int]] = []             # [start, end] of each w:r element
+        open_runs: list[int] = []
         for m in token.finditer(self.xml):
+            if m.group("do"):                       # §19.6: tracked deletions are not text
+                deleted += 1
+                continue
+            if m.group("dc"):
+                deleted = max(0, deleted - 1)
+                continue
+            if deleted or m.group("de"):
+                continue
             if m.group("ppo"):                      # §17.1: tab-stop definitions in w:pPr are never text
                 ppr += 1
             elif m.group("ppc"):
@@ -2165,8 +2229,12 @@ class DocxText:
                 continue
             elif m.group("ro"):
                 runs += 1
+                open_runs.append(len(self.runs))
+                self.runs.append([m.start(), -1])
             elif m.group("rc"):
                 runs = max(0, runs - 1)
+                if open_runs:
+                    self.runs[open_runs.pop()][1] = m.end()
             elif m.group("fo"):
                 fallback += 1
             elif m.group("fc"):
@@ -2185,7 +2253,8 @@ class DocxText:
                 if m.group("t"):
                     text = _xml_unescape(m.group("tc"))
                     paragraphs[stack[-1]].append(_Segment(m.start(), m.start("tc"), m.end("tc"), text, True, text,
-                                                          m.group("tp")))
+                                                          m.group("tp"), open_runs[-1] if open_runs else -1,
+                                                          m.end()))
                 elif runs:                          # §17.1: only run-level tabs and breaks are text
                     if m.group("tab"):
                         ch = "\t"
@@ -2194,7 +2263,8 @@ class DocxText:
                     else:
                         ch = "\n"
                     prefix = m.group("xp") or m.group("bp") or "w"
-                    paragraphs[stack[-1]].append(_Segment(m.start(), m.start(), m.end(), ch, False, ch, prefix))
+                    paragraphs[stack[-1]].append(_Segment(m.start(), m.start(), m.end(), ch, False, ch, prefix,
+                                                          open_runs[-1] if open_runs else -1, m.end()))
         return paragraphs
 
     def texts(self, breaks: bool = False) -> list[str]:
@@ -2204,11 +2274,40 @@ class DocxText:
     def editable(self) -> list[list[_Segment]]:
         return [[s for s in p if s.editable] for p in self.paragraphs]
 
+    def _emptied_runs(self) -> list[list[int]]:
+        """§19.6: runs whose text was all removed by an edit and that hold nothing else but run properties."""
+        by_run: dict[int, list[_Segment]] = {}
+        for p in self.paragraphs:
+            for s in p:
+                if s.run >= 0:
+                    by_run.setdefault(s.run, []).append(s)
+        out = []
+        for k, segs in by_run.items():
+            start, end = self.runs[k]
+            if end < 0 or any(s.text for s in segs) or all(s.text == s.original for s in segs):
+                continue
+            inner, last = [], self.xml.index(">", start) + 1
+            for s in sorted(segs, key=lambda s: s.tag_start):
+                inner.append(self.xml[last:s.tag_start])
+                last = s.end
+            inner.append(self.xml[last:self.xml.rindex("<", start, end)])
+            rest = RUN_PROPERTIES.sub("", "".join(inner))
+            if not rest.strip():
+                out.append([start, end])
+        return out
+
     def xml_bytes(self) -> bytes:
-        changed = sorted((s for p in self.paragraphs for s in p if s.text != s.original),
+        removed = self._emptied_runs()
+        changed = sorted([s for p in self.paragraphs for s in p if s.text != s.original and
+                          not any(a <= s.tag_start < b for a, b in removed)] +
+                         [_Segment(a, a, b, "", False, REMOVED_RUN, "w") for a, b in removed],
                          key=lambda s: s.tag_start)
         out, last = [], 0
         for s in changed:
+            if s.original == REMOVED_RUN:           # a whole run removed
+                out.append(self.xml[last:s.tag_start])
+                last = s.content_end
+                continue
             if s.editable:
                 tag = self.xml[s.tag_start:s.content_start]
                 special = re.search(r"[\t\f\r\n]", s.text) is not None
@@ -2253,6 +2352,11 @@ class DocxText:
         replace_file(self.path, self.package_bytes())
 
 
+REMOVED_RUN = "<removed run>"                       # _Segment.original marking a removed w:r element
+RUN_PROPERTIES = re.compile(r"<(?:[\w.-]+:)?rPr(?=[\s/>])[^>]*/>|<((?:[\w.-]+:)?rPr)(?=[\s>])[^>]*>.*?</\1\s*>"
+                            r"|<(?:[\w.-]+:)?lastRenderedPageBreak\b[^>]*/>", re.S)
+
+
 def _copy_raw_entry(src, out: zipfile.ZipFile, info: zipfile.ZipInfo) -> None:
     """Copy 1 zip entry (local header, compressed data, data descriptor) byte for byte."""
     src.seek(info.header_offset)
@@ -2284,28 +2388,39 @@ def _copy_raw_entry(src, out: zipfile.ZipFile, info: zipfile.ZipInfo) -> None:
 def _replace_in_runs(segments: list[_Segment], find: str, replace: str) -> None:
     """Replace every occurrence of find in 1 paragraph (tabs and breaks count as \\t and \\n).
 
-    Only the part that differs between find and replace is rewritten. It goes into the first text run it
-    touches; the rest of it is removed from the pieces after that run.
+    §19.6: when the part that differs between find and replace lies inside 1 run, only that part is rewritten.
+    Otherwise (§15.5) the whole replacement goes into the first run the occurrence touches, and the rest of
+    the occurrence is removed from the pieces after it.
     """
     prefix = len(os.path.commonprefix([find, replace]))
     suffix = len(os.path.commonprefix([find[prefix:][::-1], replace[prefix:][::-1]]))
-    insert = replace[prefix:len(replace) - suffix]
     pos = 0
     while True:
         text = "".join(s.text for s in segments)
         start = text.find(find, pos)
         if start < 0:
             return
-        rs, re_ = start + prefix, start + len(find) - suffix
         spans, offset = [], 0
         for s in segments:
             spans.append((offset, offset + len(s.text)))
             offset += len(s.text)
-        touched = [k for k, (a, b) in enumerate(spans) if a < re_ and b > rs]
-        if not touched:                               # a pure insertion
-            touched = [k for k, (a, b) in enumerate(spans) if a <= rs <= b and segments[k].editable][:1] \
-                or [k for k, (a, b) in enumerate(spans) if a <= rs <= b][:1]
-        host = next((k for k in touched if segments[k].editable), touched[0] if touched else None)
+
+        def touching(lo: int, hi: int) -> list[int]:
+            hit = [k for k, (a, b) in enumerate(spans) if a < hi and b > lo]
+            if not hit:                               # a pure insertion
+                hit = [k for k, (a, b) in enumerate(spans) if a <= lo <= b and segments[k].editable][:1] \
+                    or [k for k, (a, b) in enumerate(spans) if a <= lo <= b][:1]
+            return hit
+
+        rs, re_ = start + prefix, start + len(find) - suffix
+        insert = replace[prefix:len(replace) - suffix]
+        touched = touching(rs, re_)
+        if len({segments[k].run for k in touched}) != 1 or segments[touched[0]].run < 0:
+            rs, re_, insert = start, start + len(find), replace
+            touched = touching(rs, re_)
+            host = touched[0] if touched else None
+        else:
+            host = next((k for k in touched if segments[k].editable), touched[0])
         if host is None:
             return
         for k in touched:
@@ -2602,9 +2717,30 @@ class HintIndex:
             return None
         return f"the hint in {shown} is not a whole paragraph"
 
+    def path_of(self, shown: str) -> pathlib.Path:
+        return dict(self.files)[shown]
+
+    def literal(self, shown: str, text: str) -> tuple[str, bool, str]:
+        """(quote character, triple-quoted, lower-case prefix) of the string literal that is exactly `text`
+        (call only after whole_paragraph accepted it for a .py or .json file)."""
+        body = self._text(shown, self.path_of(shown))
+        start = body.find(text)
+        end = start + len(text)
+        quote = body[start - 1]
+        triple = start >= 3 and body[start - 3:start] == quote * 3 and body[end:end + 3] == quote * 3
+        head = start - (3 if triple else 1)
+        k = head
+        while k > 0 and body[k - 1] in "rRbBfFuUtT":
+            k -= 1
+        prefix = body[k:head].lower()
+        if k > 0 and (body[k - 1].isalnum() or body[k - 1] == "_"):
+            prefix = ""                             # the end of a name, not a prefix
+        return quote, triple, prefix
+
 
 HINT_PREFIX = re.compile(r"^\s*(?:TIME\b|SAY:|IF ASKED:)\s*")
 HINT_LINE_CHARS = 40
+HINT_MIN_CHARS = 8
 
 
 def hint_needles(old: str, new: str | None = None) -> list[str]:
@@ -2626,6 +2762,8 @@ def hint_needles(old: str, new: str | None = None) -> list[str]:
         out.append(longest)
     seen, unique = set(), []
     for needle in out:
+        if len(needle.strip()) < HINT_MIN_CHARS or not re.search(r"[^\W\d_]", needle):
+            continue                                # §19.1: short, time-only or number-only needles
         if needle not in seen:
             seen.add(needle)
             unique.append(needle)
@@ -2762,16 +2900,20 @@ def text_xref(report: str | None = None, files: list[str] | None = None, renumbe
             edits += [{"path": rep.shown, "line": n, "old": old, "new": new} for n, old, new in line_edits]
             if new_text != rep.text:
                 writes.append((rep.given, new_text, rep.bom))
-        done = set()
+        paired: dict[str, list] = {}                # §19.5: a file gets the plans of every report it is paired with
         for shown, p, text, bom, rkey in checked:
             fkey = path_key(p)
-            if fkey in reports or fkey in done:
+            if fkey in reports:
                 continue
-            done.add(fkey)
-            if not plans[rkey]:
+            entry = paired.setdefault(fkey, [shown, p, text, bom, []])
+            if rkey not in entry[4]:
+                entry[4].append(rkey)
+        for shown, p, text, bom, rkeys in paired.values():
+            active = sorted(k for k in rkeys if plans[k])     # by report key: independent of argument order
+            if not active:
                 continue
-            new_text, line_edits = _renumber_file(text, plans[rkey], reports[rkey].own, headings.get(rkey, []),
-                                                  p.suffix.lower() == ".py")
+            new_text, line_edits = _renumber_file(
+                text, [(plans[k], reports[k].own, headings.get(k, [])) for k in active], p.suffix.lower() == ".py")
             edits += [{"path": shown, "line": n, "old": old, "new": new} for n, old, new in line_edits]
             if new_text != text:
                 writes.append((str(p), new_text, bom))
@@ -2871,7 +3013,7 @@ def text_apply_edits(edits: list, path: str | None = None, write: bool = False,
     if not isinstance(force_office, bool):
         raise ToolError("force_office: must be true or false")
     per_file = bool(edits) and all(isinstance(e, dict) and "edits" in e for e in edits)
-    if not edits and path is None:                  # §17.1/§17.8: an empty list needs no path
+    if not edits:                                   # §17.1, §19.1: an empty list is ok, whatever path names
         return {"ok": True, "applied": 0, "failures": [], "diff": ""}
     if not per_file:
         if path is None:
@@ -2890,9 +3032,10 @@ def text_apply_edits(edits: list, path: str | None = None, write: bool = False,
 
     if write and not force_office and any(pathlib.Path(t).suffix.lower() in OFFICE_SUFFIXES
                                           for t, _, _ in groups):
-        from tundlekit.render import office_running
+        from tundlekit import render
 
-        running = office_running()
+        xlsx = any(pathlib.Path(t).suffix.lower() == ".xlsx" for t, _, _ in groups)
+        running = render.office_running(all_apps=True) if xlsx else render.office_running()   # §18.4
         if running:
             raise ToolError(f"refusing to write Office files while Office is running ({', '.join(running)}); "
                             "close it, or pass force_office (--force-office)")
@@ -2949,10 +3092,11 @@ def text_apply_edits(edits: list, path: str | None = None, write: bool = False,
        },
        "required": ["old", "new"],
        "additionalProperties": False},
-      readOnlyHint=True)
+      readOnlyHint=False, destructiveHint=False)
 def docx_diff(old: str, new: str, search: list[str] | None = None, emit_edits: str | None = None) -> dict:
     if emit_edits is not None and (not isinstance(emit_edits, str) or not emit_edits):
         raise ToolError("emit_edits: must be a file path")
+    out = _emit_target_path(emit_edits) if emit_edits is not None else None
     a, b = compared_paragraphs(old, new)
     index = HintIndex(_str_list(search, "search"))
     matcher = difflib.SequenceMatcher(None, [normalise_paragraph(p) for p in a],
@@ -2983,18 +3127,17 @@ def docx_diff(old: str, new: str, search: list[str] | None = None, emit_edits: s
                 not_emitted.append({"old_index": i1 + k, "reason": reason})
                 continue
             shown = hits[0].rsplit(":", 1)[0]
-            target = os.path.abspath(str(dict(index.files)[shown]))
-            entry = emitted.setdefault(path_key(target), {"path": target, "edits": []})
-            entry["edits"].append({"find": find, "replace": replace, "count": 1})
+            target = os.path.abspath(str(index.path_of(shown)))
+            state = emitted.setdefault(path_key(target), (target, _EmitTarget(index, shown)))[1]
+            reason = state.add(index, shown, find, replace)
+            if reason:
+                not_emitted.append({"old_index": i1 + k, "reason": reason})
+                continue
             count += 1
     result = {"changes": changes}
     if emit_edits is not None:
-        payload = json.dumps(list(emitted.values()), indent=2, ensure_ascii=False) + "\n"
-        out = pathlib.Path(native_path(emit_edits))
-        if out.is_dir():
-            raise ToolError(f"emit_edits: {emit_edits} is a directory")
-        if not out.parent.is_dir():
-            raise ToolError(f"emit_edits: no such directory: {out.parent}")
+        payload = json.dumps([{"path": t, "edits": st.edits} for t, st in emitted.values() if st.edits],
+                             indent=2, ensure_ascii=False) + "\n"
         replace_file(str(out), payload.encode("utf-8"))
         result["edits_written"] = count
         result["not_emitted"] = not_emitted
@@ -3002,6 +3145,93 @@ def docx_diff(old: str, new: str, search: list[str] | None = None, emit_edits: s
 
 
 EMIT_MIN_CHARS = 12
+UNSAFE_LITERAL = "unsafe literal"
+
+
+def _py_escape(text: str, quote: str, triple: bool) -> str:
+    """§19.1: text as the body of a Python string literal quoted with `quote` (tripled when `triple`)."""
+    out = text.replace("\\", "\\\\")
+    if triple:
+        out = re.sub(re.escape(quote) + "{3,}", lambda m: ("\\" + quote) * len(m.group(0)), out)
+        if out.endswith(quote) and not out.endswith("\\" + quote):
+            out = out[:-1] + "\\" + quote           # it would run into the closing quotes
+        return out
+    return out.replace(quote, "\\" + quote).replace("\r", "\\r").replace("\n", "\\n")
+
+
+def _json_escape(text: str, ascii_only: bool) -> str:
+    return json.dumps(text, ensure_ascii=ascii_only)[1:-1]
+
+
+def _parses(suffix: str, text: str) -> bool:
+    try:
+        if suffix == ".py":
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                ast.parse(text)
+        else:
+            json.loads(text)
+    except (SyntaxError, ValueError, RecursionError, MemoryError):
+        return False
+    return True
+
+
+class _EmitTarget:
+    """A hinted file receiving emitted edits; the edits are simulated so the file must still parse (§19.1)."""
+
+    def __init__(self, index: HintIndex, shown: str):
+        self.path = index.path_of(shown)
+        self.suffix = self.path.suffix.lower()
+        self.text = index._text(shown, self.path)
+        self.ascii_only = all(ord(ch) < 128 for ch in self.text)   # JSON: keep the file's own style
+        self.edits: list[dict] = []
+
+    def add(self, index: HintIndex, shown: str, find: str, replace: str) -> str | None:
+        """Add 1 edit (replace escaped for its literal), or return the not_emitted reason."""
+        escaped = replace
+        if self.suffix == ".py":
+            quote, triple, prefix = index.literal(shown, find)
+            raw = "r" in prefix
+            if not raw and _py_escape(find, quote, triple) != find:
+                return UNSAFE_LITERAL                # the literal's value is not the paragraph text
+            if raw or "b" in prefix or "f" in prefix or "t" in prefix:
+                if _py_escape(replace, quote, triple) != replace or "{" in replace or "}" in replace:
+                    return UNSAFE_LITERAL
+            else:
+                escaped = _py_escape(replace, quote, triple)
+        elif self.suffix == ".json":
+            if _json_escape(find, self.ascii_only) != find:
+                return UNSAFE_LITERAL
+            escaped = _json_escape(replace, self.ascii_only)
+        if len(_occurrence_offsets(self.text, find)) != 1:
+            return f"the paragraph no longer occurs exactly once in {shown}"
+        new_text = self.text.replace(find, escaped)
+        if self.suffix in (".py", ".json") and not _parses(self.suffix, new_text):
+            return UNSAFE_LITERAL
+        self.text = new_text
+        self.edits.append({"find": find, "replace": escaped, "count": 1})
+        return None
+
+
+def _emit_target_path(emit_edits: str) -> pathlib.Path:
+    """§19.1, §19.3: a usable output path that is new, or a previous emitted-edits file (a JSON list)."""
+    from tundlekit.render import check_path_string
+
+    check_path_string(emit_edits, "emit_edits")
+    out = pathlib.Path(native_path(emit_edits))
+    if out.is_dir():
+        raise ToolError(f"emit_edits: {emit_edits} is a directory")
+    if not out.parent.is_dir():
+        raise ToolError(f"emit_edits: no such directory: {out.parent}")
+    if out.exists() or out.is_symlink():
+        try:
+            previous = json.loads(out.read_bytes().decode("utf-8-sig"))
+        except (OSError, ValueError, RecursionError):
+            previous = None
+        if not isinstance(previous, list):
+            raise ToolError(f"emit_edits: {emit_edits} exists and is not an edits file (a JSON list); "
+                            "refusing to overwrite it")
+    return out
 
 
 def _emit_problem(index: HintIndex, find: str, hits: list[str]) -> str | None:

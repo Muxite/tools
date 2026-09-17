@@ -19,6 +19,15 @@ Install once (Python 3.10+), from the repository root:
 pip install -e .[all]
 ```
 
+For development and tests, install the dev extra instead (it includes `all` plus pytest):
+
+```
+pip install -e .[dev]
+```
+
+Only after the package is installed do `tundlekit`, `tundlekit-mcp` and `python -m tundlekit` work from any
+directory (a report folder, a tundle). Without the install, they only work from the repository root.
+
 ## 2. Using the tools
 
 There are 3 equivalent ways to run a tool. All return the same JSON result.
@@ -48,8 +57,8 @@ tundlekit diagram render examples/diagram.json -o build/diagram.svg --json
 
 **MCP** (agents that speak the Model Context Protocol): run `tundlekit-mcp` as a stdio server. Tools have the same
 names and arguments as `tundlekit call` (`bundle_status`, `deck_build`, `diagram_render`, `chart_bar`,
-`palette_get`, `text_lint`, `render_office`, `office_check`, `review_coverage`, `claims_trace`, `papers_fetch`,
-`translate_check`, …). Results come back as JSON text
+`palette_get`, `text_lint`, `render_office`, `office_check`, `review_coverage`, `claims_trace`, `report_build`,
+`deck_pack`, `papers_page`, `papers_fetch`, `translate_check`, …). Results come back as JSON text
 plus `structuredContent`; failures come back with `isError: true` and a message.
 
 **Python**: `import tundlekit.registry as reg; reg.load_all(); reg.call("palette_get", {})`.
@@ -58,7 +67,18 @@ Paths in arguments are relative to the working directory of the process (for the
 started in). `bundle_prune` with `yes` rewrites git history and is marked destructive: run the dry run first and
 follow the tundle-bundle skill.
 
-Before any tool builds or renders an Office file (`deck build`, `render office`, a report build script), run
+Round 6 added 3 build tools:
+
+| CLI | MCP tool | Does | Writes |
+|---|---|---|---|
+| `tundlekit report build REPORT.md -o OUT.docx [--excerpts DIR] [--author NAME] [--overwrite] [--force-office]` | `report_build` | the house-style .docx from a Markdown report, standard library only; lists every Markdown problem at once; refuses while Word or PowerPoint runs, and refuses to replace a .docx that differs from the report (hand edits) unless `--overwrite` | the .docx |
+| `tundlekit deck pack DECK.pptx [-o PACK.md] [--force]` / `tundlekit deck pack DECK.pptx --check PACK.md` | `deck_pack` | a presenter pack skeleton from a built deck, or a check of an existing pack against it (K001-K006); needs the `office` extra | with `-o` (existing file only with `--force`) |
+| `tundlekit papers page REPORT.md -o paper-summaries.html [--dir PAPERS] [--index INDEX.md] [--title TEXT]` | `papers_page` | a self-contained HTML page with 1 card per cited paper, from the summary files | the .html (a build artifact, overwritten) |
+
+After `report build`, `tundlekit text docx-diff REPORT.md OUT.docx` must give `changes: []` (only `insert`
+changes when the report uses excerpts). Back up the previous .docx first with `tundlekit bundle backup`.
+
+Before any tool builds or renders an Office file (`deck build`, `report build`, `render office`, a build script), run
 `tundlekit office check` (MCP `office_check`, read-only). It exits 1 while Word, PowerPoint or Excel is running;
 ask the owner to close them, then `tundlekit office check --wait 120` waits for them. Never close them yourself.
 Before every write to an existing deliverable, snapshot it with

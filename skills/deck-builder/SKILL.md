@@ -19,6 +19,7 @@ Building needs the `office` extra (`pip install -e ".[office]"` in the tundlekit
 | what changed between 2 decks, with where the old text lives in the sources | `tundlekit deck diff OLD.pptx NEW.pptx [--search PATH...]` | `deck_diff` |
 | does the deck cover the report, section by section, rule by rule | `tundlekit review coverage REPORT.md DECK.pptx [--cuts cuts.txt]` | `review_coverage` |
 | stage colours for `stage` | `tundlekit palette show` | `palette_get` |
+| draft a presenter pack from a built deck, or check a pack is still current | `tundlekit deck pack DECK.pptx [-o PACK.md] [--force]` or `tundlekit deck pack DECK.pptx --check PACK.md` | `deck_pack` |
 
 Add `--json` for a machine-readable result. Through MCP, pass `spec_path` (a file) or `spec` (an inline object).
 
@@ -34,6 +35,7 @@ Add `--json` for a machine-readable result. Through MCP, pass `spec_path` (a fil
 5. `tundlekit deck lint OUT.pptx` on the built file and `tundlekit review coverage REPORT.md OUT.pptx` when there is
    a report; then run the deliverable-review skill (render every
    slide, contact sheets, adversarial pass).
+6. `tundlekit deck pack OUT.pptx --check PACK.md` when a presenter pack exists (or `-o PACK.md` to draft one).
 
 Close PowerPoint before building (an open file can be locked or clobbered): `tundlekit office check` exits 1
 while Word, PowerPoint or Excel is running, and `--wait 120` waits for them to close. Then back up the previous
@@ -175,6 +177,36 @@ is introduced. Rules appear right after the evidence that motivates them, then a
 **Cutting for time**, in this order: extra papers → state-of-the-art comparisons → challenge lists →
 background depth. Never cut a main point, a rule slide or the design overview. Prefer fewer slides: merge a
 table and a diagram into 1 diagram the presenter can talk over.
+
+## Deck scaffold
+
+When the report exists first, start the spec from its outline. This is a template to fill by hand (or with a
+short script of your own); tundlekit has no command for it.
+
+1. A title slide.
+2. A divider per argument block of the structure template ("The evidence", "The design").
+3. 1 content stub per level-2 or level-3 report section. Its `title` is the section's claim sentence (not the
+   heading's topic words), and its `source` is `Report §N` or `Report §N.M`.
+4. A `notes.time` on every stub, chosen so that the times sum to the budget target.
+
+1 stub:
+
+```json
+{"type": "content", "title": "Tools kept by self-tests fail most held-out tests", "source": "Report §2.3",
+ "body": {"kind": "bullets", "items": ["…"]},
+ "notes": {"time": "0:45", "say": "…"}}
+```
+
+Then fill each stub from its section, cut or merge stubs for time, and check:
+
+```
+tundlekit deck lint deck-src/deck.json
+tundlekit review coverage REPORT.md deck-src/deck.json
+```
+
+Coverage is exact here, because every footer cites `§N`. After building, draft the presenter pack with
+`tundlekit deck pack build/deck.pptx -o PACK.md`, and run `tundlekit deck pack build/deck.pptx --check PACK.md`
+after every cut or reorder (see "Presenter pack").
 
 ## Slide-writing rules
 
@@ -326,6 +358,38 @@ old self:
   a heavily retitled slide can also show up as a `removed` plus `added` pair, so compare the 2 before deleting.
 - A table gives at most 1 `text` change, with a row-by-row diff (cells joined with ` | `).
 
+## Presenter pack (`deck pack`)
+
+`tundlekit deck pack DECK.pptx` (`deck_pack`, needs the `office` extra) reads a built deck and prints a presenter
+pack skeleton: a title line, a deck line (slide count, core and insert counts, core time and time with inserts),
+a crib section with 1 line per slide (`- slide 9a (insert): Title`), an "If asked" section with each slide's
+IF ASKED bullets from the notes, and a timing table with the running core time. Slide keys follow
+`deck build` numbering (`3`, `3a`); a slide without TIME counts 0 and gives a warning.
+
+```
+tundlekit deck pack build/deck.pptx -o notes/PRESENTER-PACK.md
+tundlekit deck pack build/deck.pptx --check notes/PRESENTER-PACK.md
+```
+
+`-o` refuses to replace an existing pack unless `--force` is given; without `-o` nothing is written. Presenters
+may append a note to a generated crib line after ` · `.
+
+`--check` compares an existing pack (generated or hand-written) with the current deck. Run it after every cut,
+insert or reorder. It exits 1 on errors (and on warnings with `--strict`):
+
+| Rule | Severity | Finding |
+|---|---|---|
+| K001 | error | the slide count stated in the pack header is neither the deck's slide count nor its core count |
+| K002 | error | a crib line whose key names no slide, or repeats a key (or no crib section at all); the best-matching slide is named when there is one |
+| K003 | warning | a slide with no crib line (inserts and hidden slides are flagged as such) |
+| K004 | warning | generated pack: the crib text differs from the slide's current title (`now slide KEY` when it moved) |
+| K005 | warning | hand-written pack: a crib line shares few key words with its slide; the best match is named |
+| K006 | warning | a time stated in the header is neither the core time nor the time with inserts |
+
+A pack is "generated" when its crib heading is exactly `Crib`; any other heading containing "crib" makes it
+hand-written. A run of K005 findings whose best matches are all shifted by the same amount means the pack is
+that many slides ahead of or behind the deck after a cut: renumber the crib from that point.
+
 ## Lint rules (`tundlekit deck lint`)
 
 | Rule | Severity | Finding |
@@ -359,5 +423,7 @@ Lint and diff output is a starting list to confirm. The remaining false positive
   none on text that does not) is possible; the rendered slide decides.
 - `deck diff`: a heavily retitled slide shows as `removed` plus `added`; `hint` may point at a spec line holding the
   same text on another slide.
+- `deck pack --check`: K005 on crib lines that paraphrase a slide with few shared words (divider slides
+  especially).
 - `review coverage`: slides without a `§` footer are matched by title only, so a reworded title gives a false
   C001/C002 pair.

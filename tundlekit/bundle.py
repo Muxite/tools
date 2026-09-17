@@ -666,12 +666,16 @@ def _verify_source(top: Path, source: Path, findings: list[dict], checked: list[
             target = folder / per_file
     elif file_line is None:
         candidates = sorted(p for p in folder.iterdir()
-                            if p.is_file() and not p.is_symlink() and not _is_special(p.name))
+                            if p.is_file() and not p.is_symlink() and not _is_special(p.name)
+                            and not _is_junk_file(p.name))
         if len(candidates) == 1:
             target = candidates[0]
+        elif candidates:
+            findings.append(_finding("B013", "warning", rel, f"cannot tell which file the hash is for: {NO_FILE_LINE} "
+                                     f"and {len(candidates)} files are next to it, so it covers none of them (add a "
+                                     "`- File: <name>` line)"))
         else:
-            what = "no file" if not candidates else f"{len(candidates)} files"
-            findings.append(_finding("B013", "warning", rel, f"cannot tell which file the hash is for ({what} next "
+            findings.append(_finding("B013", "warning", rel, "cannot tell which file the hash is for (no file next "
                                      "to it; add a `- File: <name>` line)"))
     if expected is None or target is None:
         return
@@ -773,6 +777,7 @@ FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 
 
 SOURCE_SUFFIX = ".source.md"
+NO_FILE_LINE = "SOURCE.md has no - File: line"
 
 
 def _is_special(name: str) -> bool:
@@ -805,14 +810,26 @@ def _path_key(path: str | os.PathLike) -> str:
     return os.path.normcase(os.path.normpath(os.path.abspath(path)))
 
 
+def _others(filenames: list[str]) -> list[str]:
+    """The installer candidates among a folder's regular file names: not README/SOURCE files, not junk."""
+    return [n for n in filenames if not _is_special(n) and not _is_junk_file(n)]
+
+
+def _ambiguous_source(folder: str | os.PathLike, filenames: list[str]) -> bool:
+    """§19.4: folder has a SOURCE.md without a `- File:` line and 2 or more installers, so it covers none."""
+    shared = next((n for n in filenames if n.lower() == "source.md"), None)
+    return (shared is not None and len(_others(filenames)) >= 2
+            and _file_line_value(os.path.join(folder, shared)) is None)
+
+
 def _coverage(folder: str | os.PathLike, filenames: list[str]) -> set[str]:
     """Path keys of the files that the SOURCE files among `filenames` (the regular files of folder) cover (§17.3).
 
-    SOURCE.md covers its `- File:` target, or else the only other file in the folder; `<name>.SOURCE.md`
-    covers `<name>`.
+    SOURCE.md covers its `- File:` target, or else the only other file in the folder (junk files are never
+    "other files", §19.4); `<name>.SOURCE.md` covers `<name>`.
     """
     keys: set[str] = set()
-    others = [n for n in filenames if not _is_special(n)]
+    others = _others(filenames)
     for n in filenames:
         per_file = _per_file_target(n)
         if per_file is not None:
@@ -1337,8 +1354,9 @@ def _sha256_file(path: str | os.PathLike) -> str:
       "file name (or taken from the folder's README.md row), download URL, file date, SHA-256 and install steps. "
       "It goes to SOURCE.md when the folder holds no other installer, else to <name>.SOURCE.md. A written file "
       "passes bundle_verify. An existing one is only replaced with force=true. With a directory as `file`, does "
-      "this for every installer under setup/<dir>/ that no SOURCE file covers and returns {results: [...]} "
-      "(force is refused there).",
+      "this for every installer under setup/<dir>/ that no SOURCE file covers and returns {results: [...], "
+      "skipped: [{file, reason}]} (force is refused there; a folder whose SOURCE.md has no '- File:' line but "
+      "holds 2+ installers is skipped).",
       {"type": "object",
        "properties": {"file": {"type": "string",
                                "description": "the installer file, or a directory to cover every installer in it"},
@@ -1360,14 +1378,30 @@ def bundle_source(file: str, url: str | None = None, install: str | None = None,
         if force:
             raise ToolError("force is not allowed with a directory: replace existing SOURCE files one at a time "
                             "(bundle source FILE --write --force)")
-        return {"results": [_source_one(path, url, install, write, force=False)
-                            for path in _uncovered_installers(Path(os.path.abspath(file)))]}
+        results, skipped, ambiguous = [], [], {}
+        for path in _uncovered_installers(Path(os.path.abspath(file))):
+            folder = str(path.parent)
+            if folder not in ambiguous:
+                ambiguous[folder] = _ambiguous_source(folder, _regular_files(folder))
+            if ambiguous[folder]:
+                skipped.append({"file": str(path), "reason": f"{NO_FILE_LINE}; add one"})
+            else:
+                results.append(_source_one(path, url, install, write, force=False))
+        return {"results": results, "skipped": skipped}
     if not os.path.isfile(file):
         raise ToolError(f"not a file or directory: {file}")
     name = os.path.basename(os.path.abspath(file))
     if _is_special(name):
         raise ToolError(f"{name} describes an installer; pass the installer file itself")
     return _source_one(file, url, install, write, force, strict=True)
+
+
+def _regular_files(folder: str | os.PathLike) -> list[str]:
+    try:
+        with os.scandir(folder) as it:
+            return sorted(e.name for e in it if e.is_file(follow_symlinks=False))
+    except OSError:
+        return []
 
 
 def _source_name(folder: str, name: str) -> str:
@@ -1564,17 +1598,27 @@ def _versions_dir(file: Path) -> Path:
     return folder / "versions"
 
 
+def _backup_label(source: Path, versions: Path) -> str:
+    """§19.2: the file's folder relative to the versions/ parent, with separators as `-`; "" next to it."""
+    rel = Path(os.path.relpath(source.parent, versions.parent))
+    return "-".join(part for part in rel.parts if part != os.curdir)
+
+
 def _snapshot_pattern(stem: str, ext: str) -> re.Pattern:
     flags = re.I if os.name == "nt" else 0
     return re.compile(rf"{re.escape(stem)} \(before [^()]*\){re.escape(ext)}", flags)
 
 
-def _check_office(force_office: bool) -> None:
+def _check_office(force_office: bool, paths=()) -> None:
+    """§18.4: Excel and LibreOffice count too when any target is a .xlsx."""
     if force_office:
         return
     from tundlekit import render  # lazy: render is heavier and may be patched in tests
 
-    running = render.office_running()
+    if any(os.fspath(p).lower().endswith(".xlsx") for p in paths):
+        running = render.office_running(all_apps=True)
+    else:
+        running = render.office_running()
     if running:
         raise ToolError(f"Office is running ({', '.join(running)}): close it so the files are saved and not "
                         "locked, or pass force_office (nothing was copied)")
@@ -1597,11 +1641,13 @@ def _copy_to_temp(source: Path, target: str) -> str:
 
 @tool("bundle_backup",
       "Keep a dated snapshot before a big edit: copy each file to the nearest versions/ folder (walking up to the "
-      "tundle root; else <file dir>/versions, created) as '<stem> (before <reason> <YYYY-MM-DD>)<ext>'. The copy "
+      "tundle root; else <file dir>/versions, created) as '<stem> (before <reason> <YYYY-MM-DD>)<ext>', with the "
+      "file's folder relative to the versions/ parent (parts joined by '-') and a space in front when the file is "
+      "in a subfolder. The copy "
       "is atomic and keeps the modification time. Refuses, copying nothing, while Office is running (unless "
       "force_office), for an empty reason or one with ()/\\:*?\"<>|, for a missing file, or when a snapshot "
       "exists (unless overwrite). Lists older '(before ...)' snapshots of the same file as superseded; "
-      "prune=true deletes them.",
+      "prune=true deletes them (result lists pruned paths and not_pruned [{path, error}]).",
       {"type": "object",
        "properties": {"files": {"type": "array", "items": {"type": "string"}, "minItems": 1,
                                 "description": "the files to snapshot"},
@@ -1632,13 +1678,16 @@ def bundle_backup(files: list[str], reason: str | None = None, prune: bool = Fal
             what = "is not a file" if path.exists() else "does not exist"
             raise ToolError(f"{f} {what} (nothing was copied)")
         sources.append(path)
-    _check_office(force_office)
+    _check_office(force_office, sources)
 
     date = _now().strftime("%Y-%m-%d")
     plans, seen = [], {}
     for source in sources:
         versions = _versions_dir(source)
         stem, ext = os.path.splitext(source.name)
+        label = _backup_label(source, versions)
+        if label:
+            stem = f"{label} {stem}"
         target = versions / f"{stem} (before {reason} {date}){ext}"
         key = _path_key(target)
         if key in seen:
@@ -1719,17 +1768,20 @@ def bundle_backup(files: list[str], reason: str | None = None, prune: bool = Fal
     result = {"backups": [{"source": str(source), "path": str(target), "bytes": os.stat(target).st_size}
                           for source, _, target, _ in plans],
               "superseded": [str(p) for _, _, _, superseded in plans for p in superseded]}
+    result["pruned"], result["not_pruned"] = [], []
     if prune:
-        failed = []
         for path in result["superseded"]:
             try:
                 os.unlink(path)
             except FileNotFoundError:
-                pass
+                continue  # already gone: nothing was deleted by this call
             except OSError as e:
-                failed.append({"path": path, "error": str(e.strerror or e)})
-        if failed:
-            result["not_pruned"] = failed
+                result["not_pruned"].append({"path": path, "error": str(e.strerror or e)})
+                continue
+            if os.path.lexists(path):
+                result["not_pruned"].append({"path": path, "error": "still exists after deleting"})
+            else:
+                result["pruned"].append(path)
     return result
 
 
@@ -1884,9 +1936,10 @@ def _cli_source(args):
             state = ("skipped (SOURCE.md exists)" if one.get("skipped")
                      else "wrote" if one["written"] else "would write")
             lines.append(f"{state} {one['path']}: {_heading(one['program'], one['version'])}")
+        lines += [f"skipped {s['file']}: {s['reason']}" for s in r.get("skipped", [])]
         if not lines:
             lines.append("every installer already has a SOURCE.md")
-        elif not args.write:
+        elif not args.write and r["results"]:
             lines.append("(dry run: add --write to create the SOURCE.md files)")
         return CliResult(r, "\n".join(lines))
     text = r["text"].rstrip("\n")
@@ -1911,12 +1964,15 @@ def _cli_backup(args):
     r = bundle_backup(files=args.files, reason=args.reason, prune=args.prune, overwrite=args.overwrite,
                       force_office=args.force_office)
     lines = [f"saved {b['path']} ({human_size(b['bytes'])})" for b in r["backups"]]
-    if r["superseded"]:
-        verb = "pruned" if args.prune else "superseded (--prune deletes them)"
-        lines.append(f"{verb}:")
+    if args.prune:
+        if r["pruned"]:
+            lines.append("pruned:")
+            lines += [f"  {p}" for p in r["pruned"]]
+    elif r["superseded"]:
+        lines.append("superseded (--prune deletes them):")
         lines += [f"  {p}" for p in r["superseded"]]
-    lines += [f"could not delete {f['path']}: {f['error']}" for f in r.get("not_pruned", [])]
-    return CliResult(r, "\n".join(lines))
+    lines += [f"could not delete {f['path']}: {f['error']}" for f in r["not_pruned"]]
+    return CliResult(r, "\n".join(lines), exit_code=1 if r["not_pruned"] else 0)
 
 
 def _cli_verify(args):

@@ -1116,6 +1116,9 @@ def deck_build(out: str, spec: dict | None = None, spec_path: str | None = None,
         raise ToolError(f"inserts must be one of shown, hidden, off, not {_short(mode)}")
     if times_file is not None and not plan.meta["id"]:
         raise ToolError("meta.id is required when times_file is given")
+    from tundlekit.render import check_path_string
+
+    check_path_string(out, "out")
     try:
         out_path = pathlib.Path(out).resolve()
         parent_ok = out_path.parent.is_dir()
@@ -1943,6 +1946,346 @@ def _table_changes(old_tables: list, new_tables: list):
             yield o, n
 
 
+# ------------------------------------------------------------------ presenter packs (§18.2)
+PACK_STOP_PREFIXES = ("TIME", "SAY:", "INSERT:", "MUST HIT:")
+PACK_COUNT_RE = re.compile(r"\b(\d+) slides?\b")
+PACK_TIME_RE = re.compile(r"(?<![\d:])\d{1,3}:\d{2}(?![\d:])")
+CRIB_LINE_RE = re.compile(r"^\s*[-*]\s+(?:(?i:slide)\s+)?(\d+[a-z]?)\s*(?:\([^)]*\))?\s*:\s*(.*)$")
+CRIB_WORD_RE = re.compile(r"[a-z0-9]+(?:[.%-][a-z0-9]+)*%?")
+CRIB_STOP = frozenset("that this with from what when only each then than they their there into once never every "
+                      "same which while".split())
+
+
+def _collapse(text: str) -> str:
+    return " ".join((text or "").split())
+
+
+def _asked_bullets(notes: str) -> list[str]:
+    """IF ASKED bullets (§18.2.1): after an `IF ASKED:` line, up to a TIME / SAY: / INSERT: / MUST HIT: line."""
+    bullets, inside = [], False
+    for raw in notes.split("\n"):
+        if raw.startswith("IF ASKED:"):
+            inside = True
+            first = raw[len("IF ASKED:"):].strip()
+            if first:
+                bullets.append(first)
+            continue
+        if not inside:
+            continue
+        if raw.startswith(PACK_STOP_PREFIXES):
+            inside = False
+            continue
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("- "):
+            bullets.append(line[2:].strip())
+        elif bullets:
+            bullets[-1] = (bullets[-1] + " " + line).strip()
+        else:
+            bullets.append(line)
+    return [b for b in bullets if b]
+
+
+def _pack_slides(infos: list[dict]) -> list[dict]:
+    """Slide keys (§18.2): deck_build's numbering read back."""
+    counter, letter, out = 0, 0, []
+    for info in infos:
+        number = info["number"]
+        if not info["insert"]:
+            if number is not None:
+                key = number
+                counter = int(re.match(r"\d+", number).group(0))
+            else:
+                counter += 1
+                key = str(counter)
+            letter = 0
+        elif number is not None:
+            key = number
+        else:
+            letter += 1
+            n, suffix = letter, ""
+            while n:
+                n, r = divmod(n - 1, 26)
+                suffix = chr(ord("a") + r) + suffix
+            key = f"{counter}{suffix}"
+        out.append({"key": key, "position": info["index"], "title": _collapse(info["title"]),
+                    "insert": info["insert"], "hidden": info["hidden"], "seconds": info["seconds"],
+                    "asked": _asked_bullets(info["notes"])})
+    return out
+
+
+def _pack_times(slides: list[dict]) -> tuple[int, int]:
+    core = sum(s["seconds"] or 0 for s in slides if not s["insert"])
+    ins = sum(s["seconds"] or 0 for s in slides if s["insert"])
+    return core, ins
+
+
+def _pack_text(deck_name: str, stem: str, slides: list[dict]) -> str:
+    core, ins = _pack_times(slides)
+    n_core = sum(1 for s in slides if not s["insert"])
+    head = (slides[0]["title"] if slides else "") or stem
+    out = [f"# Presenter pack: {head}", "",
+           f"Deck: `{deck_name}` · {len(slides)} slides ({n_core} core, {len(slides) - n_core} inserts) · "
+           f"core {mmss(core)} · with inserts {mmss(core + ins)}", "", "## Crib", ""]
+    for s in slides:
+        flags = ", ".join(f for f, on in (("insert", s["insert"]), ("hidden", s["hidden"])) if on)
+        out.append(f"- slide {s['key']}{f' ({flags})' if flags else ''}: {s['title']}")
+    out += ["", "## If asked", ""]
+    asked = [s for s in slides if s["asked"]]
+    if not asked:
+        out += ["(none)", ""]
+    for s in asked:
+        out += [f"### slide {s['key']}: {s['title']}", ""]
+        out += [f"- {b}" for b in s["asked"]]
+        out.append("")
+    out += ["## Timing", "", "| Slide | Title | Time | Core cumulative |", "|---|---|---|---|"]
+    running = 0
+    for s in slides:
+        time = mmss(s["seconds"]) if s["seconds"] is not None else "-"
+        if s["insert"]:
+            cum = ""
+        else:
+            running += s["seconds"] or 0
+            cum = mmss(running)
+        out.append(f"| {s['key']} | {s['title'].replace('|', chr(92) + '|')} | {time} | {cum} |")
+    out += [f"|  | **Core total** | {mmss(core)} |  |", f"|  | **Inserts** | {mmss(ins)} |  |"]
+    return "\n".join(out) + "\n"
+
+
+def _write_text_atomic(path: pathlib.Path, text: str, shown: str) -> None:
+    import os
+    import tempfile
+
+    fd, tmp = None, None
+    try:
+        fd, tmp = tempfile.mkstemp(prefix="." + path.name + ".", suffix=".tmp", dir=str(path.parent))
+        with os.fdopen(fd, "wb") as f:
+            fd = None
+            f.write(text.encode("utf-8"))
+        os.replace(tmp, path)
+        tmp = None
+    except (OSError, ValueError) as e:
+        raise ToolError(f"cannot write {shown}: {e}") from None
+    finally:
+        if fd is not None:
+            os.close(fd)
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+
+def _crib_tokens(text: str) -> list[str]:
+    return CRIB_WORD_RE.findall((text or "").lower())
+
+
+def _key_words(text: str) -> set[str]:
+    return {t for t in _crib_tokens(text)
+            if any(c.isdigit() for c in t) or (len(t) >= 4 and t not in CRIB_STOP)}
+
+
+def _slide_words(info: dict) -> set[str]:
+    words = set(_crib_tokens(info["title"]))
+    for t in info["texts"]:
+        words.update(_crib_tokens(t))
+    words.update(_crib_tokens(info["notes"]))
+    return words
+
+
+def _best_match(keys: set[str], words: list[set[str]], slides: list[dict], own: int | None):
+    """(key, found) of the best-scoring other slide when it scores >= 2/3, else None."""
+    if len(keys) < 2:
+        return None
+    best, best_f = None, -1
+    for i, w in enumerate(words):
+        if i == own:
+            continue
+        f = len(keys & w)
+        if f > best_f:
+            best, best_f = i, f
+    if best is None or 3 * best_f < 2 * len(keys):
+        return None
+    return slides[best]["key"], best_f
+
+
+def _best_note(best, k: int) -> str:
+    if best is None:
+        return "no other slide matches it"
+    return f"best match: slide {best[0]} ({best[1]}/{k} key words)"
+
+
+def _read_pack(check: str) -> str:
+    p = pathlib.Path(check)
+    if not _is_file(p):
+        raise ToolError(f"pack not found: {check}")
+    try:
+        text = p.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError as e:
+        raise ToolError(f"pack {check} is not UTF-8: {e}") from None
+    except (OSError, ValueError) as e:
+        raise ToolError(f"cannot read pack {check}: {e}") from None
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _pack_check(pptx_path: str, check: str, infos: list[dict], slides: list[dict]) -> dict:
+    lines = _read_pack(check).split("\n")
+    shown = _display(check)
+    findings = []
+
+    def add(rule, severity, line, message, excerpt=""):
+        findings.append({"rule": rule, "severity": severity, "path": shown, "line": line,
+                         "message": message, "excerpt": excerpt})
+
+    core, ins = _pack_times(slides)
+    n_core = sum(1 for s in slides if not s["insert"])
+    deck = {"slides": len(slides), "core": n_core, "inserts": len(slides) - n_core,
+            "core_time": mmss(core), "total_time": mmss(core + ins)}
+
+    # header: after the first `# ` line, before the first `## ` heading
+    h2 = [i for i, ln in enumerate(lines) if ln.startswith("## ")]
+    first_h1 = next((i for i, ln in enumerate(lines) if ln.startswith("# ")), None)
+    start = first_h1 + 1 if first_h1 is not None else 0
+    end = next((i for i in h2 if i >= start), len(lines))
+    stated_count, count_line, times = None, None, []
+    for i in range(start, end):
+        if stated_count is None:
+            m = PACK_COUNT_RE.search(lines[i])
+            if m:
+                stated_count, count_line = int(m.group(1)), i + 1
+        for m in PACK_TIME_RE.finditer(lines[i]):
+            times.append((m.group(0), i + 1))
+    if stated_count is not None and stated_count not in (len(slides), n_core):
+        add("K001", "error", count_line,
+            f"the pack states {stated_count} slides; the deck has {len(slides)} ({n_core} core)",
+            lines[count_line - 1].strip())
+    valid = {core, core + ins}
+    for t, ln in times:
+        mins, secs = t.split(":")
+        if int(secs) >= 60 or int(mins) * 60 + int(secs) not in valid:
+            add("K006", "warning", ln,
+                f"the pack states {t}; the deck's core time is {mmss(core)}, {mmss(core + ins)} with inserts",
+                lines[ln - 1].strip())
+
+    # crib section
+    crib_start = next((i for i in h2 if re.search(r"(?i)\bcrib\b", lines[i][3:])), None)
+    form = "hand"
+    crib = []
+    by_key = {s["key"]: i for i, s in enumerate(slides)}
+    if crib_start is None:
+        add("K002", "error", None, "the pack has no crib section (a level-2 heading containing 'crib')")
+    else:
+        form = "generated" if lines[crib_start][3:].strip() == "Crib" else "hand"
+        crib_end = next((i for i in h2 if i > crib_start), len(lines))
+        words = [_slide_words(info) for info in infos]
+        titles = {}
+        for s in slides:
+            titles.setdefault(s["title"], s["key"])
+        seen = set()
+        for i in range(crib_start + 1, crib_end):
+            m = CRIB_LINE_RE.match(lines[i])
+            if not m:
+                continue
+            key, text = m.group(1), m.group(2).strip()
+            own = by_key.get(key)
+            keys = _key_words(text)
+            k = len(keys)
+            found = len(keys & words[own]) if own is not None else 0
+            score = round(found / k, 2) if own is not None and k >= 2 else None
+            crib.append({"key": key, "line": i + 1, "text": text,
+                         "slide": slides[own]["position"] if own is not None else None, "score": score})
+            excerpt = lines[i].strip()
+            if own is None or key in seen:
+                best = _best_match(keys, words, slides, own)
+                why = "names no slide in the deck" if own is None else "repeats an earlier crib line"
+                add("K002", "error", i + 1, f"crib key {key} {why}; {_best_note(best, k)}", excerpt)
+                seen.add(key)
+                continue
+            seen.add(key)
+            s = slides[own]
+            if form == "generated":
+                old = _collapse(text)
+                cut = _collapse(text.split(" · ", 1)[0])
+                if s["title"] not in (old, cut):
+                    msg = f"slide {key}: crib text {cut!r} differs from the slide's title {s['title']!r}"
+                    other = titles.get(cut)
+                    if other is not None and other != key:
+                        msg += f"; now slide {other}"
+                    add("K004", "warning", i + 1, msg, excerpt)
+            elif score is not None and 3 * found < k:
+                best = _best_match(keys, words, slides, own)
+                add("K005", "warning", i + 1,
+                    f"slide {key}: crib text matches the slide poorly ({found}/{k} key words, score {score:.2f}); "
+                    f"{_best_note(best, k)}", excerpt)
+        for s in slides:
+            if s["key"] in seen:
+                continue
+            flags = ", ".join(f for f, on in (("insert", s["insert"]), ("hidden", s["hidden"])) if on)
+            add("K003", "warning", crib_start + 1,
+                f"slide {s['key']}{f' ({flags})' if flags else ''} has no crib line: {s['title']!r}")
+
+    findings.sort(key=lambda f: (f["path"], f["line"] or 0, f["rule"]))
+    counts = {sev: sum(1 for f in findings if f["severity"] == sev) for sev in ("error", "warning", "info")}
+    return {"ok": counts["error"] == 0, "findings": findings, "counts": counts, "pack": str(check),
+            "form": form, "stated": {"slides": stated_count, "times": [t for t, _ in times]},
+            "deck": deck, "crib": crib, "warnings": _pack_warnings(slides)}
+
+
+def _pack_warnings(slides: list[dict]) -> list[str]:
+    return [f"slide {s['key']}: no TIME" for s in slides if s["seconds"] is None]
+
+
+@tool("deck_pack",
+      "Presenter pack for a built .pptx. Without check: write a Markdown skeleton (title, deck line with slide "
+      "counts and core / with-inserts times, a crib line per slide keyed like deck_build's numbering 3, 3a, the "
+      "IF ASKED bullets from the notes, and a timing table); out writes it (an existing file needs force). With "
+      "check: compare an existing pack with the deck. K001 stated slide count matches neither the slide nor the "
+      "core count; K002 crib key names no slide or repeats (or no crib section); K003 slide without a crib line; "
+      "K004 generated pack: crib text differs from the current title; K005 hand pack: crib line matches its slide "
+      "poorly; K006 stated time is neither the core nor the total time. Needs python-pptx.",
+      {"type": "object",
+       "properties": {
+           "pptx_path": {"type": "string", "description": "path to the built .pptx"},
+           "out": {"type": "string", "description": "write the pack here (refused if it exists, unless force)"},
+           "force": {"type": "boolean", "description": "overwrite an existing out"},
+           "check": {"type": "string", "description": "check this existing pack against the deck instead"}},
+       "required": ["pptx_path"],
+       "additionalProperties": False},
+      readOnlyHint=False)
+def deck_pack(pptx_path: str, out: str | None = None, force: bool = False, check: str | None = None) -> dict:
+    if out is not None and check is not None:
+        raise ToolError("give either out or check, not both")
+    out_path = None
+    if out is not None:
+        from tundlekit.render import check_path_string
+
+        check_path_string(out, "out")
+        try:
+            out_path = pathlib.Path(out)
+            parent_ok, exists = out_path.resolve().parent.is_dir(), out_path.exists()
+        except (OSError, ValueError) as e:
+            raise ToolError(f"invalid output path {out!r}: {e}") from None
+        if not parent_ok:
+            raise ToolError(f"output directory does not exist: {out_path.resolve().parent}")
+        if exists and not force:
+            raise ToolError(f"{out} exists; pass force to replace it")
+        if exists and out_path.is_dir():
+            raise ToolError(f"{out} is a directory")
+    infos = _inspect(pptx_path)
+    slides = _pack_slides(infos)
+    if check is not None:
+        return _pack_check(pptx_path, check, infos, slides)
+    p = pathlib.Path(pptx_path)
+    text = _pack_text(p.name, p.stem, slides)
+    if out_path is not None:
+        _write_text_atomic(out_path, text, out)
+    core, ins = _pack_times(slides)
+    return {"deck": str(pptx_path), "text": text, "path": str(out) if out_path is not None else None,
+            "written": out_path is not None, "core_time": mmss(core), "total_time": mmss(core + ins),
+            "slides": slides, "warnings": _pack_warnings(slides)}
+
+
 # ------------------------------------------------------------------ CLI
 def add_cli(groups) -> None:
     from tundlekit.cli_support import common_flags
@@ -1975,6 +2318,14 @@ def add_cli(groups) -> None:
                    help="files or directories to search for the old text")
     common_flags(c)
     c.set_defaults(handler=_cli_diff)
+
+    c = cmds.add_parser("pack", help="write a presenter-pack skeleton for a .pptx, or check a pack against it")
+    c.add_argument("pptx_path", help="deck (.pptx)")
+    c.add_argument("-o", "--out", help="write the pack here (default: print it)")
+    c.add_argument("--force", action="store_true", help="replace an existing --out")
+    c.add_argument("--check", help="check this existing pack against the deck")
+    common_flags(c, checker=True)
+    c.set_defaults(handler=_cli_pack)
 
     c = cmds.add_parser("inspect", help="list the slides, texts and notes of a .pptx")
     c.add_argument("pptx_path", help="deck (.pptx)")
@@ -2028,6 +2379,27 @@ def _cli_inspect(args):
         lines.append(f"{s['index']:>3} [{s['number'] or '-'}] {s['title']!r} {time}, "
                      f"{s['say_words']} SAY words {flags}".rstrip())
     return CliResult(r, text="\n".join(lines))
+
+
+def _cli_pack(args):
+    from tundlekit.cli_support import CliResult, format_findings
+
+    r = deck_pack(args.pptx_path, out=args.out, force=args.force, check=args.check)
+    warn = [f"WARN {w}" for w in r["warnings"]]
+    if args.check is not None:
+        d = r["deck"]
+        text = (format_findings(r) + f"\n{r['form']} pack; deck: {d['slides']} slides ({d['core']} core), "
+                f"core {d['core_time']}, with inserts {d['total_time']}")
+        return CliResult(r, text="\n".join([text] + warn))
+    if r["written"]:
+        lines = [f"wrote {r['path']}: {len(r['slides'])} slides, core {r['core_time']}, "
+                 f"with inserts {r['total_time']}"] + warn
+        return CliResult(r, text="\n".join(lines), exit_code=0)
+    if warn and not args.json:              # stdout carries the pack itself, so warnings go to stderr
+        import sys
+
+        sys.stderr.write("\n".join(warn) + "\n")
+    return CliResult(r, text=r["text"], exit_code=0)
 
 
 def _cli_diff(args):

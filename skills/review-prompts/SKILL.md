@@ -64,7 +64,9 @@ Also give each reviewer:
    Collect exact edits in an edits file and apply them with `tundlekit text apply-edits EDITS.json FILE` (dry run,
    then `--write`). When the owner edited the built .docx, `tundlekit text docx-diff REPORT.md EDITED.docx --search
    report-src --emit-edits edits.json` drafts that file. Run `tundlekit office check` before rebuilding.
-2. Propagate every fix (above), rebuild, re-render, re-run `tundlekit review coverage` and `tundlekit claims trace`.
+2. Propagate every fix (above), rebuild (`tundlekit report build REPORT.md -o OUT.docx` for the report, then
+   `tundlekit deck pack DECK.pptx --check PACK.md` when the deck changed), re-render, re-run
+   `tundlekit review coverage` and `tundlekit claims trace`.
 3. Tool output given to reviewers is a starting list, not a verdict. Tell them the known noise: `claims trace`
    weak locations (T003) may be coincidences and T004 means nothing was traced; `review coverage` matches
    footer-less slides by title only, so a false C001/C002 pair is possible; `text lint` findings are already

@@ -277,9 +277,13 @@ def _approved_zh() -> dict[str, list[str]]:
     return table
 
 
-def _finding(rule: str, severity: str, path: str, message: str, term: str, line: int | None = None) -> dict:
-    return {"rule": rule, "severity": severity, "path": path.replace("\\", "/"), "line": line,
-            "message": message, "excerpt": term}
+def _finding(rule: str, severity: str, path: str, message: str, term: str, line: int | None = None,
+             compared: str | None = None) -> dict:
+    found = {"rule": rule, "severity": severity, "path": path.replace("\\", "/"), "line": line,
+             "message": message, "excerpt": term}
+    if compared is not None:
+        found["compared"] = compared.replace("\\", "/")
+    return found
 
 
 @tool(
@@ -288,7 +292,7 @@ def _finding(rule: str, severity: str, path: str, message: str, term: str, line:
     "(CamelCase words, acronyms such as MCP, slash terms such as TCP/IP, runs of 2-4 English words set in "
     "Chinese text; code, URLs and file paths excluded), counts each in every file, and compares each target "
     "with the previous file (compare same-language: the nearest earlier file in the same script). L001 "
-    "(warning): a term that disappeared. L002 (info): its count changed. L003 (info): gone, but a mostly "
+    "(warning): a term that disappeared (each L finding names the compared file). L002 (info): its count changed. L003 (info): gone, but a mostly "
     "Chinese target uses the glossary's approved rendering (glossary false turns this off).",
     {"type": "object",
      "properties": {
@@ -351,15 +355,16 @@ def translate_terms(src: str, targets: list[str], glossary: bool = True, compare
                 if used is not None:
                     findings.append(_finding("L003", "info", target,
                                              f"'{term}' appears {before} time(s) in {previous} and not in "
-                                             f"{target}: rendered as {used} (approved glossary rendering)", term, line))
+                                             f"{target}: rendered as {used} (approved glossary rendering)",
+                                             term, line, previous))
                 else:
                     findings.append(_finding("L001", "warning", target,
                                              f"'{term}' appears {before} time(s) in {previous} and not in "
-                                             f"{target}", term, line))
+                                             f"{target}", term, line, previous))
             elif before != now and before and now:
                 findings.append(_finding("L002", "info", target,
                                          f"'{term}' appears {before} time(s) in {previous} and {now} in {target}",
-                                         term, line))
+                                         term, line, previous))
     findings.sort(key=lambda f: (f["path"], f["line"] or 0, f["rule"]))
     counts = {"error": 0, "warning": sum(f["severity"] == "warning" for f in findings),
               "info": sum(f["severity"] == "info" for f in findings)}

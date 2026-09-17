@@ -20,6 +20,9 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
 | hand edits in a built deck, with where the old text lives | `tundlekit deck diff BUILT.pptx EDITED.pptx --search deck-src` | `deck_diff` |
 | hand edits in a built .docx vs its source, as an edits file | `tundlekit text docx-diff REPORT.md EDITED.docx --search report-src --emit-edits edits.json` | `docx_diff` |
 | apply those edits (dry run, then `--write`) | `tundlekit text apply-edits edits.json REPORT.md` | `text_apply_edits` |
+| build the report .docx from its Markdown (refuses to overwrite hand edits) | `tundlekit report build REPORT.md -o OUT.docx [--excerpts DIR] [--overwrite]` | `report_build` |
+| presenter pack still matches the deck (after cuts and reorders) | `tundlekit deck pack DECK.pptx --check PACK.md` | `deck_pack` |
+| rebuild the paper-summaries HTML page | `tundlekit papers page REPORT.md -o paper-summaries.html --dir papers` | `papers_page` |
 | snapshot a deliverable into `versions/` before writing it | `tundlekit bundle backup FILE... --reason "CHANGE"` | `bundle_backup` |
 | stale § / Fig. / Table references in scripts and notes, each against the report it slices | `tundlekit text xref REPORT.md --in FILE[=REPORT]... [--exclude GLOB...]` | `text_xref` |
 
@@ -64,9 +67,20 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
 0. **Office closed**: `tundlekit office check` must exit 0 (use `--wait SECONDS` while the owner closes files).
    Repeat it before every later build or render, and back up (`tundlekit bundle backup`) before every build
    that overwrites a deliverable.
-1. **Build** the deck and report from their scripts or specs (`tundlekit deck build SPEC.json -o OUT.pptx`).
+1. **Build** the deck and report from their scripts or specs:
+   ```
+   tundlekit bundle backup build/deck.pptx build/report.docx --reason "rebuild"
+   tundlekit deck build deck-src/deck.json -o build/deck.pptx
+   tundlekit report build REPORT.md -o build/report.docx
+   tundlekit text docx-diff REPORT.md build/report.docx
+   tundlekit papers page REPORT.md -o build/paper-summaries.html --dir papers
+   ```
    Fix every build warning (overflow, table past the bottom, strip too long, a block overlapping a strip, over
-   budget).
+   budget). `report build` (`report_build`) lists every Markdown problem at once and writes nothing until all
+   are fixed. It refuses to replace a .docx that differs from the report (hand edits): carry those edits back
+   first, and pass `--overwrite` only when they are carried or meant to be dropped. The `docx-diff` after it
+   must give `changes: []` (or only `insert` changes for excerpts). Rebuild the reading pages and the
+   paper-summaries page (`papers_page`) after every report edit too.
 2. **Lint** mechanically: `tundlekit deck lint OUT.pptx`, `tundlekit text lint REPORT.md`,
    `tundlekit text fignums REPORT.md --refs NOTES.md`, and `text xref` with each script paired with the report it
    actually slices:
@@ -88,6 +102,12 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
    ```
    tundlekit review coverage REPORT.md build/deck.pptx --cuts cuts.txt
    tundlekit claims trace REPORT.md --papers papers --ledger LEDGER.md --in NOTES.md
+   ```
+   When the talk has a presenter pack, check it against the built deck (`deck_pack`); K001 and K002 are
+   errors (wrong slide count, crib keys naming no slide), K003-K006 warnings (missing crib lines, stale titles,
+   poor matches, wrong stated times):
+   ```
+   tundlekit deck pack build/deck.pptx --check notes/PRESENTER-PACK.md
    ```
    `review coverage` lists report sections with no slide (C001), slides with no section (C002), footers citing
    missing sections (C003) and rule names that differ between the 2 (C004-C006); agreed cuts go in `cuts.txt`.
@@ -177,6 +197,9 @@ The checkers give a starting list for a person or agent to confirm. The remainin
 - `deck diff`: a slide whose title was rewritten beyond recognition (similarity below 0.4) shows as `removed` plus
   `added`, not as a title change.
 - `text docx-diff`: template text in the .docx (title page, table of contents) shows as `insert`.
+- `deck pack --check`: K005 on crib lines that paraphrase a slide with few shared words (divider slides
+  especially).
+- `report build`: none known. Markdown it does not support is an error to fix, not noise.
 - `render office`: the "renders under 10 KB" warning can also fire on genuinely sparse slides; look before acting.
 - `office check`: it sees only Word, PowerPoint and Excel (LibreOffice elsewhere); another program holding the
   file open is not detected. When the process list cannot be read, the result has `"ok": false` and an `error`,
