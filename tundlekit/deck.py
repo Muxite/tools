@@ -1717,15 +1717,14 @@ def search_files(search: list[str] | None) -> list[tuple[str, str]]:
     return out
 
 
-def find_hints(old: str, files: list[tuple[str, str]], limit: int = 3) -> list[str]:
-    """Up to `limit` `path:line` places where `old` (else its longest line of 12+ characters) occurs."""
+def find_hints(old: str, files: list[tuple[str, str]], limit: int = 3, new: str | None = None) -> list[str]:
+    """Up to `limit` `path:line` places where the first hint candidate that occurs anywhere occurs (§17.2):
+    `old`, then each changed line of `old` against `new`, then its longest line of 12+ characters."""
+    from tundlekit.textlint import hint_needles
+
     if not old or not files:
         return []
-    needles = [old]
-    longest = max(old.splitlines() or [""], key=len).strip()
-    if len(longest) >= 12 and longest != old:
-        needles.append(longest)
-    for needle in needles:
+    for needle in hint_needles(old, new):
         hits = []
         for shown, text in files:
             start = text.find(needle)
@@ -1880,7 +1879,8 @@ def deck_diff(old: str, new: str, search: list[str] | None = None) -> dict:
 
     def add(slide, field, o, n, diff=None, hint_text=None):
         changes.append({"slide": slide, "field": field, "old": o, "new": n, "diff": diff,
-                        "hint": find_hints(hint_text, files) if hint_text else []})
+                        "hint": find_hints(hint_text, files, new=n if isinstance(n, str) else None)
+                        if hint_text else []})
 
     paired_new = sorted(pairs)
     kept = _kept_in_order([pairs[j] for j in paired_new])

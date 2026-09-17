@@ -36,8 +36,16 @@ Add `--json` for a machine-readable result. Through MCP, pass `spec_path` (a fil
    slide, contact sheets, adversarial pass).
 
 Close PowerPoint before building (an open file can be locked or clobbered): `tundlekit office check` exits 1
-while Word, PowerPoint or Excel is running, and `--wait 120` waits for them to close. Back up the previous
-deliverable to `versions/<name> (before <change> <date>).pptx` first.
+while Word, PowerPoint or Excel is running, and `--wait 120` waits for them to close. Then back up the previous
+deliverable before **every** write to it (a build, or edits applied to a .pptx/.docx):
+
+```
+tundlekit bundle backup deck/talk.pptx --reason "reorder slides"
+```
+
+It copies the file to the nearest `versions/` folder as `talk (before reorder slides 2026-09-17).pptx` and refuses
+while Office is running (MCP `bundle_backup`; details in the tundle-bundle skill). `--force-office` exists on
+`bundle backup` and `text apply-edits`, but the rule is to close Office, not to force.
 
 ## Spec format
 
@@ -301,7 +309,7 @@ Each change names the slide, the field (`title`, `text`, `notes`, `hidden`, `num
 `moved`), the old and new text with a unified diff, and `hint`: up to 3 `path:line` places under `--search` where
 the old text occurs, which is usually the line of the spec to edit. Apply every change to the spec (for many small
 text edits, `tundlekit text apply-edits EDITS.json deck.json` applies anchored replacements and fails if an anchor
-is not unique), rebuild, and diff again: the result should list only changes you chose not to carry.
+is not unique), back up, rebuild, and diff again: the result should list only changes you chose not to carry.
 
 **After cuts and reorders.** The owner often deletes, inserts and reorders slides, which renumbers everything
 after them. Deck diff pairs slides by title first (exact, then similarity ≥ 0.8), then by number text, then by

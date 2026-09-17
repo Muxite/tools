@@ -26,12 +26,14 @@ Add `--json` to any command for a machine-readable result.
 | SOURCE.md checksums | `tundlekit bundle verify` | `bundle_verify` |
 | draft a SOURCE.md for an installer (hash, program, version guessed) | `tundlekit bundle source FILE [--url URL] [--install CMD] [--write] [--force]` | `bundle_source` |
 | draft SOURCE.md for every installer in a folder tree that has none | `tundlekit bundle source DIR --all [--write]` | `bundle_source` (`file` = a directory) |
+| snapshot files into `versions/` before changing them | `tundlekit bundle backup FILE... --reason TEXT [--prune] [--overwrite] [--force-office]` | `bundle_backup` |
 | add missing rows to a setup folder's README table | `tundlekit bundle setup-table DIR [--write]` | `bundle_setup_table` |
 
 ## Rules
 
 - **Latest only.** Replace a file instead of adding `v2`, `final`, `(new)`, `copy` or `backup` copies. Git keeps
-  the last few versions. The only place for older snapshots is a topic's `versions/` folder.
+  the last few versions. The only place for older snapshots is a topic's `versions/` folder, and
+  `tundlekit bundle backup` is the way to put them there (see below).
 - **Reading and setup material, not work trees.** No caches, build output, virtualenvs or `node_modules`.
 - **One device edits at a time.** Before changing anything, check that this copy is the newest (`compare`).
   When done, `release`, then copy the whole folder to the other devices.
@@ -74,6 +76,34 @@ Add `--json` to any command for a machine-readable result.
    ```
 
 The release uses git's configured identity. Set `user.name` and `user.email` first on a fresh device.
+
+## Snapshots before an edit (`bundle backup`)
+
+Before changing a report, deck or other document in place (by hand in Office, or with a tool that writes it),
+snapshot it:
+
+```
+tundlekit bundle backup reports/final-report.docx --reason "cut section 4"
+tundlekit bundle backup deck/talk.pptx deck/talk.pdf --reason "reorder slides" --prune
+```
+
+- **Where the copy goes.** The nearest `versions/` folder, found by walking up from the file to the tundle root
+  (the root's own `versions/` counts). If there is none, `<file's folder>/versions/` is created.
+- **Name.** `<stem> (before <reason> <YYYY-MM-DD>)<ext>`, e.g. `final-report (before cut section 4 2026-09-17).docx`.
+  The date is today (or `TUNDLEKIT_NOW` when set). The copy is atomic and keeps the file's modification time.
+  These names are what lint's B003/B004 expect in `versions/`.
+- **Reason.** Required, short, says what you are about to change. It must not be empty or contain any of
+  `( ) / \ : * ? " < > |`.
+- **Refused, with nothing copied**, when any file is missing, when a target name already exists (pass
+  `--overwrite` to replace it, e.g. a second backup the same day for the same reason), or while PowerPoint, Word
+  or Excel is running. Close Office first; `--force-office` exists, but closing Office is the rule, because an
+  open document may not be saved to disk yet and Office may write it again after the snapshot.
+- **Result.** `{"backups": [{"source", "path", "bytes"}], "superseded": [...]}`. `superseded` lists the older
+  `(before ...)` snapshots of the same stem and extension in that `versions/` folder. With `--prune` they are
+  deleted, so only the newest snapshot stays (approved clearing, see below). Snapshots named any other way, such as
+  `talk (annotated 2026-09-01).pptx`, are never superseded or pruned.
+
+Back up before **every** write to an Office file, not once per session. Then `release` as usual.
 
 ## Starting a tundle
 
@@ -155,7 +185,7 @@ Links (symlinks, junctions) are never followed: each counts as 1 entry.
 | B003 | warning | copy/version marker in a name (`report v2.docx`, `x (1).pdf`, `y - Copy.txt`, `final`, `old`, `backup`) outside `versions/`. Replace the original instead |
 | B004 | info | several snapshots of 1 document in `versions/`. Older ones may be cleared; keep the newest |
 | B005 | warning | junk: `__pycache__`, `.pytest_cache`, `.venv`, `venv`, `node_modules`, `.ipynb_checkpoints`, `*.pyc`, `*.tmp`, `~$*`, `Thumbs.db`, `desktop.ini`, `.DS_Store`, `._*`. Delete. Reported as info when `.gitignore` already skips it: git ignores it, but a copied folder still carries it |
-| B006 | error | a file or folder in `setup/<dir>/` missing from that folder's `README.md` table. Add a row |
+| B006 | error | a file or folder in `setup/<dir>/` missing from that folder's `README.md` table. Add a row (`SOURCE.md` and `<name>.SOURCE.md` files are exempt) |
 | B007 | error | a `setup/<dir>/README.md` row naming something that does not exist. Fix or remove the row |
 | B008 | warning | top-level folder without `README.md` |
 | B009 | warning | `X.pdf` older than its `X.docx`/`X.pptx` source. Re-export the PDF |
@@ -163,7 +193,7 @@ Links (symlinks, junctions) are never followed: each counts as 1 entry.
 | B011 | info | very large file. Consider whether it belongs, and clear history after replacing it |
 | B012 | error | `SOURCE.md` checksum mismatch |
 | B013 | warning | `SOURCE.md` whose hash or target file cannot be determined, or whose `- File:` points outside the tundle |
-| B014 | info | number of installers under `setup/<dir>/` with no `SOURCE.md` next to them. Draft them with `bundle source` |
+| B014 | info | number of installers under `setup/<dir>/` not covered by a `SOURCE.md` or `<name>.SOURCE.md` (see coverage below). Draft them with `bundle source DIR --all` |
 
 ## setup/: installers, tables and SOURCE.md
 
@@ -197,12 +227,19 @@ setup/any/        runs on both: scripts, Python wheels, portable archives (creat
   - File:       <file name, needed when the folder holds more than 1 file>
   - Install:    <steps, or the silent/unattended command>
   ```
-  Draft it instead of typing the hash: `tundlekit bundle source FILE` prints the text (program and version guessed
+- **Which file a SOURCE file covers.** A `SOURCE.md` covers exactly the file named in its `- File:` line; without
+  that line, it covers the only other file in its folder. When a folder holds **several installers**, give each
+  its own `<name>.SOURCE.md` next to it (`tool-setup.exe` → `tool-setup.exe.SOURCE.md`), which covers `<name>`.
+  B014 counts every installer covered by neither, and `verify` checks both kinds.
+- **Drafting.** Draft a SOURCE file instead of typing the hash: `tundlekit bundle source FILE` prints the text (program and version guessed
   from the file name, architecture tokens such as `x64` and trailing `Setup`/`Installer` words removed, SHA-256 and
   download date filled in); add `--url URL --install "CMD" --write` to write it (`--force` to overwrite an existing
-  one). When the folder's `README.md` table already lists the file, its "What it is" cell supplies the program and
-  version instead of the file name (the text before the first `,` or `⚠`, split at the first token that starts with
-  a digit), so a good README row is reused. Check the guessed program and version, and replace any
+  one). It writes `SOURCE.md` when the folder holds no other installer, and `<name>.SOURCE.md` otherwise.
+  **README cell reuse.** When the folder's `README.md` table already lists the file, its "What it is" cell supplies
+  the program and version instead of the file name, so a good README row is reused. The cell is split at the first
+  version-like token (starts with a digit and contains a `.`, or looks like `R2025a`); what comes before is the
+  program, and anything after the version (`(x64)`, `, x64`) is dropped: `7-Zip 26.03, x64` gives `7-Zip` and
+  `26.03`. Check the guessed program and version, and replace any
   `<official download URL>` or `<steps>` placeholder. By hand, get the hash with
   `Get-FileHash <file>` (Windows) or `sha256sum <file>` (Linux). Then check it:
   ```
@@ -219,14 +256,16 @@ tundlekit bundle lint                                   # B006 lists unlisted fi
 tundlekit bundle setup-table setup/windows              # dry run: the rows it would add
 tundlekit bundle setup-table setup/windows --write      # append them to setup/windows/README.md
 tundlekit bundle source setup/windows/python-3.13.5-amd64.exe --url https://www.python.org/downloads/ --write
-tundlekit bundle source setup --all                     # dry run: a SOURCE.md draft for every installer without one
-tundlekit bundle source setup --all --write             # write them; existing SOURCE.md files are skipped
+tundlekit bundle source setup --all                     # dry run: 1 draft per uncovered installer (<name>.SOURCE.md when a folder has several)
+tundlekit bundle source setup --all --write             # write them; existing SOURCE files are skipped
 tundlekit bundle verify
 ```
 
-`bundle source DIR --all` covers every file that B014 would count in that tree and has no SOURCE.md yet; the
-result is `{"results": [...]}`, 1 entry per file. It never overwrites an existing SOURCE.md. Fill in the URL and
-install steps of each draft afterwards.
+`bundle source DIR --all` covers every installer that B014 counts in that tree; the result is
+`{"results": [...]}`, 1 entry per uncovered installer. In a folder with several installers each gets its own
+`<name>.SOURCE.md`, so after `--write` B014 is clean. It never overwrites an existing SOURCE file, and `--force`
+is refused (an error, not ignored) together with `--all`. Fill in the URL and install steps of each draft
+afterwards.
 
 `setup-table` adds 1 row per unlisted entry (`` | `name` | {program} {version} | ``) after the last row of the
 first table, or creates the table; existing rows are untouched. Stub installers (a name with `Setup`, `Installer`,
@@ -239,7 +278,9 @@ file, or list it by hand. A `|` line inside a fenced code block in the README is
 `bundle source`, `bundle setup-table` and the lint rules.
 
 Name guessing handles common patterns: `tailscale-setup-1.102.4.exe` gives `tailscale` 1.102.4, `7z2409.exe`
-gives `7z` 24.09, `winrar-x64-723.exe` gives `winrar` 7.23, and `R2025a` is a MATLAB-style version.
+gives `7z` 24.09, `winrar-x64-723.exe` gives `winrar` 7.23, and `R2025a` is a MATLAB-style version. Compact
+versions are never taken from years (`19xx`, `20xx`) or from groups ending in `00`, so `backup-2024`,
+`office2016` and `foo-100` get no version: fill it in by hand.
 
 ## Known noise
 
@@ -252,6 +293,8 @@ Lint and the drafting commands give a starting list to confirm. The remaining fa
 - `bundle source`, `bundle setup-table`: program names and versions guessed from unusual file names are often
   wrong (a build number taken for a version, a vendor prefix kept). Check every draft; a README row that already
   describes the file is used instead of the guess.
+- `bundle backup`: `superseded` is by stem and extension only; a snapshot of a different document that happens to
+  share the stem is listed too. Read the list before passing `--prune`.
 - `bundle verify`: B013 on a SOURCE.md that deliberately records no hash (a web installer that changes daily).
 
 ## Checklist before handing a copy on

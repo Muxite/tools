@@ -76,7 +76,8 @@ def test_terms_kept_no_findings(tmp_path):
 
 
 def test_dropped_term_is_l001(tmp_path, monkeypatch):
-    """§15.6: L001 (warning) for a term present before and absent now, on the target path, line null."""
+    """§15.6: L001 (warning) for a term present before and absent now, on the target path; §17.5: `line` is the
+    term's first line in the compared file (zh.md line 3)."""
     monkeypatch.chdir(tmp_path)
     r3.write(tmp_path / "zh.md", ZH)
     r3.write(tmp_path / "en.md", EN_DROP)
@@ -86,7 +87,7 @@ def test_dropped_term_is_l001(tmp_path, monkeypatch):
     f = l001[0]
     assert f["severity"] == "warning"
     assert f["path"] == "en.md"
-    assert f["line"] is None
+    assert f["line"] == 3  # §17.5 (was null under §15.6)
     assert "capability capsule" in f["message"].lower()
     assert counts(res, "capability capsule") == [2, 0]
     assert res["ok"] is True

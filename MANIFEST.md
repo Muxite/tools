@@ -1647,3 +1647,157 @@ The skills cover these points:
 - **tundle-bundle:** `bundle source DIR --all`, and README names reused.
 - **All skills:** checker output is a starting list for a human or agent to confirm, and the known remaining noise is
   listed per tool.
+
+---
+
+## 17. Round 5 (reviews of round 4)
+
+This round fixes the defects found in the round-4 reviews and adds 1 small tool. `claims_trace` is out of scope
+(user decision): it is low priority and its tests are not release gates. Where this section conflicts with earlier
+sections, this section wins.
+
+### 17.1 docx edits and emitted edits
+- **Run-level tabs.** Only run-level tabs (`w:tab` directly inside a `w:r`) read as `\t`. Tab-stop definitions
+  (`w:tabs/w:tab` in `w:pPr`) are never text. An edit never writes inside `w:pPr`.
+- **Page breaks.** `<w:br w:type="page"/>` reads as `\f`, not `\n`, so a `\n` find or replace never touches a page
+  break.
+- **Whole-paragraph hints.**
+  - A hint location counts for `emit_edits` only when the old paragraph text matches a whole paragraph of the hinted
+    file: blank lines or file edges on both sides (Markdown), or a whole string literal (Python/JSON).
+  - The emitted `find` must be at least 12 characters and contain a letter.
+  - Any other replace is listed in a new result list `"not_emitted": [{"old_index", "reason"}]`.
+- **Paths in emitted edits.** Emitted edit paths are absolute.
+- **Empty lists.** `text_apply_edits` accepts an empty list: `ok` true, nothing written.
+- **All-or-nothing writes.** Multi-file writes (list form, and `text_xref --write`) stage every new file as a temp
+  file first, then replace the targets in order. If any replace fails, the targets already replaced are restored
+  from backups taken just before. The `ToolError` says which files were restored.
+- **Read-only targets.** Before any temp file is created, a read-only target gives a `ToolError` ("read-only") and
+  no temp file is left. Temp files are always removed on failure.
+- **Office guard.** `text_apply_edits` with `write` on a `.docx`, `.pptx` or `.xlsx` refuses while
+  `render.office_running()` is non-empty, unless `force_office` is true (CLI `--force-office`).
+
+### 17.2 deck_diff and text_xref hints and references
+- **Changed-line hints.** `deck_diff` and `docx_diff` hints search, in order:
+  1. the whole old string;
+  2. each changed line from the unified diff (lines starting with `-`, without the marker, with `TIME`/`SAY:`/
+     `IF ASKED:` prefixes removed), taking its first 40 characters when longer;
+  3. the longest line of 12 or more characters.
+
+  Search stops at the first candidate that finds any location. Hints stay at most 3.
+- **X001 against the slice source.** In `text_xref`, a `.py` file whose module-level default slice source resolves
+  (§16.5) is checked for X001 against that source, not the paired report.
+- **End markers.** X002 requires uniqueness only for a call's first marker. For the second (end) marker, it
+  requires at least 1 occurrence after the first occurrence of the start marker.
+- **Other-report skip.** The skip applies only when the words directly before the reference, within the same
+  clause (no `.`, `;` or `:` in between), are `<name> report` with a name other than the paired report's.
+  `our`, `this`, `final` and `the` are never names.
+- **Renumbering scope.** With several reports, a `renumber` entry applies only to the report whose targets contain
+  the old reference, and to the files paired with it. If several reports contain it, the result is a
+  `ToolError` listing them, unless `renumber_report` (CLI `--renumber-report REPORT`) selects one.
+- **Appendix cascade.** `App. E=App. D` and `Appendix E=Appendix D` rename, in the report and the paired files,
+  keeping each spelling:
+  - the `## Appendix E` heading and every `### E.n` heading;
+  - `App. E`, `App. E.n`, `Appendix E` and `Appendix E.n`;
+  - `Table En`, `Fig. En` and `Figure En`.
+
+  If the target letter already exists and isn't renamed in the same call, the result is a `ToolError`. Swaps are
+  allowed.
+
+### 17.3 bundle
+- **SOURCE.md coverage.**
+  - A SOURCE.md covers exactly the file named in its `- File:` line, or the only other file in its directory when
+    it has no `- File:` line.
+  - Besides `SOURCE.md`, a directory may hold per-file `<name>.SOURCE.md` files, each covering `<name>`.
+  - B014 counts each installer not covered this way.
+  - `bundle_verify` checks both kinds.
+- **Writing SOURCE files.** `bundle_source` on a file writes `SOURCE.md` when the directory has no other installer,
+  and `<name>.SOURCE.md` otherwise. `bundle_source DIR --all` produces 1 entry per uncovered installer, and after
+  `--write` B014 is clean.
+- **`--force` in batch mode.** It is refused (`ToolError`) rather than ignored.
+- **README "What it is" cell.** The split point is the first token after the first token that starts with a digit
+  and contains a `.` or matches `R20\d\d[ab]`. Text after that version token (`(x64)`, `, x64`) is dropped. So
+  `7-Zip 26.03, x64` gives `7-Zip` and `26.03`.
+- **Compact versions.** Compact versions never come from 4-digit groups `19xx` or `20xx`, or from groups ending in
+  `00`. So `backup-2024`, `office2016` and `foo-100` get no version.
+- **Temp files.** `_atomic_write` follows §17.1: read-only targets are refused up front, and temp files are removed
+  on failure.
+- **New tool `bundle_backup`** (`tundlekit bundle backup FILE... --reason TEXT [--prune] [--overwrite] [--force-office]`):
+  - Copies each file to the nearest `versions/` directory, found by walking up from the file to the tundle root,
+    or else `<file dir>/versions`, created if needed. The copy is named `<stem> (before <reason> <YYYY-MM-DD>)<ext>`,
+    with the date from `TUNDLEKIT_NOW`, or else today.
+  - Refuses, with nothing copied:
+    - while `render.office_running()` is non-empty, unless `force_office`;
+    - when `reason` is empty or contains any of `()/\:*?"<>|`;
+    - when a target exists, unless `overwrite`;
+    - when a file is missing.
+  - The copy is atomic and keeps the modification time.
+  - Result `{"backups": [{"source", "path", "bytes"}], "superseded": [paths]}`.
+    - `superseded` lists the older `(before …)` snapshots of the same stem and extension in that directory.
+    - With `prune`, they are deleted.
+    - Snapshots whose parentheses don't start with `before ` (for example `(annotated …)`) are never superseded.
+  - Not read-only; `destructiveHint` is true only in effect with `prune`, and the annotation is `destructiveHint: true`.
+
+### 17.4 papers_summary
+- **Banner lines.** More lines are skipped before the title: `Published in`, `Language Resources and Evaluation`,
+  `manuscript No.`, `(will be inserted by the editor)`, `Transactions on`, and lines that are only a URL or an email.
+- **Title start.** The title may start on a line of 2 or more words when the next non-empty line is also part of
+  it. A run of 1–2-word lines is joined while they end with no punctuation and the joined text has at most 20
+  words.
+- **Author lines.** Any 1 digit, `∗`, `*` or `†` mark directly after a capitalised word counts. So do a line of 2–6
+  capitalised words with no verb-like lower-case word (a single name line), `Independent Researcher`,
+  `University`, `Institute`, `Inc.`, `Lab`, and lines containing `github.com` or `@`. Title continuation stops
+  there.
+- **Small caps.** A lone capital `X` followed by a space and a run `R` of 3 or more capitals (letters only) is
+  joined into `XR` only when `R` is not in a built-in list of common English words. The list covers at least the
+  500 most frequent English words plus common title words such as `SURVEY`, `MULTI`, `AGENT`, `AGENTS`, `LANGUAGE`,
+  `MODEL`, `MODELS`, `LEARNING`, `SYSTEM` and `SYSTEMS`.
+  - When `X` is `A`, `I` or `O`, `R` must also be at least 4 letters.
+  - Examples: `A LITA -G` → `ALITA-G`; `D EEP R ESEARCH` → `DEEP RESEARCH`; `A S YSTEMATIC` → `A SYSTEMATIC`.
+  - Kept as they are: `A SURVEY`, `I AM`, `FOR A MULTI-AGENT`, `Part B RL`.
+- **ALL-CAPS titles.** A title that is fully upper-case (ignoring acronyms of 2–5 letters that are in the source's
+  own later text) is converted to title case, keeping those acronyms.
+- **Authors field.** Author marks (digits, `∗`, `*`, `†`, commas left dangling) are stripped from `authors`, and
+  the line is cut at the first affiliation word.
+
+### 17.5 translate_terms
+- **One CJK share.** `same-language` grouping and L003 use the same CJK share: letters after removing term tokens.
+- **Slash terms.** A slash term followed by sentence punctuation is still a term. Path masking never takes trailing
+  `.`, `,`, `;` or `:`.
+- **Line numbers.** L001, L002 and L003 carry `line`: the first line in the compared (previous or same-language)
+  file where the term occurs.
+
+### 17.6 review_coverage, diagram, fignums, office_check
+- **Unrecognised shapes.** `review_coverage` reads text from unrecognised shapes as `deck_inspect` does.
+- **Rule names.** They come from the first definition-like occurrence: a table row, or a line starting with `R<n>`,
+  in preference to prose.
+- **`png` target.** `diagram_render` with a `png` path that is an existing directory, or a device name, is a
+  `ToolError`.
+- **fignums duplicates.** `text_fignums` never reports the same finding twice for 1 file reached under 2 spellings.
+- **office_check unknown state.** When `tasklist` or `ps` fails, the result has `"ok": false` and
+  `"error": <message>`. The CLI exits 1.
+
+### 17.7 Docs
+- **zh-en-translation:** use `--compare same-language` for round trips.
+- **Examples:** FILE=REPORT examples are shown in PowerShell form, with a Git Bash note.
+- **tundle-bundle:** covers `bundle backup` and per-file `<name>.SOURCE.md`.
+- **deck-builder, report-writing, deliverable-review:** use `tundlekit bundle backup` in place of the manual
+  versions/ copy rule.
+
+### 17.8 Pinned details
+- **bundle_backup arguments:** `files` (list, required), `reason`, `prune`, `overwrite`, `force_office`. The Office
+  guard applies to every file type. The `versions/` search includes the tundle root.
+- **B006:** `<name>.SOURCE.md` files are exempt, like `SOURCE.md`.
+- **Name lines (§17.4).** A "single name line" has 2–6 words, each starting with a capital followed by lower-case
+  letters (hyphens and initials such as `D.` allowed). None of its words is all-caps, and none (lower-cased) is in
+  the common-word list used for small caps. So `Auditing LLM Agents`, `Reliable Agent Pipelines` and
+  `SCIENTIFIC KNOWLEDGE` are title continuations, not names.
+- **Title runs.** A run of 1–2-word title lines also joins after a line ending in `:` (`DSPY:` / `Compiling`).
+- **Rule names (§17.6).** A bullet `- R4: ...` is prose. Definition lines are table rows and non-bullet lines
+  starting with `R<n>`.
+- **Clauses (§17.2).** A comma does not end a clause for the other-report skip.
+- **Empty lists (§17.1).** An empty edits list needs no `path`.
+- **Email and URL lines (§17.4).** These are skipped only before the title. After the title starts, such a line ends
+  the title and is the author line.
+- **Suffix affiliation words (§17.4).** When the first affiliation word is a suffix word (`Inc.`, `Ltd.`, `Corp.`,
+  `Lab`, `Labs`, `LLC`), the cut also removes the organisation name before it, back to the last author mark or
+  comma. So `Bo Li∗ Acme Inc.` gives `Bo Li`.

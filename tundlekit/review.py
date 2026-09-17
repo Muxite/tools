@@ -20,6 +20,7 @@ NUMBERED_RE = re.compile(r"^(\d+(?:\.\d+)?)\.?\s+(.*)$")
 DEEP_NUMBERED_RE = re.compile(r"^(\d+(?:\.\d+){2,})\.?(?:\s+(.*))?$")
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
 RULE_LINE_RE = re.compile(r"^\s*[-*•]?\s*(?:\*\*|__)?R(\d+)\b[.:)]?(?:\*\*|__)?[.:)]?\s+(.*)")
+BULLET_RE = re.compile(r"^\s*[-*•+]\s")
 RULE_CELL_RE = re.compile(r"(?:\*\*|__)?R(\d+)[.:)]?(?:\*\*|__)?")
 RULE_NAME_CUT_RE = re.compile(r"[:;]|\.(?=\s|$)|\s—\s")
 RULE_NAME_WORDS = 12
@@ -71,7 +72,7 @@ def read_report(text: str) -> tuple[list[dict], dict[str, tuple[int, str]]]:
     """(sections, rules) from the body bucket (§14.2) of a Markdown report.
 
     sections: [{"section", "heading", "line", "level"}] for numbered level-2/3 headings.
-    rules: {n: (line, name)} for the first occurrence of each rule.
+    rules: {n: (line, name)} for the first definition of each rule (§17.6), else its first mention.
     """
     sections, rules, _ = read_report_full(text)
     return sections, rules
@@ -127,14 +128,19 @@ def read_report_full(text: str):
         if bucket != "body":
             continue
         n, name = _rule_in_line(line)
+        definition = n is not None and not BULLET_RE.match(line)
         if n is None and line.lstrip().startswith("|") and not _is_separator_row(line):
             cells = _table_cells(line)
             cm = RULE_CELL_RE.fullmatch(cells[0]) if cells else None
             if cm and len(cells) > 1:
-                n, name = _rule_id(cm.group(1)), cells[1]
-        if n is not None and n not in rules:
-            rules[n] = (no, short_rule_name(name))
-    return sections, rules, deeper
+                n, name, definition = _rule_id(cm.group(1)), cells[1], True
+        if n is not None:
+            # §17.6/§17.8: a table row or a non-bullet line starting with R<n> defines the rule; bullets and
+            # other prose only name it when there is no definition
+            rank = 0 if definition else 1
+            if n not in rules or rank < rules[n][0]:
+                rules[n] = (rank, no, short_rule_name(name))
+    return sections, {n: (no, name) for n, (_, no, name) in rules.items()}, deeper
 
 
 def _rule_id(digits: str) -> str:
@@ -235,16 +241,18 @@ def _pptx_slides(path: str) -> list[dict]:
             continue
         frames, rows, footer = [], [], []
         for sh in deck._iter_shapes(slide.shapes):
-            if getattr(sh, "has_text_frame", False) and sh.has_text_frame:
-                text = sh.text_frame.text.replace("\x0b", "\n").replace("\r", "\n")
+            got = deck._frame_read(sh)            # §17.6: unrecognised shapes are read as deck_inspect reads them
+            if got is not None:
+                text = got[0].replace("\x0b", "\n").replace("\r\n", "\n").replace("\r", "\n")
                 frames.append(text.split("\n"))
-                top = sh.top
+                top = None if isinstance(sh, deck._RawShape) else deck._shape_top(sh)
                 stripped = text.strip()
                 if (top is not None and top >= FOOTER_TOP_IN * EMU_PER_INCH and stripped
                         and not NUMBER_TEXT_RE.fullmatch(stripped)):
                     footer.append(stripped)
-            if getattr(sh, "has_table", False) and sh.has_table:
-                rows.extend([c.text for c in r.cells] for r in sh.table.rows)
+            table = deck._table_rows(sh)
+            if table is not None:
+                rows.extend(table)
         slides.append({"position": pos, "number": info["number"], "title": info["title"],
                        "footer": " ; ".join(footer), "rules": _rules_from(frames, rows)})
     return slides

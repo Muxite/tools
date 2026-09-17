@@ -16,7 +16,8 @@ def test_star_digit_author_marks_end_title(tmp_path):
     h.marker_txt(d / "2312.04511.txt", h.paper_pages(p1, 4))
     lines = h.summary_lines(h.call("papers_summary", id="2312.04511", dir=str(d)))
     assert lines[0] == "# 2312.04511 · An LLM Compiler for Parallel Function Calling"
-    assert lines[2].startswith("Sehoon Kim * 1 Suhong Moon * 1 Ryan Tabrizi 1 · arXiv 2312.04511")
+    # §17.4: author marks are stripped from `authors`
+    assert " ".join(lines[2].split()).startswith("Sehoon Kim Suhong Moon Ryan Tabrizi · arXiv 2312.04511")
 
 
 @pytest.mark.parametrize("name,program,version", [

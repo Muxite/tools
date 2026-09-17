@@ -32,7 +32,8 @@ def test_summary_skips_venue_line_and_joins_upper_case_continuation(tmp_path):
     res = h.call("papers_summary", id="2601.00001", dir=str(d))
     lines = h.summary_lines(res)
     assert lines[0] == "# 2601.00001 · LEDGER: A Provenance Ledger for Auditing LLM Agents"
-    assert lines[2] == "Alice Smith1, Bob Jones2, Carol White1 · arXiv 2601.00001 · 10 pp (8 body)"
+    # §17.4: author marks are stripped from `authors` (was kept verbatim under §15.8)
+    assert lines[2] == "Alice Smith, Bob Jones, Carol White · arXiv 2601.00001 · 10 pp (8 body)"
     assert h.slash(res["path"]).endswith("summaries/2601.00001 - LEDGER.md")
 
 

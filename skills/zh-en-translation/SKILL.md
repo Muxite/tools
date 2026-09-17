@@ -64,6 +64,7 @@ tundlekit translate check glossary-slice SRC.md --dir zh-en     # 2. terms relev
 tundlekit translate resources --name prompts/zh-to-en.md        # 3. translator brief: fill slots, paste the slice; save output as OUT.md
 tundlekit translate check all SRC.md OUT.md --dir zh-en         # 4. mechanical checks
 tundlekit translate terms SRC.md OUT.md                         # 4b. terms dropped (L001), changed in count (L002), or rendered per the glossary (L003)
+tundlekit translate terms SRC.md OUT.md BACK.md --compare same-language   # 4c. round trip only: BACK.md vs SRC.md
 tundlekit translate resources --name prompts/critic.md          # 5. critic brief, FRESH session: source, translation, step-4 output
 ```
 
@@ -134,7 +135,8 @@ longer term at the same place is not counted separately.
   check it against the glossary, and restore it or record why it is gone.
 - **L002** (info): the count changed. Often harmless (a pronoun replaced a repeat), sometimes a dropped or added
   mention; look at each.
-- **L003** (info): the term is absent, but the target is mostly Chinese (over 30% CJK letters) and the tundlekit
+- **L003** (info): the term is absent, but the target is mostly Chinese (over 30% CJK among the letters left after
+  removing term tokens) and the tundlekit
   glossary's approved Chinese rendering appears instead ("rendered as ..."). This is the expected result of a
   correct en→zh hop, not a loss.
 
@@ -149,12 +151,22 @@ quotes identifiers).
 a chain `SRC DRAFT FINAL` shows where a term was lost. With `--compare same-language`, each file is compared with
 the nearest earlier file of the same dominant script (Chinese vs Latin), which catches English drift across a
 Chinese hop (`EN.md` → `ZH.md` → `EN2.md`: `EN2.md` is compared with `EN.md`). A file with no earlier file of its
-script gives no findings.
+script gives no findings. The script is decided from the letters left after removing the term tokens, the same
+share L003 uses, so a Chinese file full of CamelCase identifiers still counts as Chinese.
+
+**Round trips: always use `--compare same-language`.** For a round trip (zh→en→zh, or en→zh→en back-translation
+used as a check), the question is whether the back-translation kept what the original had, so compare it with
+the original, not with the middle hop:
 
 ```
-tundlekit translate terms spec.en.md spec.zh.md spec.en2.md
+tundlekit translate terms spec.zh.md spec.en.md spec.zh2.md --compare same-language
 tundlekit translate terms spec.en.md spec.zh.md spec.en2.md --compare same-language
+tundlekit translate terms spec.en.md draft.en.md final.en.md          # same-language chain: the default is fine
 ```
+
+**Line numbers.** L001, L002 and L003 carry `line`: the first line where the term occurs in the file it was
+compared with (the previous file, or the earlier same-language file). Open that line to see the context the term
+came from, then look for the matching place in the flagged file.
 
 It complements `check all`: that checks protected spans and the glossary, this checks identifiers and English terms
 that no glossary row lists. Neither judges faithfulness; the critic does.

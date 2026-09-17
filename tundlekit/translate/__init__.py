@@ -132,9 +132,23 @@ def _terms_text(text: str) -> str:
     """Text with fenced code, inline code, URLs and file paths blanked out (newlines kept).
 
     Slash terms such as `TCP/IP` look like paths but are kept."""
-    for rx in (FENCED, INLINE_CODE, URL):
+    for rx in (FENCED, INLINE_CODE):
         text = rx.sub(_blank, text)
-    return FILE_PATH.sub(lambda m: m.group(0) if SLASH.fullmatch(m.group(0)) else _blank(m), text)
+    text = URL.sub(_mask_path, text)
+    return FILE_PATH.sub(_mask_path, text)
+
+
+_TRAILING_PUNCT = re.compile(r"[.,;:]+$")
+
+
+def _mask_path(m: re.Match) -> str:
+    """Blank a URL or path, but never its trailing `.`, `,`, `;` or `:`, and keep slash terms (§17.5)."""
+    whole = m.group(0)
+    core = _TRAILING_PUNCT.sub("", whole)
+    tail = whole[len(core):]
+    if not core or SLASH.fullmatch(core):
+        return whole
+    return re.sub(r"[^\n]", " ", core) + tail
 
 
 def _borders_ok(line: str, start: int, end: int) -> bool:
@@ -205,6 +219,16 @@ def _count_all(text: str, terms: list[str]) -> dict[str, int]:
     return counts
 
 
+def _first_lines(text: str, terms: list[str]) -> dict[str, int]:
+    """The 1-based line of each term's first counted occurrence (sub-terms of longer terms excluded)."""
+    spans = [(m.start(), m.end(), t) for t in terms for m in _term_rx(t).finditer(text)]
+    first: dict[str, int] = {}
+    for start, _, t in _outermost(spans):
+        if t not in first or start < first[t]:
+            first[t] = start
+    return {t: text.count("\n", 0, pos) + 1 for t, pos in first.items()}
+
+
 def _count(text: str, term: str) -> int:
     return len(_term_rx(term).findall(text))
 
@@ -216,12 +240,19 @@ def _cjk_share(text: str) -> float:
     return sum(1 for c in letters if CJK.match(c)) / len(letters)
 
 
-def _script(text: str) -> str:
-    """The dominant script (CJK vs Latin). Technical-term tokens (CamelCase, acronyms, slash terms) are kept
-    verbatim in translations, so they are left out: `RetryBudget已设置。` is a Chinese file."""
+def _script_share(text: str, terms: list[str] = ()) -> float:
+    """The CJK share of a file's letters once term tokens are removed (MANIFEST §17.5). Technical-term tokens
+    (the source's terms, CamelCase words, acronyms, slash terms) are kept verbatim in translations, so they are
+    left out: `RetryBudget已设置。` is a Chinese file."""
+    for t in sorted(terms, key=len, reverse=True):
+        text = _term_rx(t).sub(" ", text)
     for rx in (SLASH, CAMEL, CAPS):
         text = rx.sub(" ", text)
-    return "cjk" if _cjk_share(text) > CJK_SHARE else "latin"
+    return _cjk_share(text)
+
+
+def _script(share: float) -> str:
+    return "cjk" if share > CJK_SHARE else "latin"
 
 
 def _approved_zh() -> dict[str, list[str]]:
@@ -246,8 +277,8 @@ def _approved_zh() -> dict[str, list[str]]:
     return table
 
 
-def _finding(rule: str, severity: str, path: str, message: str, term: str) -> dict:
-    return {"rule": rule, "severity": severity, "path": path.replace("\\", "/"), "line": None,
+def _finding(rule: str, severity: str, path: str, message: str, term: str, line: int | None = None) -> dict:
+    return {"rule": rule, "severity": severity, "path": path.replace("\\", "/"), "line": line,
             "message": message, "excerpt": term}
 
 
@@ -293,7 +324,9 @@ def translate_terms(src: str, targets: list[str], glossary: bool = True, compare
     terms = find_terms(texts[0])
     per_file = [_count_all(text, terms) for text in texts]
     table = {t: [c[t] for c in per_file] for t in terms}
-    scripts = [_script(text) for text in texts]
+    shares = [_script_share(text, terms) for text in texts]
+    scripts = [_script(share) for share in shares]
+    lines = [_first_lines(text, terms) for text in texts]
     renderings = _approved_zh() if glossary else {}
 
     findings = []
@@ -306,9 +339,10 @@ def translate_terms(src: str, targets: list[str], glossary: bool = True, compare
             if prev is None:
                 continue
         previous = paths[prev]
-        mostly_cjk = _cjk_share(texts[i]) > CJK_SHARE
+        mostly_cjk = scripts[i] == "cjk"
         for term, counts in table.items():
             before, now = counts[prev], counts[i]
+            line = lines[prev].get(term)
             if before > 0 and now == 0:
                 used = None
                 if mostly_cjk:
@@ -317,15 +351,15 @@ def translate_terms(src: str, targets: list[str], glossary: bool = True, compare
                 if used is not None:
                     findings.append(_finding("L003", "info", target,
                                              f"'{term}' appears {before} time(s) in {previous} and not in "
-                                             f"{target}: rendered as {used} (approved glossary rendering)", term))
+                                             f"{target}: rendered as {used} (approved glossary rendering)", term, line))
                 else:
                     findings.append(_finding("L001", "warning", target,
                                              f"'{term}' appears {before} time(s) in {previous} and not in "
-                                             f"{target}", term))
+                                             f"{target}", term, line))
             elif before != now and before and now:
                 findings.append(_finding("L002", "info", target,
                                          f"'{term}' appears {before} time(s) in {previous} and {now} in {target}",
-                                         term))
+                                         term, line))
     findings.sort(key=lambda f: (f["path"], f["line"] or 0, f["rule"]))
     counts = {"error": 0, "warning": sum(f["severity"] == "warning" for f in findings),
               "info": sum(f["severity"] == "info" for f in findings)}

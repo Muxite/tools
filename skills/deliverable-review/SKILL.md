@@ -20,6 +20,7 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
 | hand edits in a built deck, with where the old text lives | `tundlekit deck diff BUILT.pptx EDITED.pptx --search deck-src` | `deck_diff` |
 | hand edits in a built .docx vs its source, as an edits file | `tundlekit text docx-diff REPORT.md EDITED.docx --search report-src --emit-edits edits.json` | `docx_diff` |
 | apply those edits (dry run, then `--write`) | `tundlekit text apply-edits edits.json REPORT.md` | `text_apply_edits` |
+| snapshot a deliverable into `versions/` before writing it | `tundlekit bundle backup FILE... --reason "CHANGE"` | `bundle_backup` |
 | stale § / Fig. / Table references in scripts and notes, each against the report it slices | `tundlekit text xref REPORT.md --in FILE[=REPORT]... [--exclude GLOB...]` | `text_xref` |
 
 ## Hard rules
@@ -31,13 +32,25 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
   `tundlekit office check --wait 120` polls every 2 seconds until they are closed or the time is up. Build scripts
   can call `tundlekit.render.office_running()` for the same check. `render office` with the `powerpoint` backend
   also refuses when PowerPoint or Word is open.
-- **Back up first.** Before any change, copy the current deliverable to
-  `versions/<name> (before <change> <date>).<ext>`.
+- **Back up first, with Office closed.** Before **every** write to an Office file (a build over it, a render
+  script that saves it, `text apply-edits --write` on a .docx), snapshot it:
+  ```
+  tundlekit bundle backup build/report.docx build/deck.pptx --reason "apply review edits"
+  ```
+  This copies each file to the nearest `versions/` folder as `<name> (before <change> <date>).<ext>` (MCP
+  `bundle_backup`), refuses while Word, PowerPoint or Excel is running, and refuses to overwrite an existing
+  snapshot unless `--overwrite`. `--prune` deletes the older `(before ...)` snapshots of the same file. Both
+  `bundle backup` and `text apply-edits` accept `--force-office`, but do not use it: the rule is that Office is
+  closed.
 - **Build from the script only.** Never hand-edit a built file and then regenerate over it. If the owner edited
   the built file, diff it (`tundlekit deck diff BUILT.pptx EDITED.pptx --search deck-src`, or
   `tundlekit text docx-diff REPORT.md EDITED.docx --search report-src --emit-edits edits.json`), carry every change
   into the source (`tundlekit text apply-edits edits.json REPORT.md` applies the list of per-file edits it wrote,
   all or nothing; `insert`, `delete` and ambiguous changes stay manual), then regenerate and diff again.
+  `--emit-edits` only emits a replacement whose old paragraph matches a whole paragraph of the hinted file (a
+  Markdown paragraph between blank lines, or a whole Python/JSON string literal) and whose `find` is at least 12
+  characters with a letter; every other replacement is listed under `not_emitted` with its `old_index` and a
+  `reason`. Carry each of those by hand.
 - **Render into a scratch folder**, never into the source folder, the repository root or the home folder.
   `render office` refuses those, never opens the original (it renders a copy) and empties its output folder
   first, so stale renders never survive.
@@ -49,7 +62,8 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
 ## Procedure
 
 0. **Office closed**: `tundlekit office check` must exit 0 (use `--wait SECONDS` while the owner closes files).
-   Repeat it before every later build or render.
+   Repeat it before every later build or render, and back up (`tundlekit bundle backup`) before every build
+   that overwrites a deliverable.
 1. **Build** the deck and report from their scripts or specs (`tundlekit deck build SPEC.json -o OUT.pptx`).
    Fix every build warning (overflow, table past the bottom, strip too long, a block overlapping a strip, over
    budget).
@@ -61,6 +75,11 @@ description: Review a built report (.docx/.pdf) or deck (.pptx) before it goes t
    ```
    Each `--in` entry may be written `FILE=REPORT` (a file or folder paired with its own report, for example
    `--in build/=REPORT-annotated.md`); `--exclude GLOB...` drops walked files that belong to another report.
+   The examples are PowerShell. **Git Bash note:** MSYS may rewrite an `A=B` argument whose right side looks like
+   a path (`notes=/c/work/REPORT.md`). Quote every `FILE=REPORT` and `OLD=NEW` argument, use relative paths, and if
+   a path is still rewritten, prefix the command with `MSYS2_ARG_CONV_EXCL="*"` or run it from PowerShell.
+   When a renumber (`--renumber "App. E=App. D"`, see the report-writing skill) matches several paired reports,
+   the call fails and lists them; add `--renumber-report REPORT.md` to pick one.
    A build script that slices an annotated variant (`REPORT-annotated.md`) must be checked against that variant,
    or every marker looks missing. X003 (info) means the script's slice source could not be resolved and the
    marker was not checked: check it by hand.
@@ -149,7 +168,7 @@ The checkers give a starting list for a person or agent to confirm. The remainin
 
 - `review coverage`: unnumbered headings and slides without a `§` footer are matched by title only, so a
   reworded title gives a false C001/C002 pair. Cite the section in the footer, or record the cut in `cuts.txt`.
-- `claims trace`: T001 on counts and setup details that are not paper results, and on numbers the paper writes in
+- `claims trace`: low priority and not reliable; treat its output as hints and trace numbers by hand. T001 on counts and setup details that are not paper results, and on numbers the paper writes in
   another form; weak locations (T003) may be coincidences; T004 means nothing was checked.
 - `text xref`: X001 on references into another document whose name does not end in "report"; X003 is a skipped
   check, not noise.
@@ -160,7 +179,8 @@ The checkers give a starting list for a person or agent to confirm. The remainin
 - `text docx-diff`: template text in the .docx (title page, table of contents) shows as `insert`.
 - `render office`: the "renders under 10 KB" warning can also fire on genuinely sparse slides; look before acting.
 - `office check`: it sees only Word, PowerPoint and Excel (LibreOffice elsewhere); another program holding the
-  file open is not detected.
+  file open is not detected. When the process list cannot be read, the result has `"ok": false` and an `error`,
+  and the CLI exits 1: treat it as "not known to be closed".
 
 ## Past mistakes not to repeat
 

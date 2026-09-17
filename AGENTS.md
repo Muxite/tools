@@ -61,6 +61,12 @@ follow the tundle-bundle skill.
 Before any tool builds or renders an Office file (`deck build`, `render office`, a report build script), run
 `tundlekit office check` (MCP `office_check`, read-only). It exits 1 while Word, PowerPoint or Excel is running;
 ask the owner to close them, then `tundlekit office check --wait 120` waits for them. Never close them yourself.
+Before every write to an existing deliverable, snapshot it with
+`tundlekit bundle backup FILE --reason "CHANGE"` (MCP `bundle_backup`), which copies it into the nearest
+`versions/` folder and also refuses while Office is running. `--force-office` (on `bundle backup` and
+`text apply-edits`) exists, but closing Office is the rule. `bundle_backup` with `prune` deletes older snapshots.
+
+`claims trace` is low priority and unreliable; do not use its result as a gate.
 
 Checker output (`text lint`, `deck lint`, `claims trace`, `review coverage`, `translate terms`, `bundle lint`, …)
 is a starting list to confirm, not a verdict. Each skill has a "Known noise" section listing the remaining false
@@ -213,7 +219,7 @@ with either connection. They need `tundlekit` installed where the agent runs.
 
 | Skill | Use it when |
 |---|---|
-| `tundle-bundle` | keeping, releasing, comparing, copying or pruning a tundle; setup tables and SOURCE.md |
+| `tundle-bundle` | keeping, releasing, comparing, copying or pruning a tundle; `versions/` snapshots; setup tables and SOURCE.md |
 | `deck-builder` | writing, building, timing or fixing a presentation |
 | `diagram-maker` | a figure, flowchart or bar chart is needed |
 | `report-writing` | writing or checking report prose |

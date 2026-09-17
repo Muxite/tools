@@ -1881,6 +1881,23 @@ def _run(argv: list[str]) -> None:
         raise RuntimeError((cp.stderr or cp.stdout or f"exit code {cp.returncode}").strip()[:300])
 
 
+def _check_png_target(png_path: str) -> None:
+    """`png` must name a regular file: not an existing directory and not a device (MANIFEST §17.6)."""
+    from tundlekit.render import check_path_string
+
+    check_path_string(png_path, "png")
+    if png_path.replace("/", "\\").startswith("\\\\.\\"):
+        raise ToolError(f"png is not a valid path (it names a device): {png_path!r}")
+    target = pathlib.Path(png_path)
+    try:
+        if target.is_dir():
+            raise ToolError(f"png must be a file path, but {png_path} is a directory")
+        if os.path.lexists(target) and not target.is_file():
+            raise ToolError(f"png must be a regular file, but {png_path} is not (a device or special file)")
+    except OSError as e:
+        raise ToolError(f"cannot use {png_path} as the PNG path: {e}") from None
+
+
 def _write_png(svg: str, png_path: str) -> list[str]:
     """Convert with the first converter that works. The target is replaced only by a complete PNG, and its
     directory is created only after a converter succeeded (§16.1). Returns warnings."""
@@ -1949,6 +1966,8 @@ _SPEC_HELP = (
       readOnlyHint=False, destructiveHint=False, idempotentHint=True)
 def diagram_render(spec: dict | None = None, spec_path: str | None = None, mermaid: str | None = None,
                    mermaid_path: str | None = None, out: str | None = None, png: str | None = None) -> dict:
+    if png is not None:
+        _check_png_target(png)
     spec, warnings = _load_source(spec, spec_path, mermaid, mermaid_path)
     warnings = [w for w in warnings if not w.startswith("the imported spec is not valid")]
     warnings += _require_valid(spec)

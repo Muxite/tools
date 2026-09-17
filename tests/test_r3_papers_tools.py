@@ -14,12 +14,13 @@ LLMC_P1 = ("An LLM Compiler for Parallel Function Calling\n"
            "Abstract\n"
            "The reasoning capabilities of the recent LLMs\n")
 LLMC_TITLE = "An LLM Compiler for Parallel Function Calling"
-LLMC_AUTHORS = "Sehoon Kim * 1 Suhong Moon * 1 Ryan Tabrizi 1 Nicholas Lee 1"
+LLMC_AUTHORS = "Sehoon Kim Suhong Moon Ryan Tabrizi Nicholas Lee"  # §17.4: marks stripped (whitespace collapsed)
 
 AFLOW_P1 = ("\n"
             "AFLOW: AUTOMATING AGENTIC WORKFLOW GENERATION\n"
             "Jiayi Zhang, Jinyu Xiang, Zhaoyang Yu\n"
-            "ABSTRACT\n")
+            "ABSTRACT\n"
+            "We present AFLOW, a framework for workflow search.\n")  # §17.4: AFLOW stays an acronym
 
 
 def papers_dir(tmp_path):
@@ -63,7 +64,7 @@ def test_summary_default_short_and_write(tmp_path):
     assert target.is_file()
     assert r3.slash(res["path"]).endswith("summaries/2410.10762 - AFLOW.md")
     assert r3.norm_text(target.read_text(encoding="utf-8")) == r3.skeleton(
-        "2410.10762", "AFLOW: AUTOMATING AGENTIC WORKFLOW GENERATION", "Jiayi Zhang, Jinyu Xiang, Zhaoyang Yu", 6, 4)
+        "2410.10762", "AFLOW: Automating Agentic Workflow Generation", "Jiayi Zhang, Jinyu Xiang, Zhaoyang Yu", 6, 4)
 
 
 def test_summary_default_short_truncated_to_40(tmp_path):

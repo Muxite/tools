@@ -49,7 +49,7 @@ errors or the tool failed, 2 usage error. Checkers accept `--strict` (warnings f
 
 | Group | Commands | What for |
 |---|---|---|
-| `tundlekit bundle ...` | `status`, `release`, `compare`, `prune`, `init`, `lint`, `verify`, `source`, `setup-table` | keep a tundle: versioned releases, copy comparison, history clearing, portable names, setup tables, SOURCE.md files (1 file, or a whole folder with `source DIR --all`) and checksums |
+| `tundlekit bundle ...` | `status`, `release`, `compare`, `prune`, `init`, `lint`, `verify`, `source`, `setup-table`, `backup` | keep a tundle: versioned releases, copy comparison, history clearing, portable names, setup tables, SOURCE.md and per-file `<name>.SOURCE.md` files (1 file, or a whole folder with `source DIR --all`) and checksums, and `versions/` snapshots before an edit (`backup`) |
 | `tundlekit deck ...` | `build`, `lint`, `inspect`, `diff` | PowerPoint decks from a JSON spec (native single- and multi-series charts, monospace table columns); timing and speaker-note rules, several decks against 1 times file (`lint --ids`); hand edits, cuts, moves and renumbering carried back |
 | `tundlekit diagram ...` | `render`, `validate`, `from-mermaid`, `to-mermaid` | SVG/PNG diagrams (colour = stage, style = actor) from a spec or Mermaid, with group-aware wrapping |
 | `tundlekit chart ...` | `bar` | SVG bar charts with a highlighted bar and a takeaway |
@@ -68,6 +68,7 @@ Examples:
 tundlekit bundle status
 tundlekit bundle release "Added the September report"
 tundlekit bundle source setup --all
+tundlekit bundle backup reports/report.docx --reason "cut section 4"
 tundlekit office check --wait 60
 tundlekit deck lint examples/deck.json
 tundlekit deck build examples/deck.json -o build/example.pptx
@@ -100,6 +101,7 @@ tundlekit call palette_get --args '{}'
 |---|---|---|---|
 | `bundle status`, `compare`, `lint`, `verify` | checking a copy before editing or copying it; catching unportable names, junk, stale PDFs, bad checksums | Python, `git` | no |
 | `bundle source`, `bundle setup-table` | drafting SOURCE.md files and setup README rows from file names, existing README rows and hashes instead of typing them (dry run by default); `bundle source DIR --all` drafts every missing SOURCE.md in a folder tree | Python | with `--write` |
+| `bundle backup` | snapshotting files into the nearest `versions/` folder as `<stem> (before <reason> <date>)<ext>` before an edit, instead of copying by hand; refuses while Word, PowerPoint or Excel is running (`--force-office` overrides, but closing Office is the rule), never overwrites without `--overwrite`, lists older `(before ...)` snapshots as `superseded` and deletes them with `--prune` | Python | yes (a copy; `--prune` **deletes** older snapshots) |
 | `bundle release`, `init` | 1-command versioned release with a CHANGELOG entry | Python, `git`, a git identity | yes (commit) |
 | `bundle prune` | clearing old history safely (dry run by default) | Python, `git` | yes (**rewrites history**; needs `--yes`) |
 | `deck build`, `deck inspect` | building a timed, rule-following deck from JSON, including native `series` charts (multi-series bar and line, with a legend), `mono_cols` tables and strip-overlap warnings; reading any deck's text and notes | `office` extra | build: yes |
@@ -112,7 +114,7 @@ tundlekit call palette_get --args '{}'
 | `chart bar` | a highlighted bar chart with data labels and a takeaway | nothing | with `-o` |
 | `palette show` | the shared colour rules | nothing | no |
 | `text lint`, `fignums`, `wordcount` | style-card prose checks, numbering, per-section and per-bucket word counts | nothing (`--baseline`: `git`) | no |
-| `text xref` | checking § / App. / Fig. / Table references in scripts and notes, each against the report it slices (`--in FILE=REPORT`, `--exclude`), and renumbering them all at once | nothing | with `--write` |
+| `text xref` | checking § / App. / Fig. / Table references in scripts and notes, each against the report it slices (`--in FILE=REPORT`, `--exclude`), and renumbering them all at once, including whole appendices (`--renumber "App. E=App. D"`; `--renumber-report` when several reports hold the reference) | nothing | with `--write` |
 | `text apply-edits` | applying review edits as anchored replacements (fails instead of silently missing), also inside .docx, and a list of per-file edits all or nothing | nothing | with `--write` |
 | `text docx-diff` | carrying hand edits in a .docx back into the Markdown source, with source line hints; `--emit-edits` writes them as an edits file for `text apply-edits` | nothing | only the `--emit-edits` file |
 | `render pdf`, `render sheet` | page PNGs and contact sheets for eyeballing a deliverable | `pdf` extra / `office` extra | yes |
@@ -142,7 +144,9 @@ tundlekit call palette_get --args '{}'
   (`layout_text`); re-extract with `tundlekit papers fetch ID --reextract` (needs pymupdf for reading-order text).
 - `review coverage` matches sections by their numbers (`§2.3` in slide footers) or by title similarity; unnumbered
   headings and slides without a footer are matched only by title, so cite the report section in every footer.
-- `claims trace` finds numbers as written (plus percent ↔ decimal). A number the paper states in another form
+- `claims trace` is deliberately low priority and is **not reliable**: it is not a release gate, it misses
+  numbers and it matches numbers by coincidence. Do not treat its output as a check; trace numbers by hand. In
+  detail: it finds numbers as written (plus percent ↔ decimal). A number the paper states in another form
   (a fraction, a rounded value, a figure read off a plot) shows as untraced until it has a ledger row, and a located
   number may still be the wrong quantity. Only references with an arXiv id are traced, and only `[n]` references
   or a paper name with its id plus a `(pN)` locator count as citations. A report with neither gives 0 claims and a
@@ -164,7 +168,16 @@ tundlekit call palette_get --args '{}'
   (`zh-en-translation` skill). `translate terms` downgrades a missing term to L003 only when the glossary has an
   approved Chinese rendering and the file is mostly Chinese.
 - `text apply-edits` on a .docx edits text within 1 paragraph; it does not add or remove paragraphs.
-  `docx-diff --emit-edits` covers only `replace` changes with exactly 1 source location.
+  `docx-diff --emit-edits` covers only `replace` changes with exactly 1 source location whose old text is a whole
+  paragraph there (a Markdown paragraph or a whole string literal) and at least 12 characters; the rest are listed
+  under `not_emitted` for manual work. `--write` on an Office file is refused while Office is running
+  (`--force-office` overrides).
+- `FILE=REPORT` and `OLD=NEW` arguments are shown in PowerShell form. Git Bash (MSYS) may rewrite an `A=B`
+  argument whose right side looks like an absolute path; keep such paths relative, quote the argument, or set
+  `MSYS2_ARG_CONV_EXCL="*"`, or use PowerShell.
+- `translate terms` reports the line (`line`) in the compared file, not in the flagged file. Use
+  `--compare same-language` for round trips (zh → en → zh), or the back-translation is compared with the middle
+  hop.
 - Every checker's output is a starting list to confirm. Each skill lists the known remaining false positives
   (noise) of the tools it runs.
 

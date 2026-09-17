@@ -10,6 +10,7 @@ import fnmatch
 import hashlib
 import os
 import re
+import shutil
 import stat as _stat
 import subprocess
 from pathlib import Path
@@ -79,6 +80,7 @@ GIT_ENV_BLOCKLIST = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_D
 PSEUDO_REFS = ("ORIG_HEAD", "FETCH_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "BISECT_HEAD", "AUTO_MERGE")
 SIGNATURE_HEADERS = (b"gpgsig", b"gpgsig-sha256")
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+FILE_ATTRIBUTE_READONLY = 0x1
 
 ROOT_PROP = {"type": "string", "description": "tundle root; default: walk up from the current directory"}
 
@@ -654,7 +656,15 @@ def _verify_source(top: Path, source: Path, findings: list[dict], checked: list[
             else:
                 target = folder / name
             break
-    if file_line is None:
+    per_file = _per_file_target(source.name)
+    if file_line is None and per_file is not None:
+        problem = _target_problem(top, folder, per_file)
+        if problem:
+            findings.append(_finding("B013", "warning", rel,
+                                     f"cannot tell which file: {per_file} (named by {source.name}) {problem}"))
+        else:
+            target = folder / per_file
+    elif file_line is None:
         candidates = sorted(p for p in folder.iterdir()
                             if p.is_file() and not p.is_symlink() and not _is_special(p.name))
         if len(candidates) == 1:
@@ -716,7 +726,7 @@ def _verify(top: Path) -> tuple[list[dict], list[dict]]:
     findings, checked = [], []
     for dirpath, _, filenames, _ in walk(top):
         for name in filenames:
-            if name.lower() == "source.md":
+            if name.lower() == "source.md" or _per_file_target(name) is not None:
                 _verify_source(top, Path(dirpath) / name, findings, checked)
     checked.sort(key=lambda c: c["source"])
     return findings, checked
@@ -762,9 +772,59 @@ SPECIAL_NAMES = ("readme.md", "source.md")
 FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 
 
+SOURCE_SUFFIX = ".source.md"
+
+
 def _is_special(name: str) -> bool:
-    """README.md or SOURCE.md, in any letter case (§16.1)."""
-    return name.lower() in SPECIAL_NAMES
+    """README.md, SOURCE.md or a per-file `<name>.SOURCE.md`, in any letter case (§16.1, §17.8)."""
+    lower = name.lower()
+    return lower in SPECIAL_NAMES or lower.endswith(SOURCE_SUFFIX)
+
+
+def _per_file_target(name: str) -> str | None:
+    """`<name>` for a per-file `<name>.SOURCE.md` (§17.3), else None."""
+    if name.lower().endswith(SOURCE_SUFFIX) and len(name) > len(SOURCE_SUFFIX):
+        return name[:-len(SOURCE_SUFFIX)]
+    return None
+
+
+def _file_line_value(path: str | os.PathLike) -> str | None:
+    """The cleaned value of a SOURCE file's first `- File:` line; None without one, "" when unreadable."""
+    try:
+        text = _read_text(Path(path))
+    except OSError:
+        return ""
+    for line in text.splitlines():
+        m = FILE_LINE.match(line)
+        if m:
+            return _clean_value(m.group(1))
+    return None
+
+
+def _path_key(path: str | os.PathLike) -> str:
+    return os.path.normcase(os.path.normpath(os.path.abspath(path)))
+
+
+def _coverage(folder: str | os.PathLike, filenames: list[str]) -> set[str]:
+    """Path keys of the files that the SOURCE files among `filenames` (the regular files of folder) cover (§17.3).
+
+    SOURCE.md covers its `- File:` target, or else the only other file in the folder; `<name>.SOURCE.md`
+    covers `<name>`.
+    """
+    keys: set[str] = set()
+    others = [n for n in filenames if not _is_special(n)]
+    for n in filenames:
+        per_file = _per_file_target(n)
+        if per_file is not None:
+            keys.add(_path_key(os.path.join(folder, per_file)))
+        elif n.lower() == "source.md":
+            value = _file_line_value(os.path.join(folder, n))
+            if value is None:
+                if len(others) == 1:
+                    keys.add(_path_key(os.path.join(folder, others[0])))
+            elif value and "\0" not in value:
+                keys.add(_path_key(os.path.join(folder, *re.split(r"[\\/]", value))))
+    return keys
 
 
 def _find_ci(folder: str | os.PathLike, name: str) -> str | None:
@@ -840,41 +900,74 @@ def _first_cell_names(line: str) -> list[str]:
     return [span.strip() for span in re.findall(r"`([^`]*)`", cells[0]) if span.strip()]
 
 
-def _atomic_write(path: str | os.PathLike, data: bytes) -> None:
-    """Write data to path atomically (§16.1): a temp file next to the target, then replace.
+def _is_read_only(path: str | os.PathLike) -> bool:
+    """An existing regular file that can't be written: read-only attribute or no write permission."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return False
+    if not _stat.S_ISREG(st.st_mode):
+        return False
+    if getattr(st, "st_file_attributes", 0) & FILE_ATTRIBUTE_READONLY:
+        return True
+    return not st.st_mode & _stat.S_IWUSR or not os.access(path, os.W_OK)
 
-    A symlink is written through to its target, and an existing file keeps its permission bits.
+
+def _refuse_read_only(target: str | os.PathLike) -> None:
+    if _is_read_only(target):
+        raise ToolError(f"{target} is read-only: make it writable first (nothing was written)")
+
+
+def _unlink_quietly(path: str | os.PathLike | None) -> None:
+    if path is None:
+        return
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
+def _temp_beside(target: str, fill) -> str:
+    """A new temp file in target's folder, filled by `fill(binary file)`; its path. Removed again on failure."""
+    folder, base = os.path.split(target)
+    for n in range(100):
+        candidate = os.path.join(folder, f".{base}.{os.getpid()}.{n}.tundlekit-tmp")
+        try:
+            fd = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o666)
+        except FileExistsError:
+            continue
+        break
+    else:
+        raise OSError(f"cannot create a temporary file in {folder}")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            fill(f)
+    except BaseException:
+        _unlink_quietly(candidate)
+        raise
+    return candidate
+
+
+def _atomic_write(path: str | os.PathLike, data: bytes) -> None:
+    """Write data to path atomically (§16.1, §17.3): a temp file next to the target, then replace.
+
+    A read-only target is refused (ToolError) before any temp file exists, and the temp file never outlives a
+    failure. A symlink is written through to its target, and an existing file keeps its permission bits.
     """
     target = os.path.realpath(path) if os.path.islink(path) else os.path.abspath(path)
+    _refuse_read_only(target)
     try:
         mode = _stat.S_IMODE(os.stat(target).st_mode)
     except OSError:
         mode = None
-    folder, base = os.path.split(target)
-    tmp = None
+    tmp = _temp_beside(target, lambda f: f.write(data))
     try:
-        for n in range(100):
-            candidate = os.path.join(folder, f".{base}.{os.getpid()}.{n}.tundlekit-tmp")
-            try:
-                fd = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o666)
-            except FileExistsError:
-                continue
-            tmp = candidate
-            break
-        else:
-            raise OSError(f"cannot create a temporary file in {folder}")
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
         if mode is not None:
             os.chmod(tmp, mode)
         os.replace(tmp, target)
-        tmp = None
-    finally:
-        if tmp is not None:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
+    except BaseException:
+        _unlink_quietly(tmp)
+        raise
 
 
 def _readme_path(folder: Path) -> Path:
@@ -972,7 +1065,8 @@ def bundle_lint(root: str | None = None, max_path: int = 160, large_mb: float = 
     top = find_root(root)
     findings: list[dict] = []
     junk: list[tuple[str, bool]] = []      # (relative path, is a folder): B005, severity decided below
-    uncovered = 0                          # B014
+    installers: list[str] = []             # B014: path keys of installer files under setup/<dir>/
+    covered: set[str] = set()
     n_files = 0
     for dirpath, dirnames, filenames, linknames in walk(top):
         folder = Path(dirpath)
@@ -1009,9 +1103,8 @@ def bundle_lint(root: str | None = None, max_path: int = 160, large_mb: float = 
                                          "looks like a copy or old version: replace the file instead"))
             if _is_junk_file(name):
                 junk.append((rel, False))
-            elif (len(parts) >= 2 and parts[0] == "setup" and not _is_special(name)
-                  and not _source_covers(top, parts)):
-                uncovered += 1
+            elif len(parts) >= 2 and parts[0] == "setup" and not _is_special(name):
+                installers.append(_path_key(full))
             try:
                 stat = os.stat(full, follow_symlinks=False)
             except OSError:
@@ -1022,6 +1115,8 @@ def bundle_lint(root: str | None = None, max_path: int = 160, large_mb: float = 
             if ext.lower() == ".pdf":
                 _lint_pdf(folder, rel, stem, stat.st_mtime, present, findings)
 
+        if parts and parts[0] == "setup":
+            covered |= _coverage(folder, names)
         if parts and parts[-1] == "versions":
             _lint_versions(rel_dir, names, findings)
         if len(parts) == 2 and parts[0] == "setup":
@@ -1036,27 +1131,14 @@ def bundle_lint(root: str | None = None, max_path: int = 160, large_mb: float = 
                                      "copied folder"))
         else:
             findings.append(_finding("B005", "warning", rel, what))
+    uncovered = sum(1 for key in installers if key not in covered)
     if uncovered:
         findings.append(_finding("B014", "info", "setup",
-                                 f"{uncovered} installer file(s) under setup/ have no SOURCE.md "
-                                 "(tundlekit bundle source FILE --write)"))
+                                 f"{uncovered} installer file(s) under setup/ are not covered by a SOURCE.md or "
+                                 "<name>.SOURCE.md (tundlekit bundle source DIR --all --write)"))
     _lint_changelog(top, findings)
     findings.extend(_verify(top)[0])
     return _checker_result(_apply_ignore(findings, ignore), files=n_files)
-
-
-def _source_covers(top: Path, parts: list[str]) -> bool:
-    """A file in setup/<dir>/... is covered by a SOURCE.md in its own folder or its setup/<dir>/<sub>/ folder."""
-    return _covered(top.joinpath(*parts), top.joinpath(*parts[:3]) if len(parts) >= 3 else None)
-
-
-def _has_source(folder: Path) -> bool:
-    name = _find_ci(folder, "SOURCE.md")
-    return name is not None and (folder / name).is_file()
-
-
-def _covered(folder: Path, sub: Path | None) -> bool:
-    return _has_source(folder) or (sub is not None and _has_source(sub))
 
 
 def _git_ignored(top: Path, entries: list[tuple[str, bool]]) -> set[str]:
@@ -1165,7 +1247,8 @@ def _find_version(stem: str) -> tuple[str, str] | None:
     if m:
         digits, before = m.group(1), stem[:m.start(1)]
         attached = before and before[-1] not in SEPARATORS
-        if before.strip(SEPARATORS) and (not attached or len(before) >= 2):
+        excluded = digits.endswith("00") or (len(digits) == 4 and digits[:2] in ("19", "20"))
+        if not excluded and before.strip(SEPARATORS) and (not attached or len(before) >= 2):
             cut = len(digits) - 2
             return f"{digits[:cut]}.{digits[cut:]}", before
     return None
@@ -1215,13 +1298,26 @@ def _readme_guess(folder: Path, name: str) -> tuple[str, str] | None:
         cells = _cells(line)
         if len(cells) < 2:
             continue
-        what = re.split(r"[,⚠]", cells[1], maxsplit=1)[0].strip()
-        tokens = what.split()
-        at = next((i for i, t in enumerate(tokens) if t[:1].isdigit()), len(tokens))
-        program, version = " ".join(tokens[:at]), " ".join(tokens[at:])
+        program, version = _split_what(cells[1])
         if program or version:
             return program, version
     return None
+
+
+def _split_what(cell: str) -> tuple[str, str]:
+    """(program, version) from a README "What it is" cell (§17.3).
+
+    The version is the first token that starts with a digit and contains a `.`, or is `R20xx[ab]`; the program is
+    the text before it (up to a `,` or `⚠`), and the text after it is dropped. Without such a token, the program is
+    the text before the first `,` or `⚠` and there is no version.
+    """
+    tokens = cell.split()
+    for i, token in enumerate(tokens):
+        bare = token.rstrip(".,;:!?)]*_")
+        if (bare[:1].isdigit() and "." in bare) or re.fullmatch(r"R20[0-9]{2}[ab]", bare):
+            program = re.split(r"[,⚠]", " ".join(tokens[:i]), maxsplit=1)[0].strip()
+            return program, bare
+    return re.split(r"[,⚠]", cell, maxsplit=1)[0].strip(), ""
 
 
 def _heading(program: str, version: str) -> str:
@@ -1237,19 +1333,21 @@ def _sha256_file(path: str | os.PathLike) -> str:
 
 
 @tool("bundle_source",
-      "Draft (or with write=true, write) the SOURCE.md next to an installer: program and version guessed from the "
+      "Draft (or with write=true, write) the SOURCE record of an installer: program and version guessed from the "
       "file name (or taken from the folder's README.md row), download URL, file date, SHA-256 and install steps. "
-      "A written SOURCE.md passes bundle_verify. An existing SOURCE.md is only replaced with force=true. With a "
-      "directory as `file`, does this for every installer under setup/<dir>/ that has no SOURCE.md (existing ones "
-      "are skipped) and returns {results: [...]}.",
+      "It goes to SOURCE.md when the folder holds no other installer, else to <name>.SOURCE.md. A written file "
+      "passes bundle_verify. An existing one is only replaced with force=true. With a directory as `file`, does "
+      "this for every installer under setup/<dir>/ that no SOURCE file covers and returns {results: [...]} "
+      "(force is refused there).",
       {"type": "object",
        "properties": {"file": {"type": "string",
                                "description": "the installer file, or a directory to cover every installer in it"},
                       "url": {"type": "string", "description": "official download URL"},
                       "install": {"type": "string", "description": "install steps or silent install command"},
-                      "write": {"type": "boolean", "description": "write SOURCE.md (default: return the text only)",
+                      "write": {"type": "boolean", "description": "write the SOURCE file (default: text only)",
                                 "default": False},
-                      "force": {"type": "boolean", "description": "replace an existing SOURCE.md",
+                      "force": {"type": "boolean",
+                                "description": "replace an existing SOURCE file (single file only)",
                                 "default": False}},
        "required": ["file"], "additionalProperties": False},
       readOnlyHint=False, destructiveHint=False)
@@ -1259,6 +1357,9 @@ def bundle_source(file: str, url: str | None = None, install: str | None = None,
         if value is not None and ("\n" in value or "\r" in value):
             raise ToolError(f"{label} must be 1 line")
     if os.path.isdir(file):
+        if force:
+            raise ToolError("force is not allowed with a directory: replace existing SOURCE files one at a time "
+                            "(bundle source FILE --write --force)")
         return {"results": [_source_one(path, url, install, write, force=False)
                             for path in _uncovered_installers(Path(os.path.abspath(file)))]}
     if not os.path.isfile(file):
@@ -1269,9 +1370,32 @@ def bundle_source(file: str, url: str | None = None, install: str | None = None,
     return _source_one(file, url, install, write, force, strict=True)
 
 
+def _source_name(folder: str, name: str) -> str:
+    """The SOURCE file for installer `name` in folder (§17.3): an existing `<name>.SOURCE.md`, an existing SOURCE.md
+    whose `- File:` names it, SOURCE.md when the folder holds no other installer, else `<name>.SOURCE.md`."""
+    per_file = _find_ci(folder, name + ".SOURCE.md")
+    if per_file is not None:
+        return per_file
+    try:
+        entries = sorted(os.listdir(folder))
+    except OSError:
+        entries = []
+    shared = _find_ci(folder, "SOURCE.md")
+    if shared is not None:
+        value = _file_line_value(os.path.join(folder, shared))
+        if value and _path_key(os.path.join(folder, *re.split(r"[\\/]", value))) == \
+                _path_key(os.path.join(folder, name)):
+            return shared
+    others = [e for e in entries if e != name and not _is_special(e) and not _is_junk_file(e)
+              and os.path.isfile(os.path.join(folder, e))]
+    if not others:
+        return shared or "SOURCE.md"
+    return name + ".SOURCE.md"
+
+
 def _source_one(file: str | os.PathLike, url: str | None, install: str | None, write: bool, force: bool,
                 strict: bool = False) -> dict:
-    """The single-file bundle_source. Without strict, an existing SOURCE.md is skipped (written false)."""
+    """The single-file bundle_source. Without strict, an existing SOURCE file is skipped (written false)."""
     file = os.fspath(file)
     name = os.path.basename(os.path.abspath(file))
     try:
@@ -1290,13 +1414,14 @@ def _source_one(file: str | os.PathLike, url: str | None, install: str | None, w
         f"- SHA-256:    {digest}",
         f"- Install:    {install if install is not None else '<steps>'}",
     ]) + "\n"
-    existing = _find_ci(folder or ".", "SOURCE.md")
-    path = os.path.join(folder, existing or "SOURCE.md")
+    target = _source_name(folder or ".", name)
+    path = os.path.join(folder, target)
+    exists = os.path.lexists(path)
     result = {"path": path, "text": text, "sha256": digest, "program": program, "version": version,
               "written": False}
-    if existing is not None and not force:
+    if exists and not force:
         if not strict:
-            result["skipped"] = "SOURCE.md already exists"
+            result["skipped"] = f"{target} already exists"
             return result
         if write:
             raise ToolError(f"{path} already exists: pass force to replace it")
@@ -1323,7 +1448,7 @@ def _setup_base(folder: Path) -> Path | None:
 
 
 def _uncovered_installers(folder: Path) -> list[Path]:
-    """Files under folder that B014 counts (installers under setup/<dir>/ without a SOURCE.md), 1 per folder."""
+    """Files under folder that B014 counts: installers under setup/<dir>/ that no SOURCE file covers (§17.3)."""
     base = _setup_base(folder)
     if base is None:  # a plain folder: treat it as a setup/<dir>/ folder of its own
         base, start = folder.parent, folder
@@ -1333,20 +1458,16 @@ def _uncovered_installers(folder: Path) -> list[Path]:
         start = base
     else:
         return []
-    found = []
+    candidates, covered = [], set()
     for dirpath, dirnames, filenames, _ in walk(start):
         dirnames[:] = [d for d in dirnames if d not in JUNK_DIRS]
         here = Path(dirpath)
+        covered |= _coverage(here, filenames)
         parts = Path(os.path.relpath(here, base)).parts
         if not parts or parts[0] in (os.curdir, os.pardir):
             continue  # files directly in setup/ are not counted
-        sub = base.joinpath(*parts[:2]) if len(parts) >= 2 else None
-        if _covered(here, sub):
-            continue
-        installers = [n for n in filenames if not _is_special(n) and not _is_junk_file(n)]
-        if installers:
-            found.append(here / installers[0])  # 1 SOURCE.md per folder: the first installer in sorted order
-    return found
+        candidates += [here / n for n in filenames if not _is_special(n) and not _is_junk_file(n)]
+    return [p for p in candidates if _path_key(p) not in covered]
 
 
 def _insert_rows(text: str, rows: list[str], title: str) -> str:
@@ -1426,12 +1547,199 @@ def bundle_setup_table(dir: str, write: bool = False) -> dict:
     return {"added": rows, "skipped": skipped, "written": written}
 
 
+# ---------------------------------------------------------------- backup (§17.3)
+
+BAD_REASON_CHARS = set('()/\\:*?"<>|')
+
+
+def _versions_dir(file: Path) -> Path:
+    """The nearest `versions/` walking up from file's folder to its tundle root (included), else `<dir>/versions`."""
+    folder = file.parent
+    chain = [folder, *folder.parents]
+    root_at = next((i for i, d in enumerate(chain) if _is_tundle(d)), None)
+    if root_at is not None:
+        for candidate in chain[:root_at + 1]:
+            if (candidate / "versions").is_dir():
+                return candidate / "versions"
+    return folder / "versions"
+
+
+def _snapshot_pattern(stem: str, ext: str) -> re.Pattern:
+    flags = re.I if os.name == "nt" else 0
+    return re.compile(rf"{re.escape(stem)} \(before [^()]*\){re.escape(ext)}", flags)
+
+
+def _check_office(force_office: bool) -> None:
+    if force_office:
+        return
+    from tundlekit import render  # lazy: render is heavier and may be patched in tests
+
+    running = render.office_running()
+    if running:
+        raise ToolError(f"Office is running ({', '.join(running)}): close it so the files are saved and not "
+                        "locked, or pass force_office (nothing was copied)")
+
+
+def _copy_to_temp(source: Path, target: str) -> str:
+    """source copied into a temp file beside target, with source's modification time."""
+    def fill(f):
+        with open(source, "rb") as src:
+            shutil.copyfileobj(src, f, MiB)
+    tmp = _temp_beside(target, fill)
+    try:
+        st = os.stat(source)
+        os.utime(tmp, ns=(st.st_atime_ns, st.st_mtime_ns))
+    except BaseException:
+        _unlink_quietly(tmp)
+        raise
+    return tmp
+
+
+@tool("bundle_backup",
+      "Keep a dated snapshot before a big edit: copy each file to the nearest versions/ folder (walking up to the "
+      "tundle root; else <file dir>/versions, created) as '<stem> (before <reason> <YYYY-MM-DD>)<ext>'. The copy "
+      "is atomic and keeps the modification time. Refuses, copying nothing, while Office is running (unless "
+      "force_office), for an empty reason or one with ()/\\:*?\"<>|, for a missing file, or when a snapshot "
+      "exists (unless overwrite). Lists older '(before ...)' snapshots of the same file as superseded; "
+      "prune=true deletes them.",
+      {"type": "object",
+       "properties": {"files": {"type": "array", "items": {"type": "string"}, "minItems": 1,
+                                "description": "the files to snapshot"},
+                      "reason": {"type": "string", "description": "why, e.g. 'restyle' (goes into the name)"},
+                      "prune": {"type": "boolean", "description": "delete the superseded snapshots",
+                                "default": False},
+                      "overwrite": {"type": "boolean", "description": "replace an existing snapshot of the same "
+                                                                      "name", "default": False},
+                      "force_office": {"type": "boolean", "description": "copy even while Office is running",
+                                       "default": False}},
+       "required": ["files", "reason"], "additionalProperties": False},
+      readOnlyHint=False, destructiveHint=True)
+def bundle_backup(files: list[str], reason: str | None = None, prune: bool = False, overwrite: bool = False,
+                  force_office: bool = False) -> dict:
+    reason = (reason or "").strip()
+    if not reason:
+        raise ToolError("reason is empty: say why the snapshot is taken, e.g. --reason restyle")
+    bad = sorted({c for c in reason if c in BAD_REASON_CHARS or ord(c) < 32 or ord(c) == 127})
+    if bad:
+        shown = " ".join(c if c.isprintable() else repr(c) for c in bad)
+        raise ToolError(f"reason {reason!r} contains characters that can't go into the snapshot name: {shown}")
+    if not files:
+        raise ToolError("no files given")
+    sources = []
+    for f in files:
+        path = Path(os.path.abspath(f))
+        if not path.is_file():
+            what = "is not a file" if path.exists() else "does not exist"
+            raise ToolError(f"{f} {what} (nothing was copied)")
+        sources.append(path)
+    _check_office(force_office)
+
+    date = _now().strftime("%Y-%m-%d")
+    plans, seen = [], {}
+    for source in sources:
+        versions = _versions_dir(source)
+        stem, ext = os.path.splitext(source.name)
+        target = versions / f"{stem} (before {reason} {date}){ext}"
+        key = _path_key(target)
+        if key in seen:
+            raise ToolError(f"{seen[key]} and {source} would both be copied to {target} (nothing was copied)")
+        seen[key] = source
+        if _path_key(source) == key:
+            raise ToolError(f"{source} is already that snapshot (nothing was copied)")
+        if os.path.lexists(target):
+            if not overwrite:
+                raise ToolError(f"{target} already exists: pass overwrite to replace it (nothing was copied)")
+            if not target.is_file() or target.is_symlink():
+                raise ToolError(f"{target} exists and is not a regular file (nothing was copied)")
+            _refuse_read_only(target)
+        pattern = _snapshot_pattern(stem, ext)
+        superseded = []
+        if versions.is_dir():
+            try:
+                names = sorted(os.listdir(versions))
+            except OSError as e:
+                raise ToolError(f"cannot read {versions}: {e.strerror or e}") from None
+            superseded = [versions / n for n in names
+                          if pattern.fullmatch(n) and _path_key(versions / n) != key
+                          and (versions / n).is_file() and not (versions / n).is_symlink()]
+        plans.append((source, versions, target, superseded))
+
+    created_dirs, temps = [], []
+    try:
+        for source, versions, target, _ in plans:
+            if not versions.is_dir():
+                missing = [d for d in (versions, *versions.parents) if not d.exists()]
+                versions.mkdir(parents=True, exist_ok=True)
+                created_dirs += [d for d in missing if d not in created_dirs]
+            temps.append(_copy_to_temp(source, str(target)))
+    except (OSError, ToolError) as e:
+        for tmp in temps:
+            _unlink_quietly(tmp)
+        for d in sorted(created_dirs, key=lambda d: len(d.parts), reverse=True):
+            try:
+                d.rmdir()
+            except OSError:
+                pass
+        if isinstance(e, ToolError):
+            raise
+        raise ToolError(f"cannot copy: {e.strerror or e} (nothing was copied)") from None
+
+    done: list[tuple[Path, str | None]] = []   # (target, backup of the replaced snapshot)
+    try:
+        for (source, versions, target, _), tmp in zip(plans, temps):
+            saved = None
+            if os.path.lexists(target):
+                saved = _temp_beside(str(target), lambda f: None)
+                os.replace(target, saved)
+            try:
+                os.replace(tmp, target)
+            except BaseException:
+                if saved is not None:
+                    os.replace(saved, target)
+                raise
+            done.append((target, saved))
+    except OSError as e:
+        restored = []
+        for target, saved in reversed(done):
+            try:
+                if saved is not None:
+                    os.replace(saved, target)
+                else:
+                    os.unlink(target)
+                restored.append(str(target))
+            except OSError:
+                pass
+        for tmp in temps:
+            _unlink_quietly(tmp)
+        undone = f"; undone: {', '.join(restored)}" if restored else ""
+        raise ToolError(f"cannot copy: {e.strerror or e}{undone}") from None
+    for _, saved in done:
+        _unlink_quietly(saved)
+
+    result = {"backups": [{"source": str(source), "path": str(target), "bytes": os.stat(target).st_size}
+                          for source, _, target, _ in plans],
+              "superseded": [str(p) for _, _, _, superseded in plans for p in superseded]}
+    if prune:
+        failed = []
+        for path in result["superseded"]:
+            try:
+                os.unlink(path)
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                failed.append({"path": path, "error": str(e.strerror or e)})
+        if failed:
+            result["not_pruned"] = failed
+    return result
+
+
 # ---------------------------------------------------------------- CLI
 
 def add_cli(groups) -> None:
     from tundlekit.cli_support import common_flags
 
-    p = groups.add_parser("bundle", help="tundle maintenance: status, release, compare, prune, init, lint, verify")
+    p = groups.add_parser("bundle", help="tundle maintenance: status, release, compare, prune, init, lint, verify, "
+                                        "source, setup-table, backup")
     cmds = p.add_subparsers(dest="command", metavar="COMMAND", required=True)
 
     def command(name, help, handler, checker=False, root=True):
@@ -1468,6 +1776,12 @@ def add_cli(groups) -> None:
     c = command("setup-table", "add README.md table rows for unlisted setup entries", _cli_setup_table, root=False)
     c.add_argument("dir", metavar="DIR", help="the setup/<dir>/ folder")
     c.add_argument("--write", action="store_true", help="update README.md")
+    c = command("backup", "copy files to versions/ as '<stem> (before REASON DATE)<ext>'", _cli_backup, root=False)
+    c.add_argument("files", metavar="FILE", nargs="+", help="the files to snapshot")
+    c.add_argument("--reason", required=True, help="why the snapshot is taken (goes into the name)")
+    c.add_argument("--prune", action="store_true", help="delete the older (before ...) snapshots it supersedes")
+    c.add_argument("--overwrite", action="store_true", help="replace an existing snapshot of the same name")
+    c.add_argument("--force-office", action="store_true", help="copy even while Office is running")
     c = command("verify", "check SOURCE.md checksums", _cli_verify, checker=True)
     c.add_argument("--ignore", action="append", metavar="RULE[:GLOB]", help="drop findings (repeatable)")
 
@@ -1588,6 +1902,20 @@ def _cli_setup_table(args):
     lines += [f"skipped {s['name']}: {s['reason']}" for s in r.get("skipped", [])]
     if r["added"]:
         lines.append("added to README.md" if r["written"] else "(dry run: add --write to update README.md)")
+    return CliResult(r, "\n".join(lines))
+
+
+def _cli_backup(args):
+    from tundlekit.cli_support import CliResult
+
+    r = bundle_backup(files=args.files, reason=args.reason, prune=args.prune, overwrite=args.overwrite,
+                      force_office=args.force_office)
+    lines = [f"saved {b['path']} ({human_size(b['bytes'])})" for b in r["backups"]]
+    if r["superseded"]:
+        verb = "pruned" if args.prune else "superseded (--prune deletes them)"
+        lines.append(f"{verb}:")
+        lines += [f"  {p}" for p in r["superseded"]]
+    lines += [f"could not delete {f['path']}: {f['error']}" for f in r.get("not_pruned", [])]
     return CliResult(r, "\n".join(lines))
 
 

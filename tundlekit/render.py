@@ -108,6 +108,31 @@ def _import_pptx():
 
 # ---------------------------------------------------------------------------------------------- backend discovery
 
+class ProcessListError(RuntimeError):
+    """The process list (tasklist / ps) could not be read, so the Office state is unknown."""
+
+
+def _scan_office(all_apps: bool) -> list[str]:
+    """Running Office process names; ProcessListError when tasklist (Windows) or ps (elsewhere) fails."""
+    if sys.platform != "win32":
+        return _soffice_scan() if all_apps else []
+    try:
+        proc = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True,
+                              errors="replace", timeout=60)
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        raise ProcessListError(f"could not run tasklist ({exc})") from None
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()[:200]
+        raise ProcessListError(f"tasklist failed with exit code {proc.returncode}" + (f": {detail}" if detail else ""))
+    images = set()
+    for line in (proc.stdout or "").splitlines():
+        first = line.split(",", 1)[0].strip().strip('"').upper()
+        if first:
+            images.add(first)
+    names = OFFICE_PROCESSES + (OFFICE_EXTRA if all_apps else ())
+    return [name for name in names if name in images]
+
+
 def office_running(all_apps: bool = False) -> list[str]:
     """Names of running Office processes (POWERPNT.EXE, WINWORD.EXE) that COM automation would attach to.
 
@@ -116,31 +141,29 @@ def office_running(all_apps: bool = False) -> list[str]:
     On Windows, if tasklist cannot be run, the state is unknown, so this raises ToolError rather than report
     "nothing running".
     """
-    if sys.platform != "win32":
-        return _soffice_running() if all_apps else []
     try:
-        proc = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True,
-                              errors="replace", timeout=60)
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise ToolError(f"refusing to use Office: could not run tasklist to check for open Office ({exc})") from None
-    images = set()
-    for line in proc.stdout.splitlines():
-        first = line.split(",", 1)[0].strip().strip('"').upper()
-        if first:
-            images.add(first)
-    names = OFFICE_PROCESSES + (OFFICE_EXTRA if all_apps else ())
-    return [name for name in names if name in images]
+        return _scan_office(all_apps)
+    except ProcessListError as exc:
+        if sys.platform != "win32":
+            return []
+        raise ToolError(f"refusing to use Office: {exc} to check for open Office") from None
 
 
-def _soffice_running() -> list[str]:
-    """Distinct LibreOffice process names from `ps` (`soffice`, `soffice.bin`); [] when ps is unavailable."""
+_OFFICE_RUNNING = office_running
+
+
+def _soffice_scan() -> list[str]:
+    """Distinct LibreOffice process names from `ps` (`soffice`, `soffice.bin`); ProcessListError on failure."""
     try:
         proc = subprocess.run(["ps", "-A", "-o", "comm="], capture_output=True, text=True, errors="replace",
                               timeout=60)
-    except (OSError, subprocess.SubprocessError):
-        return []
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        raise ProcessListError(f"could not run ps ({exc})") from None
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()[:200]
+        raise ProcessListError(f"ps failed with exit code {proc.returncode}" + (f": {detail}" if detail else ""))
     found = []
-    for line in proc.stdout.splitlines():
+    for line in (proc.stdout or "").splitlines():
         name = os.path.basename(line.strip())
         if name.lower().startswith("soffice") and name not in found:
             found.append(name)
@@ -261,13 +284,23 @@ def office_check(wait: float | None = None) -> dict:
     if isinstance(wait, bool) or not isinstance(wait, (int, float)) or not math.isfinite(wait) or wait < 0:
         raise ToolError(f"wait must be a finite number of seconds >= 0, got {wait!r}")
     deadline = time.monotonic() + wait
-    running = list(office_running(all_apps=True))
-    while running:
-        left = deadline - time.monotonic()
-        if left <= 0:
-            break
-        time.sleep(min(OFFICE_POLL, left))
-        running = list(office_running(all_apps=True))
+
+    def poll() -> list[str]:
+        names = _scan_office(all_apps=True)          # ProcessListError: the state is unknown (§17.6)
+        if office_running is not _OFFICE_RUNNING:     # a replaced hook (embedding code, tests) supplies the names
+            names = office_running(all_apps=True)
+        return list(names)
+
+    try:
+        running = poll()
+        while running:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                break
+            time.sleep(min(OFFICE_POLL, left))
+            running = poll()
+    except (ProcessListError, ToolError) as exc:
+        return {"running": [], "ok": False, "error": f"cannot tell whether Office is running: {exc}"}
     return {"running": running, "ok": not running}
 
 
@@ -1072,7 +1105,10 @@ def add_cli(groups) -> None:
 
 def _cli_office_check(args) -> CliResult:
     r = office_check(wait=args.wait)
-    text = "ok: no Office application is running" if r["ok"] else "running: " + ", ".join(r["running"])
+    if r.get("error"):
+        text = r["error"]
+    else:
+        text = "ok: no Office application is running" if r["ok"] else "running: " + ", ".join(r["running"])
     return CliResult(r, text, exit_code=0 if r["ok"] else 1)
 
 

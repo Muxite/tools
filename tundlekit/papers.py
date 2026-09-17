@@ -536,22 +536,119 @@ SUMMARY_FILE = re.compile(r"(.+?) - .*\.md")
 INDEX_COUNT = re.compile(r"(\d+) summaries")
 
 
-VENUE_LINE = re.compile(r"(?i)^(published as|accepted (at|to)|under review|preprint|arxiv:|proceedings of|"
-                        r"workshop on)")
+# Common English words (the ~600 most frequent, plus words common in paper titles). Used by the small-caps rule
+# and the single-name-line rule (MANIFEST §17.4, §17.8).
+COMMON_WORDS = frozenset("""
+a able about above accept according account across act action activity actually add address administration admit
+adult affect after again against age agency agent agents ago agree agreement ahead air all allow almost alone along
+already also although always am american among amount analysis and animal another answer any anyone anything appear
+apply approach area argue arm around arrive art article artist as ask assume at attack attention attorney audience
+author authority available avoid away baby back bad bag ball bank bar base be beat beautiful because become bed
+before begin behavior behind believe benefit best better between beyond big bill billion bit black blood blue board
+body book born both box boy break bring brother budget build building business but buy by call camera campaign can
+cancer candidate capital car card care career carry case catch cause cell center central century certain certainly
+chair challenge chance change character charge check child choice choose church citizen city civil claim class clear
+clearly close coach cold collection college color come commercial common community company compare computer concern
+condition conference congress consider consumer contain continue control cost could country couple course court
+cover create crime cultural culture cup current customer cut dark data daughter day dead deal death debate decade
+decide decision deep defense degree democrat democratic describe design despite detail determine develop development
+die difference different difficult dinner direction director discover discuss discussion disease do doctor dog door
+down draw dream drive drop drug during each early east easy eat economic economy edge education effect effort eight
+either election else employee end energy enjoy enough enter entire environment environmental especially establish
+even evening event ever every everybody everyone everything evidence exactly example executive exist expect
+experience expert explain eye face fact factor fail fall family far fast father fear federal feel feeling few field
+fight figure fill film final finally financial find fine finger finish fire firm first fish five floor fly focus
+follow food foot for force foreign forget form former forward four free friend from front full fund future game
+garden gas general generation get girl give glass go goal good government great green ground group grow growth guess
+gun guy hair half hand hang happen happy hard have he head health hear heart heat heavy help her here herself high
+him himself his history hit hold home hope hospital hot hotel hour house how however huge human hundred husband i
+idea identify if image imagine impact important improve in include including increase indeed indicate individual
+industry information inside instead institution interest interesting international interview into investment
+involve is issue it item its itself job join just keep key kid kill kind kitchen know knowledge land language large
+last late later laugh law lawyer lay lead leader learn learning least leave left leg legal less let letter level lie
+life light like likely line list listen little live local long look lose loss lot love low machine magazine main
+maintain major majority make man manage management manager many market marriage material matter may maybe me mean
+measure media medical meet meeting member memory mention message method middle might military million mind minute
+miss mission model models modern moment money month more morning most mother mouth move movement movie mr mrs much
+multi music must my myself name nation national natural nature near nearly necessary need network never new news
+newspaper next nice night no none nor north not note nothing notice now number occur of off offer office officer
+official often oh oil ok old on once one only onto open operation opportunity option or order organization other
+others our out outside over own owner page pain painting paper parent part participant particular particularly
+partner party pass past patient pattern pay peace people per perform performance perhaps period person personal
+phone physical pick picture piece place plan plant play player pm point police policy political politics poor
+popular population position positive possible power practice prepare present president pressure pretty prevent
+price private probably problem process produce product production professional professor program project property
+protect prove provide public pull purpose push put quality question quickly quite race radio raise range rate rather
+reach read ready real reality realize really reason receive recent recently recognize record red reduce reflect
+region relate relationship religious remain remember remove report represent republican require research resource
+respond response responsibility rest result return reveal rich right rise risk road rock role room rule run safe
+same save say scene school science scientist score sea season seat second section security see seek seem sell send
+senior sense series serious serve service set seven several sex sexual shake share she shoot short shot should
+shoulder show side sign significant similar simple simply since sing single sister sit site situation six size
+skill skin small smile so social society soldier some somebody someone something sometimes son song soon sort sound
+source south southern space speak special specific speech spend sport spring staff stage stand standard star start
+state statement station stay step still stock stop store story strategy street strong structure student study stuff
+style subject success successful such suddenly suffer suggest summer support sure surface survey system systems
+table take talk task tax teach teacher team technology television tell ten tend term test than thank that the
+their them themselves then theory there these they thing think third this those though thought thousand threat
+three through throughout throw thus time to today together tonight too top total tough toward town trade
+traditional training travel treat treatment tree trial trip trouble true truth try turn tv two type under
+understand unit until up upon us use usually value various very via victim view violence visit voice vote wait walk
+wall want war watch water way we weapon wear week weight well west western what whatever when where whether which
+while white who whole whom whose why wide wife will win wind window wish with within without woman wonder word work
+worker world worry would write writer wrong yard yeah year yes yet you young your yourself
+aware based benchmark benchmarks efficient evaluation framework frameworks generative graph improving large
+learn learned methods modeling neural novel open optimization planning reasoning reinforcement retrieval review
+robust scalable self study survey systematic tool tools toward towards understanding using vision
+""".split())
+
+VENUE_LINE = re.compile(
+    r"(?i)^(published (as|in)|accepted (at|to)|under review|preprint|arxiv:|proceedings of|workshop on"
+    r"|language resources and evaluation)"
+    r"|(?i:manuscript no\.|\(will be inserted by the editor\)|\btransactions on\b)"
+    r"|^<?(?:https?://|www\.)\S+>?$"
+    r"|^[\w.-]+\.(?:com|org|net|io|edu|ai|dev)(?:/\S*)?$"
+    r"|^<?[^\s@]*@\S+>?$")
 TITLE_WORDS = 20
 # Author marks after a name: `Smith1,`, `Smith1 2`, `Smith* 1`, `Smith*1`, `Smith†`, superscript digits.
 _DIGIT_MARK = re.compile(r"[a-z][0-9]{1,2}(?:\s*,\s*[0-9]{1,2})*(?=\s*(?:[,*∗†‡§]|$|\s[A-Z0-9]))")
+_SINGLE_MARK = re.compile(r"\b[A-Z][a-z]+(?:[0-9](?![0-9A-Za-z]|\.[0-9])|[∗*†])")
 _SYMBOL_MARK = re.compile(r"[A-Za-z]\s?[*∗†‡§]|[†‡]")
 _SUPERSCRIPT_MARK = re.compile(r"[A-Za-z.][¹²³⁴⁵⁶⁷⁸⁹⁰]")
-_CAPITALISED = re.compile(r"\b[A-Z][A-Za-z'’.-]*")
+_AFFILIATION = re.compile(r"\bIndependent Researcher\b|\bUniversit(?:y|ies)\b|\bInstitute\b|\bInc\.|\bLabs?\b"
+                          r"|\bLtd\.|\bCorp\.|\bLLC\b|\bLaborator(?:y|ies)\b|github\.com|\S*@")
+_SUFFIX_AFFILIATION = re.compile(r"Inc\.|Ltd\.|Corp\.|Labs?|LLC")
+_AUTHOR_MARK = re.compile(r"[∗*†‡§¹²³⁴⁵⁶⁷⁸⁹⁰,]|(?<=[A-Za-z.])[0-9]")
+_ADDRESS_ONLY = re.compile(r"(?i)^<?(?:https?://|www\.)\S+>?$|^[\w.-]+\.(?:com|org|net|io|edu|ai|dev)(?:/\S*)?$"
+                           r"|^<?[^\s@]*@\S+>?$")
 _SECTION_START = re.compile(r"(?i)^(abstract|introduction|[0-9]+\.?\s+introduction)\b")
-_SMALL_CAPS = re.compile(r"(?<![A-Za-z])([A-Z]) ([A-Z]{2,})(?![a-z])")
+_SMALL_CAPS = re.compile(r"(?<![A-Za-z0-9])([A-Z]) ([A-Z]{3,})(?![a-z0-9])")
 _SPACED_HYPHEN = re.compile(r"(?<![A-Za-z])([A-Z]{2,}) -(?=[A-Z])")
+_NAME_WORD = re.compile(r"(?:[A-Z][a-z]+['’]?(?:[-'’][A-Za-z][a-z]*)*|[A-Z]\.)")
+_ENDS_WITH_CONNECTOR = re.compile(r"(?i)(?:[&\-–]|\b(?:and|of|for|the|with|to|in|on|a|an|via|from))$")
+_PUNCT_END = re.compile(r"[^\w\s]$")
+_MINOR_WORDS = frozenset("a an the and but or nor for of in on at to by as via vs with from into onto upon per".split())
+
+
+def _name_line(line: str) -> bool:
+    """A single name line (MANIFEST §17.8): 2-6 capitalised words, no all-caps word, no common word."""
+    words = line.split()
+    if not 2 <= len(words) <= 6:
+        return False
+    for w in words:
+        if not _NAME_WORD.fullmatch(w):
+            return False
+        if w.lower().rstrip(".") in COMMON_WORDS:
+            return False
+    return any(len(w) > 2 for w in words)
 
 
 def _author_line(line: str) -> bool:
-    """An author list: an e-mail `@`, author marks after names, or a comma list of 3+ capitalised words."""
-    if "@" in line or _SYMBOL_MARK.search(line) or _SUPERSCRIPT_MARK.search(line):
+    """An author or affiliation line: e-mail, author marks after names, a comma list of 3+ capitalised words,
+    a single name line, or an affiliation word (MANIFEST §16.6, §17.4)."""
+    if "@" in line or _SYMBOL_MARK.search(line) or _SUPERSCRIPT_MARK.search(line) or _SINGLE_MARK.search(line):
+        return True
+    if _AFFILIATION.search(line):
         return True
     marks = len(_DIGIT_MARK.findall(line))
     if marks >= 2 or (marks and "," in line):
@@ -561,43 +658,157 @@ def _author_line(line: str) -> bool:
         caps = [w for w in words if w[0].isupper()]
         if len(caps) >= 3 and len(caps) * 3 >= len(words) * 2:
             return True
-    return False
+    return _name_line(line)
 
 
 def rejoin_small_caps(text: str) -> str:
-    """`A LITA -G` -> `ALITA-G`, `D EEP R ESEARCH` -> `DEEP RESEARCH` (MANIFEST §16.6)."""
-    prev = None
-    while prev != text:
-        prev = text
-        text = _SMALL_CAPS.sub(r"\1\2", text)
-    return _SPACED_HYPHEN.sub(r"\1-", text)
+    """`A LITA -G` -> `ALITA-G`, `D EEP R ESEARCH` -> `DEEP RESEARCH`, but `A SURVEY` stays (MANIFEST §17.4)."""
+    text = _SPACED_HYPHEN.sub(r"\1-", text)
+
+    def join(m: re.Match) -> str:
+        x, r = m.group(1), m.group(2)
+        if r.lower() in COMMON_WORDS or (x in "AIO" and len(r) < 4):
+            return m.group(0)
+        return x + r
+
+    return _SMALL_CAPS.sub(join, text)
 
 
-def _title_and_authors(page1: str) -> tuple[str, str]:
-    """Title and author line of a paper's first page (MANIFEST §15.8, §16.6)."""
-    lines = page1.split("\n")
-    start = None
-    for i, ln in enumerate(lines):
-        text = ln.strip()
-        if not text or VENUE_LINE.match(text):
+def _acronym_like(token: str) -> bool:
+    letters = re.sub(r"[^A-Za-z]", "", token)
+    return 2 <= len(letters) <= 5 and sum(c.isupper() for c in letters) >= 2 and token.isalnum()
+
+
+def _title_case(title: str, later: str) -> str:
+    """An ALL-CAPS title in title case, keeping acronyms that the paper uses later (MANIFEST §17.4)."""
+    cache: dict[str, bool] = {}
+
+    def kept(part: str) -> bool:
+        if part not in cache:
+            cache[part] = (_acronym_like(part) and part.lower() not in COMMON_WORDS
+                           and re.search(rf"(?<![A-Za-z0-9]){re.escape(part)}(?![A-Za-z0-9])", later) is not None)
+        return cache[part]
+
+    tokens = re.findall(r"[A-Za-z0-9]+", title)
+    if not any(re.search("[A-Za-z]", t) for t in tokens if not kept(t)):
+        return title
+    if any(re.search("[a-z]", t) for t in tokens if not kept(t)):
+        return title
+    # keep a whole hyphenated token (`ALITA-G`) when the paper writes it that way
+    out, first = [], True
+    for piece in re.split(r"(\s+)", title):
+        if not piece or piece.isspace():
+            out.append(piece)
             continue
-        if len(text.split()) > 3:
+        core = piece.strip(":;,.!?()[]\"'")
+        if "-" in core and re.search(rf"(?<![\w-]){re.escape(core)}(?![\w-])", later):
+            out.append(piece)
+        else:
+            parts = re.split(r"([-/])", piece)
+            done = []
+            for k, part in enumerate(parts):
+                m = re.match(r"^([^A-Za-z0-9]*)([A-Za-z0-9]+)(.*)$", part)
+                if not m:
+                    done.append(part)
+                    continue
+                pre, word, post = m.groups()
+                if kept(word):
+                    new = word
+                elif word.lower() in _MINOR_WORDS and not first and k == 0:
+                    new = word.lower()
+                else:
+                    new = word[:1].upper() + word[1:].lower()
+                done.append(pre + new + post)
+            out.append("".join(done))
+        first = piece.rstrip().endswith(":")
+    return "".join(out)
+
+
+def _clean_authors(line: str) -> str:
+    """Authors without marks, cut at the first affiliation word (MANIFEST §17.4)."""
+    line = line.strip()
+    if _ADDRESS_ONLY.match(line):                    # an e-mail or URL line after the title is the author line
+        return line
+    m = _AFFILIATION.search(line)
+    if m:
+        cut = m.start()
+        if _SUFFIX_AFFILIATION.fullmatch(m.group(0)):
+            # `Bo Li∗ Acme Inc.`: the organisation name goes too, back to the last author mark or comma (§17.8)
+            marks = [k.end() for k in _AUTHOR_MARK.finditer(line, 0, cut)]
+            if marks:
+                cut = marks[-1]
+        line = line[:cut]
+    line = re.sub(r"[∗*†‡§¹²³⁴⁵⁶⁷⁸⁹⁰]", " ", line)
+    line = re.sub(r"(?<=[A-Za-z.])[0-9]{1,2}(?:\s*,\s*[0-9]{1,2})*(?![0-9])", " ", line)
+    line = re.sub(r"(?<![A-Za-z0-9])[0-9]{1,2}(?:\s*,\s*[0-9]{1,2})*(?![0-9A-Za-z])", " ", line)
+    line = re.sub(r"\s*,(?:\s*,)*", ", ", line)
+    line = " ".join(line.split())
+    return line.strip(" ,")
+
+
+def _run_line(text: str) -> bool:
+    return 1 <= len(text.split()) <= 2
+
+
+def _title_and_authors(page1: str, later: str = "") -> tuple[str, str]:
+    """Title and author line of a paper's first page (MANIFEST §15.8, §16.6, §17.4)."""
+    lines = [ln.strip() for ln in page1.split("\n")]
+
+    def cont(j: int, parts: list[str], words_limit: int = TITLE_WORDS) -> bool:
+        if j >= len(lines):
+            return False
+        text = lines[j]
+        if not text or VENUE_LINE.search(text) or _SECTION_START.match(text):
+            return False
+        if len(" ".join(parts).split()) >= words_limit:
+            return False
+        if _author_line(text):
+            joined = " ".join(parts)
+            dangling = _ENDS_WITH_CONNECTOR.search(joined) and not (
+                "@" in text or _AFFILIATION.search(text) or _SYMBOL_MARK.search(text)
+                or _SINGLE_MARK.search(text) or _DIGIT_MARK.search(text) or "," in text)
+            return bool(dangling)
+        return True
+
+    start = None
+    run = False
+    for i, text in enumerate(lines):
+        if not text or VENUE_LINE.search(text):
+            continue
+        n = len(text.split())
+        if n > 3:
+            start = i
+            break
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        if _run_line(text) and nxt and (text.endswith(":") or not _PUNCT_END.search(text)) \
+                and _run_line(nxt) and not _PUNCT_END.search(nxt) and cont(i + 1, [text]):
+            start, run = i, True
+            break
+        if text.endswith(":") and n <= 2 and cont(i + 1, [text]):
+            start = i
+            break
+        if n >= 2 and cont(i + 1, [text]):
             start = i
             break
     if start is None:
         return "", ""
-    parts, last = [lines[start].strip()], start
-    for i in range(start + 1, len(lines)):
-        text = lines[i].strip()
-        words = len(" ".join(parts).split())
-        if (not text or words >= TITLE_WORDS or _author_line(text) or VENUE_LINE.match(text)
-                or _SECTION_START.match(text)):
-            break
-        parts.append(text)
-        last = i
+    parts, last = [lines[start]], start
+    j = start + 1
+    if run:
+        while (j < len(lines) and _run_line(lines[j]) and not _PUNCT_END.search(lines[j])
+               and len(" ".join(parts + [lines[j]]).split()) <= TITLE_WORDS and cont(j, parts, TITLE_WORDS + 1)):
+            parts.append(lines[j])
+            last = j
+            j += 1
+    while cont(j, parts):
+        parts.append(lines[j])
+        last = j
+        j += 1
     title = rejoin_small_caps(" ".join(" ".join(parts).split()))
-    authors = next((ln.strip() for ln in lines[last + 1:] if ln.strip()), "")
-    return title, authors
+    rest = "\n".join(lines[last + 1:]) + "\n" + later
+    title = _title_case(title, rest)
+    authors = next((ln for ln in lines[last + 1:] if ln), "")
+    return title, _clean_authors(authors)
 
 
 def _clean_short(short: str) -> str:
@@ -627,7 +838,8 @@ def papers_summary(id: str, dir: str | None = None, short: str | None = None, wr
     ref_page = references_page(pairs)
     body = ref_page - 1 if ref_page else pages
     page1 = next((text for n, text in pairs if n == 1), pairs[0][1] if pairs else "")
-    title, authors = _title_and_authors(page1)
+    later = "\n".join(text for n, text in pairs if n != 1)
+    title, authors = _title_and_authors(page1, later)
     name = _clean_short(short if short is not None else title.split(":", 1)[0][:40])
     if not name:
         name = stored_name(id) if short is None else ""

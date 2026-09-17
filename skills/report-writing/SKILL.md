@@ -10,10 +10,11 @@ description: Draft and check technical report prose in a fixed house voice (the 
 | style lint (voice, markers, sentence length) | `tundlekit text lint REPORT.md [--rules S001,S002] [--ignore S003] [--max-words 42]` | `text_lint` |
 | figure and table numbering, dangling references | `tundlekit text fignums REPORT.md [--refs DECK-NOTES.md]` | `text_fignums` |
 | words per section and bucket, change since a git ref or a file | `tundlekit text wordcount REPORT.md [--baseline HEAD~1] [--baseline-file OLD.md] [--no-tables]` | `text_wordcount` |
-| § / App. / Fig. / Table references in other files; renumbering | `tundlekit text xref REPORT.md --in FILE[=REPORT]... [--exclude GLOB...] [--renumber OLD=NEW] [--write]` | `text_xref` |
+| § / App. / Fig. / Table references in other files; renumbering | `tundlekit text xref REPORT.md --in FILE[=REPORT]... [--exclude GLOB...] [--renumber OLD=NEW] [--renumber-report REPORT] [--write]` | `text_xref` |
 | every cited number located on a page of its paper | `tundlekit claims trace REPORT.md --papers DIR [--ledger LEDGER.md] [--in FILE...]` | `claims_trace` |
 | apply exact review edits (dry run first) | `tundlekit text apply-edits EDITS.json FILE [--write]` | `text_apply_edits` |
 | hand edits in a .docx vs the source, optionally as an edits file | `tundlekit text docx-diff OLD NEW [--search PATH...] [--emit-edits EDITS.json]` | `docx_diff` |
+| snapshot a file into `versions/` before writing it | `tundlekit bundle backup FILE... --reason "CHANGE"` | `bundle_backup` |
 
 Paths may be files or folders (folders are walked for `*.md` and `*.txt`). Add `--json` for machine-readable
 results, `--strict` to fail on warnings. Write Markdown; convert to .docx only at the end.
@@ -161,15 +162,34 @@ target. X002 is a heading marker that a build script slices on (`between("…")`
 other than once in the report. To renumber, give all moves in 1 call: they apply simultaneously, so swaps work,
 and only whole references change (`Fig. 1` never touches `Fig. 10`):
 
-```
+```powershell
 tundlekit text xref report.md --in deck-src/deck.json --renumber "Fig. 9=Fig. 10" "Fig. 10=Fig. 9"
 tundlekit text xref report.md --in deck-src/deck.json --renumber "§4.2=§4.3" --write
+tundlekit text xref report.md --in deck-src/deck.json --renumber "App. E=App. D" --write
 ```
 
 Without `--write` it lists the planned edits (path, line, old, new). With it, the report's headings and captions
 and every file under `--in` are rewritten. A heading renumber also renumbers the slice markers that quote it
 (`between("### 4.2 ...")`, `section("4.2")`), and each reference keeps its spelling (`Fig.9` becomes `Fig.10`,
 `Table 07` becomes `Table 08`). Fenced code in the report is never renumbered.
+
+**Appendix cascade.** `--renumber "App. E=App. D"` (or `"Appendix E=Appendix D"`) renames the whole appendix, in
+the report and in every paired file, keeping each spelling: the `## Appendix E` heading and every `### E.n`
+heading; `App. E`, `App. E.n`, `Appendix E` and `Appendix E.n`; and `Table En`, `Fig. En` and `Figure En`. Use it
+after cutting or moving an appendix. If appendix D already exists and is not renamed in the same call, the call
+fails; move both at once (`"App. D=App. E" "App. E=App. D"` swaps them).
+
+**Several reports.** With several reports paired, a renumber applies only to the report whose headings or
+captions hold the old reference, and to the files paired with that report. When more than 1 report holds it,
+the call fails and lists them; pick one with `--renumber-report`:
+
+```powershell
+tundlekit text xref report.md --in build_deck.py=report.md build_capsule.py=capsule/REPORT-annotated.md --renumber "§4.2=§4.3" --renumber-report report.md --write
+```
+
+The report and every target file are written all or nothing: each new file is staged first, and if any replace
+fails the files already replaced are restored (the error says which). A read-only target is refused before
+anything is written.
 
 ### Pair each file with the report it actually slices
 
@@ -178,9 +198,14 @@ script or notes file uses 1 of them. Checking every file against 1 report floods
 Pair each file (or folder) with its own report as `FILE=REPORT`, and drop walked files that belong elsewhere with
 `--exclude`:
 
-```
+```powershell
 tundlekit text xref report.md --in build_deck.py=report.md build_capsule.py=report-capsules/REPORT-annotated.md notes --exclude "*/versions/*" "*.bak.md"
 ```
+
+The `FILE=REPORT` examples here are PowerShell. **Git Bash note:** MSYS may rewrite an `A=B` argument whose right
+side looks like a path (`notes=/c/work/REPORT.md`). Quote every `FILE=REPORT` and `OLD=NEW` argument
+(`"build_deck.py=report.md"`), keep the paths relative, and if a path is still rewritten, prefix the command with
+`MSYS2_ARG_CONV_EXCL="*"` or run it from PowerShell.
 
 When every `--in` entry is paired, the positional report may be left out. Other points:
 
@@ -188,14 +213,23 @@ When every `--in` entry is paired, the positional report may be left out. Other 
   clean report. X002 checks each `between(...)`/`section(...)` marker against the file the call actually reads: a
   `src=NAME` keyword or third argument, or the module-level `.md` path bound to a name (such as
   `SRC = HERE.parents[1] / "report-capsules" / "REPORT-annotated.md"`). Only paths built from string literals and
-  `__file__` anchors (`HERE`, `ROOT` with `.parent`/`.parents[k]`) are followed.
+  `__file__` anchors (`HERE`, `ROOT` with `.parent`/`.parents[k]`) are followed. A `.py` file whose default slice
+  source resolves is also checked for X001 against that source, not against the report it is paired with.
+- **End markers.** Only a call's first (start) marker must occur exactly once. The second (end) marker needs at
+  least 1 occurrence after the start marker, so a repeated `### ` style end marker is fine.
 - **X003** (info) means the slice source could not be resolved, so that marker was not checked. It is not a pass:
   open the script, find the file it slices, and check the marker by hand (or pair the script with that file).
-- References preceded on the same line by another report's name (`see the capsule report §3`) and citation
-  brackets that start with a number (`[5, App. H]`) are skipped. The report's own name (its H1 title when that
+- References directly preceded, in the same clause (no `.`, `;` or `:` in between; a comma does not end it), by
+  another report's name (`see the capsule report §3`) and citation brackets that start with a number
+  (`[5, App. H]`) are skipped. `our report`, `this report`, `the report` and `final report` are never another
+  report. The report's own name (its H1 title when that
   ends in "report", else its folder name) is checked normally.
 
 ## Tracing numbers to pages (`claims trace`)
+
+**Low priority and unreliable.** `claims trace` is not maintained as a release gate and its results can be
+wrong in both directions (numbers missed and numbers matched by coincidence). Use it as a pointer list at most; tracing every number to a page by hand is the real
+check.
 
 `tundlekit claims trace REPORT.md --papers DIR [--ledger LEDGER.md] [--in FILE...]` takes every body paragraph that
 cites a paper and contains a number, maps the citation to an arXiv id, and searches that paper's text page by page
@@ -256,8 +290,14 @@ tundlekit text apply-edits edits.json report.md --write
 ```
 
 Each `find` must occur exactly `count` times (default 1), or nothing is written and every failure is listed. The
-dry run prints a unified diff. It also works on a `.docx` (within 1 paragraph, across runs), which keeps the
-owner's formatting.
+dry run prints a unified diff. An empty list is valid and writes nothing.
+
+It also works on a `.docx` (within 1 paragraph, across runs), which keeps the owner's formatting. In a .docx, a
+tab inside the text reads as `\t` and a page break as `\f` (so a `\n` edit never touches a page break); tab-stop
+settings are never text, and paragraph properties are never edited. Back up first
+(`tundlekit bundle backup report.docx --reason "review edits"`) and close Word: `--write` on a .docx, .pptx or
+.xlsx is refused while Word, PowerPoint or Excel is running. `--force-office` overrides that, but closing Office
+is the rule.
 
 ## Carrying hand edits back (`text docx-diff`)
 
@@ -280,9 +320,12 @@ tundlekit text apply-edits edits.json report.md
 tundlekit text apply-edits edits.json report.md --write
 ```
 
-`--emit-edits` writes every `replace` change that has exactly 1 hint location, as a list of
-`{"path": <hint file>, "edits": [{"find", "replace", "count": 1}]}` objects, 1 per target file; the result's
-`edits_written` gives the count. `text apply-edits` accepts that list form and applies each object to its own
+`--emit-edits` writes a `replace` change only when it has exactly 1 hint location and the old paragraph matches a
+**whole paragraph** there (a Markdown paragraph with blank lines or the file edge on both sides, or a whole
+Python/JSON string literal), and the `find` is at least 12 characters with a letter. Every other replacement is
+listed under `not_emitted` (`old_index`, `reason`): carry those by hand. The file is a list of
+`{"path": <absolute hint file path>, "edits": [{"find", "replace", "count": 1}]}` objects, 1 per target file; the
+result's `edits_written` gives the count. `text apply-edits` accepts that list form and applies each object to its own
 `path`, all or nothing across files. Carry `insert` and `delete` changes, and replacements with 0 or several
 hints, by hand. Then rebuild and diff again.
 
@@ -308,7 +351,7 @@ Checker output is a starting list to confirm, not a verdict. The remaining false
   "paper" ("the capsule deck's Fig. 2"). Reword it, or resolve the file with `--refs NOTES.md=REPORT.md`.
 - `text xref`: X001 on references into another document whose name does not end in "report" ("the design note
   §3"). X003 is a skipped check, never noise to ignore.
-- `claims trace`: T001 on numbers that are counts or setup details rather than paper results ("12 slides"), and
+- `claims trace`: low priority and unreliable overall (see above). T001 on numbers that are counts or setup details rather than paper results ("12 slides"), and
   on numbers the paper writes in another form (a fraction, a rounded value, a plot reading); add a ledger row.
   Weak locations (T003) may be coincidences. T004 means nothing was checked.
 - `text docx-diff`: template text in the .docx (title page, table of contents) shows as `insert`.
@@ -320,11 +363,11 @@ Checker output is a starting list to confirm, not a verdict. The remaining false
 - [ ] `tundlekit text fignums` clean, with the deck notes passed as `--refs`
 - [ ] `tundlekit text xref` clean for the deck script and notes, each paired with the report it slices, and every
   X003 checked by hand
-- [ ] `tundlekit claims trace` has no untraced numbers and no T004, and every weak location (T003) is checked by
+- [ ] if `tundlekit claims trace` was run (optional; unreliable): no untraced numbers and no T004, and every weak location (T003) is checked by
   hand
 - [ ] every paper named by title in each section that uses it; every number traced to a page, table or file:line
 - [ ] every claim bounded by a labelled limitations list where it needs one; status stated in plain words
 - [ ] coverage matches the deck (`tundlekit review coverage REPORT.md DECK.pptx`); rule names and counts match
-- [ ] `tundlekit office check` passes before the .docx is built; previous version backed up to `versions/` before
-  overwriting; the rendered document reviewed page by page
+- [ ] `tundlekit office check` passes before the .docx is built; previous version backed up with
+  `tundlekit bundle backup REPORT.docx --reason "CHANGE"` before every write; the rendered document reviewed page by page
   (deliverable-review skill)
