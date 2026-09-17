@@ -209,6 +209,7 @@ with either connection. They need `tundlekit` installed where the agent runs.
 | `diagram-maker` | a figure, flowchart or bar chart is needed |
 | `report-writing` | writing or checking report prose |
 | `deliverable-review` | before a report or deck goes out |
+| `deliverable-production` | planning or running a report and talk end to end, or coordinating several agents on one |
 | `paper-reading` | fetching, reading, citing or summarising papers |
 | `zh-en-translation` | reading, quoting or translating Chinese ↔ English technical text |
 | `held-out-build-gate` | building a capability with independent, held-out tests |

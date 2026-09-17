@@ -18,6 +18,10 @@ description: Draw architecture, pipeline and agent-workflow diagrams as SVG (and
 standard library only. PNG output needs `cairosvg`, `rsvg-convert` or `inkscape`, and falls back to pymupdf (the `pdf` extra) when none
 of those exists; check with `tundlekit render backends` (`svg_to_png` names the converter). Add `--json` for machine-readable results.
 
+Which layout fits which point, and how to keep text readable at both slide and report width, are in
+[references/layout-and-legibility.md](references/layout-and-legibility.md). Read it before drawing a figure that
+is more than a row of boxes.
+
 ## The rules
 
 | Rule | How |

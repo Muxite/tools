@@ -172,6 +172,7 @@ the default tundle for the bundle tools. Configuration snippets for common agent
 | [`diagram-maker`](skills/diagram-maker/SKILL.md) | diagrams by the stage/actor rules, the Mermaid subset, bar charts |
 | [`report-writing`](skills/report-writing/SKILL.md) | the style card voice, claim → limitations lists, report rules, text checks |
 | [`deliverable-review`](skills/deliverable-review/SKILL.md) | render, contact sheets, adversarial review against flaw classes |
+| [`deliverable-production`](skills/deliverable-production/SKILL.md) | running the whole project: production order, reading it aloud early, lanes for several agents, the hand-back package |
 | [`paper-reading`](skills/paper-reading/SKILL.md) | fetching and reading papers, citation rules, summary files |
 | [`zh-en-translation`](skills/zh-en-translation/SKILL.md) | translation tiers, the translator + critic pipeline, checks |
 | [`held-out-build-gate`](skills/held-out-build-gate/SKILL.md) | building a capability behind a manifest, held-out tests and a capped gate |

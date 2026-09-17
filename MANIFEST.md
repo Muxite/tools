@@ -853,12 +853,13 @@ Required skills:
 |---|---|
 | `tundle-bundle` | keeping a tundle: the latest-only rule, status → release → compare → copy; history clearing (when, how, and what is approved or not approved to clear, from HISTORY-CLEANUP.md); lint and verify; setup tables and SOURCE.md |
 | `deck-builder` | writing a deck spec and building it: the deck structure template, slide-writing rules, speaker-note rules (SAY / IF ASKED, no MUST HIT, no meta or defensive lines), the timing table and words budget, insertion slides, the deck↔report 1-argument rule, then `deck lint` |
-| `diagram-maker` | diagrams by the stage/actor rules; the spec and the Mermaid subset; when to reproduce a paper's figure versus draw your own; charts via `chart bar` |
+| `diagram-maker` | diagrams by the stage/actor rules; the spec and the Mermaid subset; when to reproduce a paper's figure versus draw your own; charts via `chart bar`; layout recipes and the text-size rule for slide and report width, in `references/layout-and-legibility.md` |
 | `report-writing` | the style card voice and drafting rules, the claim → labelled limitations list pattern, the report rules and the deck element → report element mapping, `text lint`, `text fignums`, `text wordcount` |
 | `deliverable-review` | the review procedure: build from the script, render, contact sheets, read slides alone, the adversarial pass over the flaw-class table, propagate fixes, record the review; the hard rules (Office closed, back up first, no markers in deliverables) |
 | `paper-reading` | fetch, list, abs, grep, body; cite by title and arXiv id, never by nickname or author; trace every number to a page; the summary file format |
 | `zh-en-translation` | tiers T0/T1/T2, the T2 pipeline with a separate translator and a fresh-context critic, the quoting convention, `translate check` modes; the rules and prompts via `translate resources` |
 | `held-out-build-gate` | building a capability safely: a manifest first; a suite author who writes visible and held-out tests from the manifest alone; an implementer who never sees held-out tests; capped gate attempts that reveal only admit/reject plus a reason; an adversarial review when attempts run out |
+| `deliverable-production` | running a report-and-talk project end to end: the production order; fixing the audience and collapsing scope first; the slide count from the time budget; reading the talk aloud from the outline; Markdown and specs as the sources of truth and how hand edits come back; time and cutting discipline; worktree lanes for several agents; the hand-back package (state table, changelog recording rejections, presenter pack, doubts with their Settled by lines) |
 
 ---
 

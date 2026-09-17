@@ -135,6 +135,8 @@ COVERAGE = [
     ("diagram-maker", r"mermaid"),
     ("diagram-maker", r"stage"),
     ("diagram-maker", r"actor"),
+    ("diagram-maker", r"ratio"),
+    ("diagram-maker", r"legib"),
     ("report-writing", r"text lint"),
     ("report-writing", r"text fignums"),
     ("report-writing", r"text wordcount"),
