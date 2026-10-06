@@ -27,6 +27,8 @@ Walk input, preparation, planning, execution, verification, persistence, release
 
 Keep delivery phases, implementation stages, runtime phases, and workflow roles separate unless sources establish their equivalence. A bounded trial needs explicit inclusions, exclusions, and architectural exit meaning; it does not imply full milestone completion.
 
+For a vocabulary migration, keep one canonical crosswalk and apply display conventions across prose, tables and diagrams. Explain component containment, inputs, outputs and authority rather than treating related names as interchangeable. Put a former-name note beside the first renamed-slice mention on each maintained page; preserve source bytes, clause titles and registered identifiers unless their migration is separately authorized.
+
 Retain trust boundaries, effect controls, evidence access, independent acceptance ownership, deployment topology, durable state, and recovery behavior where the product requires them. Resolve high-level outcomes for cancellation, unavailable environments, invalid evidence, persistence failure, and interactive versus headless operation. A scientific negative may be a valid result; distinguish it from infrastructure failure.
 
 Keep producer claims separate from acceptance evidence. Explain reusable checks versus bound obligations and where verification ends; do not invent recursive reviewers. A high-level owner or failure outcome cannot be deferred as a private implementation detail. Record unresolved product choices rather than declaring readiness without them.

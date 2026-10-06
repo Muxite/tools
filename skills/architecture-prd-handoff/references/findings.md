@@ -92,6 +92,26 @@ These findings come from a documentation reconciliation and package cleanup perf
 
 **Limit:** No general Markdown package validator is added by this documentation update. External URLs and renderer-specific anchor rules may need separate checks.
 
+## Renaming a slice needs adjacent aliases and a distinct scope
+
+**Observed:** A user wanted a trial renamed to follow PRD delivery-phase language while avoiding confusion with the complete phase. A nearby former-name note was needed for agents holding earlier task context.
+
+**Consequence:** A distant migration note or a phase-only label could lose the historical connection or imply completion of broader obligations.
+
+**Correction:** Name the bounded capability inside its delivery context, keep its partial scope explicit, and place the former-name note beside its first mention on each maintained page. Keep a canonical crosswalk; apply display names to prose and diagrams while preserving source text, exact clause titles and registered identifiers.
+
+**Limit:** A display rename does not register a new TASK, migrate a schema or rename an existing interface. Those changes require their own ownership and compatibility decisions.
+
+## Vocabulary crosswalks must preserve component authority
+
+**Observed:** Independent review found an actor row that assigned final decision and durable release to a semantic verifier while also saying that its CC could not release output. Another paragraph used a blanket equation between the verifier and the complete gate.
+
+**Consequence:** Even with accurate definitions elsewhere, an actionable table could lead an implementer to assign protected release authority to a model assessment.
+
+**Correction:** Describe the boundary's contained components separately: deterministic checking, scoped semantic assessment, protected decision, and durable state/release. Inspect actor tables and sequence labels as well as the glossary. Apply the same terminology across them; a model-generated assessment must not silently become an authoritative decision.
+
+**Limit:** Component names and allocations depend on the design. The reusable requirement is clarity about who assesses, decides and commits, rather than this particular vocabulary or deployment topology.
+
 ## Updating this document
 
 Add demonstrated findings with their evidence and limits. Distinguish a user preference from a repository requirement and both from a reusable correction. Consolidate repetitions; retire advice contradicted by later evidence. Do not append full conversation transcripts, local artifact paths, or project requirements. Promote guidance into the skill when it changes decisions across realistic future tasks.
