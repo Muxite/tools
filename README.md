@@ -235,6 +235,7 @@ the default tundle for the bundle tools. Configuration snippets for common agent
 | [`zh-en-translation`](skills/zh-en-translation/SKILL.md) | translation tiers, the translator + critic pipeline, checks |
 | [`held-out-build-gate`](skills/held-out-build-gate/SKILL.md) | building a capability behind a manifest, held-out tests and a capped gate |
 | [`review-prompts`](skills/review-prompts/SKILL.md) | ready briefs for fresh-context reviewers: so-what, first-time reader, adversarial flaw classes, fact-check |
+| [`architecture-prd-handoff`](skills/architecture-prd-handoff/SKILL.md) | PRD reconciliation, architecture cleanup, portable design inputs, and [maintained findings](skills/architecture-prd-handoff/references/findings.md) |
 
 Example inputs are in [`examples/`](examples/): a deck spec, a diagram spec, a Mermaid flowchart and a chart spec.
 

@@ -859,6 +859,7 @@ Required skills:
 | `paper-reading` | fetch, list, abs, grep, body; cite by title and arXiv id, never by nickname or author; trace every number to a page; the summary file format |
 | `zh-en-translation` | tiers T0/T1/T2, the T2 pipeline with a separate translator and a fresh-context critic, the quoting convention, `translate check` modes; the rules and prompts via `translate resources` |
 | `held-out-build-gate` | building a capability safely: a manifest first; a suite author who writes visible and held-out tests from the manifest alone; an implementer who never sees held-out tests; capped gate attempts that reveal only admit/reject plus a reason; an adversarial review when attempts run out |
+| `architecture-prd-handoff` | reconcile current PRD and architecture authority; preserve verbatim sources and historical context; consolidate the maintained reading package; separate architectural obligations from implementation choices; verify links, requirement accounting, diff scope, and published bytes; maintain demonstrated findings in `references/findings.md` |
 
 ---
 

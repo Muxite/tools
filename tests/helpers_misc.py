@@ -33,6 +33,7 @@ REQUIRED_SKILLS = [
     "zh-en-translation",
     "held-out-build-gate",
     "review-prompts",  # §15.9 / §15.10: added to the §11 required table
+    "architecture-prd-handoff",  # §11: architecture reconciliation and maintained findings
 ]
 
 # Groups listed in the manifest sections (§2-§10).

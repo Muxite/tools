@@ -248,6 +248,7 @@ with either connection. They need `tundlekit` installed where the agent runs.
 | `zh-en-translation` | reading, quoting or translating Chinese ↔ English technical text |
 | `held-out-build-gate` | building a capability with independent, held-out tests |
 | `review-prompts` | dispatching fresh-context reviewers (so-what, first-time reader, flaw classes, fact-check) |
+| `architecture-prd-handoff` | reconciling PRDs and architecture, consolidating maintained design packages, and preserving reusable findings |
 
 ## 5. Working on this repository
 
