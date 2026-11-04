@@ -99,3 +99,37 @@ Production qualification additionally needs tenant/authentication, native provid
 Three independent adversarial reviewers exercised protocol/usability, coding and Factory/scientific cases. Their original findings and second-cycle findings were retained, fixed and independently rechecked. Added regressions cover external executable identity, changed PATH resolution, overlapping workspace leases, unavailable final observations, late responses after reconciliation, migration dispatch collisions, malformed interval data and optional boolean schemas.
 
 [The Factory/Lab report](reference/integrations/factory-lab-report.json) uses the actual pinned Strata manifest reader and full file verification on a synthetic native product containing zero CCs. Tampering fails verification. The entrypoint is not executed, so this establishes artifact handoff and inspection rather than inference, engine loading or hardware measurement.
+
+## Product amendment: worked Factory and runner flow
+
+[The hybrid declaration](reference/examples/http_product/cc.yaml) has one served capability `api` and one finite capability `inspect`. Caller view:
+
+| Choice | Inputs | Effects | Results / interpretation |
+|---|---|---|---|
+| Call `inspect` | None | No declared external effects | JSON report names the application/API document and observed source tree when built. It does not start the engine. |
+| Start `api` | None in the synthetic fixture | Persistent process and loopback listener | Instance ID, endpoint, logs and startup readiness. GET `/compute?x=3` returns a numeric value/factor; this is a synthetic API, not inference. |
+| Stop the instance | Existing instance ID | Process termination | Confirmed lifecycle state; missing foreground generation requires reconciliation. |
+
+[The source-product demo](reference/integrations/product_demo.py) creates an exact base repository, constructs a binary-capable patch changing a computation factor from 1 to 2, binds the expected tree, builds in a separate checkout, seals the payload and starts its service. GET `/compute?x=3` returns 6, then the runner stops it. The report contains the full source-change, materialization, inspection receipt, instance and response. No package-wide port or permission union is authored.
+
+```text
+python reference/integrations/product_demo.py --directory NEW_DIRECTORY --report REPORT.json
+python -m unittest discover -s reference -p "test_*.py"
+```
+
+The second command includes local tests; upstream integration modules are separate scripts with separately installed dependencies. [The MCP product demo](reference/integrations/product_mcp_demo.py) uses actual pinned OpenJiuwen `StdioClient`: a hybrid package discovers only `inspect`; removing the finite `inspect` entry discovers zero generated tools while retaining a valid served-capability CC. Normal invocation preserves the complete receipt and runs no semantic checks.
+
+| Evidence level | This amendment demonstrates | Still separate |
+|---|---|---|
+| Declaration/local replay | Product-only/hybrid packages, required ports/open JSON, grants, duplicate keys, literal argument data, stale PID, failed readiness, failed build logs, timeout uncertainty, empty patch, LFS rejection | Unsupported runtime/resource providers remain rejected. |
+| Native execution | Actual Git reconstruction/build, service startup, HTTP response, inspection and shutdown | Synthetic CPU fixture; not engine execution. |
+| Upstream host invocation | Real pinned client discovery and native capability invocation | Deterministic driver, not live-model agent behavior. |
+| Image/hardware | No new passing execution claimed | Working Docker and real Strata/Muse/GB10 trials required. |
+
+[Runner responsibilities and mistake cases](12-runner-and-mistakes.md) give the comprehension and field-ownership checks. Current reports and independent adversarial findings/verification are retained under the published transfer revision; earlier evidence remains historical and is not relabeled as current-code execution.
+
+## Unified materials and service alignment
+
+[The passive methodology package](reference/examples/method_library/cc.yaml) has identity/version and `materials` only. Prepare it, describe it and retrieve `method` with `Host.material`; no execution grants or dummy binding are needed. Its bytes remain sealed after the author's source changes. An active search library would instead declare a normal capability or served interface, with network effects if needed.
+
+`test_unified.py` adds rejection/identity/import checks. A previous `applications` draft imports into the single canonical capability map; conflicting IDs fail. Explicit files hidden under ignored directories are rejected during preparation, so a successful release cannot point to omitted material. [The Lab plan](13-lab-composition-and-telemetry.md) leaves actual Incus/GPU execution and telemetry-provider integration unclaimed.

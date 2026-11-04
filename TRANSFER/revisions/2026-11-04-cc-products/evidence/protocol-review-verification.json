@@ -1,0 +1,31 @@
+{
+  "reviewer": "adversarial_protocol",
+  "date": "2026-11-04",
+  "original_report": "protocol-review.json",
+  "status": "All three reported defects closed at independently tested boundaries; original findings retained as historical evidence",
+  "production_files_edited": false,
+  "tests": {"command":"python -m unittest test_products -q", "result":"15 tests passed"},
+  "reproduce": "python TRANSFER/revisions/2026-11-04-cc-products/evidence/protocol-verify.py",
+  "evidence": "protocol-verification-evidence.json",
+  "verification": [
+    {
+      "id":"PRODUCT-PROTOCOL-01",
+      "status":"closed",
+      "observed":"Deleted the original artifact after successful startup. Identical start/key returned the original running instance ID. A newly constructed Host without session grants retrieved the same ID through lookup_instance(key). CLI instance-key also retrieved that ID without session configuration. Code lookup does not call release admission or artifact validation.",
+      "boundary":"start still requires release and session admission before replay, but the new dedicated lookup is explicitly documented for missing environment/release access or changed authorization. This supplies the necessary lost-reply recovery path without implying a new execution grant."
+    },
+    {
+      "id":"PRODUCT-PROTOCOL-02",
+      "status":"closed with explicit foreground-lifetime profile boundary",
+      "observed":"Reran ordinary launcher-parent-exits scenario. Child remains alive; stop now raises STOP_UNCONFIRMED and durable instance state is unknown, rather than stopped. Independent probe terminates and waits for the identified child, then explicitly reconciles original instance.",
+      "boundary":"README, 03 and 12 explicitly require foreground leader lifetime; daemonizing workloads need a qualified supervisor. This is honest uncertainty reporting, not native process containment. A reconciliation assertion is operator evidence, not automatic proof."
+    },
+    {
+      "id":"PRODUCT-PROTOCOL-03",
+      "status":"closed",
+      "observed":"The exact prior input 'Explain the token {input.NAME} literally' now starts successfully; actual provenance command contains that unchanged literal argument; diagnostics empty. Replacement now scans only authored argument templates."
+    }
+  ],
+  "remaining_blockers": [],
+  "limits": "Local native tests only. No live container, remote recovery, OS isolation, device qualification or semantic correctness is implied. Existing original probe is historical and expects earlier failures; protocol-verify.py catches and checks the new intended stop uncertainty."
+}

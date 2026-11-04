@@ -68,3 +68,15 @@ The notebook's authored notes, research/design history, prompts, executable CC e
 The original 62 MB migration inventory is retained as [a compressed historical receipt](historical-migration-manifest.jsonl.gz). It describes the original workspace, including excluded/linked sources; it is not a claim that all those sources are present. Historical archive links and Windows paths remain unchanged. Use current note entrypoints and the current CC folder for maintained navigation. The original full-vault validator also has one known unrelated broken repository link.
 
 This is a normal content-replacement commit. Previous toolbox code remains recoverable from Git history at `bfd34b69f1823fece8e95645f7bea3b442f226bd`. No history rewrite or force push is needed.
+
+## Current amendment: products and runner
+
+The current protocol uses `capabilities` with optional `serves` for persistent provision, plus optional passive `materials`. The preceding `applications` draft is import-only compatibility. `Host.prepare/describe/material/start/lookup_instance/inspect_instance/stop/reconcile_instance` manage applications in the same store. MCP projects capabilities only. The optional `cc-source-change/1` materializer binds exact base/patch/tree and produces a native payload/build record; failures retain build-attempt logs. Use native first, images when deployment dependencies warrant them, and retain source linkage for either.
+
+Run the updated protocol checker for the complete local suite. Run `reference/integrations/product_demo.py --directory NEW_DIRECTORY --report REPORT.json` for actual synthetic source/build/service execution. In the pinned integration environment, `product_mcp_demo.py` verifies hybrid/product-only discovery through the actual upstream client. Reports, independent findings and resolution evidence are under `TRANSFER/revisions/2026-11-04-cc-products/evidence`.
+
+Native applications must keep their foreground leader alive. Missing leader identity does not establish child cessation: stop retains unknown and requires reconciliation. Timed-out native builds retain unknown attempts and partial logs; their children may continue, so inspect before retry. No native process containment, working-image execution or real inference measurement is inferred from this amendment. Original transfer checkpoint and historical evidence remain unchanged.
+
+### Latest Lab alignment
+
+Read CC Protocols/13-lab-composition-and-telemetry.md for the actual Incus implementation plan. Canonical authoring is one capabilities map; services retain their native interfaces, while skill/reference-only packages need no binding. Native/image packaging is independent of capability lifetime. Internal telemetry and clean uninstall are optional profiles; minimal runner identity/state records remain necessary for honest communication. `cc-observation/1` is an optional output/artifact profile, not an implemented mandatory exporter. Incus, GPU, SOL/inference-agent trials and generic service-to-MCP projection require actual integration evidence. New tests add passive material identity, sealed inclusion, import collision and execution-authority boundaries.

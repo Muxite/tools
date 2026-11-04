@@ -1,0 +1,106 @@
+---
+id: cc-upstream-coding-integration
+status: pinned-source-appendix-runtime-unverified
+source: official JiuwenSwarm develop 26acdaddae1fa0daf0f888f8012f0284a2548204 and pinned dependencies
+last_reviewed: 2026-11-04
+next_action: Exercise the v2 registered-agent adapter against this pinned upstream
+---
+# Pinned upstream coding integration appendix  -  v2
+
+This appendix retains the November 4 pinned source findings. The active v2 contract is in [01](01-declaration.md), calls in [03](03-calls-and-receipts.md), and the native coding workflow in [08](08-coding-capsule.md). Source inspection and bounded adapter checks do not establish a deployed JiuwenSwarm trial. Actual pinned `StdioClient` and native `TaskTool`/`SysOperation` checks are recorded in [05](05-examples-and-conformance.md); those use deterministic drivers, not a live model or complete server.
+
+## 1. Review boundary
+
+Reviewed the official `openJiuwen-ai/jiuwenswarm` default branch, `develop`, fetched on November 4, 2026: **26acdaddae1fa0daf0f888f8012f0284a2548204**. This is upstream, not the AI4Research fork. The local working branch was not changed. Source inspection establishes interface behavior; it does not establish deployed interoperability.
+
+| Component | Reviewed version |
+|---|---|
+| JiuwenSwarm | `26acdaddae1fa0daf0f888f8012f0284a2548204` |
+| agent-core | `4dbaa84ca568af3f181da4f9cd26b713a5b73039` |
+| agent-gateway | `a9e4d447033f0eadf5e8583c06cfb8993e01e539` |
+| agent-protocol dependency | `cbbadde9101db6e3d75e4ef2b9bdb6029fd92088`; pin identified, implementation not audited |
+| A2A SDK | `1.0.0`; use the versioned 1.0 protocol mapping |
+
+Pins come from upstream [pyproject.toml](https://github.com/openJiuwen-ai/jiuwenswarm/blob/26acdaddae1fa0daf0f888f8012f0284a2548204/pyproject.toml). A dependency declared against `develop` still needs its resolved commit captured in the build lock. A branch name is insufficient build provenance.
+
+## 2. Integration boundary
+
+Keep coding-agent planning, conversation, worktrees, checkpoints and permission interactions native. Install a CC host adapter that projects capabilities into the existing tool system and owns call identity, admission, execution binding and receipts. A long-lived coding workspace can host many calls. A container restart for every edit would break useful native behavior.
+
+```mermaid
+flowchart TB
+    release["Verified CC release"] --> adapter["Host CC adapter"]
+    agent["Native coding agent"] -->|tool arguments| adapter
+    identity["Host identity and permissions"] --> adapter
+    adapter -->|bound invocation| native["Native tool or MCP provider"]
+    adapter -->|delegated task| remote["A2A agent"]
+    native --> workspace["Leased worktree or execution provider"]
+    workspace --> evidence["Artifacts and effect journal"]
+    remote --> evidence
+    evidence --> receipt["Durable CC receipt"]
+    receipt --> agent
+    receipt --> evaluator["Independent evaluation"]
+```
+
+MCP exposes capability-shaped tools. A2A carries delegated work, task updates and artifacts. CC supplies the implementation identity, operation contract, authority boundary and evidence links across those transports. Exact CC routing must be negotiated; a generic chat agent is not automatically an exact operation executor.
+
+## 3. Source findings and required adaptations
+
+| Observed upstream behavior | Consequence for CC | Required adaptation |
+|---|---|---|
+| Coding harness builds a `DeepAgentSpec` with registered native tools. Product adapter retains session lifecycle responsibilities. | CC can join the native tool surface. | Generate cards from resolved capabilities; preserve native worktree/checkpoint behavior. |
+| Generic `mcp_` tools classify as `unknown_mcp`, high risk and high flexibility; name-based facts are not authoritative. | Registering an MCP endpoint alone does not produce precise permissions. | Add a host-verified capability fact binding tied to exact registered tool, release, operation and provider. An unverified server remains unknown. |
+| `ToolInvocationKeyV1` contains host-owned invocation, root session, request, execution session and tool-call identities. | A useful identity already exists. | Persist a tenant-scoped mapping from this identity to the CC key before dispatch. Keep it through retries; a deliberate new invocation gets a new key. |
+| Native MCP client retries transport failures through `with_reconnect`. | The first execution may have committed before its response was lost. | Inject the CC key before the retry wrapper; require durable provider deduplication or prohibit automatic effectful replay. Same key with changed bound content is a conflict. |
+| MCP result extraction reads `content` and preserves `isError`, but does not read `structuredContent`. | A structured-only receipt can disappear on this path. | Capture/validate the raw receipt in the host or use a single canonical JSON text receipt alongside structured content. Generate both from one record; reject disagreement. Do not recover authority by asking the model to interpret prose. |
+| Resource kernel keys include trusted identity, routing, credential reference and recipe; leases retain live resources. | Native ownership can prevent accidental cross-user reuse. | Include release/configuration identity in lease selection. Retire discovery entries without terminating active calls. |
+| Gateway maps A2A text to query and other parts to file-oriented parameters. Its card offers a generic `chat` skill. | A data part is not an existing CC dispatch interface. | Add a negotiated versioned routing extension and schema validation before agent dispatch. Reject unsupported required semantics. |
+| Gateway uses `InMemoryTaskStore` and a process-local pending-task map. | Restart recovery is not established for builds or measurements. | Durable task/call mapping, event sequence, artifact store and recovery reconciliation are required. |
+| Gateway cancel method emits canceled status and closes the queue; this method does not dispatch a downstream stop. | Receiving canceled status does not prove a build or benchmark stopped. | Forward cancellation to the actual execution owner; publish confirmed cancellation only after stop/effect reconciliation. Otherwise retain unknown execution outcome. |
+| Gateway maps an internal interrupt to canceled. | Human input/authentication pauses can lose their meaning. | Explicitly distinguish interrupted waiting, rejection, confirmed cancellation and failure at the CC bridge. |
+| Generated-artifact delivery uses a single-use grant bound to execution context and channel. | Producing a file does not authorize sending it anywhere. | Reuse scoped artifact-delivery checks; output references do not carry ambient publication authority. |
+| SkillPack installer uses staging, validation and inventory transactions. | Existing install UX and transaction patterns are reusable. | Reuse patterns, while validating executable CC bindings separately from skill documents. |
+
+### Source anchors
+
+- [Coding spec assembly](https://github.com/openJiuwen-ai/jiuwenswarm/blob/26acdaddae1fa0daf0f888f8012f0284a2548204/jiuwenswarm/agents/harness/code/spec.py), [native code adapter](https://github.com/openJiuwen-ai/jiuwenswarm/blob/26acdaddae1fa0daf0f888f8012f0284a2548204/jiuwenswarm/server/runtime/agent_adapter/interface_code.py).
+- [Permission capability facts](https://github.com/openJiuwen-ai/jiuwenswarm/blob/26acdaddae1fa0daf0f888f8012f0284a2548204/jiuwenswarm/agents/harness/common/rails/permissions/tool_capabilities.py), [exact tool binding](https://github.com/openJiuwen-ai/jiuwenswarm/blob/26acdaddae1fa0daf0f888f8012f0284a2548204/jiuwenswarm/agents/harness/common/rails/permissions/tool_binding.py), [invocation identity](https://github.com/openJiuwen-ai/jiuwenswarm/blob/26acdaddae1fa0daf0f888f8012f0284a2548204/jiuwenswarm/agents/harness/common/rails/permissions/tool_invocation_key.py).
+- [MCP reconnect](https://github.com/openJiuwen-ai/agent-core/blob/4dbaa84ca568af3f181da4f9cd26b713a5b73039/openjiuwen/core/foundation/tool/mcp/client/reconnect.py), [HTTP call path](https://github.com/openJiuwen-ai/agent-core/blob/4dbaa84ca568af3f181da4f9cd26b713a5b73039/openjiuwen/core/foundation/tool/mcp/client/streamable_http_client.py), [result extraction](https://github.com/openJiuwen-ai/agent-core/blob/4dbaa84ca568af3f181da4f9cd26b713a5b73039/openjiuwen/core/foundation/tool/mcp/base.py).
+- [Resource kernel](https://github.com/openJiuwen-ai/jiuwenswarm/blob/26acdaddae1fa0daf0f888f8012f0284a2548204/jiuwenswarm/runtime/kernel.py), [MCP registration](https://github.com/openJiuwen-ai/jiuwenswarm/blob/26acdaddae1fa0daf0f888f8012f0284a2548204/jiuwenswarm/server/runtime/agent_adapter/interface_deep.py).
+- [Pinned A2A gateway](https://github.com/openJiuwen-ai/agent-gateway/blob/a9e4d447033f0eadf5e8583c06cfb8993e01e539/agent_gateway/channel_manager/protocol/a2a/a2a_connect.py), [ingress authentication](https://github.com/openJiuwen-ai/agent-gateway/blob/a9e4d447033f0eadf5e8583c06cfb8993e01e539/agent_gateway/channel_manager/protocol/a2a/security.py).
+- [Execution-provider contract](https://github.com/openJiuwen-ai/jiuwenswarm/blob/26acdaddae1fa0daf0f888f8012f0284a2548204/jiuwenswarm/agents/harness/common/rails/permissions/execution_provider_contract.py), [artifact delivery](https://github.com/openJiuwen-ai/jiuwenswarm/blob/26acdaddae1fa0daf0f888f8012f0284a2548204/jiuwenswarm/agents/harness/common/rails/permissions/generated_artifact_delivery.py), [SkillPack installation](https://github.com/openJiuwen-ai/jiuwenswarm/blob/26acdaddae1fa0daf0f888f8012f0284a2548204/jiuwenswarm/server/runtime/skill/skillpack_install.py).
+
+## 4. Enterprise operating contract
+
+| Boundary | Required behavior | Avoided workaround |
+|---|---|---|
+| Identity | Authenticate tenant, principal, project and delegated actor from trusted host context. Bind them to each call. | Tenant IDs supplied in model arguments or A2A metadata becoming authority. |
+| Authorization | Admit the selected operation and concrete resource scope. Recheck revoked grants before new effects and resume. | Granting a whole capsule administrator access to run one inspector. |
+| Execution | Declare and verify provider capabilities. No silent host fallback. A privileged profiler uses an explicitly qualified host provider. | Mounting everything into a container to make attachment work. |
+| Secrets | Bind short-lived credential handles outside model arguments, artifacts and receipts. Record credential identity/version, never secret bytes. | Shipping credentials inside the CC image. |
+| Long tasks | Durable job status, bounded waiting, cancellation acknowledgment and resumable observation. Persist terminal evidence before announcing success. | Keeping a chat connection alive for a multi-hour build. |
+| Distribution | Mirrored pinned artifacts, offline import and explicit unavailable-material errors. Consumer policy decides signature/qualification requirements. | Mutable tags, hidden internet fetches or pretending an offline build succeeded. |
+| Artifacts | Verify bytes, audience and retention. Renew expired access URLs without changing content identity. Restrict fetch destinations and archive extraction paths. | Treating a signed URL as permanent identity or allowing arbitrary URL fetches. |
+| Discovery | Per-tenant eligible operations, stable binding during invocation, explicit refresh on upgrades. | A tool name silently changing implementation mid-task. |
+| Events | Tenant-scoped sequence/cursor, redacted operational summaries, schema version and bounded retention. | Raw reasoning or secret-bearing logs as public progress messages. |
+| Quotas | Host-enforced time, concurrency, storage and spend limits with clear exhaustion results. | Optional author fields being the only resource control. |
+
+These are host requirements. They do not add enterprise fields to every CPU tool declaration. Domain profiles add only the semantics needed by their operations.
+
+## 5. A2A lifecycle inspiration
+
+Use the negotiated A2A version's actual wire states. Version 1 uses `TASK_STATE_*`; old lowercase examples are not interchangeable. A2A supports messages, tasks, interrupted input/authentication states and artifacts. These are useful delegation mechanisms. Artifact availability and task completion still require CC-specific result validation. [A2A 1.0 specification](https://a2a-protocol.org/v1.0.0/specification/)
+
+For this proposal, keep the existing CC receipt states. A nonterminal delegated call remains `running`; its durable host job record carries a required action, actor, deadline and resume token. The adapter maps A2A input/authentication interruption to that record. A headless call without an authorized response path terminates `blocked` with `INPUT_REQUIRED` or `AUTH_REQUIRED`. Resume tokens are single-use and scoped to the task; resumption cannot increase authority implicitly. Expiry triggers stop/reconciliation, not invented success.
+
+An interrupted implementation request may negotiate missing decisions. An already bound measurement must not change candidate, inputs or evaluation policy in place. A change produces a new bound call. A2A task IDs, CC request IDs and execution attempts remain separate correlated identities.
+
+## 6. Deployment qualification
+
+1. Native host adapter: install one CPU operation and one effectful coding operation; retain upstream permissions and worktree behavior.
+2. Durable call store: disconnect after an effect commits; reconnect returns the same receipt without repeating the effect. Reject changed content under the same key.
+3. MCP boundary: preserve structured receipts and errors; test large artifact references and a valid negative test report.
+4. A2A bridge: round-trip typed inputs/artifacts, pause/resume, restart, duplicate events and confirmed cancellation. Advertise only tested bindings.
+5. Factory/Lab trial: resolve a request, deliver a native engine component, restart Muse, verify the actual loaded revision and obtain an independently assessed measurement.
+
+The v2 reference host supports native source, pinned image and host-registered `jiuwenswarm` bindings through a common receipt boundary. This removes the earlier image-only declaration restriction. Actual pinned upstream client/task checks exercise the interface; they are not a full upstream runtime deployment. Full JiuwenSwarm runtime, enterprise isolation, remote A2A/MCP recovery and GB10 execution require separate evidence. No upstream code was deployed by this source review.

@@ -1,0 +1,34 @@
+{
+  "reviewer":"adversarial_protocol",
+  "date":"2026-11-04",
+  "scope":"Unified capabilities/serves/materials core; existing lifecycle implementation; passive package and compatibility import boundaries",
+  "production_files_edited":false,
+  "tests":{"command":"python -m unittest discover -q","result":"60 tests passed in 34.561 seconds"},
+  "independent_probe":"python TRANSFER/revisions/2026-11-04-cc-lab-alignment/evidence/protocol-edge-probe.py",
+  "probe_evidence":"protocol-edge-evidence.json",
+  "verified":[
+    "Passive-only materials declaration with SKILL.md seals without executable bindings. After editing original SKILL.md, retrieved artifact still contains the originally sealed bytes. No callable entries are generated.",
+    "Canonical capabilities map retains both echo and engine; callable_entries selects echo, service_entries selects engine. Normalization is idempotent.",
+    "Previous applications draft imports into canonical serves exactly, removes the old applications field, and a conflicting capability/application name rejects DUPLICATE_ID.",
+    "Served capability dispatch remains explicitly lifecycle-based; material retrieval does not invent a runnable tool or execute a skill. MCP listing uses callable_entries rather than fabricating a generic engine invocation."
+  ],
+  "findings":[
+    {
+      "id":"UNIFIED-PROTOCOL-01",
+      "severity":"P2",
+      "title":"Explicit declared material could be omitted by generic sealing ignore rules",
+      "initial_attempt":{"cc":"2","id":"review.material","version":"1.0.0","materials":{"notes":{"path":".cc-state/notes.md"}}},
+      "initial_observation":"With existing .cc-state/notes.md, prepare returned release 01b04c1f1e68e33d4af38e8ee3d15d60395aca26a8d369a1c75125249d478ef8; material lookup raised raw FileNotFoundError because tree_files excluded .cc-state, despite declared-file existence passing admission.",
+      "minimal_fix":"Explicit declaration references must either be included in sealed rows or rejected before returning a release; do not accept a runnable/material reference whose bytes were omitted by generic ignore rules.",
+      "current_status":"closed during review",
+      "current_verification":"Independent saved probe now receives structured UNSEALED_MATERIAL at prepare: Declared file is excluded from sealing: .cc-state/notes.md. No unusable release is returned."
+    }
+  ],
+  "remaining_core_blockers":[],
+  "documentation_review":{"status":"pending updated prose at this snapshot","observation":"README/01/12 still contained the superseded separate applications map when read. Parent is actively rewriting these; this timing difference is not reported as a final defect. Re-read updated docs before final delivery."},
+  "limits":[
+    "No Incus, GPU, sidecar deployment, remote lifecycle or live image execution was performed or implied.",
+    "Native trusted-local execution still has no OS containment. Existing explicit foreground-leader lifetime boundary remains relevant.",
+    "Sealed hashes establish material identity; skill contents, model serialization and candidate telemetry are not independently trustworthy evidence simply because they are packaged or receipted."
+  ]
+}

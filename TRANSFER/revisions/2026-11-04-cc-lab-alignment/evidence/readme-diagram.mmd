@@ -1,0 +1,21 @@
+flowchart TB
+    author["Author / brief"] --> declaration["Declaration or request"]
+    declaration --> factory["Software Factory"]
+    factory --> source["Exact repository + patch + dependencies"]
+    source --> build["Materialize / build"]
+    build --> release["Immutable CC release: native payload or pinned image"]
+    release --> materials["Optional skills and reference materials"]
+    materials --> agent
+    release --> catalog["Optional catalog"]
+    catalog --> agent["Lab agent"]
+    agent --> runner["Runner: prepare and authorize"]
+    release --> runner
+    runner -->|"call capability"| tool["Outputs + receipt"]
+    runner -->|"start service capability"| instance["Instance + endpoints + logs"]
+    instance --> measurement["Measurement capability"]
+    measurement --> tool
+    tool -. identifies .-> release
+    instance -. identifies .-> release
+    release -. lineage .-> build
+    build -. materials .-> source
+    tool --> evaluator["Independent evaluation when requested"]

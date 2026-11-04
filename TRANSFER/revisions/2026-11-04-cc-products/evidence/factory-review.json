@@ -1,0 +1,71 @@
+{
+  "reviewer": "independent Factory/source-build reviewer",
+  "scope": "Trusted local Git reconstruction, dependency/build evidence and product handoff. No GPU, image execution or inference claims.",
+  "date": "2026-11-04",
+  "evidence": "factory-review-probe-evidence.json",
+  "production_files_changed": false,
+  "source_sha256": {
+    "AI4Research-Notebook\\Designs\\CC and Strata delivery\\CC Protocols\\reference\\source_build.py": "f5c3f4f670a3b05809ca20b152cd01d310a0e659bc14abbe8908b08e42f77057",
+    "AI4Research-Notebook\\Designs\\CC and Strata delivery\\CC Protocols\\reference\\integrations\\product_demo.py": "58997a0d6ac500ed9027051e97d010a16fdcf9dbeaa9c79596ef8415391297a0"
+  },
+  "findings": [
+    {
+      "id": "PRODUCT-FACTORY-01",
+      "severity": "P1",
+      "file": "reference/source_build.py",
+      "line": 34,
+      "title": "Timed-out builds leave untracked live descendants and no reconciliation record",
+      "attempt": "Authorize build argv running Python that spawns a child (separate cwd, stdout/stderr DEVNULL), then sleeps. Child sleeps1.5s and writes a marker only under this review probe directory. materialize(timeout=1).",
+      "observed": "BUILD_TIMEOUT raised after1.56s; marker absent at error and present2s later. No attempt/log files were added to the host store and no package was published. Native child effects continued after the returned error.",
+      "impact": "The caller cannot inspect or reconcile an identified original build; retrying can overlap surviving effects. Trusted-local scope permits execution but does not establish cessation.",
+      "general_fix": "Reserve and persist a build attempt identity before dispatch, record process identity/generation and logs, preserve partial artifacts and an unknown state when whole-tree cessation is unconfirmed. Provide lookup/reconciliation before retry. Confirm process-tree stop when supported; do not infer it from direct-parent timeout."
+    },
+    {
+      "id": "PRODUCT-FACTORY-02",
+      "severity": "P2",
+      "file": "reference/source_build.py",
+      "line": 36,
+      "title": "Failure discards build stdout, exit history and reconstruction observations",
+      "attempt": "Build argv prints build diagnosis stdout, prints separate stderr, exits7.",
+      "observed": "CCError BUILD_FAILED contains only stderr. No new store files or durable build record. The preceding fetch/base/tree/lock observations and stdout are discarded with the temporary directory.",
+      "impact": "Failures and interruptions cannot be audited or diagnosed from retained execution evidence, despite docs04/11/12 requiring retained failures and observations.",
+      "general_fix": "Persist phase commands, exit codes, stdout and stderr separately for every outcome, with source-change/base/tree/lock identities and failing phase in a durable failure/attempt record. No executable package should be published for failed work."
+    },
+    {
+      "id": "PRODUCT-FACTORY-03",
+      "severity": "P2",
+      "file": "reference/source_build.py",
+      "line": 53,
+      "title": "Unresolved Git LFS objects can be published as complete payload material",
+      "attempt": "Stage .gitattributes with weights.bin filter=lfs plus a standard pointer to unavailable sha256:111...111,size123456. Apply the verified binary patch. Authorized build copies weights.bin into dist alongside the service.",
+      "observed": "Materialization succeeds and publishes release15c469...; payload/weights.bin is the literal LFS pointer. GIT_LFS_SKIP_SMUDGE=1 prevents object retrieval, and only submodule modes are checked.",
+      "impact": "The bounded profile accepts omitted required LFS bytes rather than reporting unsupported source material, conflicting with doc12 omission row and risking a nominally built candidate with missing weights.",
+      "general_fix": "Detect tracked LFS-managed pointers before build/publishing and reject with UNSUPPORTED_SOURCE_MATERIAL unless an explicit supported resolved-material profile binds/verifies the object bytes. Document separately admitted external weights instead of presenting unresolved pointer files as their material."
+    },
+    {
+      "id": "PRODUCT-FACTORY-04",
+      "severity": "P2",
+      "file": "reference/source_build.py",
+      "line": 48,
+      "title": "An unchanged pinned source cannot be built through the source-change profile",
+      "attempt": "Use exact existing base commit and its tree with a verified zero-byte patch artifact, leaving the normal build recipe unchanged.",
+      "observed": "PATCH_REJECTED: No valid patches in input (allow with --allow-empty). The repository is complete; no source modification is needed.",
+      "impact": "Factory cannot use this profile to build an existing paper/application revision without inventing a source edit.",
+      "general_fix": "Support an empty patch as a no-op while still checking exact base and resulting tree, for example git apply --allow-empty on check/apply. Alternatively expose a documented exact-base build path that preserves the same evidence."
+    }
+  ],
+  "verified_boundaries": [
+    "Template and caller repository remain separate; fresh checkout receives the patch.",
+    "Immutable full base/tree IDs and patch digest verification are checked; git apply checks/index application precede expected-tree comparison.",
+    "Missing dependency lock, changed tracked source/index and nonempty output checks exist; dependencies are not installed implicitly.",
+    "Build authority is explicit trusted_build=True and distinct from runtime start grants.",
+    "Successful payload is copied into a package with generated provenance and prepared before destination publication.",
+    "Product demonstration uses actual synthetic Git patch/build, inspector, HTTP startup/readiness/invocation and stop. Its CPU-only limitation is explicit.",
+    "Docs distinguish build success, readiness, qualification, installation eligibility, actual loaded generation and independent measurement."
+  ],
+  "notes": [
+    "A dependency-lock hash identifies the supplied file; it does not prove installed dependencies or full environment closure. This limitation is explicitly documented.",
+    "Build records point to patch/source locators; transferable delivery must retain the referenced bytes or clearly identify unavailable rebuild material.",
+    "The four probe changes and outcomes are retained in factory-review-probe-evidence.json. No production implementation/docs edited."
+  ]
+}

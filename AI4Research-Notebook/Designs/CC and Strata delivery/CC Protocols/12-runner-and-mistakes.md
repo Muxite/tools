@@ -1,0 +1,136 @@
+---
+id: cc-v2-12-runner-and-mistakes
+status: v2-reference-implementation
+source: November 4 unified capability and Incus Lab amendment
+last_reviewed: 2026-11-04
+next_action: Qualify image, GPU and remote providers on the receiving machine
+---
+# Runner contract and mistakes
+
+## 1. Small mental model
+
+| Concept | Meaning | Result |
+|---|---|---|
+| Capsule | Versioned software package and shared implementation bindings | Immutable release after preparation |
+| Capability | One action or served interface; owns its ports and behavior | Outputs/receipt or a managed service instance |
+| Material | Skill, methodology or reference bytes | Sealed context without an executable |
+| Call | One capability bound to actual inputs/resources and authority | Recorded execution and optional assessment |
+| Instance | One application startup generation | Inspectable lifecycle, not a finished tool call |
+
+The same package may provide finite and served capabilities plus passive materials, in any useful combination. A coding subagent can inspect, plan, implement, test or review through separate capabilities. One implement call contains an ordinary native coding session; its internal file edits are not individual CC calls. A Factory-built engine can be a served capability; an engine inspector is a capability. No extra package `kind` discriminant or separate `applications` authoring map is necessary.
+
+Inputs/outputs are per capability, not capsule-wide. Shared `defs` describe ports once; callers still connect values explicitly. Service setup ports belong to the selected capability. The application's HTTP/API contract describes subsequent requests/results. A lifecycle record is not a replacement for a business API response.
+
+## 2. Minimum runner responsibilities
+
+Every runner must implement the core boundary below. It must advertise/document its supported binding, application and resource profiles. A valid declaration is not a promise that every host has its runtime, credentials, GPU or authority.
+
+| Responsibility | Required behavior |
+|---|---|
+| Parse and describe | Reject duplicate/unknown protocol fields, unsupported mandatory semantics and unresolved references; preserve broad JSON payloads. Present each entry's behavior, inputs, results/interfaces, prerequisites and effects. |
+| Prepare/admit | Verify immutable materials, select a supported binding, check actual environment/resources and authority. Never fall back silently to another implementation or host. |
+| Stage data | Verify artifact bytes, contain outputs, stage host paths and resolve host-issued handles. JSON stays data; command text inside JSON is never host authority. |
+| Bind effects | Select one entry, intersect existing session authorization, reject missing authority and record enforcement limits. Installation, outbound network, model use, publication and deployment are distinct effects. |
+| Execute | Use the declared argument vector or registered native delegate; no implicit shell, dependency installation or generic-chat substitution. Enforce supported deadlines and record uncertainty honestly. |
+| Preserve identity | Reserve a host-generated key before transport dispatch; bind all execution/assessment parameters. Deduplicate identical requests and reject changed-key reuse. |
+| Record | Keep results, logs, partial evidence, execution identity and provenance. Do not infer tests ran from an agent's final message. |
+| Verify optionally | Run zero semantic checkers by default. Requested advisory failures preserve useful outputs. Explicit acceptance policy alone gates acceptance. |
+| Recover | Lookup before retry; unknown effects are not replayed automatically. Reconciliation records who established cessation and retains previous/late observations. |
+| Manage served capabilities | When the service profile is supported: start, return endpoints/generation, inspect, collect logs, stop and reconcile. Readiness and scientific correctness remain separate. |
+
+The reference runner offers native trusted-local capability/application processes, finite image calls and an image lifecycle adapter, registered JiuwenSwarm capability delegates, and local SQLite state. Image lifecycle code is not a passing image execution demonstration. Application interfaces are loopback HTTP; persistent workspace/device/secret assignment requires another provider. Native execution has no OS isolation. The ledger is local; it does not coordinate unrelated stores/programs.
+
+The materializer is optional. A runner can accept a completed package without fetching Git or building software. A Factory implementer needs only a valid declaration, its actual implementation, dependency/setup instructions and a demonstrated call or application startup. An existing project need not adopt CC internally.
+
+## 3. Keep the standard firm and authoring light
+
+| Must remain firm | Optional until useful |
+|---|---|
+| Package identity and pinned implementation | Registry, signature and reproducible-build service |
+| Selected entry and required port presence | Domain JSON Schema and restricted nested options |
+| Artifact identity and supported resource/binding semantics | Full scientific provenance profile for a tiny string tool |
+| Authorization boundaries and truthful execution state | External semantic verifier or review agent |
+| Distinction between missing, empty, partial, failure and unknown | Promotion/benchmark acceptance policy |
+
+No extra required author fields were added to ordinary tool-only CCs. Served capabilities add only their startup/interface information. Materials-only packages require no process binding. Source reconstruction uses a companion record instead of adding Git/build fields to every CC. The implementation grows because lifecycle and builds have real responsibilities; separate adapter modules keep them out of finite tool dispatch. Simpler declarations do not remove runtime error handling.
+
+### One owner per fact
+
+| Fact | Authoritative owner |
+|---|---|
+| Entry meaning, ports, allowed effects | Declaration |
+| Shared port descriptor or implementation binding | `defs` or `bindings`; reference by local ID |
+| Native engine ABI/backend/component files | Existing Strata manifest, carried as material |
+| Desired fixed/open implementation choices | Request |
+| Base, patch, expected resulting source tree | Source-change record |
+| Actual build steps, dependency-lock digest, payload identity | Factory-generated build record |
+| Granted resources/limits and verification selection | Bound call/start, under host session policy |
+| Actual outputs, process identity, effects and limitations | Receipt or instance observations |
+| Workload, acceptance criteria and scientific verdict | Lab/evaluator; independent of candidate self-report |
+
+Reference fields may repeat *identities* to link records; the compiler/runner generates those links. Authors do not maintain duplicate permission or payload-hash lists in a package summary.
+
+## 4. Use-case and comprehension matrix
+
+Use the published declaration alone to choose the entry, supply its ports, predict its declared effects and locate its results/interface. Then inspect execution evidence separately.
+
+| Case | Author/caller action | Expected meaning |
+|---|---|---|
+| Small CPU function | `takes: {text: text}`, `gives: {trimmed: text}`; native binding | Empty string is present success; missing required `trimmed` is malformed result. |
+| General agent | `task: text`, broad `context: json`, `result: json` | New nested context fields need no protocol change. Context never authorizes tools or network. |
+| Coding subagent | Assigned worktree/resource; direct edit capability | Return base/result, changed files, optional diff/snapshot and observed checks. Dirty/untracked files retained; concurrent edits require leases/reconciliation. |
+| Test/review | Separate capabilities on saved source/output | Test failures can be valid executed test reports. Review failure need not block unrelated work. |
+| Paper method | Fit/calibrate artifact → predict artifact → evaluate metrics | No hidden model object between calls. Missing weights/environment is a specific unavailable dependency; negative metrics are valid output. |
+| Profiler | Target handle/input, attach prerequisite, bounded sample options | `process.attach` is explicit; trace artifact can be complete, partial or unavailable. GPU/attach providers need qualification. |
+| Engine product | Start application with exact candidate/configuration material | Instance identity/endpoints are delivery; health is not a benchmark pass. |
+| Hybrid package | Start engine; separately call inspector/benchmark | Shared carrier does not authorize siblings. Benchmark effects need their own grants. |
+| Test ground | Start fixture service; call independent measurement capability | Candidate and test environment have separate identities/policy owners. No core pipeline language needed. |
+| Non-agent application | Use its HTTP contract after start | No fictitious agent-tool process wrapper is required. |
+| Incomplete request | Resolve named open pointers, then implement/prepare | Unfilled executable choices cannot run. Changed fixed requirements need a revised request. |
+
+The runnable examples are indexed in [05](05-examples-and-conformance.md). Profiler, GPU engine and remote enterprise cases are supported design boundaries, not new claims of executed adapters.
+
+## 5. Mistakes and recovery
+
+| Mistake or edge case | Required outcome / recovery |
+|---|---|
+| Send a request/template as a runnable release | Reject unresolved/missing implementation. Complete and prepare first. |
+| Treat arbitrary `context` instructions as authority | Keep them as input data. Host session policy determines permitted tools/resources. |
+| Treat a persistent service startup as an ordinary finite process call | `SERVICE_REQUIRES_START`; use explicit start or a supported native service client. |
+| Treat a diff as a complete engine | Require exact base, full reconstruction material and resulting tree; then build. |
+| Omit binary/untracked/LFS/submodule material | Reconstructed tree/material checks fail or builder reports unsupported material. Never claim complete source from a text diff alone. |
+| Patch wrong base or build rewrites tracked source | `PATCH_REJECTED`, `TREE_MISMATCH` or `BUILD_MUTATED_SOURCE`; no published package. |
+| Use mutable image tag or unsupported binding | Reject before dispatch; resolve or choose an eligible provider. |
+| Missing dependencies or incompatible ABI | Explicit setup/admission failure; no implicit install or fallback. Actual platform qualification is required. |
+| Supply stale/tampered artifact | Reject digest mismatch. A trusted digest does not make executable serialization safe. |
+| Lose a start/edit reply | Lookup original key; do not allocate a new key and repeat effects blindly. |
+| Reuse key after changing inputs/checks/start limits | `KEY_CONFLICT`; deliberate new execution requires a new key. |
+| Stop a reused PID | Refuse `INSTANCE_REPLACED`; generation must match. A port/PID alone is insufficient identity. |
+| Readiness probe succeeds against wrong/stale endpoint | Startup probe is not loaded-identity evidence. Use host allocated ports; Lab binds actual component/generation before scoring. |
+| Crash during spawn before identity persistence | Keep `unknown`, reconcile original instance; no automatic new startup. |
+| Agent interrupted after partial edits | Retain changes/logs and lease uncertainty. Inspect/reconcile; no automatic rollback or replay. |
+| Agent says tests passed without executing tests | Supporting message only; report missing observed test evidence. |
+| Good execution reports poor coverage/latency | Valid scientific negative. Preserve metrics; optional assessment can reject promotion. |
+| Optional checker missing/crashes | Diagnostic, execution/output retained. Explicit required acceptance remains distinct. |
+| Image exposes egress while caller authorized only listening | Reject basic bridge policy; explicit outbound grant or enforcing provider required. |
+| Candidate invents its own acceptance criteria | Treat as proposed metadata. Independent evaluator chooses/fixes policy. |
+
+## 6. Practical tradeoffs and next qualification
+
+| Choice | Benefit | Cost or boundary |
+|---|---|---|
+| Broad payloads, strict envelope | Easy tool adoption, stable communication | Domain mistakes require useful descriptions or optional schemas. |
+| Native first | Immediate experiments with existing tools/sessions | Team trust, dependency drift and no OS isolation. |
+| Images alongside native | Common startup/lifecycle with packaged system dependencies | Engine/driver/external-asset qualification still needed. |
+| Separate source-build profile | Exact change handoff without burdening every tool | Complex repos need a qualified builder; the reference is intentionally bounded. |
+| Optional semantic assessment | Results available without verifier-induced graph blocking | Callers must choose stronger evidence where consequences warrant it. |
+
+Next work is a working-container replay, real Lab GPU/resource admission and loaded-identity measurement, plus production isolation and remote lifecycle recovery. Preserve the same small contract; add a profile only for a demonstrated unmet case.
+
+### Foreground application boundary
+
+The reference native application must keep its foreground leader alive for the lifetime of its work. Daemonizing launchers need a qualified service supervisor/provider. If the leader disappears, `stop` reports `STOP_UNCONFIRMED` and retains `unknown` instead of claiming its children stopped. Inspect descendants and reconcile the original instance; do not start another copy automatically. This is separate from OS isolation.
+
+## 7. Final Lab alignment
+
+Canonical authoring has one `capabilities` map; `serves` marks persistent provision. `materials` allows passive-only skill/reference packages without a dummy executable. Native/image and finite/service are independent choices. The earlier `applications` draft is import-only compatibility, never a second current authoring route. [13](13-lab-composition-and-telemetry.md) defines the optional telemetry and Incus composition plan. Optional observation failures do not turn a valid tool or benchmark result into execution failure; exact missing evidence remains visible.

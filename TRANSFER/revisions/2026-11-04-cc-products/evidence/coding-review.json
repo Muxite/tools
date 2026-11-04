@@ -1,0 +1,411 @@
+{
+  "review": "Independent coding-agent and product-boundary review",
+  "date": "2026-11-04",
+  "scope": [
+    "README.md",
+    "08-coding-capsule.md",
+    "12-runner-and-mistakes.md",
+    "reference/ccv2.py",
+    "reference/applications.py",
+    "reference/source_build.py",
+    "reference/test_ccv2.py",
+    "reference/test_products.py",
+    "reference/test_source_build.py"
+  ],
+  "assumptions": [
+    "Native execution is trusted-local; no OS isolation or arbitrary process containment inferred.",
+    "Ordinary native reads/edits/internal helper tools remain inside a reusable task, without per-edit CC wrapping.",
+    "Application means managed software/API; capability means finite callable action.",
+    "Only report/evidence output modified; all probes use disposable temporary fixtures, and spawned child processes were explicitly stopped."
+  ],
+  "initial_findings": [
+    {
+      "id": "CODING-PRODUCT-01",
+      "severity": "P1",
+      "status": "resolved_by_retest",
+      "title": "Stop falsely confirms vanished launchers whose child worker continues",
+      "attempted_declaration": {
+        "cc": "2",
+        "id": "review.launcher",
+        "version": "1.0.0",
+        "bindings": {
+          "default": {
+            "kind": "native",
+            "command": [
+              "{python}",
+              "{bundle}/launcher.py",
+              "{input.heartbeat}",
+              "{input.pidfile}"
+            ]
+          }
+        },
+        "applications": {
+          "server": {
+            "does": "Launch ordinary child worker then exit",
+            "takes": {
+              "heartbeat": "text",
+              "pidfile": "text"
+            },
+            "changes": [
+              "process.exec",
+              "workspace.write"
+            ],
+            "interfaces": {}
+          }
+        }
+      },
+      "reproduction": "Launcher creates a Python child that updates a heartbeat file, records child PID, then exits. After 0.4 seconds inspect, stop, wait, and inspect heartbeat/child. This is an ordinary daemonizing launcher, not a hostile escape.",
+      "initial_outcome": {
+        "inspection": "exited",
+        "stop": "stopped",
+        "child_alive_after_stop": true,
+        "heartbeat_after_false_stop": [
+          "5",
+          "8"
+        ]
+      },
+      "minimum_general_fix": "Qualify a lifecycle scope that survives the launcher, or explicitly limit the reference provider to foreground leaders and preserve unknown/STOP_UNCONFIRMED when descendant cessation cannot be established.",
+      "initial_evidence": {
+        "sources": {
+          "ccv2.py": "c4dec051e5067848c497bc744238d628b3db4655416a35052627347545527ff7",
+          "applications.py": "77b3ba814f70e1649070054e17ff8f0335ad191b09dec21ea3f3a419e4bb3a14",
+          "source_build.py": "c12564501a573be07c4c65db51c301052cb6843ee7113a72132a433b9c52c1f7"
+        },
+        "case": {
+          "start": {
+            "format": "cc-instance/2",
+            "id": "787240a2-5055-4127-838a-85f62e99b91d",
+            "key": "launcher-once",
+            "release": "3a518081031af683f25d91b57e565d7d9a61d77891b70d937cd6787f552f375c",
+            "application": "server",
+            "state": "running",
+            "readiness": "not_checked",
+            "endpoints": {},
+            "identity": {
+              "kind": "native",
+              "pid": 16192,
+              "created": 1793823712.2755585
+            },
+            "inputs": {
+              "heartbeat": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\heartbeat.txt",
+              "pidfile": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\child.pid"
+            },
+            "effects": {
+              "declared": [
+                "process.exec",
+                "workspace.write"
+              ],
+              "granted": [
+                "process.exec",
+                "workspace.write"
+              ],
+              "assurance": "trusted_local",
+              "limits": "Native process-tree observation is not OS isolation; readiness is not semantic correctness"
+            },
+            "provenance": {
+              "binding": {
+                "command": [
+                  "{python}",
+                  "{bundle}/launcher.py",
+                  "{input.heartbeat}",
+                  "{input.pidfile}"
+                ],
+                "kind": "native"
+              },
+              "started": 1793823712.2689533,
+              "owner": {
+                "pid": 14580,
+                "created": 1793823711.9385564
+              },
+              "executable_sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a",
+              "command": [
+                "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+                "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\store\\releases\\3a518081031af683f25d91b57e565d7d9a61d77891b70d937cd6787f552f375c\\bundle/launcher.py",
+                "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\heartbeat.txt",
+                "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\child.pid"
+              ]
+            },
+            "diagnostics": [],
+            "logs": {
+              "stdout": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\store\\instances\\787240a2-5055-4127-838a-85f62e99b91d\\stdout.log",
+              "stderr": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\store\\instances\\787240a2-5055-4127-838a-85f62e99b91d\\stderr.log"
+            }
+          },
+          "inspection": {
+            "format": "cc-instance/2",
+            "id": "787240a2-5055-4127-838a-85f62e99b91d",
+            "key": "launcher-once",
+            "release": "3a518081031af683f25d91b57e565d7d9a61d77891b70d937cd6787f552f375c",
+            "application": "server",
+            "state": "exited",
+            "readiness": "not_ready",
+            "endpoints": {},
+            "identity": {
+              "kind": "native",
+              "pid": 16192,
+              "created": 1793823712.2755585
+            },
+            "inputs": {
+              "heartbeat": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\heartbeat.txt",
+              "pidfile": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\child.pid"
+            },
+            "effects": {
+              "declared": [
+                "process.exec",
+                "workspace.write"
+              ],
+              "granted": [
+                "process.exec",
+                "workspace.write"
+              ],
+              "assurance": "trusted_local",
+              "limits": "Native process-tree observation is not OS isolation; readiness is not semantic correctness"
+            },
+            "provenance": {
+              "binding": {
+                "command": [
+                  "{python}",
+                  "{bundle}/launcher.py",
+                  "{input.heartbeat}",
+                  "{input.pidfile}"
+                ],
+                "kind": "native"
+              },
+              "started": 1793823712.2689533,
+              "owner": {
+                "pid": 14580,
+                "created": 1793823711.9385564
+              },
+              "executable_sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a",
+              "command": [
+                "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+                "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\store\\releases\\3a518081031af683f25d91b57e565d7d9a61d77891b70d937cd6787f552f375c\\bundle/launcher.py",
+                "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\heartbeat.txt",
+                "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\child.pid"
+              ]
+            },
+            "diagnostics": [],
+            "logs": {
+              "stdout": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\store\\instances\\787240a2-5055-4127-838a-85f62e99b91d\\stdout.log",
+              "stderr": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\store\\instances\\787240a2-5055-4127-838a-85f62e99b91d\\stderr.log"
+            }
+          },
+          "stop": {
+            "format": "cc-instance/2",
+            "id": "787240a2-5055-4127-838a-85f62e99b91d",
+            "key": "launcher-once",
+            "release": "3a518081031af683f25d91b57e565d7d9a61d77891b70d937cd6787f552f375c",
+            "application": "server",
+            "state": "stopped",
+            "readiness": "not_ready",
+            "endpoints": {},
+            "identity": {
+              "kind": "native",
+              "pid": 16192,
+              "created": 1793823712.2755585
+            },
+            "inputs": {
+              "heartbeat": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\heartbeat.txt",
+              "pidfile": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\child.pid"
+            },
+            "effects": {
+              "declared": [
+                "process.exec",
+                "workspace.write"
+              ],
+              "granted": [
+                "process.exec",
+                "workspace.write"
+              ],
+              "assurance": "trusted_local",
+              "limits": "Native process-tree observation is not OS isolation; readiness is not semantic correctness"
+            },
+            "provenance": {
+              "binding": {
+                "command": [
+                  "{python}",
+                  "{bundle}/launcher.py",
+                  "{input.heartbeat}",
+                  "{input.pidfile}"
+                ],
+                "kind": "native"
+              },
+              "started": 1793823712.2689533,
+              "owner": {
+                "pid": 14580,
+                "created": 1793823711.9385564
+              },
+              "executable_sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a",
+              "command": [
+                "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+                "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\store\\releases\\3a518081031af683f25d91b57e565d7d9a61d77891b70d937cd6787f552f375c\\bundle/launcher.py",
+                "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\heartbeat.txt",
+                "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\child.pid"
+              ],
+              "stopped": 1793823712.7024755
+            },
+            "diagnostics": [],
+            "logs": {
+              "stdout": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\store\\instances\\787240a2-5055-4127-838a-85f62e99b91d\\stdout.log",
+              "stderr": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-vln3vj7e\\store\\instances\\787240a2-5055-4127-838a-85f62e99b91d\\stderr.log"
+            }
+          },
+          "child_alive_after_stop": true,
+          "heartbeat_before_after_stop": [
+            "5",
+            "8"
+          ],
+          "same_key_deduplicates": true
+        }
+      },
+      "verification": "Exact launcher probe rerun: stop raises STOP_UNCONFIRMED and durable record is unknown. Reviewer kills/waits known child, then explicitly reconciles. No false stopped receipt remains."
+    }
+  ],
+  "passing_scenarios": [
+    {
+      "scenario": "Application mistaken for finite agent tool",
+      "outcome": "Host.call on api returns APPLICATION_NOT_CALLABLE; no implicit service launch."
+    },
+    {
+      "scenario": "Lost application-start reply",
+      "outcome": "Fresh Host.lookup_instance(original_key) returns original ID without new dispatch; same-key start after staged source artifact deletion also returns same ID."
+    },
+    {
+      "scenario": "Application input resembles protocol placeholders",
+      "outcome": "Literal {input.payload}|{port.api}|{bundle} arrives unchanged; command values are substituted once."
+    },
+    {
+      "scenario": "Package exposes both inspector and application",
+      "outcome": "Inspected tests distinguish independent effects and startup from capability execution; calling inspector does not start application."
+    },
+    {
+      "scenario": "Ordinary coding regression",
+      "outcome": "All 34 core tests pass, retaining dirty source, overlap leases, unknown deadlines and reconciliation behavior."
+    },
+    {
+      "scenario": "Build authority",
+      "outcome": "No trusted_build authorization rejects before source build; explicit trusted builds remain arbitrary trusted-local code, not isolated."
+    },
+    {
+      "scenario": "Unresolved LFS payload",
+      "outcome": "Current materializer refuses with UNSUPPORTED_SOURCE_MATERIAL and durable build-attempt diagnostic; no product published.",
+      "evidence": {
+        "source_sha256": "f5c3f4f670a3b05809ca20b152cd01d310a0e659bc14abbe8908b08e42f77057",
+        "case": {
+          "published": false,
+          "error": {
+            "code": "UNSUPPORTED_SOURCE_MATERIAL",
+            "path": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-lfs-wrqjpfjm\\store\\builds\\edb1e9c3-4d34-4493-8adf-91829ba3045e\\attempt.json",
+            "message": "Unresolved Git LFS pointer: weights.bin"
+          }
+        }
+      }
+    }
+  ],
+  "verification": {
+    "sources": {
+      "ccv2.py": "2fb9e6f1fc72246e0775d5c88c0161da72f73bfc80370a63cca928795184e95c",
+      "applications.py": "7906d1698e5ccaa49be045d1814538f2b35e619973356ab093032f2762da5e26",
+      "source_build.py": "f5c3f4f670a3b05809ca20b152cd01d310a0e659bc14abbe8908b08e42f77057"
+    },
+    "launcher_case": {
+      "inspection": "exited",
+      "stop_state": "unknown",
+      "stop_error": "STOP_UNCONFIRMED",
+      "child_alive": true,
+      "lookup_without_session": true,
+      "replay_same_instance": true,
+      "receipt": {
+        "format": "cc-instance/2",
+        "id": "5f314572-d753-4322-91f6-1c696a0acd6c",
+        "key": "launcher-once",
+        "release": "3a518081031af683f25d91b57e565d7d9a61d77891b70d937cd6787f552f375c",
+        "application": "server",
+        "state": "unknown",
+        "readiness": "not_ready",
+        "endpoints": {},
+        "identity": {
+          "kind": "native",
+          "pid": 2928,
+          "created": 1793823851.9395196
+        },
+        "inputs": {
+          "heartbeat": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-verify-t1300kmu\\heartbeat.txt",
+          "pidfile": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-verify-t1300kmu\\child.pid"
+        },
+        "effects": {
+          "declared": [
+            "process.exec",
+            "workspace.write"
+          ],
+          "granted": [
+            "process.exec",
+            "workspace.write"
+          ],
+          "assurance": "trusted_local",
+          "limits": "Native process-tree observation is not OS isolation; readiness is not semantic correctness"
+        },
+        "provenance": {
+          "binding": {
+            "command": [
+              "{python}",
+              "{bundle}/launcher.py",
+              "{input.heartbeat}",
+              "{input.pidfile}"
+            ],
+            "kind": "native"
+          },
+          "started": 1793823851.9326355,
+          "owner": {
+            "pid": 12480,
+            "created": 1793823851.6129284
+          },
+          "executable_sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a",
+          "command": [
+            "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+            "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-verify-t1300kmu\\store\\releases\\3a518081031af683f25d91b57e565d7d9a61d77891b70d937cd6787f552f375c\\bundle/launcher.py",
+            "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-verify-t1300kmu\\heartbeat.txt",
+            "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-products-coding-verify-t1300kmu\\child.pid"
+          ]
+        },
+        "diagnostics": [
+          {
+            "code": "STOP_UNCONFIRMED",
+            "message": "Foreground leader exited; child cessation is not established. Inspect and reconcile."
+          }
+        ],
+        "logs": {
+          "stdout": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-verify-t1300kmu\\store\\instances\\5f314572-d753-4322-91f6-1c696a0acd6c\\stdout.log",
+          "stderr": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-products-coding-verify-t1300kmu\\store\\instances\\5f314572-d753-4322-91f6-1c696a0acd6c\\stderr.log"
+        }
+      }
+    },
+    "literal_input": {
+      "expected": "{input.payload}|{port.api}|{bundle}",
+      "actual": "{input.payload}|{port.api}|{bundle}",
+      "preserved": true
+    },
+    "lost_start_reply": {
+      "lookup_same_id": true,
+      "duplicate_without_artifact_same_id": true
+    },
+    "application_as_capability": "APPLICATION_NOT_CALLABLE"
+  },
+  "tests": [
+    {
+      "command": "python -m unittest test_ccv2 -q",
+      "observed": "34 tests passed"
+    },
+    {
+      "command": "python -m unittest test_products test_source_build -q",
+      "observed": "19 tests passed"
+    }
+  ],
+  "documentation_note": {
+    "severity": "P2",
+    "status": "sent_to_parent_for_final_alignment",
+    "note": "At final read, README/12 did not yet explicitly say native application lifetime requires a foreground leader. Document this provider boundary alongside the now-honest STOP_UNCONFIRMED recovery; a normal exited launcher cannot be certified stopped without independent descendant reconciliation."
+  },
+  "remaining_high_priority_findings": [],
+  "final_status": "runtime_review_passed_after_fix; foreground-provider documentation alignment pending parent"
+}

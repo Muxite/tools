@@ -59,3 +59,11 @@ For a locally changed Muse instance, join parent component → source/configurat
 Retain raw measurements and limitations. Thresholds must not change after viewing a candidate. Promotion is separate from `state: succeeded`. [11](11-factory-lab-handoff.md) provides the short checklist.
 
 The reference host records native delegate/checker module, name and loaded-code hash, plus a source-file hash where available. This identifies the host adapter code without copying closures or secret configuration into receipts. Actual model/deployment settings, child interpreters and external provider revisions require the adapter's own binding evidence; a callback name alone does not establish them.
+
+## Product capsule lineage
+
+A product CC binds its native payload/image to build evidence; `cc-instance/2` binds that release to a startup generation. The measurement capability takes the admitted candidate/instance, model, workload and environment as explicit inputs/resources and emits an ordinary receipt. Keep actual loaded component/configuration evidence with that measurement; a package release or successful health probe alone cannot establish it.
+
+For a locally modified Muse candidate retain: parent image/component → exact source base and complete patch/configuration artifact → resulting tree → dependency/build record → resulting binary/snapshot/image → selected configuration → restart and loaded generation → measurement window/raw outputs → optional independent assessment. Reusing an image tag, PID or mutable worktree name loses this chain.
+
+Strata's `engine-component.json` remains authoritative for engine-specific compatibility and files. Bundle it as a native contract/material; do not reauthor its ABI/backend/hash fields in CC. External weights/datasets remain separate admitted artifacts. A candidate's self-tests are supporting outputs; the Lab's frozen workload and acceptance criteria have an independent owner.

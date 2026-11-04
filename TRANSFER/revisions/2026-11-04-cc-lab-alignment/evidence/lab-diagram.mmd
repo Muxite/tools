@@ -1,0 +1,30 @@
+flowchart TB
+    pool["CC pool: engine image, tools, scripts, skills and references"]
+    select["Lab selects pinned releases and admitted materials"]
+    adapter["Planned Incus adapter: pull/import, verify and start"]
+    engine["Engine instance: native API and actual loaded generation"]
+    swarm["JiuwenSwarm Lab / inference agent"]
+    tools["Selected tool/client capabilities"]
+    sidecar["Optional observer or collector capability"]
+    bench["Selected SOL benchmark: pinned suite, model, workload and window"]
+    evidence["Receipts, raw metrics and optional traces with coverage"]
+    assess["Frozen Lab criteria: pass, fail or inconclusive"]
+    retain["Retain experiment or explicitly stop owned resources"]
+    cleanup["Optional clean uninstall of owned resources"]
+    pool --> select
+    select --> adapter
+    adapter --> engine
+    select --> swarm
+    swarm --> tools
+    tools --> bench
+    select -.-> sidecar
+    tools -->|"Native requests / authorized attachment"| engine
+    bench -->|"Workload requests"| engine
+    engine -->|"Responses and measurements"| bench
+    engine -.->|"Available telemetry only"| sidecar
+    tools --> evidence
+    bench --> evidence
+    sidecar -.-> evidence
+    evidence --> assess
+    assess --> retain
+    retain -.-> cleanup

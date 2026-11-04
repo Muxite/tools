@@ -1,0 +1,107 @@
+---
+id: cc-v2-01-declaration
+status: v2-reference-implementation
+source: November 4 CC v2 revision
+last_reviewed: 2026-11-04
+next_action: Qualify selected adapter and consumer evidence policy
+---
+# Declare capabilities and bindings
+
+One package contains named capabilities, applications, or both. A call selects one capability; a start selects one application. Sharing a package does not execute siblings or share authority.
+
+| Package field | Meaning |
+|---|---|
+| `cc` | Required string `"2"`. |
+| `id`, `version` | Required package identity and `major.minor.patch` version. Release digest fixes exact bytes. |
+| `bindings` | Named executable bindings; required normal binding name is `default`. |
+| `capabilities` | Optional map of names to callable contracts; omitted means empty. |
+| `applications` | Optional map of names to application contracts; omitted means empty. At least one of these two maps must be nonempty. |
+| `provenance` | Optional nonempty bundle-relative path to a build record; sealed with the package. No default. |
+| `defs` | Optional map of shared port descriptors, default `{}`; reference as `$name`. |
+
+| Capability field | Meaning/default |
+|---|---|
+| `does` | Required action, interpretation and relevant limitations. |
+| `takes`, `gives` | Port-name maps; each defaults to `{}`. |
+| `needs` | Required host provisions, default `[]`. |
+| `changes` | Declared effect classes, default `[]`. |
+| `guarantees` | Checkable commitments, default `[]`. They advertise what can be assessed; they neither run a checker nor prove a result. |
+| `using` | Selected binding name, default `default`. |
+
+Unsupported required semantics are rejected. Releases contain no unresolved choices or fake digests. Use a [request](02-compiler-and-release.md) while implementation remains open.
+
+## Syntax and field validation
+
+Declarations are UTF-8 JSON or YAML mappings. Reject duplicate keys, YAML aliases/anchors/tags, unknown protocol fields and nonfinite numbers. IDs and local names match `[a-z][a-z0-9._-]*`; names are scoped by package and field namespace. Version is a string of three decimal components with no leading zero except zero itself. Port maps and shared-definition maps have string keys. Needs/effects/check lists contain unique strings. Key order has no meaning. Normalization materializes the listed defaults, retains shared-definition references and never merges capability ports.
+
+Required package fields have no default. `does` is nonempty text. A descriptor's `optional` is boolean. Binding command is a nonempty string array; binding agent is a nonempty host registration name. Native/image bindings additionally accept optional `lock`, a bundle-relative file path sealed with the source. This identifies the supplied dependency lock; it does not install dependencies or establish a hermetic environment. JiuwenSwarm bindings accept exactly `kind` and `agent`.
+
+## Four port kinds
+
+Shorthand `"json"`, `"text"`, `"artifact"` or `"handle"` expands to a descriptor with that `kind`:
+
+```json
+{"kind":"json","optional":false,"description":"Caller options","schema":{"type":"object"}}
+```
+
+`optional` defaults to `false`; `schema`, `description` and `media_type` are optional. Schema applies to JSON/text ports; media type applies to artifacts. External schema references must be bundled. JSON accepts broad JSON unless a useful schema constrains it. Text carries a string; artifact carries a byte reference; handle carries a host-resolved string. Do not force closed domain records onto ordinary options. Media type is metadata, not proof that content was inspected.
+
+```json
+{
+  "defs":{"report":{"kind":"artifact","media_type":"application/json"}},
+  "capabilities":{
+    "inspect":{"does":"Inspect supplied data.","takes":{"options":"json"},"gives":{"report":"$report"}}
+  }
+}
+```
+
+This fragment illustrates reuse; add identity and bindings for a complete declaration. Shared definitions do not schedule pipelines. Callers explicitly supply outputs to later inputs.
+
+## Three bindings
+
+| Kind | Descriptor | Owner |
+|---|---|---|
+| Native | `{"kind":"native","command":["{python}","{bundle}/tool.py"]}` | Team-trusted local process. |
+| Image | `{"kind":"image","image":"REGISTRY@sha256:DIGEST","command":["python","/app/tool.py"]}` | Configured container adapter. Use a pinned image digest or local `sha256:` image ID. |
+| JiuwenSwarm | `{"kind":"jiuwenswarm","agent":"registered-agent-name"}` | Host-registered native agent adapter. |
+
+Commands are argument vectors, never implicit shell strings. `{python}` selects the host interpreter; `{bundle}` selects sealed source. Host registration fixes the agent provider; arbitrary caller names are not authenticated agents. Capability adapters share the call/result/receipt boundary. Applications select native/image bindings and use start/inspect/stop; their payloads do not exchange CC process packets. Availability and execution evidence remain separate from declaration validity.
+
+## Requirements and effects
+
+Built-in needs are `workspace`, `python`, `process`, `gpu` and `environment`. Built-in effects are `workspace.read`, `workspace.write`, `process.exec`, `process.attach`, `process.control`, `gpu.use`, `dependency.install`, `network.listen`, `network.request`, `model.invoke`, `git.publish` and `deploy`. Common actions need no external rule document. Custom needs/effects/checks require host support; unsupported required meanings are rejected.
+
+The declaration is an authority ceiling. Host grants bind concrete resources and limits. Configure `Host(..., session_grants=[...])` once. Calls without explicit grants inherit only the selected capability's declared effects that the session has authorized. Explicit call grants can narrow the session authorization and cannot widen it. A sibling capability does not inherit the capsule's union of effects.
+
+The reference host still requires authorization for the selected capability's full declared effect list; missing authority is a real prerequisite failure, not an optional quality warning. It does not claim that native arbitrary code can selectively enforce missing permissions. Artifact references and handles do not authorize access. Model invocation, dependency installation, publication and deployment remain distinct effects.
+
+`changes: []` expresses no declared external effects. On trusted native execution it cannot establish that arbitrary code was prevented from making them. [03](03-calls-and-receipts.md) distinguishes enforcement from observation.
+
+## Identity and migration
+
+Contract, executable or material changes require a new sealed release. Native sealing hashes the resolved executable and verifies it again at use. Implementation scripts belong in the bundle and use `{bundle}`; absolute external arguments after argv[0] are rejected as `UNSEALED_IMPLEMENTATION`. Version is a compatibility label; release identity is immutable. Preserve original v1 bytes and lineage. Migration reports unsupported rules, profiles and bindings instead of flattening them into empty lists. Translate only when destination behavior preserves source meaning.
+
+## Application contract
+
+Applications share `does`, `using`, `takes`, `needs`, `changes` and `guarantees` with capabilities, with the same types/defaults and entry-scoped authority. They do not have `gives`: startup returns the standard instance record; business requests/results use the published application interface.
+
+| Application field | Type / requiredness / default / validation |
+|---|---|
+| `interfaces` | Optional map, default `{}`. Interface IDs follow local ID rules. The reference profile supports HTTP. |
+| `interfaces.ID.protocol` | Required string `http`; other protocols require another qualified adapter. |
+| `interfaces.ID.port` | Required integer 1..65535; service/container port. Native `{port.ID}` requests host allocation instead. |
+| `interfaces.ID.path` | String origin-relative base path; default `/`, never a remote URL. |
+| `interfaces.ID.contract` | Optional bundled API-document path; file must exist when sealing. This is the authority for domain request/result semantics. |
+| `ready` | Optional object; no automatic probe when omitted. |
+| `ready.interface` | Required known interface ID when `ready` is present. |
+| `ready.path` | Required origin-relative HTTP GET path. A 2xx response within the startup timeout establishes startup readiness only. |
+
+Native launch arguments can contain `{input.NAME}` and `{port.INTERFACE}`. Text inputs become literal argument text; JSON and artifact inputs become staged read-only-intent file paths. Host-issued device/workspace handles require a qualified deployment provider; the reference application adapter rejects them. Omitted optional inputs are not substituted; an unresolved placeholder is an error. No implicit environment-variable or shell expansion occurs.
+
+`process.exec` authorizes a persistent application process; `network.listen` authorizes publishing its declared interfaces. Neither grants outbound network, package installation, deployment to another host or sibling capabilities. The basic Docker bridge requires `network.request` for its egress exposure or rejects admission as `UNSUPPORTED_NETWORK_POLICY`. An enforcing provider can offer a narrower policy. Native execution is trusted-local.
+
+Capability and application names have separate namespaces. Routing is explicit (`call` versus `start`); generated MCP tools include capabilities only. An application-only package is a valid CC, not automatically an agent tool. Do not duplicate API fields inside a fictitious `invoke` capability. Add such a capability only when its own behavior and effects provide a useful wrapper.
+
+Existing tool-only declarations keep their prior normalized bytes: an absent `applications` field is not inserted into their release subject. Older v2 runners must reject the new fields, never silently drop them. Version `cc: "2"` alone does not imply support for application or source-build profiles; negotiate/check runner support before dispatch.
+
+For image applications the service must listen on the declared container port and a container-reachable interface (typically `0.0.0.0`); publishing a port does not expose a service bound only to the container loopback. The runner publishes the host endpoint on loopback. Keep container paths inside bindings; callers supply host-staged ports/artifacts.

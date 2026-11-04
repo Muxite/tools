@@ -129,3 +129,47 @@ Native sessions can carry many calls. Conversation pause, input-required state, 
 Scheduling and graph propagation belong to the caller. This revision does not change M1's old scheduler or node adapter. Its former verifier-blocking behavior must be migrated explicitly rather than assumed fixed by a v2 declaration.
 
 The synchronous reference callback demonstrates completed native tasks and deadline uncertainty. It does not implement a general background-job service, pause/resume API or cancellation forwarding service; those controls remain owned by the native session integration and must be qualified before being advertised. The local ledger is single-user, with leases scoped to that store. Separate stores or external programs do not participate in its concurrency control.
+
+## Served capabilities: lifecycle and native requests
+
+`Host.prepare(bundle)` seals a package; `describe(release)` returns the capability/application contracts. `start(release, capability, inputs=None, key=None, grants=None, timeout=15)` selects a served capability. `lookup_instance(key)`, `inspect_instance(id)`, `stop(id)` and explicit `reconcile_instance(id, stopped=True, note=...)` operate on its existing execution.
+
+```text
+python reference/ccv2.py prepare PACKAGE --store STORE
+python reference/ccv2.py describe RELEASE --store STORE
+python reference/ccv2.py start RELEASE api --store STORE --session SESSION.json --trusted-local --key START_KEY
+python reference/ccv2.py instance-key START_KEY --store STORE
+python reference/ccv2.py instance INSTANCE_ID --store STORE
+python reference/ccv2.py stop INSTANCE_ID --store STORE
+```
+
+`SESSION.json` is host configuration, for example `{"grants":["process.exec","network.listen"]}`. Normal service startup does not need tool input/output wrappers or an invented completion message. Optional `--inputs INPUTS.json` supplies application setup ports. Ongoing requests follow the declared API; start inputs and application request bodies serve different purposes.
+
+| `cc-instance/2` field | Producer and meaning |
+|---|---|
+| `format`, `id`, `key` | Runner-issued format, instance identity and durable deduplication key. |
+| `release`, `capability`, `inputs` | Bound immutable release, selected entry and setup inputs. |
+| `state` | `preparing`, `running`, `exited`, `stopped`, `failed` or `unknown`. |
+| `readiness` | `not_checked`, `ready`, `not_ready` or `failed`; separate from scientific quality. |
+| `endpoints` | Resolved interface ID to local URL; never authorize a caller to treat a foreign URL as host authority. |
+| `identity` | Native PID **and creation time**, or container name/ID; generation prevents stopping a reused PID. |
+| `provenance` | Binding, actual command/executable or image identity, startup owner/time, optional build-record artifact and stop time. |
+| `effects` | Selected declarations/grants, assurance mode and explicit observation limits. Not a claim of complete monitoring. |
+| `logs`, `diagnostics` | Runner log locations and machine-readable failures. Native files are live; image logs are collected on inspect/stop. |
+| `reconciliations`, `late_observations` | Optional runner/operator history; retained rather than overwritten by late replies. |
+
+The start key binds release, capability, inputs, grants and startup timeout before spawn. Same-key retry returns the recorded instance; changed parameters give `KEY_CONFLICT`. A new key is a deliberate new instance, not recovery from a lost reply. No automatic restart/replay after uncertainty. If the host dies between spawn and identity persistence, the surviving record becomes `unknown`; an operator must establish cessation and record reconciliation.
+
+Startup health is an operational probe. Without `ready`, a live process is `running/not_checked`. With `ready`, a successful bounded HTTP probe is `running/ready`. Probe failure preserves logs/diagnostics and attempts cleanup. Inspection detects known process exit; readiness is the recorded startup observation, not continuous health monitoring or proof the intended binary serves every endpoint. Qualified Lab measurement must bind actual loaded identity. A new runner must document health supervision and provider limitations.
+
+Stopping checks native generation or container identity and records confirmation; uncertain stopping remains unresolved. Native process-tree termination is best-effort observation, not containment of arbitrary detached children. Publication, deployment, secret injection, device assignment, mounts, remote routing and automatic restarts need explicit qualified providers. The local reference profile supplies loopback HTTP and no secret-management API.
+
+### Foreground application boundary
+
+The reference native application must keep its foreground leader alive for the lifetime of its work. Daemonizing launchers need a qualified service supervisor/provider. If the leader disappears, `stop` reports `STOP_UNCONFIRMED` and retains `unknown` instead of claiming its children stopped. Inspect descendants and reconcile the original instance; do not start another copy automatically. This is separate from OS isolation.
+
+`lookup_instance(key)` / `instance-key` reads the recorded startup even if the original artifact, environment or authorization is no longer available. It does not launch or reauthorize anything. Same-key start checks its fingerprint before revalidating input artifact bytes; use direct lookup when release access or session authority has changed.
+
+## Passive materials
+
+`Host.material(release, name)` and CLI `material RELEASE NAME --store STORE` return the sealed artifact and descriptor for a named skill/reference. They do not execute it, install dependencies or grant tools. Passive packages can be prepared/described without any implementation binding. A material is context, while an active search service is a capability with its own execution/interface contract.

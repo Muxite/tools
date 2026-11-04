@@ -7,7 +7,7 @@ next_action: Qualify selected adapter and consumer evidence policy
 ---
 # Factory to Lab · delivery checklist
 
-The full provenance/measurement route is [04](04-provenance.md); construction is [02](02-compiler-and-release.md). Factory delivers a product and optional CCs. **Zero CCs is valid.**
+The full provenance/measurement route is [04](04-provenance.md); construction is [02](02-compiler-and-release.md). Factory can deliver an engine/service CC, tool CCs and a test-ground CC. A raw product may still contain zero embedded CCs; the delivery wrapper supplies its contract and lifecycle.
 
 | Boundary | Required fact |
 |---|---|
@@ -25,3 +25,11 @@ Preserve native `engine-component.json` rather than invent a competing engine fo
 Source is not a built engine. A diff is complete only with exact base and all reconstructing material. Restart request is not loaded-generation evidence. Successful benchmark execution is not improvement. Retain failures, interruptions and missing evidence.
 
 A qualified-host restart and measurement trial is required before claiming end-to-end Strata/Muse/GB10 validation. Local CC checks do not establish it.
+
+## Default choice
+
+For today's experiments use native source/payload plus an exact patch/build record. Use a pinned image when system dependencies or deployment setup make it worthwhile. Preserve source linkage for both. Do not block a CPU tool on Docker or require the Lab to rebuild a candidate for every measurement.
+
+One package may expose the engine service capability and optional `inspect`/`benchmark` capabilities. They share sealed materials, not permission grants. A separate test-ground package can start fixtures/services and expose measurement capabilities; the caller wires their instance/artifact outputs explicitly. This is ordinary orchestration, not a required CC pipeline language.
+
+An inference engine speaking its native HTTP interface is a supported served-capability model. GPU handles, qualified GB10 admission, actual Strata loader selection, restart evidence and inference measurements require the real Lab integration; the synthetic HTTP demonstration establishes none of those hardware facts.

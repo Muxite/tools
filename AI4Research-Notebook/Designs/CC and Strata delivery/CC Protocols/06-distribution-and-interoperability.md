@@ -19,7 +19,7 @@ Recipients need immutable contract/material identity and an eligible adapter. Na
 
 Transport does not automatically supply authority or deduplication. Preserve structured receipts and error status; for text-only clients emit the same canonical JSON receipt. Reject conflicting copies. Model interpretation of prose cannot recover authority.
 
-Discover eligible capabilities only. Pin bindings through invocation; upgrades cannot silently switch active calls. Tenant/principal comes from trusted host context. Keep artifact identity separate from expiring access URLs and publication authority.
+Project finite capabilities into the current generated MCP tool discovery. Served capabilities appear in package/runner discovery and require explicit start authority; a service can itself expose MCP or another native API, but the bridge must support that interface rather than guess methods. Passive materials can be mapped to resources/prompts by a separately supported adapter. Pin bindings through invocation; upgrades cannot silently switch active calls. Tenant/principal comes from trusted host context. Keep artifact identity separate from expiring access URLs and publication authority.
 
 Configure MCP server grants once as session authorization. Each invocation inherits only the selected capability's declared effects. Model arguments do not select grants or verification policy. Normal MCP dispatch runs no semantic checker; a negative optional assessment is data, not a transport failure. Required acceptance policies remain host/caller choices. Execution failures still carry `isError`.
 

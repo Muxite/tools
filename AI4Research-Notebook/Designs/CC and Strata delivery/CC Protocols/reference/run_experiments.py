@@ -24,12 +24,14 @@ def main():
     root = args.output or args.environment / ('run-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ'))
     root.mkdir(parents=True, exist_ok=True)
     stages = [
-        ('local-regressions', ['-m', 'unittest', '-q', 'test_ccv2']),
+        ('local-regressions', ['-m', 'unittest', '-q', 'test_ccv2', 'test_products', 'test_source_build', 'test_unified']),
         ('mapie', ['integrations/mapie_demo.py', '--store', str(root / 'mapie-store'), '--report', str(root / 'mapie-report.json')]),
         ('scientific-replays', ['integrations/mapie_negative_replays.py', '--store', str(root / 'scientific-store'), '--report', str(root / 'mapie-replays-report.json')]),
         ('upstream-mcp', ['integrations/upstream_mcp_demo.py', '--store', str(root / 'mcp-store'), '--report', str(root / 'mcp-report.json')]),
         ('upstream-native-task', ['integrations/upstream_native_demo.py', '--root', str(root / 'native'), '--report', str(root / 'native-report.json')]),
         ('native-product-handoff', ['integrations/factory_lab_demo.py', '--root', str(root / 'factory-lab'), '--strata-source', str(WORKSPACE / 'Strata'), '--report', str(root / 'factory-lab-report.json')]),
+        ('product-upstream-mcp', ['integrations/product_mcp_demo.py', '--directory', str(root / 'product-mcp'), '--report', str(root / 'product-mcp-report.json')]),
+        ('source-product-lifecycle', ['integrations/product_demo.py', '--directory', str(root / 'product'), '--report', str(root / 'product-report.json')]),
     ]
     results = []
     for name, command in stages:

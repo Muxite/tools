@@ -90,7 +90,7 @@ def unique_mapping(loader, node):
 UniqueLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, unique_mapping)
 ID = re.compile(r'^[a-z][a-z0-9._-]*$')
 NEEDS = {'workspace', 'python', 'process', 'gpu', 'environment'}
-EFFECTS = {'workspace.read', 'workspace.write', 'process.exec', 'process.attach', 'process.control', 'gpu.use', 'dependency.install', 'network.request', 'model.invoke', 'git.publish', 'deploy'}
+EFFECTS = {'workspace.read', 'workspace.write', 'process.exec', 'process.attach', 'process.control', 'gpu.use', 'dependency.install', 'network.listen', 'network.request', 'model.invoke', 'git.publish', 'deploy'}
 STATES = {'running', 'succeeded', 'failed', 'blocked', 'cancelled', 'unknown'}
 IGNORED = {'.git', '.venv', '__pycache__', '.pytest_cache', '.cc-state', '.mypy_cache', '.ruff_cache'}
 
@@ -120,18 +120,51 @@ def port(value, defs):
     return result
 
 
+def service_entries(declaration):
+    """Derived lifecycle view; services remain capabilities in the canonical model."""
+    return {name: {**{k: deepcopy(v) for k, v in cap.items() if k != 'serves'}, **deepcopy(cap['serves'])}
+            for name, cap in declaration.get('capabilities', {}).items() if 'serves' in cap}
+
+
+def callable_entries(declaration):
+    return {name: cap for name, cap in declaration.get('capabilities', {}).items() if 'serves' not in cap}
+
+
 def normalize(raw):
-    fields(raw, {'cc', 'id', 'version', 'bindings', 'capabilities', 'defs'}, {'cc', 'id', 'version', 'bindings', 'capabilities'})
+    fields(raw, {'cc', 'id', 'version', 'bindings', 'capabilities', 'applications', 'materials', 'defs', 'provenance'}, {'cc', 'id', 'version'})
     require(raw['cc'] == '2', 'UNSUPPORTED_VERSION', 'Explicit v2 declaration required; migrate v1 first')
     require(isinstance(raw['id'], str) and ID.fullmatch(raw['id']), 'INVALID_ID', 'Invalid capsule ID')
     require(isinstance(raw['version'], str) and re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', raw['version']), 'INVALID_VERSION', 'Use major.minor.patch')
     result = deepcopy(raw)
     result.setdefault('defs', {})
+    result.setdefault('capabilities', {})
+    require(isinstance(result['capabilities'], dict), 'INVALID_DECLARATION', 'capabilities must be a map')
+    # Explicit compatibility import for the short-lived applications draft.
+    # Canonical output owns each entry only in capabilities.
+    legacy = result.pop('applications', {})
+    require(isinstance(legacy, dict), 'INVALID_DECLARATION', 'applications must be a map')
+    for name, app in legacy.items():
+        require(name not in result['capabilities'], 'DUPLICATE_ID', 'Conflicting capability/application ID: ' + name)
+        fields(app, {'does', 'using', 'takes', 'needs', 'changes', 'guarantees', 'interfaces', 'ready'}, {'does'})
+        cap = {k: deepcopy(v) for k, v in app.items() if k not in {'interfaces', 'ready'}}
+        cap['serves'] = {k: deepcopy(v) for k, v in app.items() if k in {'interfaces', 'ready'}}
+        result['capabilities'][name] = cap
+    result.setdefault('bindings', {})
+    materials = result.get('materials', {})
+    require(isinstance(materials, dict), 'INVALID_DECLARATION', 'materials must be a map')
+    for name, material in materials.items():
+        require(isinstance(name, str) and ID.fullmatch(name), 'INVALID_ID', name)
+        fields(material, {'path', 'description', 'media_type'}, {'path'})
+        require(isinstance(material['path'], str) and bool(material['path']), 'INVALID_MATERIAL', 'Material path must name a bundled file')
+        for field in ('description', 'media_type'):
+            require(field not in material or isinstance(material[field], str), 'INVALID_MATERIAL', field + ' must be text')
+    if 'provenance' in result:
+        require(isinstance(result['provenance'], str) and bool(result['provenance']), 'INVALID_DECLARATION', 'provenance must name a bundled build record')
     require(isinstance(result['defs'], dict), 'INVALID_DECLARATION', 'defs must be a mapping')
     for name, definition in result['defs'].items():
         require(ID.fullmatch(name), 'INVALID_ID', name)
         port(definition, {})
-    require(isinstance(result['bindings'], dict) and 'default' in result['bindings'], 'MISSING_BINDING', 'bindings.default is required')
+    require(isinstance(result['bindings'], dict) and (not result['capabilities'] or 'default' in result['bindings']), 'MISSING_BINDING', 'bindings.default is required')
     for name, binding in result['bindings'].items():
         require(ID.fullmatch(name), 'INVALID_ID', name)
         require(isinstance(binding, dict), 'INVALID_DECLARATION', 'Binding must be an object')
@@ -149,14 +182,17 @@ def normalize(raw):
             require(isinstance(binding['agent'], str) and bool(binding['agent']), 'INVALID_BINDING', 'agent must name a host-registered delegate')
         else:
             raise CCError('UNSUPPORTED_BINDING', str(kind))
-    require(isinstance(result['capabilities'], dict) and bool(result['capabilities']), 'INVALID_DECLARATION', 'Provide at least one capability')
+    require(result['capabilities'] or materials, 'INVALID_DECLARATION', 'Provide capabilities, materials or both')
     for name, cap in result['capabilities'].items():
+        require(isinstance(cap, dict), 'INVALID_DECLARATION', 'Capability must be an object')
+        application = 'serves' in cap
         require(ID.fullmatch(name), 'INVALID_ID', name)
-        fields(cap, {'does', 'takes', 'gives', 'needs', 'changes', 'guarantees', 'using'}, {'does'})
+        allowed = {'does', 'takes', 'needs', 'changes', 'guarantees', 'using'} | ({'serves'} if application else {'gives'})
+        fields(cap, allowed, {'does'})
         require(isinstance(cap['does'], str) and bool(cap['does'].strip()), 'INVALID_DECLARATION', f'{name}.does must explain the action')
         cap.setdefault('using', 'default')
         require(cap['using'] in result['bindings'], 'UNRESOLVED_REFERENCE', f'{name}.using')
-        for side in ('takes', 'gives'):
+        for side in (('takes',) if application else ('takes', 'gives')):
             cap.setdefault(side, {})
             require(isinstance(cap[side], dict), 'INVALID_DECLARATION', f'{name}.{side} must be a port mapping')
             for pname, definition in cap[side].items():
@@ -168,6 +204,25 @@ def normalize(raw):
         require(set(cap['needs']) <= NEEDS, 'UNSUPPORTED_PREREQUISITE', str(set(cap['needs']) - NEEDS))
         require(set(cap['changes']) <= EFFECTS, 'UNSUPPORTED_EFFECT', str(set(cap['changes']) - EFFECTS))
         # Checkable commitments advertise what can be assessed, not automatic gates.
+        if application:
+            service = cap['serves']
+            fields(service, {'interfaces', 'ready'})
+            require(result['bindings'][cap['using']]['kind'] in {'native', 'image'}, 'UNSUPPORTED_BINDING', 'Applications use native/image process bindings; agent sessions remain capabilities')
+            service.setdefault('interfaces', {})
+            require(isinstance(service['interfaces'], dict), 'INVALID_DECLARATION', 'interfaces must be a map')
+            for interface, definition in service['interfaces'].items():
+                require(ID.fullmatch(interface), 'INVALID_ID', interface)
+                fields(definition, {'protocol', 'port', 'path', 'contract'}, {'protocol', 'port'})
+                require(definition['protocol'] == 'http', 'UNSUPPORTED_INTERFACE', 'Reference runner supports HTTP interfaces')
+                require(type(definition['port']) is int and 0 < definition['port'] < 65536, 'INVALID_INTERFACE', 'port must be 1..65535')
+                definition.setdefault('path', '/')
+                require(isinstance(definition['path'], str) and definition['path'].startswith('/') and not definition['path'].startswith('//'), 'INVALID_INTERFACE', 'Interface path must be origin-relative')
+                if 'contract' in definition:
+                    require(isinstance(definition['contract'], str) and bool(definition['contract']), 'INVALID_INTERFACE', 'contract is a bundled API document path')
+            if 'ready' in service:
+                fields(service['ready'], {'interface', 'path'}, {'interface', 'path'})
+                require(service['ready']['interface'] in service['interfaces'], 'UNRESOLVED_REFERENCE', 'Unknown readiness interface')
+                require(isinstance(service['ready']['path'], str) and service['ready']['path'].startswith('/') and not service['ready']['path'].startswith('//'), 'INVALID_INTERFACE', 'Readiness path must be origin-relative')
     encoded(result)
     return result
 
@@ -264,6 +319,42 @@ class Host:
         """Seal current implementation bytes and invoke without manual digest plumbing."""
         return self.call(self.seal(bundle), capability, inputs, **options)
 
+    def prepare(self, bundle):
+        """Install a materialized bundle. Source-change builds are a separate step."""
+        return self.seal(bundle)
+
+    def describe(self, release):
+        declaration, _ = self.release(release)
+        return {key: deepcopy(declaration.get(key, {})) for key in ('id', 'version', 'capabilities', 'materials')}
+
+    def material(self, release, name):
+        declaration, bundle = self.release(release)
+        require(name in declaration.get('materials', {}), 'UNKNOWN_MATERIAL', name)
+        descriptor = declaration['materials'][name]
+        return {'release': release, 'material': name, **deepcopy(descriptor),
+                'artifact': self.put_artifact(contained(bundle, descriptor['path']))}
+
+    def _applications(self):
+        from applications import Applications
+        if not hasattr(self, '_application_manager'):
+            self._application_manager = Applications(self, sys.modules[__name__])
+        return self._application_manager
+
+    def start(self, release, capability, inputs=None, **options):
+        return self._applications().start(release, capability, {} if inputs is None else inputs, **options)
+
+    def lookup_instance(self, key):
+        return self._applications().lookup(key)
+
+    def inspect_instance(self, instance):
+        return self._applications().inspect(instance)
+
+    def stop(self, instance, **options):
+        return self._applications().stop(instance, **options)
+
+    def reconcile_instance(self, instance, **options):
+        return self._applications().reconcile(instance, **options)
+
     def _assess(self, receipt, packet, checks):
         """Advisory checks cannot rewrite execution or mutate its returned values."""
         for check in checks:
@@ -287,16 +378,29 @@ class Host:
         bundle = Path(bundle).resolve()
         decl = load(bundle / 'cc.yaml')
         rows = tree_files(bundle)
+        included = {row['path'] for row in rows}
+        def sealed_path(relative, missing='MISSING_MATERIAL'):
+            path = contained(bundle, relative)
+            require(path.is_file(), missing, relative)
+            require(path.relative_to(bundle).as_posix() in included, 'UNSEALED_MATERIAL', 'Declared file is excluded from sealing: ' + relative)
+            return path
+        if 'provenance' in decl:
+            sealed_path(decl['provenance'])
+        for material in decl.get('materials', {}).values():
+            sealed_path(material['path'])
+        for app in service_entries(decl).values():
+            for interface in app['interfaces'].values():
+                if 'contract' in interface:
+                    sealed_path(interface['contract'])
         for binding in decl['bindings'].values():
             if 'lock' in binding:
-                require(contained(bundle, binding['lock']).is_file(), 'MISSING_MATERIAL', binding['lock'])
+                sealed_path(binding['lock'])
         executables = {}
         for name, binding in decl['bindings'].items():
             if binding['kind'] in {'native', 'image'}:
                 for arg in binding['command']:
                     if arg.startswith('{bundle}/') or arg.startswith('{bundle}\\'):
-                        path = contained(bundle, arg[len('{bundle}')+1:])
-                        require(path.is_file(), 'MISSING_IMPLEMENTATION', 'Missing bundled command material: ' + arg)
+                        sealed_path(arg[len('{bundle}')+1:], 'MISSING_IMPLEMENTATION')
             if binding['kind'] != 'native':
                 continue
             for arg in binding['command'][1:]:
@@ -465,6 +569,7 @@ class Host:
         attempt.mkdir(parents=True)
         try:
             decl, bundle = self.release(release)
+            require(capability not in service_entries(decl), 'SERVICE_REQUIRES_START', 'Use start for this capability')
             require(capability in decl['capabilities'], 'UNKNOWN_CAPABILITY', capability)
             cap = decl['capabilities'][capability]
             binding = decl['bindings'][cap['using']]
@@ -519,6 +624,8 @@ class Host:
                                      'source_release': release, 'python': {'path': self.python, 'sha256': file_sha(self.python)},
                                      'workspace_before': workspace_before, 'verification': verification,
                                      'packages': sorted([d.metadata['Name'], d.version] for d in importlib.metadata.distributions() if d.metadata['Name'])}
+            if 'provenance' in decl:
+                receipt['provenance']['build_record'] = self.put_artifact(contained(bundle, decl['provenance']))
             (attempt / 'request.json').write_bytes(encoded(request))
             if binding['kind'] == 'jiuwenswarm':
                 require(binding['agent'] in self.delegates, 'MISSING_DELEGATE', 'Host must register native agent dispatch')
@@ -712,7 +819,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action', required=True)
     p = sub.add_parser('validate'); p.add_argument('declaration')
-    p = sub.add_parser('seal'); p.add_argument('bundle'); p.add_argument('--store', required=True)
+    for action in ('seal', 'prepare'):
+        p = sub.add_parser(action); p.add_argument('bundle'); p.add_argument('--store', required=True)
+    p = sub.add_parser('material'); p.add_argument('release'); p.add_argument('name'); p.add_argument('--store', required=True)
+    p = sub.add_parser('describe'); p.add_argument('release'); p.add_argument('--store', required=True)
+    p = sub.add_parser('start'); p.add_argument('release'); p.add_argument('capability'); p.add_argument('--store', required=True)
+    p.add_argument('--inputs'); p.add_argument('--key'); p.add_argument('--grant', action='append', default=None)
+    p.add_argument('--session', default=os.environ.get('CC_SESSION')); p.add_argument('--timeout', type=float, default=15)
+    p.add_argument('--trusted-local', action='store_true')
+    for action in ('instance', 'instance-key', 'stop', 'reconcile-instance'):
+        p = sub.add_parser(action); p.add_argument('instance'); p.add_argument('--store', required=True)
+        if action == 'reconcile-instance':
+            p.add_argument('--stopped', action='store_true'); p.add_argument('--note', required=True)
+    p = sub.add_parser('materialize'); p.add_argument('template'); p.add_argument('change'); p.add_argument('--output', required=True)
+    p.add_argument('--store', required=True); p.add_argument('--trusted-build', action='store_true'); p.add_argument('--timeout', type=float, default=120)
     for action in ('call', 'run'):
         p = sub.add_parser(action)
         p.add_argument('release' if action == 'call' else 'bundle')
@@ -746,8 +866,30 @@ def main():
             require(not (getattr(args, 'resources', None) and session.get('resources')), 'INVALID_SESSION', 'Supply resources in the session or --resources, not both')
             resources = json.loads(Path(args.resources).read_text(encoding='utf-8')) if getattr(args, 'resources', None) else session.get('resources')
             host = Host(args.store, resources=resources, session_grants=session.get('grants'))
-            if args.action == 'seal':
+            if args.action in {'seal', 'prepare'}:
                 result = {'release': host.seal(args.bundle)}
+            elif args.action == 'material':
+                result = host.material(args.release, args.name)
+            elif args.action == 'describe':
+                result = host.describe(args.release)
+            elif args.action == 'materialize':
+                from source_build import materialize
+                result = materialize(host, args.template, json.loads(Path(args.change).read_text(encoding='utf-8')),
+                                     args.output, trusted_build=args.trusted_build, timeout=args.timeout, core=sys.modules[__name__])
+            elif args.action == 'start':
+                decl = host.release(args.release)[0]
+                require(args.capability in service_entries(decl), 'NOT_SERVED_CAPABILITY', args.capability)
+                kind = decl['bindings'][service_entries(decl)[args.capability]['using']]['kind']
+                require(kind != 'native' or args.trusted_local, 'TRUST_REQUIRED', 'Use --trusted-local for team-trusted native code')
+                inputs = json.loads(Path(args.inputs).read_text(encoding='utf-8')) if args.inputs else {}
+                result = host.start(args.release, args.capability, inputs, key=args.key, grants=args.grant, timeout=args.timeout)
+                exit_code = int(result['state'] != 'running')
+            elif args.action in {'instance', 'instance-key', 'stop', 'reconcile-instance'}:
+                if args.action == 'instance-key': result = host.lookup_instance(args.instance)
+                elif args.action == 'instance': result = host.inspect_instance(args.instance)
+                elif args.action == 'stop': result = host.stop(args.instance)
+                else: result = host.reconcile_instance(args.instance, stopped=args.stopped, note=args.note)
+                exit_code = int(result['state'] in {'failed', 'unknown'})
             elif args.action == 'status':
                 result = host.status(args.key)
             elif args.action == 'reconcile':

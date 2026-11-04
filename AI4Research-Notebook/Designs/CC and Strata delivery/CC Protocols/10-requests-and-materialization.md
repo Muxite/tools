@@ -14,7 +14,8 @@ The construction owner is [02 · Factory](02-compiler-and-release.md). `cc-reque
 | Brief | No | Produce software; zero CCs is valid. |
 | Template/request | No | Resolve named choices and implement. |
 | Completed package | After validation/sealing/admission | Bind resources and authority. |
-| Sealed release | Under eligible adapter/policy | Make a call. |
+| Sealed release | Under eligible adapter/policy | Call an action, start a served capability or read material. |
+| Service instance | Existing execution | Use its API, inspect, stop or reconcile. |
 | Running call | Existing execution | Observe/reconcile, do not materialize again after disconnect. |
 
 Preserve fixed fields and request identity. Unexpected privilege, dependency, changed ports or behavior requires a requirement revision. Request text grants no build/network/model/publication authority. The generic resolver fills holes; it cannot invent code or interpret arbitrary constraints.

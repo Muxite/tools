@@ -27,3 +27,11 @@ This vault holds Muk's full body of AI4Research work, including design, code act
 - The long-term goal includes whole-system self-improvement and Paper2Agent-style capability production; current M1 scope remains narrower. Start with [[Designs/AI4Research Capability Growth]] for this gap and proposed next steps.
 
 - Provenance correction: workspace `jiuwenswarm` / `ai4r_muk` and captured `ai4r_M1` checkouts are our modified AI4Research work, not original JiuwenSwarm. Label our design, our implementation, upstream JiuwenSwarm (`openjiuwen/jiuwenswarm`) and exact OpenJiuwen dependency-pin claims separately. A feature deliberately disabled by our adapter is not an upstream limitation.
+
+## November 4 product amendment
+
+A CC package may expose capabilities, applications, or both. Application startup returns an inspectable/stoppable instance; the product payload need not speak the tool packet protocol. Source-change/build records are separate from runtime contracts. Default semantic checking remains off. See CC Protocols/12-runner-and-mistakes.md for runner responsibilities and supported boundaries. The original zero-embedded-CC product case remains valid.
+
+## Unified Lab amendment
+
+The latest user direction supersedes separate applications authoring. Use one `capabilities` map, optional `serves` lifecycle and optional `materials` for skills/reference-only packages. Native/image is execution packaging, not a separate software category. Internal telemetry and clean uninstall are optional; Incus/provider execution must be qualified separately. See CC Protocols/13-lab-composition-and-telemetry.md. Earlier authoring drafts and their test evidence remain historical in transfer revision snapshots.

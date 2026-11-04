@@ -44,3 +44,11 @@ python TRANSFER/bootstrap.py --profile integration --run
 Use `--plan` to inspect setup without changing anything. Dependencies and upstream repositories are fetched into ignored local directories. Supply your own model access and hardware configuration when advancing beyond deterministic demonstrations.
 
 This replaces the repository's active contents at the user's request. The former toolbox remains in Git history at `bfd34b69f1823fece8e95645f7bea3b442f226bd`. [Transfer scope and exclusions](TRANSFER/CONTINUE.md#transfer-scope).
+
+## Product capsules and runner amendment
+
+CC v2 uses one capability map: finite actions and served interfaces are both capabilities. Optional materials permit skills/reference-only packages without a process. The updated [runner contract](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/12-runner-and-mistakes.md>) defines authority, lifecycle, recovery and supported boundaries. Source/diff reconstruction is separate from native/image startup; ordinary tools have no new mandatory fields. Semantic verification remains opt-in.
+
+The new source-to-service demonstration reconstructs an exact candidate, builds it, starts its native HTTP application, observes changed behavior and confirms shutdown. Independent review fixes cover durable lookup, literal input arguments, uncertain child cessation, retained failed-build logs, unresolved LFS material and omitted referenced materials. Image and GPU qualification remain separate.
+
+The latest [Lab composition and telemetry plan](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/13-lab-composition-and-telemetry.md>) describes the Incus engine image, pooled script/service/knowledge CCs and optional observations. Actual Incus integration and clean-uninstall providers remain qualification work; default execution does not require internal instrumentation.

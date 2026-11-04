@@ -1,0 +1,47 @@
+{
+  "reviewer": "adversarial_protocol",
+  "date": "2026-11-04",
+  "scope": "Current optional-capabilities/applications extension; README, 01, 03, 12, reference/applications.py and test_products.py",
+  "production_files_edited": false,
+  "tests": {"command":"python -m unittest test_products -q", "result":"12 tests passed"},
+  "reproduce": "python TRANSFER/revisions/2026-11-04-cc-products/evidence/protocol-probe.py",
+  "evidence": "protocol-probe-evidence.json",
+  "findings": [
+    {
+      "id":"PRODUCT-PROTOCOL-01",
+      "severity":"P1",
+      "title":"Existing start key cannot recover its instance after input materials disappear",
+      "location":"reference/applications.py start: release/authority/input validation precedes previous-key lookup",
+      "attempt":"Add takes:{data:artifact} to the HTTP example. Start with key replay and a valid external local artifact reference. Delete that original artifact after startup. Repeat the identical start request/key.",
+      "observed":"First instance is running; retry raises MISSING_ARTIFACT before the ledger lookup; original instance remains running. The host already staged the input, so re-access to the caller's original source is unnecessary for replay.",
+      "contradiction":"03 promises same-key retry returns the recorded instance and lost-reply lookup uses the original key. No public instance-by-key lookup currently exists, so a caller who lost the first ID cannot perform the documented recovery.",
+      "minimal_fix":"Provide explicit key lookup independent of current release/material admission. Also compare/reserve immutable request identity and replay matching records before performing dispatch prerequisites; reject changed content as KEY_CONFLICT. Preserve trusted caller authorization policy for access to ledger records without requiring artifact availability or a fresh launch grant. Never spawn a replacement merely because lookup prerequisites changed."
+    },
+    {
+      "id":"PRODUCT-PROTOCOL-02",
+      "severity":"P1",
+      "title":"Stop confirms stopped while an ordinary application's child is still executing",
+      "location":"reference/applications.py inspect and stop: missing parent process means alive=false / NoSuchProcess pass",
+      "attempt":"Native application launch.py creates an ordinary subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']) with redirected standard streams; launcher prints child PID, waits .3 seconds, then exits. No detached session or malicious process hiding is used. Start app without interfaces/readiness, inspect until exited, then stop original instance.",
+      "observed":"inspect state=exited. stop returns state=stopped, diagnostics=[] and a stopped timestamp. psutil confirms the child PID remains running immediately afterward. Reproduced twice; probe explicitly terminates child afterward.",
+      "contradiction":"03 says uncertain stopping remains unresolved and records confirmation. The no-OS-isolation limitation is valid, but it does not establish cessation of children after losing the root's process tree.",
+      "minimal_fix":"Do not convert absent root identity into confirmed application stop. Without qualified owner containment or sufficient retained execution-tree identity, record unknown/STOP_UNCONFIRMED and require explicit reconciliation of remaining effects. Define and enforce the native profile's foreground-leader lifetime assumption, or add a qualified Windows Job Object / Unix supervision provider to track actual owned descendants. A PID-generation check prevents killing a replacement but does not prove prior descendants stopped."
+    },
+    {
+      "id":"PRODUCT-PROTOCOL-03",
+      "severity":"P2",
+      "title":"Literal text setup values are reinterpreted as launch templates",
+      "location":"reference/applications.py start: sequential command.replace then unresolved-placeholder scan",
+      "attempt":"Declare takes:{prompt:text}; command:['{python}','{bundle}/worker.py','{input.prompt}']. Start with prompt='Explain the token {input.NAME} literally'.",
+      "observed":"Start fails UNRESOLVED_REFERENCE, 'Unknown launch input/interface placeholder', despite all declared launch placeholders being resolved and the caller having supplied a valid plain string. An input containing a declared {port.ID} would instead be silently rewritten by the later replacement pass.",
+      "contradiction":"01 promises text inputs become literal argument text and no implicit expansion. Text content should not become a second template language.",
+      "minimal_fix":"Parse and validate placeholders in the original declaration arguments, then perform one substitution pass using the parsed template. Never rescan or recursively substitute inserted input bytes. Keep text values broad and literal."
+    }
+  ],
+  "qualifications": [
+    "No native OS sandbox is requested or assumed. Findings concern truthful identity, lifecycle state and literal argument semantics under the documented trusted-local profile.",
+    "The public Host/CLI stop and reconciliation APIs appear to be trusted local operator operations sharing ledger ownership. Absence of process.control grant checks alone was not labeled an authorization defect without a claim of multi-principal store isolation.",
+    "Readiness probes explicitly do not prove loaded application identity; this limitation is stated honestly. No live image/container qualification was performed.",
+    "Reconciliation assertions are operator observations, not automatically trustworthy scientific evidence."
+  ]
+}

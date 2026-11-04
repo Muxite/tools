@@ -5,7 +5,7 @@ from copy import deepcopy
 import json
 import uuid
 
-from ccv2 import CCError, Host, port
+from ccv2 import CCError, Host, port, callable_entries
 
 
 def tool_schema(capability, defs):
@@ -53,7 +53,7 @@ async def serve(store, release, grants=(), resources=None):
 
     def tools():
         return [types.Tool(name=name, description=cap['does'] + (' Permitted effects: ' + ', '.join(cap['changes']) if cap['changes'] else ''),
-                           inputSchema=tool_schema(cap, declaration['defs'])) for name, cap in declaration['capabilities'].items()]
+                           inputSchema=tool_schema(cap, declaration['defs'])) for name, cap in callable_entries(declaration).items()]
 
     async def dispatch(name, arguments):
         values = dict(arguments or {})
