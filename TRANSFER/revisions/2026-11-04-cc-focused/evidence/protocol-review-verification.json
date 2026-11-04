@@ -1,0 +1,37 @@
+{
+  "reviewer":"adversarial_protocol",
+  "date":"2026-11-04",
+  "original_report":"protocol-review.json",
+  "status":"All three reported protocol defects independently verified closed; final full suite and package checks pass",
+  "production_files_edited":false,
+  "probe":"python TRANSFER/revisions/2026-11-04-cc-focused/evidence/protocol-probe.py",
+  "scratch":"All probe runtime package/store data created and removed under D:/cc-focused-protocol-scratch",
+  "verification":[
+    {
+      "id":"FOCUSED-PROTOCOL-01",
+      "status":"closed",
+      "observed":"Reran original copied/imported index omitting tool.py. Both calls now return blocked/DIGEST_MISMATCH with empty outputs, before either version of unindexed implementation executes.",
+      "reviewed_boundary":"Host.release now checks normalized declaration and cc.yaml agreement, sorted unique portable index paths, exact actual bundle file set/bytes/sizes and canonical index digest. Local executable binding remains outside portable identity. Native bytecode writes are disabled. These are file-admission checks, not native OS containment."
+    },
+    {
+      "id":"FOCUSED-PROTOCOL-02",
+      "status":"closed",
+      "observed":"Exact prior desired.bindings.default={} request with separate open kind and command pointers now resolves successfully to a completed native declaration. check_package verifies the partial-schema derivation and all fixture schemas/links."
+    },
+    {
+      "id":"FOCUSED-PROTOCOL-03",
+      "status":"closed",
+      "observed":"Exact prior event-blocked delegate/check scenario now returns a running receipt whose pending assessment validates against published messages receipt schema. USAGE explicitly defines pending and not_run, and runtime uses not_run when execution ends before checks can run."
+    }
+  ],
+  "checks":[
+    {"command":"python reference/check_package.py","result":"passed: 2 embedded declarations/requests, 7 packages, 11 message fixtures, current local links; includes stagedArtifact and artifactOutput"},
+    {"command":"python -m unittest discover -q","result":"Final rerun: all 81 tests passed in 38.195 seconds","earlier_run":"An earlier 81-test run had one stale assertion expecting inconclusive for required checks blocked before execution. Parent corrected assertion to documented not_run; final independent rerun passed."}
+  ],
+  "remaining_protocol_blockers":[],
+  "remaining_validation_work":[],
+  "limits":[
+    "No live image/Incus/GPU/model/remote recovery or OS-isolation qualification follows from local probes.",
+    "Portable hashes and receipts establish limited identities/observations, not scientific correctness or independent trust in candidate outputs."
+  ]
+}

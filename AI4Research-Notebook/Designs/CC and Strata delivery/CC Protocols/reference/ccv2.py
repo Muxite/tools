@@ -21,8 +21,10 @@ import tempfile
 import time
 import uuid
 
+import rfc8785
 import yaml
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, ValidationError
+from schema_tools import validate as validate_schema
 
 
 class CCError(ValueError):
@@ -37,6 +39,14 @@ class CCError(ValueError):
 def require(condition, code, message, path=''):
     if not condition:
         raise CCError(code, message, path)
+
+
+def unique_json(pairs):
+    result = {}
+    for key, value in pairs:
+        require(key not in result, 'DUPLICATE_ID', 'Duplicate JSON key: ' + key)
+        result[key] = value
+    return result
 
 
 def encoded(value):
@@ -131,24 +141,14 @@ def callable_entries(declaration):
 
 
 def normalize(raw):
-    fields(raw, {'cc', 'id', 'version', 'bindings', 'capabilities', 'applications', 'materials', 'defs', 'provenance'}, {'cc', 'id', 'version'})
-    require(raw['cc'] == '2', 'UNSUPPORTED_VERSION', 'Explicit v2 declaration required; migrate v1 first')
+    fields(raw, {'cc', 'id', 'version', 'bindings', 'capabilities', 'materials', 'defs', 'provenance'}, {'cc', 'id', 'version'})
+    require(raw['cc'] == '2', 'UNSUPPORTED_VERSION', 'Expected protocol version 2')
     require(isinstance(raw['id'], str) and ID.fullmatch(raw['id']), 'INVALID_ID', 'Invalid capsule ID')
     require(isinstance(raw['version'], str) and re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', raw['version']), 'INVALID_VERSION', 'Use major.minor.patch')
     result = deepcopy(raw)
     result.setdefault('defs', {})
     result.setdefault('capabilities', {})
     require(isinstance(result['capabilities'], dict), 'INVALID_DECLARATION', 'capabilities must be a map')
-    # Explicit compatibility import for the short-lived applications draft.
-    # Canonical output owns each entry only in capabilities.
-    legacy = result.pop('applications', {})
-    require(isinstance(legacy, dict), 'INVALID_DECLARATION', 'applications must be a map')
-    for name, app in legacy.items():
-        require(name not in result['capabilities'], 'DUPLICATE_ID', 'Conflicting capability/application ID: ' + name)
-        fields(app, {'does', 'using', 'takes', 'needs', 'changes', 'guarantees', 'interfaces', 'ready'}, {'does'})
-        cap = {k: deepcopy(v) for k, v in app.items() if k not in {'interfaces', 'ready'}}
-        cap['serves'] = {k: deepcopy(v) for k, v in app.items() if k in {'interfaces', 'ready'}}
-        result['capabilities'][name] = cap
     result.setdefault('bindings', {})
     materials = result.get('materials', {})
     require(isinstance(materials, dict), 'INVALID_DECLARATION', 'materials must be a map')
@@ -164,20 +164,22 @@ def normalize(raw):
     for name, definition in result['defs'].items():
         require(ID.fullmatch(name), 'INVALID_ID', name)
         port(definition, {})
-    require(isinstance(result['bindings'], dict) and (not result['capabilities'] or 'default' in result['bindings']), 'MISSING_BINDING', 'bindings.default is required')
+    require(isinstance(result['bindings'], dict) and (not result['capabilities'] or bool(result['bindings'])), 'MISSING_BINDING', 'Executable capabilities require bindings; selected IDs must resolve')
     for name, binding in result['bindings'].items():
         require(ID.fullmatch(name), 'INVALID_ID', name)
         require(isinstance(binding, dict), 'INVALID_DECLARATION', 'Binding must be an object')
         kind = binding.get('kind')
         if kind in {'native', 'image'}:
-            fields(binding, {'kind', 'command', 'image', 'lock'}, {'kind', 'command'} | ({'image'} if kind == 'image' else set()))
-            require(isinstance(binding['command'], list) and bool(binding['command']) and all(isinstance(x, str) and x for x in binding['command']), 'INVALID_BINDING', 'command must be a nonempty argument vector')
+            fields(binding, {'kind', 'command', 'image', 'lock'}, ({'kind', 'command'} if kind == 'native' else {'kind', 'image'}))
+            if kind == 'image':
+                binding.setdefault('command', [])
+            require(isinstance(binding['command'], list) and (bool(binding['command']) or kind == 'image') and all(isinstance(x, str) and x for x in binding['command']), 'INVALID_BINDING', 'Native command must be nonempty; image can use its pinned default')
             require(kind == 'image' or 'image' not in binding, 'INVALID_BINDING', 'Native binding cannot have image')
             if kind == 'image':
                 require(isinstance(binding['image'], str) and re.fullmatch(r'(?:[^\s]+@)?sha256:[0-9a-f]{64}', binding['image']), 'MUTABLE_BINDING', 'Resolve image to immutable digest or local image ID')
             if 'lock' in binding:
                 require(isinstance(binding['lock'], str) and bool(binding['lock']), 'INVALID_BINDING', 'lock is a bundle-relative path')
-        elif kind == 'jiuwenswarm':
+        elif kind == 'delegate':
             fields(binding, {'kind', 'agent'}, {'kind', 'agent'})
             require(isinstance(binding['agent'], str) and bool(binding['agent']), 'INVALID_BINDING', 'agent must name a host-registered delegate')
         else:
@@ -223,17 +225,32 @@ def normalize(raw):
                 fields(service['ready'], {'interface', 'path'}, {'interface', 'path'})
                 require(service['ready']['interface'] in service['interfaces'], 'UNRESOLVED_REFERENCE', 'Unknown readiness interface')
                 require(isinstance(service['ready']['path'], str) and service['ready']['path'].startswith('/') and not service['ready']['path'].startswith('//'), 'INVALID_INTERFACE', 'Readiness path must be origin-relative')
+    try:
+        validate_schema('cc.schema.json', result)
+    except ValidationError as error:
+        raise CCError('INVALID_DECLARATION', error.message, '/'+ '/'.join(map(str,error.absolute_path))) from error
     encoded(result)
     return result
 
 
-def load(path):
+def read_yaml(path):
     text = Path(path).read_text(encoding='utf-8-sig')
     require(not any(isinstance(t, (yaml.tokens.AliasToken, yaml.tokens.AnchorToken, yaml.tokens.TagToken)) for t in yaml.scan(text)), 'INVALID_DECLARATION', 'Aliases, anchors and tags are unsupported')
     try:
-        return normalize(yaml.load(text, Loader=UniqueLoader))
+        return yaml.load(text, Loader=UniqueLoader)
     except (yaml.YAMLError, TypeError) as e:
         raise CCError('INVALID_DECLARATION', str(e)) from e
+
+
+def load(path):
+    try:
+        return normalize(read_yaml(path))
+    except TypeError as error:
+        raise CCError('INVALID_DECLARATION', str(error)) from error
+
+
+def read_json(path):
+    return json.loads(Path(path).read_text(encoding='utf-8-sig'), object_pairs_hook=unique_json)
 
 
 def contained(root, relative):
@@ -325,7 +342,7 @@ class Host:
 
     def describe(self, release):
         declaration, _ = self.release(release)
-        return {key: deepcopy(declaration.get(key, {})) for key in ('id', 'version', 'capabilities', 'materials')}
+        return {key: deepcopy(declaration.get(key, {})) for key in ('cc', 'id', 'version', 'bindings', 'defs', 'capabilities', 'materials')}
 
     def material(self, release, name):
         declaration, bundle = self.release(release)
@@ -407,10 +424,15 @@ class Host:
                 require(not Path(arg).is_absolute(), 'UNSEALED_IMPLEMENTATION', 'Put implementation files in the bundle and use {bundle}; absolute external arguments are unsupported')
             command = binding['command'][0].replace('{python}', self.python).replace('{bundle}', str(bundle))
             executable = shutil.which(command) or (str(Path(command).resolve()) if Path(command).is_file() else None)
-            require(executable, 'MISSING_IMPLEMENTATION', command)
-            executables[name] = {'path': str(Path(executable).resolve()), 'sha256': file_sha(executable)}
-        manifest = {'cc': '2', 'declaration': decl, 'files': rows, 'executables': executables}
-        release = sha(encoded(manifest))
+            executables[name] = ({'path': str(Path(executable).resolve()), 'sha256': file_sha(executable)}
+                                 if executable else {'unavailable': command})
+        manifest = {'format': 'cc-release/2', 'declaration': decl, 'files': [{k: row[k] for k in ('path','sha256','size')} for row in rows]}
+        manifest['files'].sort(key=lambda row: row['path'].encode('utf-8'))
+        try:
+            canonical = rfc8785.dumps(manifest)
+        except rfc8785.CanonicalizationError as error:
+            raise CCError('INVALID_DECLARATION', str(error)) from error
+        release = sha(canonical)
         destination = self.store / 'releases' / release
         if not destination.exists():
             destination.parent.mkdir(exist_ok=True)
@@ -421,7 +443,7 @@ class Host:
                     out.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(bundle / row['path'], out)
                     require(file_sha(out) == row['sha256'], 'SOURCE_CHANGED', row['path'])
-                (stage / 'manifest.json').write_bytes(encoded(manifest))
+                (stage / 'manifest.json').write_bytes(canonical)
                 try:
                     stage.rename(destination)
                 except FileExistsError:
@@ -429,6 +451,9 @@ class Host:
             except Exception:
                 shutil.rmtree(stage, ignore_errors=True)
                 raise
+        local_binding = destination / ('binding-' + str(uuid.uuid4()) + '.tmp')
+        local_binding.write_bytes(encoded({'executables': executables}))
+        local_binding.replace(destination / 'binding.json')
         return release
 
     def release(self, release):
@@ -436,18 +461,50 @@ class Host:
         root = self.store / 'releases' / release
         require((root / 'manifest.json').is_file(), 'MISSING_RELEASE', release)
         data = (root / 'manifest.json').read_bytes()
-        require(sha(data) == release, 'DIGEST_MISMATCH', 'Release manifest changed')
-        manifest = json.loads(data)
+        manifest = json.loads(data, object_pairs_hook=unique_json)
+        try:
+            canonical = rfc8785.dumps(manifest)
+            validate_schema('messages.schema.json', manifest, 'release')
+        except (ValidationError, rfc8785.CanonicalizationError) as error:
+            raise CCError('INVALID_RELEASE', str(error)) from error
+        require(sha(canonical) == release, 'DIGEST_MISMATCH', 'Release index changed')
+        bundle = root / 'bundle'
+        require(normalize(manifest['declaration']) == manifest['declaration'], 'INVALID_RELEASE', 'Index declaration is not normalized')
+        require(load(bundle/'cc.yaml') == manifest['declaration'], 'INVALID_RELEASE', 'cc.yaml and indexed declaration differ')
+        expected = manifest['files']
+        require(expected == sorted(expected, key=lambda row: row['path'].encode('utf-8')), 'INVALID_RELEASE', 'Index paths are not sorted')
+        seen = set()
+        for row in expected:
+            relative = row['path']
+            require(relative not in seen and '\\' not in relative and not Path(relative).is_absolute() and all(part not in {'','.','..'} for part in relative.split('/')), 'INVALID_RELEASE', 'Duplicate or nonportable index path')
+            seen.add(relative)
+        actual = []
+        for path in sorted(bundle.rglob('*')):
+            require(not path.is_symlink(), 'INVALID_RELEASE', 'Links in sealed package are unsupported')
+            if path.is_file():
+                actual.append({'path':path.relative_to(bundle).as_posix(),'sha256':file_sha(path),'size':path.stat().st_size})
+            else:
+                require(path.is_dir(), 'INVALID_RELEASE', 'Special file in package')
+        actual.sort(key=lambda row:row['path'].encode('utf-8'))
+        require(actual == expected, 'DIGEST_MISMATCH', 'Package file set, bytes or sizes differ from index')
         for row in manifest['files']:
             path = contained(root / 'bundle', row['path'])
             require(path.is_file() and file_sha(path) == row['sha256'], 'DIGEST_MISMATCH', row['path'])
-        for name, executable in manifest.get('executables', {}).items():
-            binding = manifest['declaration']['bindings'][name]
-            if '{bundle}' in binding['command'][0]:
-                continue
-            path = Path(executable['path'])
-            require(path.is_file() and file_sha(path) == executable['sha256'], 'ENVIRONMENT_CHANGED', 'Native executable changed; seal a new release')
         return manifest['declaration'], root / 'bundle'
+
+    def bound_executables(self, release, selected):
+        declaration, bundle = self.release(release)
+        path = bundle.parent / 'binding.json'
+        require(path.is_file(), 'ENVIRONMENT_UNBOUND', 'Prepare this package on the current host before executing')
+        executables = json.loads(path.read_bytes())['executables']
+        require(selected in executables, 'ENVIRONMENT_UNBOUND', selected)
+        for name, executable in [(selected, executables[selected])]:
+            require('unavailable' not in executable, 'MISSING_IMPLEMENTATION', 'Runtime unavailable: ' + executable.get('unavailable', ''))
+            if '{bundle}' in declaration['bindings'][name]['command'][0]:
+                continue
+            target = Path(executable['path'])
+            require(target.is_file() and file_sha(target) == executable['sha256'], 'ENVIRONMENT_CHANGED', 'Bound executable changed; prepare again')
+        return executables
 
     def put_artifact(self, path):
         path = Path(path)
@@ -627,7 +684,7 @@ class Host:
             if 'provenance' in decl:
                 receipt['provenance']['build_record'] = self.put_artifact(contained(bundle, decl['provenance']))
             (attempt / 'request.json').write_bytes(encoded(request))
-            if binding['kind'] == 'jiuwenswarm':
+            if binding['kind'] == 'delegate':
                 require(binding['agent'] in self.delegates, 'MISSING_DELEGATE', 'Host must register native agent dispatch')
                 receipt['provenance']['delegate'] = callable_identity(self.delegates[binding['agent']])
                 dispatched = True
@@ -638,12 +695,12 @@ class Host:
                 command = [arg.replace('{python}', self.python).replace('{bundle}', str(bundle)) for arg in binding['command']]
                 if binding['kind'] == 'native':
                     manifest = json.loads((bundle.parent / 'manifest.json').read_bytes())
-                    executable = manifest.get('executables', {}).get(cap['using'])
-                    require(executable is not None, 'UNSEALED_IMPLEMENTATION', 'Reseal legacy reference-host releases to pin native executable')
+                    executable = self.bound_executables(release, cap['using']).get(cap['using'])
+                    require(executable is not None, 'UNSEALED_IMPLEMENTATION', 'Prepare this package on the current host to bind its executable')
                     if '{bundle}' not in binding['command'][0]:
                         command[0] = executable['path']
                     receipt['provenance']['resolved_executable'] = {'path': command[0], 'sha256': file_sha(command[0])}
-                env = dict(os.environ, CC_OUTPUT_DIR=str(outdir), CC_BUNDLE_DIR=str(bundle), PYTHONUTF8='1')
+                env = dict(os.environ, CC_OUTPUT_DIR=str(outdir), CC_BUNDLE_DIR=str(bundle), PYTHONUTF8='1', PYTHONDONTWRITEBYTECODE='1')
                 cwd = str(attempt)
                 if binding['kind'] == 'image':
                     receipt['effects']['assurance'] = 'container'
@@ -681,11 +738,18 @@ class Host:
                 (attempt / 'stdout.log').write_bytes(process.stdout)
                 (attempt / 'stderr.log').write_bytes(process.stderr)
                 try:
-                    result = json.loads(process.stdout)
+                    result = json.loads(process.stdout, object_pairs_hook=unique_json)
                 except (ValueError, UnicodeDecodeError) as e:
                     raise CCError('INVALID_OUTPUT' if process.returncode == 0 else 'PROCESS_FAILED', 'Expected one JSON result; inspect attempt logs') from e
-                require((process.returncode == 0) == (result.get('outcome') in {'ok', 'partial'}), 'PROCESS_FAILED', 'Exit status contradicts reported outcome')
+                require(isinstance(result, dict), 'INVALID_OUTPUT', 'Result must be one JSON object')
+                if process.returncode != 0 and result.get('outcome') != 'error':
+                    result = {'outcome': 'error', 'outputs': result.get('outputs', {}),
+                              'error': {'code': 'PROCESS_FAILED', 'message': 'Process exited nonzero; retained valid available outputs'}}
             fields(result, {'outcome', 'outputs', 'reason', 'error'}, {'outcome'})
+            try:
+                validate_schema('messages.schema.json', result, 'processResult')
+            except ValidationError as error:
+                raise CCError('INVALID_OUTPUT', error.message) from error
             require(result['outcome'] in {'ok', 'partial', 'error'}, 'INVALID_OUTPUT', 'Unknown process outcome')
             if result['outcome'] == 'error':
                 partial = result.get('outputs', {})
@@ -719,7 +783,7 @@ class Host:
             receipt['diagnostics'].append({'code': 'HOST_ERROR', 'message': str(e)})
         finally:
             if checks and receipt['assessment']['verdict'] == 'pending':
-                receipt['assessment'] = {'verdict': 'inconclusive', 'checks': [{'id': check, 'verdict': 'UNAVAILABLE'} for check in checks]}
+                receipt['assessment'] = {'verdict': 'not_run', 'checks': [{'id': check, 'verdict': 'UNAVAILABLE'} for check in checks]}
             for handle, before in workspace_before.items():
                 try:
                     after = snapshot(bound_resources[handle]['path'])
@@ -750,18 +814,21 @@ class Host:
 
 
 def resolve_request(request, answers):
-    fields(request, {'format', 'kind', 'id', 'desired', 'open'}, {'format', 'kind', 'id', 'desired', 'open'})
-    require(request['format'] == 'cc-request/2' and request['kind'] in {'request', 'template'}, 'UNSUPPORTED_VERSION', 'Expected v2 request/template')
+    try:
+        validate_schema('request.schema.json', request)
+    except ValidationError as error:
+        raise CCError('INVALID_REQUEST', error.message) from error
+    fields(request, {'format', 'id', 'desired', 'open'}, {'format', 'id', 'desired', 'open'})
+    require(request['format'] == 'cc-request/2', 'UNSUPPORTED_VERSION', 'Expected v2 request/template')
     require(isinstance(request['id'], str) and bool(request['id'].strip()), 'INVALID_REQUEST', 'Nonempty request ID required')
-    require(request['kind'] == 'request', 'INVALID_REQUEST', 'Instantiate template before resolution')
     require(isinstance(request['open'], dict) and isinstance(answers, dict) and set(answers) == set(request['open']), 'INVALID_REQUEST', 'Answer exactly the open choices')
     result = deepcopy(request['desired'])
     pointers = sorted(request['open'])
     for i, pointer in enumerate(pointers):
         require(isinstance(pointer, str) and pointer.startswith('/') and not re.search(r'~(?![01])', pointer) and not any(p.startswith(pointer + '/') for p in pointers[i+1:]), 'INVALID_REQUEST', 'Overlapping or invalid pointers')
         descriptor = request['open'][pointer]
-        fields(descriptor, {'owner', 'question'}, {'owner', 'question'})
-        require(descriptor['owner'] in {'requester', 'implementer'} and isinstance(descriptor['question'], str) and descriptor['question'].strip(), 'INVALID_REQUEST', 'Invalid decision descriptor')
+        fields(descriptor, {'owner', 'question'}, {'question'})
+        require(descriptor.get('owner', 'implementer') in {'requester', 'implementer'} and isinstance(descriptor['question'], str) and descriptor['question'].strip(), 'INVALID_REQUEST', 'Invalid decision descriptor')
         parts = [p.replace('~1', '/').replace('~0', '~') for p in pointer[1:].split('/')]
         target = result
         for part in parts[:-1]:
@@ -770,49 +837,6 @@ def resolve_request(request, answers):
         require(isinstance(target, dict) and parts[-1] not in target and answers[pointer] is not None, 'FIXED_FIELD_CHANGE', pointer)
         target[parts[-1]] = deepcopy(answers[pointer])
     return normalize(result)
-
-
-def migrate_v1(raw):
-    require(raw.get('cc') == '1', 'UNSUPPORTED_VERSION', 'Migration accepts v1 only')
-    issues = []
-    binding = raw.get('carrier')
-    if not isinstance(binding, str):
-        issues.append('Build recipe needs explicit materialization; no image fabricated')
-    oldops = raw.get('operations') or {'run': {k: v for k, v in raw.items() if k in {'does', 'takes', 'gives', 'run', 'needs', 'changes', 'guarantees'}}}
-    result = {'cc': '2', 'id': raw['id'], 'version': raw['version'], 'bindings': {}, 'capabilities': {}}
-    for name, op in oldops.items():
-        cap = {'does': op['does'], 'takes': {}, 'gives': {}}
-        for side in ('takes', 'gives'):
-            for pname, spec in op.get(side, {}).items():
-                if isinstance(spec, str) and spec.startswith('$'):
-                    spec = raw.get('defs', {}).get(spec[1:], {})
-                if spec == 'string':
-                    cap[side][pname] = 'text'
-                elif isinstance(spec, dict) and 'artifact' in spec:
-                    cap[side][pname] = {'kind': 'artifact', 'media_type': spec['artifact']}
-                elif isinstance(spec, dict) and 'schema_ref' in spec:
-                    issues.append(f'{name}.{side}.{pname}: external schema must be bundled; unresolved')
-                else:
-                    cap[side][pname] = {'kind': 'json', 'schema': {'type': spec} if isinstance(spec, str) else spec}
-        for field in ('needs', 'changes', 'guarantees'):
-            if op.get(field):
-                issues.append(f'{name}.{field}: translate original rule definitions without weakening: {op[field]}')
-        if isinstance(op.get('run'), str) and isinstance(op.get('carrier', binding), str):
-            bname = 'default' if not result['bindings'] else 'op.' + name
-            result['bindings'][bname] = {'kind': 'image', 'image': op.get('carrier', binding), 'command': [op['run']]}
-            if bname != 'default':
-                cap['using'] = bname
-        else:
-            issues.append(f'{name}: implementation binding needs manual translation')
-        result['capabilities'][name] = cap
-    if raw.get('profiles'):
-        issues.append('Required profiles need explicit translation; no semantics discarded')
-    if not issues:
-        try:
-            normalize(result)
-        except Exception as e:
-            issues.append('Translated candidate fails v2 validation: ' + str(e))
-    return {'status': 'needs_review' if issues else 'translated', 'issues': issues, 'declaration': result if not issues else None, 'candidate': result}
 
 
 def main():
@@ -850,21 +874,18 @@ def main():
     p = sub.add_parser('status'); p.add_argument('key'); p.add_argument('--store', required=True)
     p = sub.add_parser('reconcile'); p.add_argument('key'); p.add_argument('--store', required=True); p.add_argument('--stopped', action='store_true'); p.add_argument('--note', required=True)
     p = sub.add_parser('resolve'); p.add_argument('request'); p.add_argument('answers')
-    p = sub.add_parser('migrate'); p.add_argument('declaration')
     args = parser.parse_args()
     exit_code = 0
     try:
         if args.action == 'validate':
             result = load(args.declaration)
         elif args.action == 'resolve':
-            result = resolve_request(yaml.load(Path(args.request).read_text(encoding='utf-8'), Loader=UniqueLoader), json.loads(Path(args.answers).read_text()))
-        elif args.action == 'migrate':
-            result = migrate_v1(yaml.load(Path(args.declaration).read_text(encoding='utf-8'), Loader=UniqueLoader))
+            result = resolve_request(read_yaml(args.request), read_json(args.answers))
         else:
-            session = json.loads(Path(args.session).read_text(encoding='utf-8')) if getattr(args, 'session', None) else {}
+            session = read_json(args.session) if getattr(args, 'session', None) else {}
             fields(session, {'grants', 'resources'})
             require(not (getattr(args, 'resources', None) and session.get('resources')), 'INVALID_SESSION', 'Supply resources in the session or --resources, not both')
-            resources = json.loads(Path(args.resources).read_text(encoding='utf-8')) if getattr(args, 'resources', None) else session.get('resources')
+            resources = read_json(args.resources) if getattr(args, 'resources', None) else session.get('resources')
             host = Host(args.store, resources=resources, session_grants=session.get('grants'))
             if args.action in {'seal', 'prepare'}:
                 result = {'release': host.seal(args.bundle)}
@@ -874,14 +895,14 @@ def main():
                 result = host.describe(args.release)
             elif args.action == 'materialize':
                 from source_build import materialize
-                result = materialize(host, args.template, json.loads(Path(args.change).read_text(encoding='utf-8')),
+                result = materialize(host, args.template, read_json(args.change),
                                      args.output, trusted_build=args.trusted_build, timeout=args.timeout, core=sys.modules[__name__])
             elif args.action == 'start':
                 decl = host.release(args.release)[0]
                 require(args.capability in service_entries(decl), 'NOT_SERVED_CAPABILITY', args.capability)
                 kind = decl['bindings'][service_entries(decl)[args.capability]['using']]['kind']
                 require(kind != 'native' or args.trusted_local, 'TRUST_REQUIRED', 'Use --trusted-local for team-trusted native code')
-                inputs = json.loads(Path(args.inputs).read_text(encoding='utf-8')) if args.inputs else {}
+                inputs = read_json(args.inputs) if args.inputs else {}
                 result = host.start(args.release, args.capability, inputs, key=args.key, grants=args.grant, timeout=args.timeout)
                 exit_code = int(result['state'] != 'running')
             elif args.action in {'instance', 'instance-key', 'stop', 'reconcile-instance'}:
@@ -901,7 +922,7 @@ def main():
                 require(kind != 'native' or args.trusted_local, 'TRUST_REQUIRED', 'Use --trusted-local for team-trusted native code')
                 target = args.bundle if args.action == 'run' else args.release
                 invoke = host.run if args.action == 'run' else host.call
-                result = invoke(target, args.capability, json.loads(Path(args.inputs).read_text(encoding='utf-8')),
+                result = invoke(target, args.capability, read_json(args.inputs),
                                 key=args.key, grants=args.grant, timeout=args.timeout, checks=args.check, require_checks=args.require_checks)
                 if result['state'] in {'failed', 'blocked', 'unknown'} or (args.require_checks and result['assessment']['verdict'] != 'passed'):
                     exit_code = 1

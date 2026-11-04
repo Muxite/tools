@@ -4,7 +4,7 @@ Start with [the continuation guide](TRANSFER/CONTINUE.md). It states what works,
 
 ## Current task
 
-The ease-of-use revision makes semantic verification opt-in: ordinary calls run zero checkers, advisory failures preserve useful results, and explicit required checks gate acceptance. `Host.run` / CLI `run` manage source sealing automatically; session authorization can be configured once. See the [current defaults](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/07-quality-and-improvement.md>). M1's old node scheduler is unchanged.
+The ease-of-use revision makes semantic verification opt-in: ordinary calls run zero checkers, advisory failures preserve useful results, and explicit required checks gate acceptance. `Host.run` / CLI `run` manage source sealing automatically; session authorization can be configured once. See the [current defaults](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/USAGE.md>). M1's old node scheduler is unchanged.
 
 [CC Protocol v2](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/README.md>) includes the declaration standard, reference host, MCP projection, native coding-subagent example, scientific examples and preserved v1 history.
 
@@ -47,8 +47,12 @@ This replaces the repository's active contents at the user's request. The former
 
 ## Product capsules and runner amendment
 
-CC v2 uses one capability map: finite actions and served interfaces are both capabilities. Optional materials permit skills/reference-only packages without a process. The updated [runner contract](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/12-runner-and-mistakes.md>) defines authority, lifecycle, recovery and supported boundaries. Source/diff reconstruction is separate from native/image startup; ordinary tools have no new mandatory fields. Semantic verification remains opt-in.
+CC v2 uses one capability map: finite actions and served interfaces are both capabilities. Optional materials permit skills/reference-only packages without a process. The updated [runner contract](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/USAGE.md>) defines authority, lifecycle, recovery and supported boundaries. Source/diff reconstruction is separate from native/image startup; ordinary tools have no new mandatory fields. Semantic verification remains opt-in.
 
 The new source-to-service demonstration reconstructs an exact candidate, builds it, starts its native HTTP application, observes changed behavior and confirms shutdown. Independent review fixes cover durable lookup, literal input arguments, uncertain child cessation, retained failed-build logs, unresolved LFS material and omitted referenced materials. Image and GPU qualification remain separate.
 
-The latest [Lab composition and telemetry plan](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/13-lab-composition-and-telemetry.md>) describes the Incus engine image, pooled script/service/knowledge CCs and optional observations. Actual Incus integration and clean-uninstall providers remain qualification work; default execution does not require internal instrumentation.
+The latest [Lab composition and telemetry plan](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/IMPLEMENTATION.md>) describes the Incus engine image, pooled script/service/knowledge CCs and optional observations. Actual Incus integration and clean-uninstall providers remain qualification work; default execution does not require internal instrumentation.
+
+## Current CC protocol reading route
+
+Start at [the focused CC draft](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/README.md>) and its directly linked format/schemas. Five main documents separate protocol meaning from implementation strategy. [The standalone ZIP](TRANSFER/revisions/2026-11-04-cc-focused/evidence/CC-Protocol-v2-draft.zip) includes the reading set, examples and small optional SDK without the full notebook/history. Earlier drafts and experiment evidence retain their original scope.

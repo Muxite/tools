@@ -24,7 +24,7 @@ def main():
     root = args.output or args.environment / ('run-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ'))
     root.mkdir(parents=True, exist_ok=True)
     stages = [
-        ('local-regressions', ['-m', 'unittest', '-q', 'test_ccv2', 'test_products', 'test_source_build', 'test_unified']),
+        ('local-regressions', ['-m', 'unittest', '-q', 'test_ccv2', 'test_products', 'test_source_build', 'test_unified', 'test_spec']),
         ('mapie', ['integrations/mapie_demo.py', '--store', str(root / 'mapie-store'), '--report', str(root / 'mapie-report.json')]),
         ('scientific-replays', ['integrations/mapie_negative_replays.py', '--store', str(root / 'scientific-store'), '--report', str(root / 'mapie-replays-report.json')]),
         ('upstream-mcp', ['integrations/upstream_mcp_demo.py', '--store', str(root / 'mcp-store'), '--report', str(root / 'mcp-report.json')]),

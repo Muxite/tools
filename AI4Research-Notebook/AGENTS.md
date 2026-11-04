@@ -30,8 +30,8 @@ This vault holds Muk's full body of AI4Research work, including design, code act
 
 ## November 4 product amendment
 
-A CC package may expose capabilities, applications, or both. Application startup returns an inspectable/stoppable instance; the product payload need not speak the tool packet protocol. Source-change/build records are separate from runtime contracts. Default semantic checking remains off. See CC Protocols/12-runner-and-mistakes.md for runner responsibilities and supported boundaries. The original zero-embedded-CC product case remains valid.
+A CC package may expose capabilities, applications, or both. Application startup returns an inspectable/stoppable instance; the product payload need not speak the tool packet protocol. Source-change/build records are separate from runtime contracts. Default semantic checking remains off. See CC Protocols/USAGE.md for runner responsibilities and supported boundaries. The original zero-embedded-CC product case remains valid.
 
 ## Unified Lab amendment
 
-The latest user direction supersedes separate applications authoring. Use one `capabilities` map, optional `serves` lifecycle and optional `materials` for skills/reference-only packages. Native/image is execution packaging, not a separate software category. Internal telemetry and clean uninstall are optional; Incus/provider execution must be qualified separately. See CC Protocols/13-lab-composition-and-telemetry.md. Earlier authoring drafts and their test evidence remain historical in transfer revision snapshots.
+The latest user direction supersedes separate applications authoring. Use one `capabilities` map, optional `serves` lifecycle and optional `materials` for skills/reference-only packages. Native/image is execution packaging, not a separate software category. Internal telemetry and clean uninstall are optional; Incus/provider execution must be qualified separately. See CC Protocols/IMPLEMENTATION.md. Earlier authoring drafts and their test evidence remain historical in transfer revision snapshots.

@@ -1,0 +1,127 @@
+PLEASE IMPLEMENT THIS PLAN:
+# CC v2: a focused protocol package for authors, users and runners
+
+## 1. Purpose and scope
+
+Rework the existing folder into a self-contained **CC v2 draft specification**, with machine-readable schemas, complete examples and a separate implementation strategy.
+
+Lead with the problem CC solves: **software, agents and methodologies arrive with inconsistent interfaces, dependencies, usage instructions and evidence. CC supplies a common description and usage boundary so people and agents can understand, prepare, use and trace them.**
+
+Treat the existing prototype as experimental evidence. Allow format revisions; add no migration machinery or compatibility aliases.
+
+The core must work without Strata, Muse, JiuwenSwarm, a Factory, a registry, telemetry infrastructure or a network connection when its declared dependencies are available locally.
+
+## 2. Document structure and reading route
+
+Replace the 14-document main route with five documents:
+
+| Document | Responsibility |
+|---|---|
+| `README.md` | Purpose, benefits, terminology, one minimal example, overview diagram and direct links to format/schema. Target approximately 500 words. |
+| `FORMAT.md` | Package layout, declaration syntax, complete field dictionary, identifiers, defaults, references, release identity and request format. |
+| `USAGE.md` | Access, preparation, invocation, data flow, startup, results, errors, authority, stopping and optional cleanup/telemetry. |
+| `EXAMPLES.md` | Worked use cases with declarations, caller instructions, expected results and failure interpretation. |
+| `IMPLEMENTATION.md` | Implementation strategy, prototype status, dependency setup, adapters, Factory/Lab integration work and recorded experimental evidence. |
+
+Additional folders:
+
+- `schemas/`: discoverable machine-readable contracts.
+- `examples/`: complete example packages and message fixtures.
+- `profiles/`: optional source/build, telemetry and integration contracts.
+- `reference/`: experimental implementation and research.
+- `history/`: exact preserved previous drafts.
+
+Only the first four documents define or explain CC. No core requirement may exist solely in implementation notes.
+
+Preserve previous drafts before replacement, update maintained incoming links and refresh the transfer inventories. Historical evidence remains unchanged.
+
+## 3. Protocol and schema decisions
+
+### Terminology and forms
+
+Use these terms consistently:
+
+- **Capsule:** a versioned package of capabilities and/or materials.
+- **Capability:** an action or an interface provided over time.
+- **Material:** passive skills, instructions, methodologies or reference bytes.
+- **Binding:** how an implementation is executed or reached.
+- **Access:** how the consumer reads material, calls an action or connects to a served interface.
+- **Call:** one invocation with actual inputs and authority.
+- **Instance:** one running service generation.
+- **Receipt:** the runner's known execution facts and result references.
+
+Explain three delivery situations without creating three competing executable schemas:
+
+| Situation | Meaning |
+|---|---|
+| Request CC | Desired contract with explicitly identified unresolved choices; cannot execute. |
+| Runtime-built CC | Completed during a task, then prepared and used through the normal contract. |
+| Prebuilt CC | Implementation already supplied or pinned; prepared and used through the same contract. |
+
+A running instance is execution state, not another capsule format. A template is a reusable request.
+
+### Canonical format
+
+- Retain `cc: "2"`, one `capabilities` map, optional `materials` and shared `bindings`.
+- Retain `takes`, `gives`, `needs`, `changes` and `guarantees`, with one authoritative location for each fact.
+- Use optional `serves` for persistent capabilities. Native versus image remains independent of lifetime.
+- Replace framework-specific core vocabulary with a generic delegate binding; document JiuwenSwarm as an adapter.
+- Require every selected binding to resolve. Do not require an unused `default` binding when capabilities explicitly select named bindings.
+- Use ordinary ports and broad JSON options for configuration. Service setup inputs configure an instance; subsequent traffic follows its published interface.
+- Remove the separate `applications` authoring alternative and obsolete migration material from the current specification.
+
+### Published schemas
+
+Use [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12), with bundled local references:
+
+- Capsule declaration schema.
+- Request schema, reusing declaration definitions.
+- Message schemas for calls, process inputs/results, artifacts, receipts, instances and errors.
+- Separate optional-profile schemas where needed.
+
+The field dictionary must state meaning, type, scope, requiredness, defaults and validation. Document cross-reference, filesystem and authorization rules that JSON Schema cannot establish.
+
+Keep protocol envelopes precise while leaving domain JSON open unless explicitly constrained. Unknown mandatory semantics receive explicit diagnostics.
+
+Define portable release identity from a generated package index covering declaration and material bytes. Use SHA-256 over its [RFC 8785 canonical JSON](https://www.rfc-editor.org/rfc/rfc8785/). Host paths, installed environments and execution observations belong in bound execution records, not portable package identity.
+
+## 4. Usage rules and examples
+
+Integrate required behavior directly into the relevant descriptions using **MUST**, **SHOULD** and **MAY**, always naming the responsible actor. Do not create a separate acceptance-criteria document.
+
+Cover:
+
+- Local/offline preparation and direct CLI/API use with minimal supporting software.
+- Per-capability inputs/outputs, artifact staging and host-issued resources.
+- Native commands, images, delegated agents and native service interfaces.
+- Startup readiness, instance identity, lookup, stop and uncertain execution.
+- Optional installation/clean uninstall with ownership-scoped cleanup.
+- Optional verification and telemetry; unavailable optional evidence preserves completed results.
+- Distinctions between invalid input, empty success, partial evidence, execution failure, unknown effects and scientifically negative results.
+
+Include Mermaid diagrams for the overall model, request-to-usable-package lifecycle and call/service lifecycle.
+
+Worked examples must include:
+
+1. Minimal native transformation.
+2. Passive methodology library.
+3. Request resolved into a runtime-built capsule.
+4. Prebuilt image wrapping an entire application.
+5. Coding subagent using an assigned workspace.
+6. Stateful paper method passing artifacts between capabilities.
+7. Lab composition: engine, selected tools/observers and benchmark.
+
+Each example states what the recipient has, prerequisites, access method, inputs, effects, outputs, startup/cleanup and limitations. Keep Strata manifests, Incus configuration and benchmark policy in example/profile material.
+
+## 5. Validation and implementation strategy
+
+- Validate every complete declaration and message fixture against the published schemas.
+- Check semantic cases: duplicate IDs, unresolved bindings, omitted materials, artifact mismatch, undeclared effects and unsupported requirements.
+- Demonstrate identical usage semantics for prebuilt and runtime-built packages.
+- Exercise standalone native use without MCP, agent-framework, registry or telemetry dependencies.
+- Split prototype installation requirements into core and optional integrations.
+- Align prototype validation and examples with the revised format; retain previous experimental results under their original scope.
+- Render and inspect diagrams; verify links and the standalone reading package.
+- Apply a comprehension check: a reader can identify what they received, choose an access method, supply inputs, anticipate effects, locate results and understand cleanup.
+
+`IMPLEMENTATION.md` will distinguish completed prototype behavior from planned Incus, service-client integration, telemetry collection and clean-uninstall providers. Those integrations do not become prerequisites for understanding or producing a compatible CC.

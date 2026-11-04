@@ -263,7 +263,7 @@ request, the simpler Docker/image workflow and remaining executor constraints.
 
 [[Sources/Prompts/2026-11-04-cc-quality-bindings.txt|November 4 CC interoperability and quality request]] is reflected in [[Designs/CC and Strata delivery/CC Protocols/README]].
 
-[[Sources/Prompts/2026-11-04-cc-upstream-integration.txt|November 4 official upstream integration and request forms]] is interpreted in [[Designs/CC and Strata delivery/CC Protocols/09-upstream-coding-integration]], [[Designs/CC and Strata delivery/CC Protocols/10-requests-and-materialization]] and [[Designs/CC and Strata delivery/CC Protocols/11-factory-lab-handoff]]. These remain proposals, not deployed upstream capabilities.
+[[Sources/Prompts/2026-11-04-cc-upstream-integration.txt|November 4 official upstream integration and request forms]] is interpreted in [[Designs/CC and Strata delivery/CC Protocols/IMPLEMENTATION]], [[Designs/CC and Strata delivery/CC Protocols/FORMAT]] and [[Designs/CC and Strata delivery/CC Protocols/EXAMPLES]]. These remain proposals, not deployed upstream capabilities.
 
 ## November 4 - CC v2 implementation
 
@@ -279,8 +279,12 @@ request, the simpler Docker/image workflow and remaining executor constraints.
 
 ## November 4 - product capsules and runner
 
-[[Sources/Prompts/2026-11-04-cc-products-and-runner.txt|Product/source/image and complexity request]] and [[Sources/Prompts/2026-11-04-cc-products-answer.json|Explicit package-model answer]] amend v2 to allow optional capabilities and applications in one package. [[Designs/CC and Strata delivery/CC Protocols/12-runner-and-mistakes|Runner and mistakes]] owns the new support boundary. Raw products may still contain zero embedded CCs; the optional CC wrapper adds common delivery/lifecycle. Native product demonstration is synthetic; GPU and image execution remain separate qualification.
+[[Sources/Prompts/2026-11-04-cc-products-and-runner.txt|Product/source/image and complexity request]] and [[Sources/Prompts/2026-11-04-cc-products-answer.json|Explicit package-model answer]] amend v2 to allow optional capabilities and applications in one package. [[Designs/CC and Strata delivery/CC Protocols/USAGE|Runner and mistakes]] owns the new support boundary. Raw products may still contain zero embedded CCs; the optional CC wrapper adds common delivery/lifecycle. Native product demonstration is synthetic; GPU and image execution remain separate qualification.
 
 ## November 4 - unified capabilities and Incus Lab
 
-[[Sources/Prompts/2026-11-04-cc-incus-and-flexible-capabilities.txt|Incus composition, optional telemetry and passive skills]] supersedes the preceding separate-applications vocabulary. The canonical model has capabilities, optional `serves` lifecycle and passive `materials`; native/image packaging is independent. [[Designs/CC and Strata delivery/CC Protocols/13-lab-composition-and-telemetry|Lab and optional telemetry]] records standards inspiration, Incus qualification plan and ownership-scoped optional cleanup. Incus and real inference/benchmark execution remain unexecuted; current code demonstrates native serving and passive materials.
+[[Sources/Prompts/2026-11-04-cc-incus-and-flexible-capabilities.txt|Incus composition, optional telemetry and passive skills]] supersedes the preceding separate-applications vocabulary. The canonical model has capabilities, optional `serves` lifecycle and passive `materials`; native/image packaging is independent. [[Designs/CC and Strata delivery/CC Protocols/IMPLEMENTATION|Lab and optional telemetry]] records standards inspiration, Incus qualification plan and ownership-scoped optional cleanup. Incus and real inference/benchmark execution remain unexecuted; current code demonstrates native serving and passive materials.
+
+## November 4 - focused protocol publication
+
+[[Sources/Prompts/2026-11-04-cc-focused-document-request.txt|Document-set direction]], [[Sources/Prompts/2026-11-04-cc-no-migration.txt|No migration requirement]] and [[Sources/Prompts/2026-11-04-cc-focused-approved-plan.txt|Approved plan]] direct [[Designs/CC and Strata delivery/CC Protocols/README|CC v2 draft]]. FORMAT and USAGE own requirements; IMPLEMENTATION owns strategy and experimental status. Schemas and complete examples are published beside them. Previous numbered drafts are preserved as exact history snapshots.

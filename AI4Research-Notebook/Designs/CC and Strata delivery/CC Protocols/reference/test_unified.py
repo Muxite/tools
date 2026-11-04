@@ -43,19 +43,10 @@ class UnifiedTests(unittest.TestCase):
         with self.assertRaises(CCError) as error: self.host.prepare(bundle)
         self.assertEqual(error.exception.code, 'UNSEALED_MATERIAL')
 
-    def test_legacy_import_has_one_authoritative_map(self):
-        source = {'cc':'2','id':'test.import','version':'1.0.0',
-                  'bindings':{'default':{'kind':'native','command':['{python}','-c','pass']}},
-                  'applications':{'engine':{'does':'Serve an API','interfaces':{}}}}
-        canonical = normalize(source)
-        self.assertNotIn('applications', canonical)
-        self.assertEqual(set(canonical['capabilities']), {'engine'})
-        self.assertEqual(set(service_entries(canonical)), {'engine'})
-        self.assertEqual(callable_entries(canonical), {})
-        self.assertEqual(normalize(canonical), canonical)
-        wrong = deepcopy(source); wrong['capabilities'] = {'engine':{'does':'Conflict'}}
-        with self.assertRaises(CCError) as error: normalize(wrong)
-        self.assertEqual(error.exception.code, 'DUPLICATE_ID')
+    def test_obsolete_application_map_rejected(self):
+        with self.assertRaises(CCError) as error:
+            normalize({'cc':'2','id':'test.old','version':'1.0.0','applications':{}})
+        self.assertEqual(error.exception.code, 'UNKNOWN_FIELD')
 
     def test_active_capability_still_needs_real_binding(self):
         with self.assertRaises(CCError) as error:

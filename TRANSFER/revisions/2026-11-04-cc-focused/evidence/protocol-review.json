@@ -1,0 +1,46 @@
+{
+  "reviewer":"adversarial_protocol",
+  "date":"2026-11-04",
+  "scope":"Five focused root documents, declaration/request/message/profile schemas, portable release admission and actual request/running-receipt behavior",
+  "production_files_edited":false,
+  "probe":"python TRANSFER/revisions/2026-11-04-cc-focused/evidence/protocol-probe.py",
+  "scratch":"Probe creates and removes runtime packages/stores only under D:/cc-focused-protocol-scratch; evidence contains only compact JSON and reusable script",
+  "package_check":{"command":"python reference/check_package.py","result":"passed: 2 embedded declarations/requests, 7 packages, 9 messages and current local links"},
+  "findings":[
+    {
+      "id":"FOCUSED-PROTOCOL-01",
+      "severity":"P1",
+      "title":"Imported release can execute a referenced implementation absent from its portable index",
+      "location":"reference/ccv2.py Host.release",
+      "attempt":"Prepare a normal native package with cc.yaml and tool.py. Simulate an independent imported release by removing only tool.py from the index files list, recomputing canonical RFC8785 bytes and release digest, and copying the package plus local executable binding into that release directory. Keep normalized declaration and indexed cc.yaml intact. Call, mutate unindexed bundle/tool.py, call again with a fresh execution key.",
+      "observed":"Both calls succeed under release 409c4a3a2abb58c4436b29cb77edc4ad62965128ba843daba5ed097548649041. Indexed paths contain only cc.yaml. Outputs change value:1 to value:2. Host.release validates hashes of listed rows but never checks that referenced implementation is indexed.",
+      "impact":"Independent runner import/admission accepts nonconforming package closure and permits implementation drift under one portable release identity. This is an integrity/admission bug, not a request for native OS isolation.",
+      "minimal_fix":"At release admission validate normalized declaration against indexed cc.yaml, mandatory cc.yaml inclusion, portable unique normalized ordered paths, sizes and exact included file/reference coverage. Reject any declared implementation/material/lock/contract/provenance file absent from the index before dispatch. Keep host-local binding.json outside the portable subject."
+    },
+    {
+      "id":"FOCUSED-PROTOCOL-02",
+      "severity":"P2",
+      "title":"Legitimate partial request binding is rejected by derived-schema oneOf ambiguity",
+      "location":"schemas/request.schema.json $defs.binding and resolve_request",
+      "attempt":{"desired":{"cc":"2","id":"review.requested","version":"1.0.0","bindings":{"default":{}},"capabilities":{"run":{"does":"Run"}}},"open":{"/bindings/default/kind":{"question":"Choose runtime"},"/bindings/default/command":{"question":"Supply argv"}}},
+      "observed":"Providing answers native and ['{python}','{bundle}/tool.py'] fails before resolution: empty partial binding is valid under multiple binding branches. Derivation removed required keys but retained oneOf, causing a valid absent-choice object to become ambiguous.",
+      "impact":"An author cannot use the documented pointer model to resolve separately named missing binding fields, even though parents exist and completed declaration is valid.",
+      "minimal_fix":"Make partial variant validation allow overlap while required discriminators are unresolved, for example derived anyOf for partial binding alternatives; continue rejecting invalid supplied fields and validate the completed result against the strict completed oneOf."
+    },
+    {
+      "id":"FOCUSED-PROTOCOL-03",
+      "severity":"P2",
+      "title":"Running receipt with selected checks violates the published receipt schema",
+      "location":"reference/ccv2.py initial receipt assessment; schemas/messages.schema.json assessment; USAGE.md receipt dictionary",
+      "attempt":"Start a registered delegate call with checks:['core.complete']; keep the delegate waiting with a threading event. Read Host.status(key) while execution runs and validate against messages.schema.json/$defs/receipt.",
+      "observed":"Assessment is {'verdict':'pending','checks':[]}; published enum allows only not_requested, passed, failed, inconclusive. Schema validation raises ValidationError. The running receipt is also the value identical duplicate calls return during execution.",
+      "impact":"Independent consumers following the published schema reject ordinary durable running observations whenever advisory verification was selected.",
+      "minimal_fix":"Make running assessment state consistent across runtime, schema and prose. Either document/support an explicit pending observation or initialize a supported honest pre-assessment verdict; never call a selected but unexecuted check a verified pass."
+    }
+  ],
+  "qualifications":[
+    "No legacy migration or aliases are requested; the revised format may reject obsolete drafts directly.",
+    "Portable identity is intentionally separate from host executable binding; selected-runtime checks and optional image command defaults are appropriate boundaries.",
+    "No live image, Incus, GPU, model, remote durability or OS-isolation qualification is claimed by these local probes. Hashes and receipts do not establish semantic correctness or trustworthy candidate evidence."
+  ]
+}

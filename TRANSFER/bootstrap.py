@@ -70,6 +70,7 @@ def main():
     env['PATH'] = str(python.parent) + os.pathsep + env.get('PATH', '')
     run([python, '-m', 'pip', 'install', '-r', configuration['requirements']], env=env)
     if args.profile == 'integration':
+        run([python, '-m', 'pip', 'install', '-r', REFERENCE / 'requirements-test.txt'], env=env)
         sources = configuration['source_checkouts']
         for source in sources.values():
             checkout(ROOT / source['location'], source, env)

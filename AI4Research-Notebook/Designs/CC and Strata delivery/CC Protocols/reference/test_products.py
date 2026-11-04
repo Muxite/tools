@@ -17,11 +17,21 @@ EXAMPLE = Path(__file__).parent/'examples/http_product'
 
 
 def draft(declaration):
-    """Exercise explicit import compatibility with the preceding applications draft."""
+    """Create a test-only mutable service view."""
     result = deepcopy(declaration)
     result['applications'] = service_entries(result)
     result['capabilities'] = callable_entries(result)
     return result
+
+
+def undraft(declaration):
+    declaration = deepcopy(declaration)
+    declaration.setdefault('capabilities', {})
+    for name, app in declaration.pop('applications', {}).items():
+        cap = {k:v for k,v in app.items() if k not in {'interfaces','ready'}}
+        cap['serves'] = {k:v for k,v in app.items() if k in {'interfaces','ready'}}
+        declaration['capabilities'][name] = cap
+    return declaration
 
 
 class ProductTests(unittest.TestCase):
@@ -64,7 +74,7 @@ class ProductTests(unittest.TestCase):
     def test_product_only_and_no_empty_package(self):
         declaration = draft(self.host.release(self.release)[0])
         declaration.pop('capabilities')
-        product = normalize(declaration)
+        product = normalize(undraft(declaration))
         self.assertEqual(set(service_entries(product)), {'api'})
         product.pop('capabilities')
         with self.assertRaises(CCError): normalize(product)
@@ -86,10 +96,10 @@ class ProductTests(unittest.TestCase):
         declaration = draft(self.host.release(self.release)[0])
         wrong = deepcopy(declaration)
         wrong['applications']['api']['interfaces']['api']['protocol'] = 'invented'
-        with self.assertRaises(CCError): normalize(wrong)
+        with self.assertRaises(CCError): normalize(undraft(wrong))
         wrong = deepcopy(declaration)
         wrong['applications']['api']['ready']['interface'] = 'missing'
-        with self.assertRaises(CCError): normalize(wrong)
+        with self.assertRaises(CCError): normalize(undraft(wrong))
 
     def test_generation_mismatch_never_stops_another_process(self):
         app = self.start()
@@ -104,12 +114,25 @@ class ProductTests(unittest.TestCase):
         finally:
             manager.save(original)
 
+    def test_lab_optional_telemetry_does_not_block_benchmark(self):
+        app=self.start()
+        self.host.resources['engine']={'kind':'environment','url':app['endpoints']['api'],'instance':app['id']}
+        self.host.session_grants.append('network.request')
+        bundle=Path(__file__).resolve().parents[1]/'examples/lab'
+        observation=self.host.run(bundle,'observe',{'engine':'engine'})
+        self.assertEqual((observation['state'],observation['completeness']),('succeeded','partial'))
+        self.assertEqual(observation['effects']['granted'],[])
+        result=self.host.run(bundle,'benchmark',{'engine':'engine','workload':{'points':[1,2,3]}})
+        self.assertEqual(result['state'],'succeeded')
+        self.assertEqual(result['outputs']['metrics']['values'],[1,2,3])
+        self.assertEqual(result['assessment']['verdict'],'not_requested')
+
     def test_image_listen_does_not_silently_grant_egress(self):
         declaration = draft(self.host.release(self.release)[0])
         declaration['bindings']['default'] = {'kind': 'image', 'image': 'sha256:'+'a'*64, 'command': ['app']}
         import yaml
         folder = Path(self.temp.name)/'image'; folder.mkdir()
-        (folder/'cc.yaml').write_text(yaml.safe_dump(declaration), encoding='utf-8')
+        (folder/'cc.yaml').write_text(yaml.safe_dump(undraft(declaration)), encoding='utf-8')
         (folder/'api.json').write_bytes((EXAMPLE/'api.json').read_bytes())
         (folder/'inspect.py').write_bytes((EXAMPLE/'inspect.py').read_bytes())
         release = self.host.prepare(folder)
@@ -123,7 +146,7 @@ class ProductTests(unittest.TestCase):
         shutil.copytree(EXAMPLE, folder)
         declaration = draft(self.host.release(self.release)[0])
         change(declaration)
-        (folder/'cc.yaml').write_text(yaml.safe_dump(declaration), encoding='utf-8')
+        (folder/'cc.yaml').write_text(yaml.safe_dump(undraft(declaration)), encoding='utf-8')
         return self.host.prepare(folder)
 
     def test_application_inputs_are_strict_ports_with_open_json(self):

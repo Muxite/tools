@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 import yaml
-from ccv2 import CCError, Host, load, normalize, resolve_request, migrate_v1, snapshot
+from ccv2 import CCError, Host, load, normalize, resolve_request, snapshot
 from mcp_server import tool_schema, invoke_tool
 
 
@@ -104,7 +104,7 @@ class HostTests(unittest.TestCase):
         workspace = self.root / 'workspace'; workspace.mkdir()
         (workspace / 'existing.txt').write_text('dirty content')
         self.host.resources['work'] = {'kind': 'workspace', 'path': str(workspace)}
-        self.decl['bindings']['default'] = {'kind': 'jiuwenswarm', 'agent': 'coder'}
+        self.decl['bindings']['default'] = {'kind': 'delegate', 'agent': 'coder'}
         cap = self.decl['capabilities']['echo']
         cap.update(takes={'workspace': 'handle'}, gives={'value': 'json'}, needs=['workspace'], changes=['workspace.read', 'workspace.write'])
 
@@ -118,21 +118,15 @@ class HostTests(unittest.TestCase):
         self.assertEqual(result['effects']['observed'][0]['changes'][0]['path'], 'new.bin')
         self.assertEqual((workspace / 'existing.txt').read_text(), 'dirty content')
 
-    def test_request_resolution_and_migration(self):
+    def test_request_resolution(self):
         desired = dict(self.decl); desired.pop('bindings')
-        req = {'format': 'cc-request/2', 'kind': 'request', 'id': 'test.request', 'desired': desired,
+        req = {'format': 'cc-request/2', 'id': 'test.request', 'desired': desired,
                'open': {'/bindings': {'owner': 'implementer', 'question': 'Provide implementation'}}}
         resolved = resolve_request(req, {'/bindings': self.decl['bindings']})
         self.assertEqual(resolved['id'], self.decl['id'])
         req['open']['/id'] = {'owner': 'implementer', 'question': 'Overwrite?'}
         with self.assertRaises(CCError):
             resolve_request(req, {'/bindings': self.decl['bindings'], '/id': 'changed'})
-        old = {'cc': '1', 'id': 'text.trim', 'version': '1.0.0', 'carrier': 'repo@sha256:' + 'a'*64,
-               'does': 'Trim', 'run': '/tool', 'takes': {'text': 'string'}, 'gives': {'text': 'string'}}
-        self.assertEqual(migrate_v1(old)['status'], 'translated')
-        old['needs'] = ['custom']
-        self.assertIsNone(migrate_v1(old)['declaration'])
-
     def test_duplicate_unsupported_and_unresolved(self):
         path = self.bundle / 'bad.yaml'; path.write_text("cc: '2'\nid: one\nid: two")
         with self.assertRaises(CCError): load(path)
@@ -159,7 +153,7 @@ class HostTests(unittest.TestCase):
     def agent_workspace(self):
         workspace = self.root / 'workspace'; workspace.mkdir(exist_ok=True)
         self.host.resources['work'] = {'kind': 'workspace', 'path': str(workspace)}
-        self.decl['bindings']['default'] = {'kind': 'jiuwenswarm', 'agent': 'coder'}
+        self.decl['bindings']['default'] = {'kind': 'delegate', 'agent': 'coder'}
         self.decl['capabilities']['echo'].update(takes={'workspace': 'handle'}, needs=['workspace'], changes=['workspace.read', 'workspace.write'])
         return workspace
 
@@ -204,18 +198,6 @@ class HostTests(unittest.TestCase):
         command = run.call_args.args[0]
         self.assertEqual(command[command.index('--network')+1], 'none')
         self.assertEqual(receipt['state'], 'succeeded')
-
-    def test_migration_binding_name_collision(self):
-        old = {'cc': '1', 'id': 'old.example', 'version': '1.0.0', 'carrier': 'repo@sha256:' + 'a'*64,
-               'operations': {'fit': {'does': 'Fit', 'run': '/fit'}, 'default': {'does': 'Predict', 'run': '/predict'}}}
-        migrated = migrate_v1(old)
-        self.assertEqual(migrated['status'], 'translated')
-        normalized = normalize(migrated['declaration'])
-        for name, expected in [('fit', '/fit'), ('default', '/predict')]:
-            cap = normalized['capabilities'][name]
-            self.assertEqual(normalized['bindings'][cap['using']]['command'], [expected])
-        old['carrier'] = 'repo:latest'
-        self.assertEqual(migrate_v1(old)['status'], 'needs_review')
 
     def test_host_key_is_not_model_argument(self):
         import asyncio
@@ -296,7 +278,7 @@ class HostTests(unittest.TestCase):
         self.host.checkers['absent'] = None
         result = self.host.call(self.seal(), 'echo', {'value': 1}, checks=['absent'], require_checks=True)
         self.assertEqual((result['state'], result['reason']), ('blocked', 'CHECKER_UNAVAILABLE'))
-        self.assertEqual(result['assessment']['verdict'], 'inconclusive')
+        self.assertEqual(result['assessment']['verdict'], 'not_run')
         self.assertFalse((Path(result['provenance']['attempt_dir']) / 'stdout.log').exists())
 
     def test_check_policy_is_part_of_invocation_identity(self):

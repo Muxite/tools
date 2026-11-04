@@ -9,7 +9,7 @@ import platform
 import subprocess
 import sys
 
-PINS = {'jiuwenswarm': '26acdaddae1fa0daf0f888f8012f0284a2548204',
+PINS = {'delegate': '26acdaddae1fa0daf0f888f8012f0284a2548204',
         'agent-core': '4dbaa84ca568af3f181da4f9cd26b713a5b73039',
         'mapie': '90db8996a8c38c8e6574a901a1700ba889c3ac58'}
 
@@ -24,7 +24,7 @@ def run(environment):
     from openjiuwen.core.foundation.tool.mcp.client.stdio_client import StdioClient
     from openjiuwen.harness.tools.subagent.task_tool import TaskTool
     from openjiuwen.core.sys_operation import SysOperation
-    sys.path.insert(0, str(environment / 'jiuwenswarm'))
+    sys.path.insert(0, str(environment / 'delegate'))
     from jiuwenswarm.runtime.mcp_references import McpReferenceValidationInput
     reference_validation = McpReferenceValidationInput.from_iterable(['cc_mapie', 'cc_mapie'])
     assert reference_validation.references == ('cc_mapie',)
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     lines = ['# Tested Windows Python3.12 reduced integration environment.',
              '# Install packages below, then install isolated exact source checkouts with --no-deps.',
              '# Source pins are in environment-report.json; do not install editable workstation paths.']
-    lines += ['# JiuwenSwarm git@github.com:openJiuwen-ai/jiuwenswarm.git@' + PINS['jiuwenswarm'],
+    lines += ['# JiuwenSwarm git@github.com:openJiuwen-ai/jiuwenswarm.git@' + PINS['delegate'],
               '# openjiuwen git+https://github.com/openJiuwen-ai/agent-core.git@' + PINS['agent-core'],
               '# MAPIE git+https://github.com/scikit-learn-contrib/MAPIE.git@' + PINS['mapie']]
     skip_next = False

@@ -12,7 +12,7 @@ The Factory can wrap a paper repository into methodological capabilities. Its so
 
 The ease-of-use revision supersedes automatic guarantee checking. Default calls invoke no semantic checker, even when a capability advertises guarantees. `checks=[...]` is advisory; `require_checks=True` is an explicit acceptance policy. Checker exceptions/unavailability preserve completed execution and outputs. Use `Host.run(bundle, capability, inputs)` or CLI `run` for automatic sealing, and configure session grants once. M1's old node/scheduler integration is a separate migration. The original export remains recoverable at `41c709ffdd68367bfc149f2446d37dd140b1c4f5`; revision receipts preserve before/after hashes.
 
-Start at [CC v2](<../AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/README.md>) and [the evidence page](<../AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/05-examples-and-conformance.md>).
+Start at [CC v2](<../AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/README.md>) and [the evidence page](<../AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/EXAMPLES.md>).
 
 - `cc: "2"` has one `capabilities` map, shared bindings, plain arguments and artifact references.
 - The local host supports sealing, validation, native/image dispatch, registered native delegates, SQLite call identity, workspace leases, explicit reconciliation and optional semantic checks.
@@ -79,4 +79,10 @@ Native applications must keep their foreground leader alive. Missing leader iden
 
 ### Latest Lab alignment
 
-Read CC Protocols/13-lab-composition-and-telemetry.md for the actual Incus implementation plan. Canonical authoring is one capabilities map; services retain their native interfaces, while skill/reference-only packages need no binding. Native/image packaging is independent of capability lifetime. Internal telemetry and clean uninstall are optional profiles; minimal runner identity/state records remain necessary for honest communication. `cc-observation/1` is an optional output/artifact profile, not an implemented mandatory exporter. Incus, GPU, SOL/inference-agent trials and generic service-to-MCP projection require actual integration evidence. New tests add passive material identity, sealed inclusion, import collision and execution-authority boundaries.
+Read CC Protocols/IMPLEMENTATION.md for the actual Incus implementation plan. Canonical authoring is one capabilities map; services retain their native interfaces, while skill/reference-only packages need no binding. Native/image packaging is independent of capability lifetime. Internal telemetry and clean uninstall are optional profiles; minimal runner identity/state records remain necessary for honest communication. `cc-observation/1` is an optional output/artifact profile, not an implemented mandatory exporter. Incus, GPU, SOL/inference-agent trials and generic service-to-MCP projection require actual integration evidence. New tests add passive material identity, sealed inclusion, import collision and execution-authority boundaries.
+
+## Current focused protocol draft
+
+The current reading route is CC Protocols/README.md, FORMAT.md, USAGE.md and EXAMPLES.md; IMPLEMENTATION.md owns strategy/status. Machine schemas are under schemas/. The preceding numbered draft is preserved under history/draft-2026-11-04-focused, not a competing current standard. Applications aliases and migration machinery are removed. Generic delegate bindings replace framework-specific core vocabulary; image commands can use pinned defaults.
+
+Release IDs now hash the RFC 8785 canonical portable index, not host executable locations. Per-host binding.json is separate; runtime availability is checked for the selected capability. Base requirements exclude MCP and process inspection; install optional requirement groups only when used. The core package checker and core test_spec suite work in a fresh environment. See TRANSFER/revisions/2026-11-04-cc-focused/evidence for the portable ZIP, exact evidence and independent review.

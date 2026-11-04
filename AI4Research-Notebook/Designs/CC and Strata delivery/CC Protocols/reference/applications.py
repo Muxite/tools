@@ -18,6 +18,13 @@ class Applications:
         with host.db() as db:
             db.execute('CREATE TABLE IF NOT EXISTS instances (id TEXT PRIMARY KEY, key TEXT UNIQUE, fingerprint TEXT, record TEXT)')
 
+    def process_api(self):
+        try:
+            import psutil
+            return psutil
+        except ImportError as error:
+            raise self.core.CCError('UNSUPPORTED_BINDING', 'Process inspection unavailable; install requirements-services.txt for service execution') from error
+
     def get(self, instance):
         with self.host.db() as db:
             row = db.execute('SELECT record FROM instances WHERE id=?', (instance,)).fetchone()
@@ -80,7 +87,7 @@ class Applications:
             return subprocess.CompletedProcess(['docker', *arguments], 1, '', str(error))
 
     def start(self, release, name, inputs, key=None, grants=None, timeout=15):
-        import psutil
+        psutil = self.process_api()
         c, host = self.core, self.host
         declaration, bundle = host.release(release)
         c.require(name in c.service_entries(declaration), 'NOT_SERVED_CAPABILITY', name)
@@ -207,10 +214,10 @@ class Applications:
             return self.save(record)
 
     def spawn_native(self, record, binding, bundle, app, command, directory):
-        import psutil
+        psutil = self.process_api()
         host, c = self.host, self.core
         manifest = json.loads((bundle.parent/'manifest.json').read_bytes())
-        executable = manifest['executables'][app['using']]
+        executable = host.bound_executables(record['release'], app['using'])[app['using']]
         if '{bundle}' not in binding['command'][0]:
             command[0] = executable['path']
         record['provenance']['executable_sha256'] = c.file_sha(command[0])
@@ -246,7 +253,7 @@ class Applications:
     def inspect(self, instance):
         record = self.get(instance)
         if record['state'] == 'preparing':
-            import psutil
+            psutil = self.process_api()
             owner = record['provenance']['owner']
             try:
                 alive = abs(psutil.Process(owner['pid']).create_time()-owner['created']) < 0.001
@@ -264,7 +271,7 @@ class Applications:
             return record
         identity = record['identity']
         if identity['kind'] == 'native':
-            import psutil
+            psutil = self.process_api()
             try:
                 process = psutil.Process(identity['pid'])
                 alive = abs(process.create_time()-identity['created']) < 0.001 and process.is_running() and process.status() != psutil.STATUS_ZOMBIE
@@ -305,7 +312,7 @@ class Applications:
         identity = record['identity']
         self.core.require(bool(identity), 'STOP_UNCONFIRMED', 'No execution identity; reconcile before retry')
         if identity['kind'] == 'native':
-            import psutil
+            psutil = self.process_api()
             try:
                 process = psutil.Process(identity['pid'])
                 self.core.require(abs(process.create_time()-identity['created']) < 0.001, 'INSTANCE_REPLACED', 'PID generation differs; refusing to stop another process')
