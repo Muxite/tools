@@ -1,0 +1,17 @@
+cc: '2'
+id: examples.easy_results
+version: 1.0.0
+bindings:
+  default:
+    kind: native
+    command: ['{python}', '{bundle}/worker.py']
+capabilities:
+  produce:
+    does: Save a synthetic task result with broad context; no verifier is required to use it.
+    takes: {task: text, context: json}
+    gives: {result: artifact}
+    guarantees: [example.score]
+  review:
+    does: Assess an existing result against an explicit score policy without rerunning its producer.
+    takes: {result: artifact, policy: json}
+    gives: {assessment: json}

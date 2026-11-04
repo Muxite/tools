@@ -9,6 +9,24 @@ next_action: Qualify selected adapter and consumer evidence policy
 
 The logical call is `{release, capability, inputs, key}`. `inputs` is a port-name map of **plain argument values**. The host supplies the key or accepts it through its trusted calling API; model arguments do not choose principal, grants or budgets.
 
+Ordinary development can use `Host.run(bundle, capability, inputs, ...)`; it seals current source and calls it without manual release/key plumbing. `Host.call` remains the lower-level API for pinned releases. Configure `session_grants` on the Host once, or use CLI `--session FILE` / `CC_SESSION` with a JSON object containing `grants` and optional `resources`. These are already authorized host settings, not model-authored arguments. Call-level grants can narrow those permissions.
+
+## Verification is opt-in
+
+`Host.call` and `Host.run` accept `checks=()` and `require_checks=False`. Default calls run zero semantic checkers. A declaration's `guarantees` list does not change that default.
+
+| Caller choice | Behavior |
+|---|---|
+| No checks | Execute normally; assessment `not_requested`. |
+| `checks=[...]` | Run advisory checks after valid outputs exist; retain outputs and successful execution on check failure/unavailability/exception. |
+| `checks=[...], require_checks=True` | Missing required checker blocks before execution. Failed/inconclusive post-execution assessment prevents acceptance while execution remains succeeded. |
+
+The chosen policy is recorded in `provenance.verification` and participates in the invocation fingerprint. Changing it under the same key conflicts. Host callbacks may return `PASS`, `FAIL`, `INCONCLUSIVE` or `UNAVAILABLE`; exceptions become `CHECKER_ERROR`, never a fabricated execution failure. Checkers receive copies of the result packet; this is data protection, not an OS isolation guarantee for arbitrary host code.
+
+Explicitly requested callbacks run synchronously in this prototype. Advisory means they do not gate acceptance or erase results; it does not introduce a background verification service. Ordinary calls invoke none.
+
+CLI `--check ID` requests a checker and `--require-checks` requires the selected checks. No check means no semantic verification. `core.complete` is an optional built-in completeness check; domain checkers are registered by the host application. Normal call/run exit status is 0 for usable execution, including advisory failure or valid partial evidence; 1 for failed/blocked/unknown execution or explicitly required-check failure; 2 for malformed CLI input/configuration.
+
 ```json
 {"release":"SEALED_RELEASE","capability":"trim","inputs":{"text":"   "},"key":"HOST_KEY"}
 ```
@@ -96,5 +114,18 @@ This changes the current state to `failed` with reason `RECONCILED_STOP`, retain
 A late adapter response cannot replace that reconciliation. Store it as a separately hashed late observation and retain the reconciled terminal state and history. The reference host serializes finalization and reconciliation through the same local ledger.
 
 Native sessions can carry many calls. Conversation pause, input-required state, rejection and confirmed cancellation are distinct observations. Preserve interrupted work, partial artifacts and diagnostics. [09](09-upstream-coding-integration.md) identifies pinned-upstream bridge requirements.
+
+## Recover without blocking unrelated work
+
+| Observation | Caller action |
+|---|---|
+| Missing/wrong required input | Repair the named argument or select a compatible capability. |
+| Execution failure | Inspect retained logs/results; repair or choose another tool. Do not call it success. |
+| Optional check failed or unavailable | Keep using the result where its evidence is sufficient; optionally review later. |
+| Partial evidence | Retain it with its stated limitation; require completeness only where needed. |
+| Missing output needed by another call | That dependent consumer cannot proceed until supplied; unrelated work need not stop. |
+| Unknown effects | Reconcile the original attempt before replaying it. |
+
+Scheduling and graph propagation belong to the caller. This revision does not change M1's old scheduler or node adapter. Its former verifier-blocking behavior must be migrated explicitly rather than assumed fixed by a v2 declaration.
 
 The synchronous reference callback demonstrates completed native tasks and deadline uncertainty. It does not implement a general background-job service, pause/resume API or cancellation forwarding service; those controls remain owned by the native session integration and must be qualified before being advertised. The local ledger is single-user, with leases scoped to that store. Separate stores or external programs do not participate in its concurrency control.

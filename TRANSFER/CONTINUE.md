@@ -10,6 +10,8 @@ The Factory can wrap a paper repository into methodological capabilities. Its so
 
 ## Current implementation
 
+The ease-of-use revision supersedes automatic guarantee checking. Default calls invoke no semantic checker, even when a capability advertises guarantees. `checks=[...]` is advisory; `require_checks=True` is an explicit acceptance policy. Checker exceptions/unavailability preserve completed execution and outputs. Use `Host.run(bundle, capability, inputs)` or CLI `run` for automatic sealing, and configure session grants once. M1's old node/scheduler integration is a separate migration. The original export remains recoverable at `41c709ffdd68367bfc149f2446d37dd140b1c4f5`; revision receipts preserve before/after hashes.
+
 Start at [CC v2](<../AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/README.md>) and [the evidence page](<../AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/05-examples-and-conformance.md>).
 
 - `cc: "2"` has one `capabilities` map, shared bindings, plain arguments and artifact references.

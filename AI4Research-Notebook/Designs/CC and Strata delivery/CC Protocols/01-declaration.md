@@ -23,7 +23,7 @@ One package contains named capabilities. A call selects one; sharing a package d
 | `takes`, `gives` | Port-name maps; each defaults to `{}`. |
 | `needs` | Required host provisions, default `[]`. |
 | `changes` | Declared effect classes, default `[]`. |
-| `guarantees` | Requested semantic checks, default `[]`. A name alone proves nothing. |
+| `guarantees` | Checkable commitments, default `[]`. They advertise what can be assessed; they neither run a checker nor prove a result. |
 | `using` | Selected binding name, default `default`. |
 
 Unsupported required semantics are rejected. Releases contain no unresolved choices or fake digests. Use a [request](02-compiler-and-release.md) while implementation remains open.
@@ -69,7 +69,9 @@ Commands are argument vectors, never implicit shell strings. `{python}` selects 
 
 Built-in needs are `workspace`, `python`, `process`, `gpu` and `environment`. Built-in effects are `workspace.read`, `workspace.write`, `process.exec`, `process.attach`, `process.control`, `gpu.use`, `dependency.install`, `network.request`, `model.invoke`, `git.publish` and `deploy`. Common actions need no external rule document. Custom needs/effects/checks require host support; unsupported required meanings are rejected.
 
-The declaration is an authority ceiling. Host grants bind concrete resources and limits. The reference host requires grants for the selected capability’s full declared effect list; it does not silently remove effects. Artifact references and handles do not authorize access. Model invocation is a separate effect, including in coding sessions; dependency installation, publication and deployment are also separate.
+The declaration is an authority ceiling. Host grants bind concrete resources and limits. Configure `Host(..., session_grants=[...])` once. Calls without explicit grants inherit only the selected capability's declared effects that the session has authorized. Explicit call grants can narrow the session authorization and cannot widen it. A sibling capability does not inherit the capsule's union of effects.
+
+The reference host still requires authorization for the selected capability's full declared effect list; missing authority is a real prerequisite failure, not an optional quality warning. It does not claim that native arbitrary code can selectively enforce missing permissions. Artifact references and handles do not authorize access. Model invocation, dependency installation, publication and deployment remain distinct effects.
 
 `changes: []` expresses no declared external effects. On trusted native execution it cannot establish that arbitrary code was prevented from making them. [03](03-calls-and-receipts.md) distinguishes enforcement from observation.
 

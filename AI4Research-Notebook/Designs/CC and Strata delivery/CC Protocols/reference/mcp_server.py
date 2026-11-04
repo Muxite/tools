@@ -48,7 +48,7 @@ async def serve(store, release, grants=(), resources=None):
     import mcp.types as types
     from mcp.server.lowlevel import Server
     from mcp.server.stdio import stdio_server
-    host = Host(store, resources=resources)
+    host = Host(store, resources=resources, session_grants=grants)
     declaration, _ = host.release(release)
 
     def tools():
@@ -59,7 +59,7 @@ async def serve(store, release, grants=(), resources=None):
         values = dict(arguments or {})
         key = values.pop('_cc_key', None) or str(uuid.uuid4())
         try:
-            receipt = await asyncio.to_thread(host.call, release, name, values, key=key, grants=grants)
+            receipt = await asyncio.to_thread(host.call, release, name, values, key=key)
             return types.CallToolResult(content=[types.TextContent(type='text', text=json.dumps(receipt))], structuredContent=receipt,
                                         isError=receipt['state'] in {'failed', 'blocked', 'unknown'})
         except CCError as e:

@@ -1,6 +1,9 @@
 import json
+from copy import deepcopy
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import threading
 import time
 import unittest
@@ -84,9 +87,9 @@ class HostTests(unittest.TestCase):
     def test_independent_negative_assessment(self):
         self.decl['capabilities']['echo']['guarantees'] = ['coverage.target']
         release = self.seal()
-        self.assertEqual(self.host.call(release, 'echo', {'value': 1})['reason'], 'CHECKER_UNAVAILABLE')
+        self.assertEqual(self.host.call(release, 'echo', {'value': 1}, checks=['coverage.target'], require_checks=True)['reason'], 'CHECKER_UNAVAILABLE')
         self.host.checkers['coverage.target'] = lambda receipt, packet: 'FAIL'
-        result = self.host.call(release, 'echo', {'value': 1})
+        result = self.host.call(release, 'echo', {'value': 1}, checks=['coverage.target'])
         self.assertEqual((result['state'], result['assessment']['verdict']), ('succeeded', 'failed'))
         self.assertTrue(result['assessment']['checks'][0]['checker']['code_sha256'])
 
@@ -260,6 +263,138 @@ class HostTests(unittest.TestCase):
         with self.assertRaises(CCError) as e:
             self.host.call(release, 'echo', {'value': float('nan')})
         self.assertEqual(e.exception.code, 'INVALID_INPUT')
+
+    def test_advertised_guarantees_do_not_run_or_require_checkers(self):
+        self.decl['capabilities']['echo']['guarantees'] = ['missing', 'expensive']
+        callback = unittest.mock.Mock(side_effect=AssertionError('No automatic verifier'))
+        self.host.checkers['expensive'] = callback
+        result = self.host.call(self.seal(), 'echo', {'value': {'new': {'nested': ['anything', 2]}}})
+        self.assertEqual(result['state'], 'succeeded')
+        self.assertEqual(result['assessment'], {'verdict': 'not_requested', 'checks': []})
+        callback.assert_not_called()
+
+    def test_advisory_missing_crashing_and_invalid_checkers_preserve_result(self):
+        self.host.checkers['crashes'] = lambda receipt, packet: 1 / 0
+        self.host.checkers['invalid'] = lambda receipt, packet: 'looks okay'
+        def exits(receipt, packet):
+            raise SystemExit(7)
+        self.host.checkers['exits'] = exits
+        result = self.host.call(self.seal(), 'echo', {'value': 7}, checks=['missing', 'crashes', 'invalid', 'exits'])
+        self.assertEqual((result['state'], result['outputs']['value']), ('succeeded', 7))
+        self.assertEqual(result['assessment']['verdict'], 'inconclusive')
+        self.assertEqual(len(result['assessment']['checks']), 4)
+        self.assertEqual({d['code'] for d in result['diagnostics']}, {'CHECKER_ERROR', 'CHECKER_UNAVAILABLE'})
+
+    def test_required_failure_retains_execution_success(self):
+        self.host.checkers['reject'] = lambda receipt, packet: 'FAIL'
+        result = self.host.call(self.seal(), 'echo', {'value': 8}, checks=['reject'], require_checks=True)
+        self.assertEqual((result['state'], result['assessment']['verdict']), ('succeeded', 'failed'))
+        self.assertEqual(result['outputs']['value'], 8)
+        self.assertTrue(result['provenance']['verification']['required'])
+
+    def test_required_missing_checker_does_not_dispatch(self):
+        self.host.checkers['absent'] = None
+        result = self.host.call(self.seal(), 'echo', {'value': 1}, checks=['absent'], require_checks=True)
+        self.assertEqual((result['state'], result['reason']), ('blocked', 'CHECKER_UNAVAILABLE'))
+        self.assertEqual(result['assessment']['verdict'], 'inconclusive')
+        self.assertFalse((Path(result['provenance']['attempt_dir']) / 'stdout.log').exists())
+
+    def test_check_policy_is_part_of_invocation_identity(self):
+        release = self.seal()
+        self.host.call(release, 'echo', {'value': 1}, key='policy')
+        with self.assertRaises(CCError) as e:
+            self.host.call(release, 'echo', {'value': 1}, key='policy', checks=['core.complete'])
+        self.assertEqual(e.exception.code, 'KEY_CONFLICT')
+        self.host.call(release, 'echo', {'value': 1}, key='policy2', checks=['core.complete'])
+        with self.assertRaises(CCError):
+            self.host.call(release, 'echo', {'value': 1}, key='policy2', checks=['core.complete'], require_checks=True)
+
+    def test_session_authorization_is_inherited_only_by_selected_capability(self):
+        self.decl['capabilities']['echo']['changes'] = ['workspace.write']
+        self.decl['capabilities']['inspect'] = deepcopy(dict(self.decl['capabilities']['echo'], changes=[]))
+        host = Host(self.host.store, session_grants=['workspace.write', 'network.request'])
+        release = self.seal()
+        edited = host.call(release, 'echo', {'value': 1})
+        inspected = host.call(release, 'inspect', {'value': 1})
+        self.assertEqual(edited['effects']['granted'], ['workspace.write'])
+        self.assertEqual((inspected['state'], inspected['effects']['granted']), ('succeeded', []))
+        self.assertEqual(host.call(release, 'echo', {'value': 1}, grants=[])['reason'], 'DENIED')
+        limited = Host(self.host.store, session_grants=[])
+        self.assertEqual(limited.call(release, 'echo', {'value': 1}, grants=['workspace.write'])['reason'], 'DENIED')
+
+    def test_run_automatically_seals_current_source(self):
+        self.seal()
+        first = self.host.run(self.bundle, 'echo', {'value': 1})
+        (self.bundle / 'tool.py').write_text("print('{\"outcome\":\"ok\",\"outputs\":{\"value\":2}}')")
+        second = self.host.run(self.bundle, 'echo', {'value': 1})
+        self.assertEqual((first['outputs']['value'], second['outputs']['value']), (1, 2))
+        self.assertNotEqual(first['release'], second['release'])
+        self.assertEqual(self.host.call(first['release'], 'echo', {'value': 1})['outputs']['value'], 1)
+
+    def test_advisory_checker_cannot_mutate_inline_result(self):
+        def mutate(receipt, packet):
+            receipt['outputs']['value']['changed'] = True
+            return 'FAIL'
+        self.host.checkers['mutate'] = mutate
+        result = self.host.call(self.seal(), 'echo', {'value': {'original': True}}, checks=['mutate'])
+        self.assertEqual(result['outputs']['value'], {'original': True})
+
+    def test_artifact_and_logs_survive_checker_exception(self):
+        self.decl['capabilities']['echo']['gives'] = {'value': 'artifact'}
+        (self.bundle / 'tool.py').write_text("import json,sys\nfrom pathlib import Path\np=json.load(sys.stdin)\n(Path(p['output_dir'])/'value.txt').write_bytes(b'usable')\nprint('worker log',file=sys.stderr)\nprint(json.dumps({'outcome':'ok','outputs':{'value':{'path':'value.txt'}}}))\n")
+        self.host.checkers['crash'] = lambda receipt, packet: 1 / 0
+        result = self.host.call(self.seal(), 'echo', {'value': 1}, checks=['crash'])
+        self.assertEqual(result['state'], 'succeeded')
+        self.assertEqual(self.host.artifact_path(result['outputs']['value']).read_bytes(), b'usable')
+        attempt = Path(result['provenance']['attempt_dir'])
+        self.assertIn('worker log', (attempt/'stderr.log').read_text())
+        self.assertTrue((attempt/'stdout.log').is_file())
+
+    def cli(self, *arguments):
+        return subprocess.run([sys.executable, str(Path(__file__).with_name('ccv2.py')), *map(str, arguments)],
+                              capture_output=True, text=True, cwd=self.root)
+
+    def test_cli_run_advisory_strict_and_execution_exit_codes(self):
+        self.seal()
+        inputs = self.root / 'inputs.json'; inputs.write_text('{"value":1}')
+        common = ['run', self.bundle, 'echo', '--inputs', inputs, '--store', self.host.store, '--trusted-local']
+        advisory = self.cli(*common, '--check', 'missing')
+        self.assertEqual(advisory.returncode, 0, advisory.stdout + advisory.stderr)
+        self.assertEqual(json.loads(advisory.stdout)['assessment']['verdict'], 'inconclusive')
+        strict = self.cli(*common, '--check', 'missing', '--require-checks')
+        self.assertEqual(strict.returncode, 1, strict.stdout + strict.stderr)
+        complete = self.cli(*common, '--check', 'core.complete', '--require-checks')
+        self.assertEqual(complete.returncode, 0, complete.stdout + complete.stderr)
+        (self.bundle / 'tool.py').write_text("print('{\"outcome\":\"partial\",\"reason\":\"partial evidence\",\"outputs\":{\"value\":1}}')")
+        partial = self.cli(*common, '--check', 'core.complete', '--require-checks')
+        self.assertEqual(partial.returncode, 1)
+        self.assertEqual(json.loads(partial.stdout)['state'], 'succeeded')
+        (self.bundle / 'tool.py').write_text('raise SystemExit(3)')
+        failed = self.cli(*common)
+        self.assertEqual(failed.returncode, 1)
+        self.assertEqual(json.loads(failed.stdout)['state'], 'failed')
+
+    def test_cli_session_reuses_authorization_and_default_store(self):
+        self.decl['capabilities']['echo']['changes'] = ['process.exec']
+        self.seal()
+        inputs = self.root/'inputs.json'; inputs.write_text('{"value":1}')
+        session = self.root/'session.json'; session.write_text('{"grants":["process.exec"]}')
+        result = self.cli('run', self.bundle, 'echo', '--inputs', inputs, '--session', session, '--trusted-local')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)['effects']['granted'], ['process.exec'])
+        self.assertTrue((self.root/'.cc-state/calls.sqlite').is_file())
+
+    def test_failed_execution_retains_valid_partial_outputs(self):
+        (self.bundle / 'tool.py').write_text("print('{\"outcome\":\"error\",\"error\":{\"code\":\"CAPTURE_STOPPED\",\"message\":\"Stopped after partial work\"},\"outputs\":{\"value\":{\"usable\":true}}}')\nraise SystemExit(1)")
+        result = self.host.call(self.seal(), 'echo', {'value': 1})
+        self.assertEqual((result['state'], result['completeness'], result['reason']), ('failed', 'partial', 'CAPTURE_STOPPED'))
+        self.assertEqual(result['outputs']['value'], {'usable': True})
+
+    def test_missing_required_output_retains_other_valid_outputs(self):
+        self.decl['capabilities']['echo']['gives']['extra'] = 'text'
+        result = self.host.call(self.seal(), 'echo', {'value': 'keep this'})
+        self.assertEqual((result['state'], result['reason'], result['completeness']), ('failed', 'INVALID_OUTPUT', 'partial'))
+        self.assertEqual(result['outputs']['value'], 'keep this')
 
 
 if __name__ == '__main__':

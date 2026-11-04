@@ -1,0 +1,58 @@
+PLEASE IMPLEMENT THIS PLAN:
+# Make CC v2 easy by default
+
+## Summary
+
+V2 already reduces friction through broad JSON payloads, optional schemas, shared bindings and normal coding sessions inside one CC call. However, its current checker requirements can still block useful work.
+
+The revised default will be: **execute the capability, return its result, and run semantic verification only when explicitly requested.**
+
+Execution, verification and acceptance remain separate. A missing verifier must not stop ordinary tool use. This revision changes v2; M1’s existing scheduler would need a separate adapter to adopt this behavior.
+
+## Lightweight defaults
+
+- Keep the declaration small. Ordinary agent capabilities can accept `task: text` and `context: json`, then return `result: json`.
+- Allow arbitrary fields inside JSON payloads unless an author deliberately supplies a restrictive schema.
+- Keep checks for genuine communication failures: missing required inputs, invalid artifact references, unsupported bindings and malformed process results.
+- Interpret `guarantees` as checkable commitments, not instructions to invoke a verifier automatically.
+- Return useful outputs, logs and partial evidence whenever available. Failed or unavailable optional checks must not discard completed results.
+- Preserve genuine authorization boundaries. The host can authorize a workspace/session once and reuse that authorization; callers should not repeatedly construct permission lists.
+
+## Runtime and interface changes
+
+- Add `checks=()` and `require_checks=False` to `Host.call`. The default invokes **zero semantic checkers**, including when the declaration lists guarantees.
+- Add CLI `--check ID` and `--require-checks`. Verification selection becomes part of the bound call and invocation fingerprint.
+- Requested advisory checks report `passed`, `failed` or `inconclusive`. An unavailable or crashing checker produces a diagnostic while preserving execution state and outputs.
+- Explicitly required checks gate acceptance. A missing required checker blocks before execution; a failed post-execution check preserves successful execution and reports failed assessment.
+- CLI execution failures return a nonzero exit code. Advisory assessment failures do not. Explicit required-check failures do.
+- Add `Host.run(bundle, capability, inputs, ...)` and a matching `run` command that seals current source automatically. Normal development should not require manually copying release digests between commands.
+- Let calls inherit already authorized session permissions, limited to the selected capability. Explicit call grants can narrow authorization; nothing silently widens it.
+- Demonstrate verification as a separate optional capability consuming saved outputs, so adding verification never requires replaying an effectful task.
+
+## Examples and recovery guidance
+
+Publish three short examples:
+
+| Example | Intended experience |
+|---|---|
+| Coding subagent | Receive a task and workspace, edit normally, run tests, return changes and findings without mandatory external verification. |
+| Paper-method capability | Accept broad options, produce artifacts and report metrics; poor scientific results remain valid outputs. |
+| Explicit acceptance check | Request stronger verification when accepting a benchmark claim, publishing a result or promoting a candidate. |
+
+Document caller recovery clearly: repair invalid arguments, inspect execution errors, retain partial results, or select another capability. Missing required output blocks its dependent consumer; optional review failure does not imply that unrelated work must stop. Scheduling remains the caller’s responsibility.
+
+Update the published handoff and its current hash inventory, retaining the original transfer checkpoint and unchanged historical evidence.
+
+## Tests and acceptance
+
+- A declared guarantee with no requested checks runs successfully without invoking a verifier.
+- Advisory check failure, unavailability or exception preserves outputs and successful execution.
+- Explicit required checks produce the documented acceptance failure.
+- Broad JSON accepts additional nested fields without declaration changes.
+- Session authorization eliminates repeated grant arguments without granting sibling capabilities extra authority.
+- Automatic sealing executes the current source and records its release.
+- Repeating a key with changed verification requirements returns a conflict.
+- Existing integrity, artifact, reconciliation and workspace-concurrency regressions continue passing.
+
+Success means a developer can wrap and call an ordinary function or subagent with minimal configuration, obtain useful results immediately, and add stronger verification only where it earns its cost.
+

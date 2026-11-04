@@ -4,6 +4,8 @@ Start with [the continuation guide](TRANSFER/CONTINUE.md). It states what works,
 
 ## Current task
 
+The ease-of-use revision makes semantic verification opt-in: ordinary calls run zero checkers, advisory failures preserve useful results, and explicit required checks gate acceptance. `Host.run` / CLI `run` manage source sealing automatically; session authorization can be configured once. See the [current defaults](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/07-quality-and-improvement.md>). M1's old node scheduler is unchanged.
+
 [CC Protocol v2](<AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/README.md>) includes the declaration standard, reference host, MCP projection, native coding-subagent example, scientific examples and preserved v1 history.
 
 The recorded November 4 run passed 21 local tests, real pinned OpenJiuwen MCP calls and replay, native task delegation with actual code edits/tests, MAPIE scientific cases, and native Strata product inspection. Actual container execution was blocked by the source machine's Docker startup failure. Live-model behavior, full deployment and GPU inference remain unqualified.

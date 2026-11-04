@@ -71,7 +71,17 @@ python reference/run_experiments.py
 
 It selects the prepared isolated environment, writes a new report directory, and prints each stage's result. An unavailable container engine is reported separately; native experiments still run. See [environment setup and scope](reference/integrations/README.md).
 
-From this directory, validate and seal a package, then use the release identity printed by sealing:
+For ordinary development, run directly from the package folder. The host seals the current source, generates a key, and records its release automatically:
+
+```text
+python reference/ccv2.py run reference/examples/portable trim --inputs INPUTS.json --trusted-local
+```
+
+`INPUTS.json` contains `{"text":"   "}`. State is stored under `.cc-state` by default; use `--store` to choose another location. No semantic checker runs, even if the capability advertises guarantees. JSON payloads stay open unless their author supplies a schema.
+
+Optional advisory checking adds `--check core.complete`. Add `--require-checks` only when completeness should gate acceptance. `core.complete` checks completeness, not semantic correctness. Host applications can register domain checkers and select them through `Host.call(..., checks=["check-id"])`.
+
+For reproducible callers that already manage releases, the lower-level interface remains:
 
 ```text
 python reference/ccv2.py validate PACKAGE/cc.yaml
@@ -84,6 +94,8 @@ Replace uppercase placeholders with real paths/identity. `INPUTS.json` contains 
 ## Meaning of success
 
 Execution, completeness and semantic assessment are separate. A test runner can execute successfully and report failing tests. Empty semantic checks mean `not_requested`. Hashes establish byte identity, not correctness. Declared, granted, observed and enforced effects are separate facts.
+
+Semantic verification is **only on request**. Missing or crashing advisory checkers preserve successful execution and its outputs. Missing explicitly required checkers block before execution. A failing post-execution check reports failed assessment while preserving the completed result. See [quality and defaults](07-quality-and-improvement.md) and the [result-first example](reference/integrations/ease_of_use_demo.py).
 
 This route replaces active v1 syntax. Migration reports unsupported semantics rather than discarding them. Local reference checks do not establish deployed JiuwenSwarm, remote recovery, GB10 measurements or enterprise isolation. Run evidence belongs in [05](05-examples-and-conformance.md).
 

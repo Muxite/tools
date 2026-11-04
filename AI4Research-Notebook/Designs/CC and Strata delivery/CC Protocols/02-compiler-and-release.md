@@ -26,7 +26,7 @@ The session can inspect, plan, edit, test and delegate using native tools. A tas
 
 ## Release construction
 
-Validate identity, ports, binding selection and supported requirements/effects/checks. Copy source into sealed storage and hash the declaration and included material. Return release identity and available build lineage. Admit against the actual adapter before calling.
+Validate identity, ports, binding selection and supported requirements/effects. Guarantee IDs advertise checkable commitments; checker availability is checked only when a caller explicitly requires that verification. Copy source into sealed storage and hash the declaration and included material. Return release identity and available build lineage. Admit against the actual adapter before calling.
 
 ```text
 python reference/ccv2.py validate PACKAGE/cc.yaml
@@ -35,7 +35,7 @@ python reference/ccv2.py seal PACKAGE --store STORE
 
 Sealing captures required source, including binary/untracked material, rather than identifying a dirty checkout only by its commit. Later author-workspace edits cannot alter sealed execution. A source digest does not pin the entire host OS. Native sealing captures the resolved executable hash, and calls verify the current executable. Installed dependency versions are observed; full wheel-file integrity and the whole host environment are not sealed. File snapshots exclude dependency/cache directories such as `.venv`; ordinary file modes and Git HEAD/index identity are captured separately.
 
-The [reference runtime](reference/ccv2.py) is a validator/sealer and call host, not a full compiler/build system. Its callable API starts with `Host(store, resources=None, delegates=None, checkers=None, python=None)`. `seal(bundle)` seals a package; `call(release, capability, inputs, key=None, grants=(), timeout=60)` binds a capability, inputs and host policy. The callable API executes trusted local code; callers must establish that trust before using it. Consult its implementation/help for exact supported options.
+The [reference runtime](reference/ccv2.py) is a validator/sealer and call host, not a full compiler/build system. Its callable API starts with `Host(store, resources=None, delegates=None, checkers=None, python=None, session_grants=None)`. Ordinary development uses `run(bundle, capability, inputs, ...)`, which seals the current implementation automatically. `seal(bundle)` and `call(release, capability, inputs, key=None, grants=None, timeout=60, checks=(), require_checks=False)` remain available for explicit release management. The callable API executes trusted local code; callers must establish that trust before using it.
 
 ## Requests are work, not callable releases
 

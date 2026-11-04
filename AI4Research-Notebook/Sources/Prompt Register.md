@@ -272,3 +272,7 @@ request, the simpler Docker/image workflow and remaining executor constraints.
 ## November 4 - repository transfer
 
 [[Sources/Prompts/2026-11-04-tools-repository-transfer.txt|Repository replacement and compute-machine handoff]] authorizes replacing Muxite/tools active contents with the major research notebook, CC v2 implementation/evidence and reviewed presentations. The destination continuation guide owns setup and transfer exclusions. Original notebook sources remain unchanged except this capture/registration; prior tools Git history remains available.
+
+## November 4 - CC v2 ease-of-use revision
+
+[[Sources/Prompts/2026-11-04-cc-ease-of-use-plan.txt|Approved ease-of-use plan]] makes semantic verification opt-in, advisory failures nonblocking, session authority reusable and folder-based calls automatic. [[Designs/CC and Strata delivery/CC Protocols/README|Current CC v2]] implements it. M1 scheduler adoption remains a separate task. Original transfer checkpoint 41c709f and historical evidence remain preserved in the published Muxite/tools handoff.

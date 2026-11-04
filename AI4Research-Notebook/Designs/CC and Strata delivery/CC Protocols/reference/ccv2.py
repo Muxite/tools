@@ -167,7 +167,7 @@ def normalize(raw):
             require(isinstance(cap[field], list) and all(isinstance(x, str) for x in cap[field]) and len(cap[field]) == len(set(cap[field])), 'INVALID_DECLARATION', f'{name}.{field} must be unique strings')
         require(set(cap['needs']) <= NEEDS, 'UNSUPPORTED_PREREQUISITE', str(set(cap['needs']) - NEEDS))
         require(set(cap['changes']) <= EFFECTS, 'UNSUPPORTED_EFFECT', str(set(cap['changes']) - EFFECTS))
-        # Guarantee IDs are obligations. An unavailable checker blocks rather than passes.
+        # Checkable commitments advertise what can be assessed, not automatic gates.
     encoded(result)
     return result
 
@@ -227,14 +227,20 @@ def differences(before, after):
     return changed
 
 
+def complete_result(receipt, packet):
+    """Optional mechanical acceptance check; this establishes no semantic quality."""
+    return 'PASS' if receipt['completeness'] == 'complete' else 'FAIL'
+
+
 class Host:
-    def __init__(self, store, resources=None, delegates=None, checkers=None, python=None):
+    def __init__(self, store, resources=None, delegates=None, checkers=None, python=None, session_grants=None):
         self.store = Path(store).resolve()
         self.store.mkdir(parents=True, exist_ok=True)
         self.resources = resources or {}
         self.delegates = delegates or {}
-        self.checkers = checkers or {}
+        self.checkers = {'core.complete': complete_result, **(checkers or {})}
         self.python = python or sys.executable
+        self.session_grants = None if session_grants is None else self.grant_list(session_grants)
         with self.db() as db:
             db.execute('CREATE TABLE IF NOT EXISTS calls (key TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, receipt TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS leases (resource TEXT PRIMARY KEY, call_id TEXT NOT NULL)')
@@ -247,6 +253,35 @@ class Host:
             db.commit()
         finally:
             db.close()
+
+    @staticmethod
+    def grant_list(grants):
+        require(isinstance(grants, (list, tuple, set)) and all(isinstance(g, str) for g in grants), 'INVALID_GRANT', 'Grants must be effect IDs')
+        require(set(grants) <= EFFECTS, 'UNSUPPORTED_EFFECT', str(set(grants) - EFFECTS))
+        return sorted(set(grants))
+
+    def run(self, bundle, capability, inputs, **options):
+        """Seal current implementation bytes and invoke without manual digest plumbing."""
+        return self.call(self.seal(bundle), capability, inputs, **options)
+
+    def _assess(self, receipt, packet, checks):
+        """Advisory checks cannot rewrite execution or mutate its returned values."""
+        for check in checks:
+            row = {'id': check, 'verdict': 'UNAVAILABLE'}
+            checker = self.checkers.get(check)
+            if not callable(checker):
+                receipt['diagnostics'].append({'code': 'CHECKER_UNAVAILABLE', 'check': check, 'message': 'Result retained; requested checker is not registered'})
+            else:
+                try:
+                    observed = checker(deepcopy(receipt), deepcopy(packet))
+                    require(observed in {'PASS', 'FAIL', 'INCONCLUSIVE', 'UNAVAILABLE'}, 'INVALID_ASSESSMENT', check)
+                    row.update(verdict=observed, checker=callable_identity(checker))
+                except (Exception, SystemExit) as e:
+                    row['verdict'] = 'INCONCLUSIVE'
+                    receipt['diagnostics'].append({'code': 'CHECKER_ERROR', 'check': check, 'message': str(e)})
+            receipt['assessment']['checks'].append(row)
+        verdicts = [row['verdict'] for row in receipt['assessment']['checks']]
+        receipt['assessment']['verdict'] = ('failed' if 'FAIL' in verdicts else 'inconclusive' if any(v != 'PASS' for v in verdicts) else 'passed')
 
     def seal(self, bundle):
         bundle = Path(bundle).resolve()
@@ -382,20 +417,38 @@ class Host:
         path.write_bytes(encoded(receipt))
         return receipt
 
-    def call(self, release, capability, inputs, key=None, grants=(), timeout=60):
+    def call(self, release, capability, inputs, key=None, grants=None, timeout=60, checks=(), require_checks=False):
         key = key or str(uuid.uuid4())
         require(isinstance(key, str) and bool(key) and len(key) <= 256, 'INVALID_KEY', 'Nonempty bounded invocation key required')
         require(isinstance(inputs, dict), 'INVALID_INPUT', 'inputs must be an object')
         require(isinstance(timeout, (int, float)) and not isinstance(timeout, bool) and 0 < timeout <= 86400, 'INVALID_LIMIT', 'timeout must be between 0 and 86400 seconds')
+        require(isinstance(checks, (list, tuple)) and all(isinstance(c, str) and c.strip() for c in checks), 'INVALID_VERIFICATION', 'checks must be a list of nonempty IDs')
+        require(type(require_checks) is bool, 'INVALID_VERIFICATION', 'require_checks must be boolean')
+        checks = sorted(set(checks))
+        require(not require_checks or checks, 'INVALID_VERIFICATION', 'Required verification must name at least one check')
+        if grants is None:
+            grants = []
+            if self.session_grants is not None:
+                # Invalid release/capability diagnostics still come from admission below.
+                try:
+                    declaration, _ = self.release(release)
+                    declared = declaration['capabilities'].get(capability, {}).get('changes', [])
+                    grants = sorted(set(declared) & set(self.session_grants))
+                except CCError:
+                    pass
+        grants = self.grant_list(grants)
         bound_resources = deepcopy(self.resources)
         request = {'release': release, 'capability': capability, 'inputs': inputs, 'grants': sorted(set(grants)), 'resources': bound_resources, 'timeout': timeout}
+        verification = {'checks': checks, 'required': require_checks}
+        if checks:
+            request['verification'] = verification
         try:
             fingerprint = sha(encoded(request))
         except (TypeError, ValueError) as e:
             raise CCError('INVALID_INPUT', 'Call must contain finite JSON values: ' + str(e)) from e
         receipt = {'cc': '2', 'call': str(uuid.uuid4()), 'key': key, 'release': release, 'capability': capability, 'attempt': 1,
                    'state': 'running', 'completeness': 'none', 'reason': 'STARTED', 'outputs': {},
-                   'assessment': {'verdict': 'not_requested', 'checks': []}, 'provenance': {},
+                   'assessment': {'verdict': 'pending' if checks else 'not_requested', 'checks': []}, 'provenance': {'verification': verification},
                    'effects': {'declared': [], 'granted': sorted(set(grants)), 'observed': [], 'assurance': 'trusted_local',
                                'enforced': ['selected_capability', 'grant_admission', 'artifact_integrity', 'workspace_lease'],
                                'observation_limits': ['No OS-wide effect monitoring in trusted-local mode', 'Dependency directories/caches excluded from file snapshots; host-interpreter package versions recorded; child runtimes need their own evidence', 'Workspace Git HEAD/index and ordinary file modes recorded; no implied publication authorization']}, 'diagnostics': []}
@@ -416,9 +469,12 @@ class Host:
             cap = decl['capabilities'][capability]
             binding = decl['bindings'][cap['using']]
             receipt['effects']['declared'] = cap['changes']
+            require(self.session_grants is None or set(grants) <= set(self.session_grants), 'DENIED', 'Call grants exceed session authorization')
             require(set(grants) <= set(cap['changes']), 'UNDECLARED_EFFECT', 'Grant exceeds selected capability effects')
             require(set(cap['changes']) <= set(grants), 'DENIED', 'Explicit grants required for declared effects')
-            require(not set(cap['guarantees']) - set(self.checkers), 'CHECKER_UNAVAILABLE', str(set(cap['guarantees'])-set(self.checkers)))
+            if require_checks:
+                missing_checkers = [check for check in checks if not callable(self.checkers.get(check))]
+                require(not missing_checkers, 'CHECKER_UNAVAILABLE', 'Required checkers unavailable: ' + str(missing_checkers))
             require(set(inputs) <= set(cap['takes']), 'INVALID_INPUT', 'Unknown input ports')
             missing = [p for p, t in cap['takes'].items() if not port(t, decl['defs'])['optional'] and p not in inputs]
             require(not missing, 'INVALID_INPUT', f'Missing input ports: {missing}')
@@ -461,7 +517,7 @@ class Host:
             packet = {'call': receipt['call'], 'attempt': 1, 'capability': capability, 'inputs': staged, 'output_dir': str(outdir), 'resources': resources}
             receipt['provenance'] = {'binding': binding, 'started': time.time(), 'inputs': deepcopy(inputs),
                                      'source_release': release, 'python': {'path': self.python, 'sha256': file_sha(self.python)},
-                                     'workspace_before': workspace_before,
+                                     'workspace_before': workspace_before, 'verification': verification,
                                      'packages': sorted([d.metadata['Name'], d.version] for d in importlib.metadata.distributions() if d.metadata['Name'])}
             (attempt / 'request.json').write_bytes(encoded(request))
             if binding['kind'] == 'jiuwenswarm':
@@ -525,25 +581,28 @@ class Host:
             fields(result, {'outcome', 'outputs', 'reason', 'error'}, {'outcome'})
             require(result['outcome'] in {'ok', 'partial', 'error'}, 'INVALID_OUTPUT', 'Unknown process outcome')
             if result['outcome'] == 'error':
+                partial = result.get('outputs', {})
+                if isinstance(partial, dict):
+                    for pname, value in partial.items():
+                        try:
+                            require(pname in cap['gives'], 'INVALID_OUTPUT', 'Undeclared partial output: ' + pname)
+                            receipt['outputs'][pname] = self.validate_value(port(cap['gives'][pname], decl['defs']), value, output=True, outdir=outdir)
+                        except CCError as e:
+                            receipt['diagnostics'].append(e.record())
                 raise CCError(result.get('error', {}).get('code', 'TOOL_ERROR'), result.get('error', {}).get('message', 'Tool reported failure'))
             require(isinstance(result.get('outputs'), dict), 'INVALID_OUTPUT', 'outputs must be an object')
             require(set(result['outputs']) <= set(cap['gives']), 'INVALID_OUTPUT', 'Undeclared output ports')
+            for pname, value in result['outputs'].items():
+                receipt['outputs'][pname] = self.validate_value(port(cap['gives'][pname], decl['defs']), value, output=True, outdir=outdir)
             if result['outcome'] == 'ok':
                 require(all(p in result['outputs'] or port(t, decl['defs'])['optional'] for p, t in cap['gives'].items()), 'INVALID_OUTPUT', 'Missing required output')
             else:
                 require(isinstance(result.get('reason'), str) and bool(result['reason']), 'INVALID_OUTPUT', 'Partial result needs a reason')
-            for pname, value in result['outputs'].items():
-                receipt['outputs'][pname] = self.validate_value(port(cap['gives'][pname], decl['defs']), value, output=True, outdir=outdir)
             receipt.update(state='succeeded', completeness='complete' if result['outcome'] == 'ok' else 'partial', reason='COMPLETED' if result['outcome'] == 'ok' else 'PARTIAL_OUTPUT')
             if result['outcome'] == 'partial':
                 receipt['diagnostics'].append({'code': 'PARTIAL_OUTPUT', 'message': result['reason']})
-            for check in cap['guarantees']:
-                observed = self.checkers[check](receipt, packet)
-                require(observed in {'PASS', 'FAIL', 'INCONCLUSIVE'}, 'INVALID_ASSESSMENT', check)
-                receipt['assessment']['checks'].append({'id': check, 'verdict': observed, 'checker': callable_identity(self.checkers[check])})
-            if cap['guarantees']:
-                verdicts = [c['verdict'] for c in receipt['assessment']['checks']]
-                receipt['assessment']['verdict'] = 'failed' if 'FAIL' in verdicts else 'inconclusive' if 'INCONCLUSIVE' in verdicts else 'passed'
+            if checks:
+                self._assess(receipt, packet, checks)
         except CCError as e:
             receipt.update(state='unknown' if e.code in {'EXECUTION_UNKNOWN', 'EFFECT_UNKNOWN'} else 'failed' if dispatched else 'blocked', reason=e.code)
             receipt['completeness'] = 'partial' if receipt['outputs'] else 'none'
@@ -552,6 +611,8 @@ class Host:
             receipt.update(state='unknown' if dispatched else 'blocked', reason='HOST_ERROR')
             receipt['diagnostics'].append({'code': 'HOST_ERROR', 'message': str(e)})
         finally:
+            if checks and receipt['assessment']['verdict'] == 'pending':
+                receipt['assessment'] = {'verdict': 'inconclusive', 'checks': [{'id': check, 'verdict': 'UNAVAILABLE'} for check in checks]}
             for handle, before in workspace_before.items():
                 try:
                     after = snapshot(bound_resources[handle]['path'])
@@ -652,12 +713,26 @@ def main():
     sub = parser.add_subparsers(dest='action', required=True)
     p = sub.add_parser('validate'); p.add_argument('declaration')
     p = sub.add_parser('seal'); p.add_argument('bundle'); p.add_argument('--store', required=True)
-    p = sub.add_parser('call'); p.add_argument('release'); p.add_argument('capability'); p.add_argument('--inputs', required=True); p.add_argument('--store', required=True); p.add_argument('--key'); p.add_argument('--grant', action='append', default=[]); p.add_argument('--resources'); p.add_argument('--timeout', type=float, default=60); p.add_argument('--trusted-local', action='store_true')
+    for action in ('call', 'run'):
+        p = sub.add_parser(action)
+        p.add_argument('release' if action == 'call' else 'bundle')
+        p.add_argument('capability')
+        p.add_argument('--inputs', required=True)
+        p.add_argument('--store', required=action == 'call', default=None if action == 'call' else '.cc-state')
+        p.add_argument('--key')
+        p.add_argument('--grant', action='append', default=None)
+        p.add_argument('--resources')
+        p.add_argument('--session', default=os.environ.get('CC_SESSION'), help='Host-authorized grants/resources JSON; also read from CC_SESSION')
+        p.add_argument('--check', action='append', default=[])
+        p.add_argument('--require-checks', action='store_true')
+        p.add_argument('--timeout', type=float, default=60)
+        p.add_argument('--trusted-local', action='store_true')
     p = sub.add_parser('status'); p.add_argument('key'); p.add_argument('--store', required=True)
     p = sub.add_parser('reconcile'); p.add_argument('key'); p.add_argument('--store', required=True); p.add_argument('--stopped', action='store_true'); p.add_argument('--note', required=True)
     p = sub.add_parser('resolve'); p.add_argument('request'); p.add_argument('answers')
     p = sub.add_parser('migrate'); p.add_argument('declaration')
     args = parser.parse_args()
+    exit_code = 0
     try:
         if args.action == 'validate':
             result = load(args.declaration)
@@ -666,7 +741,11 @@ def main():
         elif args.action == 'migrate':
             result = migrate_v1(yaml.load(Path(args.declaration).read_text(encoding='utf-8'), Loader=UniqueLoader))
         else:
-            host = Host(args.store, resources=json.loads(Path(args.resources).read_text()) if getattr(args, 'resources', None) else None)
+            session = json.loads(Path(args.session).read_text(encoding='utf-8')) if getattr(args, 'session', None) else {}
+            fields(session, {'grants', 'resources'})
+            require(not (getattr(args, 'resources', None) and session.get('resources')), 'INVALID_SESSION', 'Supply resources in the session or --resources, not both')
+            resources = json.loads(Path(args.resources).read_text(encoding='utf-8')) if getattr(args, 'resources', None) else session.get('resources')
+            host = Host(args.store, resources=resources, session_grants=session.get('grants'))
             if args.action == 'seal':
                 result = {'release': host.seal(args.bundle)}
             elif args.action == 'status':
@@ -674,14 +753,24 @@ def main():
             elif args.action == 'reconcile':
                 result = host.reconcile(args.key, stopped=args.stopped, note=args.note)
             else:
-                decl, _ = host.release(args.release)
+                decl = load(Path(args.bundle) / 'cc.yaml') if args.action == 'run' else host.release(args.release)[0]
+                require(args.capability in decl['capabilities'], 'UNKNOWN_CAPABILITY', args.capability)
                 kind = decl['bindings'][decl['capabilities'][args.capability]['using']]['kind']
                 require(kind != 'native' or args.trusted_local, 'TRUST_REQUIRED', 'Use --trusted-local for team-trusted native code')
-                result = host.call(args.release, args.capability, json.loads(Path(args.inputs).read_text()), key=args.key, grants=args.grant, timeout=args.timeout)
+                target = args.bundle if args.action == 'run' else args.release
+                invoke = host.run if args.action == 'run' else host.call
+                result = invoke(target, args.capability, json.loads(Path(args.inputs).read_text(encoding='utf-8')),
+                                key=args.key, grants=args.grant, timeout=args.timeout, checks=args.check, require_checks=args.require_checks)
+                if result['state'] in {'failed', 'blocked', 'unknown'} or (args.require_checks and result['assessment']['verdict'] != 'passed'):
+                    exit_code = 1
         print(json.dumps(result, indent=2, ensure_ascii=False))
     except CCError as e:
         print(json.dumps({'error': e.record()}))
         raise SystemExit(2)
+    except (OSError, json.JSONDecodeError) as e:
+        print(json.dumps({'error': {'code': 'CLI_INPUT_ERROR', 'message': str(e)}}))
+        raise SystemExit(2)
+    raise SystemExit(exit_code)
 
 
 if __name__ == '__main__':

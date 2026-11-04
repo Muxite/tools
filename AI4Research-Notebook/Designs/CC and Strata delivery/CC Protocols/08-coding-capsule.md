@@ -40,6 +40,18 @@ These are roles, not mandatory capsules or a universal pipeline. One native task
 
 The host must register `coding-worker`, resolve the handle, scope the worktree and authorize model access. This illustration is no deployed upstream integration claim. `evidence` deliberately accepts broad JSON; consumers can require stronger schema/checks where useful.
 
+Authorize the host session once, then call normally. In an application with an existing native worker and host-issued handles:
+
+```python
+host = Host(STORE, delegates={"coding-worker": NATIVE_WORKER},
+            resources=HOST_HANDLES,
+            session_grants=["workspace.read", "workspace.write", "process.exec", "model.invoke"])
+receipt = host.run(CODING_BUNDLE, "implement",
+                   {"workspace": "assigned-worktree", "task": "Fix the bug and run the relevant tests"})
+```
+
+The uppercase names are application-owned bindings. No semantic verifier is needed for this call. A normal negative test report is useful result data. Request an independent check explicitly when making an acceptance decision; preserve native permissions and the agent's internal tools.
+
 ## Concurrency and evidence
 
 Assign a worktree or nonoverlapping paths per writer. Record starting commit **and dirty state**; preserve unrelated edits. Before integrating parallel work, verify target freshness and resolve conflicts. A commit alone does not identify a dirty tree.

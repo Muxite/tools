@@ -7,6 +7,24 @@ next_action: Qualify remaining image and full native-host boundaries
 ---
 # Examples and conformance evidence
 
+## Ease-of-use revision
+
+Ordinary calls now run no semantic checker, including when `guarantees` advertises checkable commitments. The [reference tests](reference/test_ccv2.py) cover advisory failure/unavailability/exception, explicit required checks, inherited session grants, automatic sealing and preserved partial outputs. M1's existing scheduler is not changed by this revision.
+
+| Use case | Ordinary call | Optional stronger decision |
+|---|---|---|
+| Coding subagent | Task and assigned workspace; direct edits/tests; broad result/evidence. | Independent review of exact changes when requested. |
+| Paper method | Fit/calibrate, predict and report metrics using broad options/artifacts. | Compare saved results against a scientific acceptance policy. |
+| Acceptance example | Produce and retain a result with no installed verifier. | Call `review` on the saved artifact; a negative decision does not rerun the producer. |
+
+Run the [small result-first example](reference/integrations/ease_of_use_demo.py) from `reference`:
+
+```text
+python integrations/ease_of_use_demo.py --store STORE --report REPORT.json
+```
+
+It is a synthetic usability example, not a scientific result. For a real method, the existing MAPIE example uses the same `Host.run`/`Host.call` surface and invokes no verifier unless requested. Schema, artifact and authorization errors remain actual errors; unrelated work is not implicitly stopped by this host.
+
 Use [the reference host](reference/ccv2.py), [tests](reference/test_ccv2.py) and [MCP projection](reference/mcp_server.py). Run from this directory. The commands below are reproduction instructions; they do not themselves claim a passing result.
 
 ## Portable native example
