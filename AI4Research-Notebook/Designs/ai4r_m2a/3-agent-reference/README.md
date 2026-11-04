@@ -1,0 +1,52 @@
+---
+id: ai4r-m2a-3-agent-reference-readme
+status: proposed-runtime-unverified
+source: ai4r_m2a/3-agent-reference/source-manifest.json
+last_reviewed: 2026-10-30
+next_action: Implement against the acceptance matrix and attach measured evidence
+---
+# Coding-agent entrypoint and completion audit
+
+[Package home](../README.md)
+
+Read Level 1 first, then only the Level 2 pages relevant to the task. The core behavior is normative; [conversion guidance](../2-human-relevant/conversion-and-integration.md) is a separately pinned mapping. These schemas are a concrete draft interface, not a production compatibility claim. Resolve a contradiction by updating the design and acceptance mapping explicitly, not by silently weakening a test.
+
+## First implementation target
+
+**Build [Stage 1](../1-human-required/00-stage-1.md) first.** Its [seven exit criteria](stage-1.json) define the initial deliverable. Map the first coding tasks to S1 IDs and their parent M2A obligations. Continue to Waves B–D only after Stage 1 passes with runtime evidence. Passing a narrow S1 criterion does not close its broader M2A parent requirement.
+
+## Machine-readable contracts
+
+- [Acceptance matrix](acceptance-matrix.json): 14 obligations, owners, checks, expected evidence and build waves.
+- [Implementation status](implementation-status.json): all runtime evidence initially NOT_RUN; document validation is recorded separately.
+- [Migration map](migration-map.json): ten categories, required members, legacy inventory and conversion actions.
+- [Schemas](schemas/README.md): package, capability, call, receipt, artifact manifest and research contract.
+- [Examples](examples/README.md): illustrative valid instances and deliberately invalid cases. These are design fixtures, not runnable packages or scientific evidence.
+- [Source map](sources.md) and [hash/pin manifest](source-manifest.json): immutable local user snapshots, inspected source identities and their authority.
+- [Package validator](tools/validate_package.py): local links/hashes, JSON schemas/fixtures, coverage and status consistency. Requires Python 3.11+ and `jsonschema`.
+
+From this folder: `python tools/validate_package.py`. From a copied package use the same command. Validation does not require the original code checkout. It checks required reading closure, not historical links embedded in immutable quoted source snapshots.
+
+## Before coding
+
+Confirm the actual branch/dependency pins, applicable repository instructions and current modifications. Register the M2a work in native specification artifacts. Select obligation IDs and a bounded wave. Establish baseline behavior, including a negative example; implement the intended behavior and attach reproducible test commands and results to those IDs. Do not run generated workloads with broader permissions than the bound call allows.
+
+For every accepted call, the runtime must independently validate real payloads, eligibility, provider scopes, aggregate budgets, bound required checks and durable publication. JSON Schema alone does not enforce those invariants. Package fixtures intentionally use synthetic hashes and are never valid admission certificates.
+
+## Following the plan
+
+1. Does JiuwenSwarm still own planning/movement, with AI4R governing evidence and portable capabilities?
+2. Is the future agenda flexible while dispatched calls and scientific criteria remain pinned?
+3. Is each hidden dependency now explicit, and are mandatory checks identical outside AI4R?
+4. Does the change preserve reasoned recovery, provenance and accepted artifact custody?
+5. Which obligation and negative scenario prove it? If none, identify the design gap before claiming completion.
+
+## Done building
+
+Every obligation must have a PASS with an inspectable evidence index containing exact code/dependency pins, commands, fixtures, outputs, scorer version and relevant receipts. All required members and transports must be accounted for. An evidence path existing is not sufficient; the recorded outcome must meet the acceptance matrix and independent scoring protocol. Replace NOT_RUN only after actual execution. A failed, skipped, mocked-only or unsupported case is not PASS. Record waivers as unmet requirements/deferred scope requiring an explicit design revision, not hidden successes.
+
+This package does not assign a production reliability SLA. Use the scoped release gates, then qualify the intended production workload and duration. Do not equate zero failures in a finite suite with zero possible failures.
+
+## Required packaging and trust amendment
+
+Read [packaging and trust](../2-human-relevant/capsule-packaging-and-trust.md) before implementing the capsule loader or admission path. Schema draft `2.0.0-m2a.2` adds image/dependency/evolution/history contracts and a scoped quality assessment. The Stage 1 amendment requires real image setup and clean local removal/reinstallation. Do not implement the deferred composition research or a complete RSI engine to satisfy these interfaces.

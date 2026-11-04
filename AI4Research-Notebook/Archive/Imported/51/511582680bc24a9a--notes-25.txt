@@ -1,0 +1,9 @@
+TIME 1:15
+SAY: Main points:
+- Keep models loaded: first token takes 6.1 s from disk, 2.7 s from RAM, 0.05 s when resident
+- Share the GPU-code cache across containers: a fresh container took 64 s without it and 5 s with it
+- Batch requests in one process instead of one process per request: 614 against 258 tokens per second, and 2.5 against 8.9 GiB
+- Reuse warm containers for short tasks: 49 ms for docker exec against 219 ms for docker run with the GPU
+Supplemental points:
+- On the GB10 the memory-related levers may behave differently, see the caveat slide
+- Batch 8 gave 1,417 tok/s and is flagged for a recheck

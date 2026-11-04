@@ -1,0 +1,33 @@
+flowchart TD
+    I[/Accepted inputs or qualified compiler intake/] --> W
+    P[/Pinned CC and execution contracts/] -.-> W
+    subgraph N[Example governed node]
+        subgraph Work[Work subnode: one bound CC]
+            W[Work CC: produce candidate]
+            W --> C[/Candidate output/]
+        end
+        C --> K[Deterministic checks]
+        K -->|valid| V
+        K -->|invalid or unavailable| G
+        subgraph Verify[Verifier subnode: separately bound CC]
+            V[Verifier CC: read-only]
+            V --> A[/Assessment and reasons/]
+        end
+        A --> Q[Validate assessment and subject]
+        Q --> G[Protected subnode gate: commit decision]
+        G -->|accepted| F[Protected node finalization]
+        G -->|not accepted| H[Halt: retain candidate evidence]
+        F -->|failed or incomplete| H
+    end
+    F -->|durable release| O[/Released output to consumers/]
+    classDef record fill:#e8f1fe,stroke:#1d4f91,color:#123d70
+    classDef tool fill:#e0f5ef,stroke:#1b7f72,color:#12554a
+    classDef control fill:#f0e7ff,stroke:#7152a3,color:#45306a
+    classDef unresolved fill:#ffe9e9,stroke:#b63636,color:#7f2020
+    style N fill:#f5f7fa,stroke:#64748b,color:#334155
+    style Work fill:#f5f7fa,stroke:#64748b,color:#334155
+    style Verify fill:#f5f7fa,stroke:#64748b,color:#334155
+    class I,P,C,A,O record
+    class W,K,V,Q tool
+    class G,F control
+    class H unresolved

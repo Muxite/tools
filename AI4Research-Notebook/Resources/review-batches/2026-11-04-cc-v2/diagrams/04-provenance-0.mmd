@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant F as Factory
+    participant L as Lab
+    participant H as Qualified host
+    participant E as Evaluator
+    F->>L: Product, native manifest, source/build lineage
+    L->>L: Verify payload, compatibility and policy
+    L->>H: Select exact candidate and restart
+    H-->>L: Actual binary/configuration + generation
+    L->>H: Pinned model/workload and measurement
+    H-->>L: Raw evidence, window and receipt
+    L->>E: Exact subject, evidence and frozen policy
+    E-->>L: Pass / fail / inconclusive

@@ -1,0 +1,19 @@
+flowchart TB
+  GOAL["User goal + constraints"] --> CO["Goal / session coordinator<br/>chooses next bounded work"]
+  MEM[("Durable goals and evidence<br/>hypotheses marked separately")] --> CO
+  CO -->|"proposes only"| HOST
+  LIB[("Scoped eligible CC catalog")] --> HOST
+  subgraph HOST["Protected execution: same authority, proposed episode interface"]
+    direction LR
+    BIND["Bind exact pins<br/>scope + total budget"] --> PLAN["One CC action<br/>or short frozen DAG"]
+    PLAN --> WORK["Ephemeral workers<br/>bounded tool use"]
+    WORK --> CHECK["Pinned checks + blind review<br/>gate releases exact outputs"]
+  end
+  HOST -->|"record results and failures"| MEM
+  classDef work fill:#E9F1FF,stroke:#3264A5,color:#142C4A,stroke-width:2px;
+  classDef host fill:#FFF0CD,stroke:#AA7424,color:#573A14,stroke-width:2px;
+  classDef data fill:#E3F3E9,stroke:#357958,color:#173D2A,stroke-width:2px;
+  class CO,PLAN,WORK work;
+  class BIND,CHECK host;
+  class MEM,LIB data;
+  style HOST fill:#FFFBF0,stroke:#AA7424,stroke-width:2px;

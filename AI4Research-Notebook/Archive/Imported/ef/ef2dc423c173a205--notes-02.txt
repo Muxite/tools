@@ -1,0 +1,7 @@
+TIME 1:30
+SAY: Main points:
+- The GPU, CPU, PCIe and memory system interact in ways that are hard to predict from first principles
+- The container is a clean boundary: cgroups give exact CPU, RAM and I/O per container even while sharing
+- Device counters belong to one task only when it ran alone, so they are collected in a quiet window and stored
+- The kernel and driver decide how work interleaves; the effect shows up as slowdown and is predicted by blending stored vectors by time share
+- Result: 4.0 pp mean error for the blend against 16.0 pp for a plain sum

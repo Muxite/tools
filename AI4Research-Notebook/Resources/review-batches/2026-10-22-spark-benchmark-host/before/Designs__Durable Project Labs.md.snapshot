@@ -1,0 +1,80 @@
+---
+id: durable-project-labs
+status: proposed-m2
+source: Sources/Prompts/2026-10-22-durable-startup-labs.txt
+last_reviewed: 2026-10-22
+next_action: Specify persistent lab identity, storage, lifecycle and recovery before expanding autonomous lab evolution
+---
+# Durable project labs
+
+A lab is a long-lived project environment: a small team or startup with a brief, accumulated knowledge, code, capabilities and evidence of progress. It can support a research project, hackathon prototype or emerging product. AI4R supplies the initial capabilities; the project develops its own useful outputs and improvements over time. A lab can be paused, upgraded, moved or restored without losing its identity or work.
+
+This is the M2 sandbox direction, not an expansion of the immediate two-image benchmark delivery. [[Designs/Lab Capsule and Factory Design Plan]] owns the VM/capsule/factory topology; [[Designs/Spark Shared Services and Storage]] owns the bounded host resources. This note owns durable lab identity, evolution and presentation readiness. No infrastructure implementation or restore test is claimed.
+
+## Identity survives compute replacement
+
+Separate **lab identity**, **deployment instance** and **run identity**. The lab has a stable ID, project brief, owner/access policy, history and resource allocation. A VM is its current deployment; containers and invocation workspaces are replaceable execution units. Restarting or restoring a lab creates a new deployment instance under the same lab identity. A deliberate fork creates a new lab identity linked to its parent checkpoint, with fresh credentials.
+
+Only one deployment may write a lab's authoritative state at a time. A control-plane lease/fencing mechanism prevents the old instance from writing after restore or migration; network isolation or provider shutdown must enforce this where storage cannot. Uncertain ownership blocks writes until reconciled. A stopped heartbeat is not proof that the previous writer is gone.
+
+| Durable project state | Replaceable or bounded execution state |
+|---|---|
+| Project brief, decisions, task backlog and curated knowledge/memory | Process memory, model KV caches and temporary sessions |
+| Source history plus captured uncommitted work, app/workflow configuration | Rebuildable source checkouts and caches once changes are captured |
+| CC declarations, factory attempts, admitted versions and lineage | Unleased candidate images, build caches and disposable containers |
+| Data/resource manifests and retained project-owned files | Temporary downloads, extraction and staging after safe publication |
+| Run records, essential artifacts, evaluations and presentation checkpoints | Rotated operational logs after required observations are retained |
+| Compatible database/catalog versions, model route history and backup manifests | Recreated VM OS/app containers and renewed runtime credentials |
+
+Use explicit persistent state mounts and a project-data disk/storage allocation independent of the VM OS lifecycle. Images and live process memory are not backups. Logical memory/knowledge that must survive belongs in a durable versioned store, not solely a model session. Secrets use separately protected storage and recovery, never project exports.
+
+## Lifecycle and recovery
+
+The control plane records desired state and observed health separately; a lab does not disappear because its compute is offline. Commands are idempotent and reconcile provider, database and job identities after interruption.
+
+| Action | Required behavior |
+|---|---|
+| Create | Allocate lab ID, persistent storage and quota; provision from a pinned base and seed capabilities |
+| Start/resume | Acquire write ownership, attach the correct data, validate compatibility/credentials and reconcile unfinished jobs before READY |
+| Pause/stop | Stop admitting work, drain or record interruption, checkpoint state and retain project storage and references |
+| Upgrade | Record source/configuration changes, take a consistent checkpoint, run migrations and readiness checks; retain a compatible rollback set |
+| Recover/restore | Fence the former writer, restore to a new instance under the same lab ID and verify data/artifact integrity before accepting new work |
+| Fork | Create a distinct lab from a consistent checkpoint with lineage, explicit copied/shared resources and fresh credentials |
+| Archive | Export/verify project state and retained dependencies, then release compute and eligible local replicas |
+| Delete | Require explicit authority and retained-data disposition; stopping or archiving never implies deletion |
+
+Persist job intent and external-operation IDs before effects. After restart, classify interrupted jobs and reconcile results; do not replay downloads, experiments or external actions blindly. Retain partial/failure evidence. Disk pressure, service failure and missing credentials produce visible degraded/blocked states, not silent loss or fabricated completion.
+
+## Changing models and evolving the lab
+
+Model choice is a versioned lab configuration. Switch providers/models for **new runs** after compatibility, tool/schema support, access and capacity checks; keep already-started runs pinned. Store the effective model/revision where available, runtime, settings and prompt/workflow version per run. Preserve prior conversation evidence; do not assume an opaque provider session or model's internal state can migrate. Required knowledge stays in project-owned records.
+
+Use the central model store/inference service rather than a copy per lab. A lab can refer to several model profiles over its life without keeping every model loaded or every revision local. Record whether historical runs remain locally replayable, externally recoverable or provenance-only; a manifest alone cannot recreate a deleted dependency.
+
+The desired M2 improvement scope is broader than the current M1 RSI helper: a lab may develop new CCs and propose improvements to its own code, workflows, prompts and model configuration under an explicit target profile. Project data persists across attempts, with immutable dataset versions and provenance. Learning from development outcomes must not contaminate protected evaluation sets.
+
+Every improvement has parent/source/configuration identities, a bounded attempt budget, evidence and rollback. Protected permissions, resource ceilings, hidden evaluation, admission rules and sealed evidence remain outside the candidate's mutation scope. Candidate work happens in an isolated copy; adoption creates a new lab version for future runs and uses consistent state migration. Do not mutate an active run's pins or treat a candidate's own checks as independent qualification. Automatic local activation, if later enabled, needs an explicitly configured protected policy; this direction does not silently replace current M1 admission rules.
+
+Useful changes can be exported back to the tested AI4R base through separate qualification. Evolving one lab does not update other labs or central AI4R automatically.
+
+## Durability within the Spark budget
+
+The supplied development machine remains 128 GB unified memory and 2 TB SSD. Long-lived labs need not stay running: keep the current two-active-lab starting limit and archive dormant projects without retaining a full powered-off VM/image history for each. Paused local data still consumes disk and must remain accounted for. Persistent does not mean unlimited retention.
+
+Protect unique project data, uncaptured source changes, admitted dependencies and required evidence from cache/image GC. Age, idle state or an expired compute lease does not authorize their deletion. Archive or migrate verified data when capacity is insufficient; refuse new growth rather than evicting irreplaceable work.
+
+Use database-consistent backups covering state, source deltas, manifests, retained artifacts and dependency locations. Keep a recoverable copy on a different device/service; another directory or VM snapshot on the same SSD is not failure-independent backup. Record backup time, scope, hashes and restore results, and configure explicit retention/recovery objectives before unattended operation. Take checkpoints before migrations or state-changing upgrades. Test restore into a clean instance; a successful backup command alone does not establish durability. Document unavailable external backup storage as a remaining durability gap.
+
+Implement the first version with a small lab registry, transactional lifecycle/job records, persistent disks/mounts, restart supervision, capacity checks and backup/restore commands. Use existing VM, Compose and database tools. Fleet orchestration, distributed scheduling and high availability are later needs; they are not prerequisites for a durable single-host prototype.
+
+## Project checkpoints and presentation
+
+Publish a **versioned project checkpoint**, not a mutable live workspace: brief and intended users, current prototype/demo, source/image/configuration identities, permitted data provenance, retained result artifacts, observed evaluations, limitations and next development steps. Link it to the exact lab/run evidence and state whether replay dependencies remain available. A lab may publish several checkpoints over time, each preserved.
+
+Export only authorized public/shareable material and keep credentials/private datasets out. A local presentation bundle is the default; external deployment/publication requires its own instruction. Presentation readiness means evidence and a runnable/reviewable prototype are organized; it does not establish scientific validity, product-market fit or production readiness.
+
+## First useful implementation and validation
+
+First prove one lab survives stop/start and replacement of its app containers with its project data intact. Then restore it into a replacement VM, switch model configuration for a new run, qualify/adopt one improvement and export a project checkpoint. Add the second lab and pressure tests after that connected path works.
+
+Required scenarios: interrupted write/job; full disk; consistent backup while jobs are active; old writer returning after recovery; incompatible app/schema upgrade with rollback; unavailable previous model; paused-lab data protected from GC; restore from external backup after losing the VM/local disk; project export without private data; and repeated development/RSI attempts with bounded storage. Record what survives, what remains incomplete and what requires user recovery action. Source design and synthetic checks are not a durability result.

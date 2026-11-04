@@ -1,0 +1,88 @@
+---
+id: cc-protocol-readme
+status: proposed-runtime-unverified
+source: November 3 single-CC workshop, M2a contracts and reviewed Muse addendum
+last_reviewed: 2026-11-04
+next_action: Replay against a qualified carrier before deployment
+---
+# Capability Capsule protocols
+
+## Definition
+
+A **Capability Capsule (CC)** is a versioned, installable package exposing one or more related operations.
+
+| Record | Meaning |
+|---|---|
+| Declaration | What each operation does, requires, changes and returns. |
+| Release | The immutable declaration and executable bindings. |
+| Call | One operation bound to inputs, authority and execution limits. |
+| Receipt | The observed result, effects, checks and output references. |
+
+## System connections
+
+```mermaid
+flowchart TB
+    author["Tool author"] --> declaration["CC declaration"]
+    declaration --> factory["Software Factory"]
+    factory --> release["Immutable CC release"]
+    factory --> build["Build provenance"]
+    release --> qualifier["Independent qualification"]
+    qualifier --> catalog["CC catalog"]
+    catalog -->|operation discovery| agent["Lab agent"]
+    agent -->|request and inputs| admission["Admission and call binding"]
+    release -->|release identity| admission
+    admission --> boundCall["Bound call"]
+    boundCall --> runner["Runner"]
+    runner --> outputs["Outputs"]
+    runner --> receipt["Receipt"]
+    receipt -.->|identifies| boundCall
+    boundCall -.->|pins| release
+    build -.->|identifies build subject| release
+    outputs --> evaluation["Independent evaluation"]
+    receipt --> evaluation
+```
+
+| Strata/Muse role | Responsibility |
+|---|---|
+| Factory | Build the candidate engine and any reusable CCs. A product may contain zero CCs. |
+| Profiler or benchmark CC | Measure the selected engine under declared conditions. |
+| Lab | Bind the engine, model, workload, environment and measurement tool. |
+| Evaluator | Assess the evidence against the frozen comparison policy. |
+
+## Minimal declaration
+
+```yaml
+cc: "1"
+id: text.trim
+version: 1.0.0
+carrier: fixture.invalid/text@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+does: Remove leading and trailing ASCII spaces. An all-space input returns an empty string.
+run: /tools/trim
+takes: {text: string}
+gives: {trimmed: string}
+```
+
+| Caller question | Answer for `text.trim/run` |
+|---|---|
+| What does it do? | Removes leading and trailing ASCII spaces. |
+| What must I supply? | One string named `text`. |
+| What can it change? | No external mutation is declared. |
+| What will I receive? | One string named `trimmed`. An empty string is valid. |
+| What can fail? | Wrong input type fails validation. A process crash fails the call. |
+| What is checked? | The runner checks the declared output type. |
+
+## Document map
+
+| Document | Defines |
+|---|---|
+| [Declaration](01-declaration.md) | Syntax, fields, defaults, identifiers and normalization. |
+| [Compiler and release](02-compiler-and-release.md) | Build stages, release identity and qualification. |
+| [Calls and receipts](03-calls-and-receipts.md) | Invocation, results, errors, effects and retries. |
+| [Provenance](04-provenance.md) | Build lineage, execution lineage and measurement identity. |
+| [Examples and conformance](05-examples-and-conformance.md) | Use cases, compatibility mappings and test evidence. |
+
+## Status
+
+- Generation 1 is a proposal. Normative requirements use **must**.
+- `fixture:` and `fixture.invalid` identify synthetic examples.
+- Existing 0.3 and M2a artifacts retain their native version identifiers.

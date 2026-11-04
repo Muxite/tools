@@ -1,0 +1,76 @@
+---
+id: lab-design-comparison-checkpoint-1
+status: comparison-for-discussion-not-selected
+source: Sources/Prompts/2026-10-27-implement-lab-comparison.txt; Resources/review-batches/2026-10-27-lab-design-comparison/source-review.json
+last_reviewed: 2026-10-27
+next_action: Discuss the lab boundary and reuse choice before changing the current architecture or deck
+---
+# Lab designs: which boundary fits our work?
+
+**Working recommendation: one VM per lab, containerized CCs inside it, and selective OpenJiuwen reuse.** This best fits people administering independently evolving research environments. Shared-host containers remain a credible lower-overhead option when lab owners do not need unrestricted guest administration. The recommendation is a fit assessment, not a measured performance or isolation result.
+
+This is checkpoint 1 only: compare the choices before selecting the architecture. The existing [[Designs/Sandbox Lab Design|sandbox proposal]] and presentation are unchanged. No platform, hypervisor or sandbox was installed or tested.
+
+## Same research system, different lab boundary
+
+Both diagrams show one expanded lab and representative peers, not a fixed number of labs or people. Each lab contains a complete independently versioned AI4R: intent/requirements, planning, research stages, checking, knowledge, capability library, CC factory and RSI. People primarily use their lab interface and may use a terminal/editor. Shared inference and package services are network endpoints that can live on another machine.
+
+CC images vendor tool implementations, adapters and software dependencies. Model weights, credentials, large datasets and attached services are separately declared resources. Containers provide the packaging/execution unit; they do not themselves supply all scientific checks or a new research orchestrator. Inference access is shown schematically: its relay or direct client must receive scoped authority rather than the Engine socket.
+
+### A. Shared-host container labs
+
+![Option A: complete AI4R labs sharing a host kernel and Engine](Lab%20Design%20Comparison/01-shared-host-containers.png)
+
+[Scalable SVG](Lab%20Design%20Comparison/01-shared-host-containers.svg)
+
+### B. VM per lab, with containerized capabilities
+
+![Option B: complete AI4R inside independently managed lab VMs](Lab%20Design%20Comparison/02-vm-per-lab.png)
+
+[Scalable SVG](Lab%20Design%20Comparison/02-vm-per-lab.svg)
+
+| Decision criterion | A: shared host containers | B: VM per lab |
+|---|---|---|
+| Advantages | Fewer guest systems to maintain; normally lower idle overhead; one Engine can share image layers | Own guest kernel, packages and Engine; direct human guest administration; VM stop works independently of guest AI4R |
+| Costs | Shared host/Engine administration needs tighter scoping; host/kernel failures can affect several labs | Guest memory/disk and updates; image/cache copies across VMs; device access needs qualification |
+| Independent AI4R and RSI | Supported with separate containers, source and data; host-level changes remain infrastructure-owned | Supported inside each guest; local changes still need recovery and qualification controls |
+| People editing the environment | Scoped container shell/editor. Giving access to the shared host Engine would expand authority beyond one lab | Guest shell/admin access can be lab-local. Hypervisor/provider authority stays outside the guest |
+| Stop when AI4R hangs | Outside operator/supervisor stops that lab's owned containers; Engine failure requires a broader host recovery path | Outside operator requests guest shutdown, then forced VM power-off if needed; guest supervisor need not respond |
+| Shared hardware | More direct host-device access, but scheduling and measurement interference still need controls | CPU guests are straightforward only on a qualified provider; GPU/device availability must be demonstrated |
+
+The baseline tradeoffs follow Docker's namespace/cgroup and daemon-authority model and libvirt's guest shutdown/power-off controls. Overhead and fault-containment outcomes are deployment-dependent. Containers with separate daemons or stronger isolation profiles are possible but outside this two-option comparison. [Docker security](https://docs.docker.com/engine/security/), [libvirt lifecycle controls](https://libvirt.org/manpages/virsh.html).
+
+## Management and execution reuse are separate decisions
+
+These approaches can combine. In particular, a small VM supervisor can reuse OpenJiuwen interfaces without adopting a complete workspace platform.
+
+| Approach | Pros | Cons / limits | Reuse, adapter and remaining AI4R work |
+|---|---|---|---|
+| Existing VM tooling + small stable supervisor | Small dependency set; preserves our lab lifecycle and packaging choices | We supply operator integration, job ownership/reconciliation and an accessible control surface | Reuse provider/Engine lifecycle; adapt typed lab/job requests; retain AI4R checking, artifact transfer and state recovery |
+| Selective OpenJiuwen / JiuwenBox reuse | Source contains goals, replay, RSI and tool-sandbox lifecycle/job controls | JiuwenBox uses bubblewrap; it is not our OCI package carrier or outer VM. API presence does not establish backend termination | Reuse compatible capabilities/interfaces; adapt scoped resource and package bindings; verify real stop and restart behavior |
+| Coder Workspaces | Existing access, provisioning and workspace-agent services; useful for multiple people | Additional control plane/database/templates; unattended work must integrate with scheduling; provider/edition constraints need checking | Evaluate workspace access/lifecycle integration. Keep the entire AI4R research loop and local data in the lab |
+
+**OpenJiuwen evidence:** installed SDK `9e339019` contains `harness/goal`, workflow journal replay and `rsi`. Its sandbox gateway exposes release policies, but base `pause/resume/delete` methods are no-ops; default `on_stop` is `delete`, and idle eviction is described as deletion. Do not map durable-lab stop to that default. At inspected upstream JiuwenSwarm `02b37f47`, JiuwenBox implements start/stop/restart/delete and background-job kill; its manager calls `runtime.stop` before recording STOPPED. These are source observations, not our host test results. [SDK lifecycle contract](https://github.com/openJiuwen-ai/agent-core/blob/develop/openjiuwen/core/sys_operation/sandbox/launchers/base.py), [JiuwenBox](https://github.com/openJiuwen-ai/jiuwenswarm/tree/develop/jiuwenbox).
+
+**Coder evidence:** its documented control plane connects users, provisioners and workspaces; workspace agents provide SSH, port forwarding and liveness. Scheduling detects specified session/activity types, so a disconnected human must not cause an active research job to be treated as idle. Coder is an evaluated option, not the default winner. [Architecture](https://coder.com/docs/install/plan/architecture), [scheduling](https://coder.com/docs/user-guides/workspace-scheduling).
+
+## Shutdown must mean an observed outcome
+
+| Operation | Designed behavior in both choices |
+|---|---|
+| Pause research | Block new dispatch; retain and account for active work. This alone does not release compute. |
+| Cancel experiment | Supervisor requests termination, escalates within a configured bound, then observes job/process status. An unconfirmed outcome stays unknown. |
+| Normal lab stop | Stop new work, drain/cancel owned jobs and stop lab services. Keep persistent data. |
+| Emergency stop | Outside control stops the owned container set in A or the whole VM in B. Host failure still needs infrastructure recovery. |
+| Restart | Reconcile jobs, ownership, accepted artifacts and application state before dispatch; inspect uncertain external effects before retry. |
+| Delete | Separate explicit operation with a data-disposition decision. Normal stop and idle expiry do not delete unique project state. |
+
+Stopping one lab must not stop a shared inference service or another lab. Cancel or reconcile its outstanding remote jobs/requests where supported; a VM power-off cannot undo an external effect. People may administer their guest, while agents have narrower access. Internal controls cannot promise protection against a human administrator deliberately overriding them.
+
+## What would change the recommendation?
+
+Choose B if direct guest administration, independent system evolution and an outside whole-VM stop are important enough to justify its cost. Choose A if workloads fit a controlled container profile and measured density/operational simplicity matters more. Both need bounded storage, verified external backups, restore and interference controls.
+
+Before calling either choice demonstrated: measure idle/run resource cost; stop a runaway job; stop an unresponsive lab from outside; restart without duplicate effects; restore retained findings; and confirm another lab and shared inference remain available. No result for these checks is claimed here. Provider support, especially accelerator access, can change the decision.
+
+The discussion now needs only two decisions: which lab boundary fits our operating model, and whether a workspace platform removes enough work to justify itself. Next, checkpoint 2 can replace the architecture explanation and stack around the selected boundary. Checkpoint 3 can expand the evidence appendix. The current deck has not been expanded.

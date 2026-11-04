@@ -1,0 +1,9 @@
+# Adaptive-holdout inference audit
+
+**Source checked:** Dwork et al., *Generalization in Adaptive Data Analysis and Holdout Reuse*, arXiv:1506.02629v2 (2015-09-25), especially [§1](https://arxiv.org/html/1506.02629v2#S1), [§4.1 Thresholdout](https://arxiv.org/html/1506.02629v2#S4.SS1), and [§4.2 SparseValidate](https://arxiv.org/html/1506.02629v2#S4.SS2).
+
+The guarantee is tied to its formal setting: an iid random holdout, specified query family/sensitivity, sample size, accuracy/confidence parameters, and a mechanism with calibrated information release and budget. Thresholdout uses training estimates unless a noisy threshold test detects overfit, then releases a noisy holdout estimate; its budget counts overfit events. SparseValidate returns Boolean holdout validations and bounds adaptive error via limited transcript and per-query base failure probabilities; it stops at total-query or positive-response budgets. These conditions matter.
+
+A hard cap limits transcript length but gives no validity guarantee by itself: any description-length bound must account for holdout size, output alphabet/precision, adaptive queries and distributional assumptions. The cap can enter a separate mechanism's analysis; it does not make an arbitrary score oracle reusable.
+
+**Inference for this design:** pass/total is finite-valued feedback that may carry information but does not itself expose per-fixture labels. A leakage probe needs a specified adaptive proposer, candidate interventions, fixture population and feedback format. On synthetic/authorized fixtures, test whether responses distinguish a chosen fixture property. A positive result demonstrates that path; a negative result is limited to the tested proposer/budget. Neither establishes validity or invalidity of the deployed protocol. A final split outside proposal adaptation is a separate safeguard, not a result of Dwork et al.

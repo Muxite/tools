@@ -1,0 +1,426 @@
+{
+  "title": "B: VM per lab",
+  "nodes": [
+    {
+      "id": "people",
+      "position": [
+        40,
+        130,
+        310,
+        84
+      ],
+      "text": "People\nLab UI / shell / editor",
+      "kind": "external"
+    },
+    {
+      "id": "operator",
+      "position": [
+        400,
+        130,
+        860,
+        84
+      ],
+      "text": "Infrastructure operator control\nWorks independently of a responsive research agent",
+      "kind": "control"
+    },
+    {
+      "id": "ui",
+      "position": [
+        100,
+        385,
+        260,
+        70
+      ],
+      "text": "Lab interface",
+      "kind": "work"
+    },
+    {
+      "id": "shell",
+      "position": [
+        390,
+        385,
+        200,
+        70
+      ],
+      "text": "Lab VM shell",
+      "kind": "external"
+    },
+    {
+      "id": "runtime",
+      "position": [
+        100,
+        500,
+        490,
+        180
+      ],
+      "text": "Complete lab AI4R, version A\nIntent / planning / research / checking\nKnowledge / capability library\nCC factory / RSI",
+      "kind": "work"
+    },
+    {
+      "id": "supervisor",
+      "position": [
+        650,
+        385,
+        540,
+        70
+      ],
+      "text": "VM supervisor + own Docker Engine",
+      "kind": "control"
+    },
+    {
+      "id": "cc",
+      "position": [
+        650,
+        510,
+        245,
+        130
+      ],
+      "text": "Containerized CCs\nVendored tool parts\nand dependencies",
+      "kind": "work"
+    },
+    {
+      "id": "apps",
+      "position": [
+        945,
+        510,
+        245,
+        130
+      ],
+      "text": "Domain applications\nLibrary, batch or\nstateful service",
+      "kind": "work"
+    },
+    {
+      "id": "data",
+      "position": [
+        100,
+        720,
+        1090,
+        62
+      ],
+      "text": "Persistent lab data: knowledge, accepted artifacts, jobs and application state",
+      "kind": "data"
+    },
+    {
+      "id": "peers",
+      "position": [
+        70,
+        840,
+        1160,
+        66
+      ],
+      "text": "Other lab VMs: their own guest kernels, Engines, AI4R versions and data",
+      "kind": "external"
+    },
+    {
+      "id": "inference",
+      "position": [
+        1310,
+        385,
+        290,
+        90
+      ],
+      "text": "Shared inference\nAuthenticated endpoint",
+      "kind": "external"
+    },
+    {
+      "id": "images",
+      "position": [
+        1310,
+        530,
+        290,
+        90
+      ],
+      "text": "Image / artifact source\nSelected pinned packages",
+      "kind": "external"
+    },
+    {
+      "id": "backup",
+      "position": [
+        1310,
+        720,
+        290,
+        90
+      ],
+      "text": "Independent backup\nVerified restore input",
+      "kind": "data"
+    },
+    {
+      "id": "restart",
+      "position": [
+        40,
+        1002,
+        385,
+        94
+      ],
+      "text": "Stopped \u2192 restart\nReconcile before dispatch",
+      "kind": "control"
+    },
+    {
+      "id": "delete",
+      "position": [
+        455,
+        1002,
+        385,
+        94
+      ],
+      "text": "Separate delete request\nExplicit data disposition",
+      "kind": "control"
+    },
+    {
+      "id": "emergency",
+      "position": [
+        870,
+        1002,
+        390,
+        94
+      ],
+      "text": "Emergency: stop the VM\nHost / provider confirms state",
+      "kind": "control"
+    },
+    {
+      "id": "shared-stays",
+      "position": [
+        1310,
+        1002,
+        290,
+        94
+      ],
+      "text": "Other labs and shared\nservices stay running*",
+      "kind": "external"
+    }
+  ],
+  "edges": [
+    {
+      "id": "people-ui",
+      "points": [
+        [
+          195,
+          214
+        ],
+        [
+          195,
+          242
+        ],
+        [
+          25,
+          242
+        ],
+        [
+          25,
+          420
+        ],
+        [
+          100,
+          420
+        ]
+      ],
+      "label": "primary connection",
+      "dashed": false
+    },
+    {
+      "id": "people-shell",
+      "points": [
+        [
+          350,
+          172
+        ],
+        [
+          370,
+          172
+        ],
+        [
+          370,
+          238
+        ],
+        [
+          610,
+          238
+        ],
+        [
+          610,
+          420
+        ],
+        [
+          590,
+          420
+        ]
+      ],
+      "label": "direct access",
+      "dashed": true
+    },
+    {
+      "id": "ui-runtime",
+      "points": [
+        [
+          230,
+          455
+        ],
+        [
+          230,
+          500
+        ]
+      ],
+      "label": "",
+      "dashed": false
+    },
+    {
+      "id": "runtime-supervisor",
+      "points": [
+        [
+          590,
+          550
+        ],
+        [
+          620,
+          550
+        ],
+        [
+          620,
+          420
+        ],
+        [
+          650,
+          420
+        ]
+      ],
+      "label": "",
+      "dashed": false
+    },
+    {
+      "id": "supervisor-cc",
+      "points": [
+        [
+          772,
+          455
+        ],
+        [
+          772,
+          510
+        ]
+      ],
+      "label": "",
+      "dashed": false
+    },
+    {
+      "id": "cc-app",
+      "points": [
+        [
+          895,
+          575
+        ],
+        [
+          945,
+          575
+        ]
+      ],
+      "label": "",
+      "dashed": false
+    },
+    {
+      "id": "runtime-data",
+      "points": [
+        [
+          345,
+          680
+        ],
+        [
+          345,
+          720
+        ]
+      ],
+      "label": "",
+      "dashed": false
+    },
+    {
+      "id": "app-data",
+      "points": [
+        [
+          1065,
+          640
+        ],
+        [
+          1065,
+          720
+        ]
+      ],
+      "label": "",
+      "dashed": false
+    },
+    {
+      "id": "inference-api",
+      "points": [
+        [
+          1190,
+          420
+        ],
+        [
+          1310,
+          420
+        ]
+      ],
+      "label": "model API",
+      "dashed": true
+    },
+    {
+      "id": "package-import",
+      "points": [
+        [
+          1310,
+          575
+        ],
+        [
+          1278,
+          575
+        ],
+        [
+          1278,
+          440
+        ],
+        [
+          1190,
+          440
+        ]
+      ],
+      "label": "",
+      "dashed": true
+    },
+    {
+      "id": "backup-data",
+      "points": [
+        [
+          1190,
+          751
+        ],
+        [
+          1310,
+          751
+        ]
+      ],
+      "label": "",
+      "dashed": true
+    },
+    {
+      "id": "operator-control",
+      "points": [
+        [
+          830,
+          214
+        ],
+        [
+          830,
+          250
+        ],
+        [
+          1220,
+          250
+        ],
+        [
+          1220,
+          348
+        ]
+      ],
+      "label": "",
+      "dashed": false
+    }
+  ]
+}

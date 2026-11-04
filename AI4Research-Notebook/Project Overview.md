@@ -1,0 +1,49 @@
+---
+id: project-overview
+status: active
+source: Sources/Implementation Intent; Resources/Current Baseline; Designs/Project Authority
+last_reviewed: 2026-10-26
+next_action: Review amendment 1 with the coder and qualify its runtime study adapter
+---
+# AI4Research: what we are building and why
+
+**Current sandbox proposal:** Research goals persist while strategy changes with evidence. [[Designs/Sandbox Lab Design]] proposes next-batch planning with durable checked execution, reusing AI4R and pinned OpenJiuwen where suitable. [[Designs/Lab Capsule and Factory Design Plan]] replaces the infrastructure-first order with one useful adaptive workload experiment and a controlled value comparison. M2 behavior remains unverified.
+
+AI4Research is designed around very long-running agentic tasks, supporting many human-guided, sandboxed research labs, each like a small startup pursuing field-specific ideas. A human helps set the direction; the lab's AI4R develops hypotheses and new ideas, analyzes data, writes code, runs experiments, and learns from results. Each lab has an independent AI4R fork, harness, shared/domain capabilities, installed applications, and persistent knowledge. Research objectives and state persist across investigations and agent sessions. Durable memory, checkpoints, recovery, RSI, and high-quality independent verification are core design concerns throughout the research process.
+
+The first lab's research target is workload profiling and standard workload/performance units: predicting task-specific hardware needs and low-level usage on other machines from historical data with minimal direct hardware access. Another lab connects robotics simulation. These are intended research programs, not claims of completed predictors or deployed labs.
+
+CCs and harnesses evolve locally through RSI, and selected capsules, data, and findings return to improve master AI4R through separate qualification and adoption. See [[Designs/Labs and Capability Capsules]] and [[Sources/Prompts/2026-10-25-multi-lab-workload-scope.txt]].
+
+**Your current focus is making Capability Capsules useful and demonstrably accurate.** A CC declares a reusable job and points to a pinned body. Declarations give independent checks a target. Provenance explains what ran; checks establish only the obligations they actually test. Neither a declaration nor a fingerprint proves arbitrary research correctness.
+
+## Read by question
+
+| Question | Canonical notebook entry |
+|---|---|
+| What did you ask for, exactly? | [[Sources/Prompt Register]]; interpretation in [[Sources/Implementation Intent]] |
+| How did CC intent change? | [[Designs/CC History]] |
+| What is authoritative or approved? | [[Designs/Project Authority]] |
+| What did the inspected core capsules do? | [[Designs/CC Reference]] |
+| What code was actually inspected? | [[Resources/Current Baseline]] |
+| How will accuracy gains be measured? | [[Experiments/CC Accuracy Study]] |
+| What should the coder change and accept? | [[Amendments/README]] |
+| How do labs, sandboxes and domain applications fit? | [[Designs/Labs and Capability Capsules]]; evidence in [[Designs/Lab Progression]] |
+| Where are documents, presentations and history? | [[Resources/Artifact Library]]; [[Presentation Library/Deck Catalog]]; [[Designs/Design Library]] |
+| What is still unknown? | [[Resources/Library Completeness]] |
+
+## The execution boundary
+
+Intent and Requirements produce constrained research work. The Planner proposes a plan; protected binding validates and pins it. Work capsules produce outputs. Host-owned checks and a fresh semantic reviewer assess their assigned obligations; the semantic reviewer sees the declaration and output only. Protected decisions control release. Benchmark execution and generated code require their own qualified runtime/resources; a web inspection UI is insufficient.
+
+Current source includes model-assisted work and substantial deterministic machinery. The native adapter already reuses pinned OpenJiuwen interfaces. Improvements should target demonstrated failures or unnecessary work, rather than replacing the runtime wholesale. [[Designs/CC Reference]] records the specific boundaries.
+
+## Honest outcomes
+
+A correct scientific FAIL or INCONCLUSIVE can be accepted. An abstention may be appropriate or avoidable. A blocked wrong candidate is prevented error; a blocked correct candidate is false rejection. A runtime crash is an operational failure. The study records these separately and does not claim higher accuracy before measurement.
+
+The notebook and amendment drafts are working artifacts. Current PRD/design and native project records retain implementation authority; source review does not create runtime acceptance.
+
+## Long-term capability direction — October 21
+
+The October 21 [[Sources/Prompts/2026-10-21-paper2agent-system-direction.txt|user direction]] explicitly includes an AI4Research capable of improving the whole system. [[Designs/AI4Research Capability Growth]] assesses the workflow generalization needed, including reusable source acquisition and a Paper2Agent-style capability factory. Current M1 RSI is narrower; this goal is not satisfied by Screening-only mutation. Keep the current accuracy study and baseline evidence while preparing the broader design.

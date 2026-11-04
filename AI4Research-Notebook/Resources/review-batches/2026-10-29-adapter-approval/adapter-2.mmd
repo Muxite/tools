@@ -1,0 +1,22 @@
+%%{init: {"theme":"neutral","fontFamily":"Segoe UI","sequence":{"width":240,"actorMargin":100,"wrap":true,"mirrorActors":false}}}%%
+sequenceDiagram
+  participant C as Central caller
+  participant M as Host manager and adapter
+  participant L as Lab AI4R API
+  C->>M: Stable request ID and intended outcome
+  M->>M: Persist ID, fingerprint and target lab
+  M->>L: Lookup mapped native client_request_id
+  alt Existing native allocation
+    L-->>M: Same native run ID and status
+  else Authenticated native no-allocation result
+    M->>L: Native intake preparation
+    L-->>M: Intake reference and submission defaults
+    M->>M: Persist exact prepared submission
+    M->>L: Submit with same durable native ID
+  end
+  Note over M,L: Delivery unknown after timeout.<br/>Reconnect and query the SAME native ID.
+  M-->>C: Native run identity or explicit uncertain state
+  C->>M: Inspect progress, result or request cancellation
+  M->>L: Native status, events, result or cancel
+  L-->>M: Native outcome
+  M-->>C: Native outcome projected for caller

@@ -1,0 +1,10 @@
+flowchart LR
+  Policy[Approved obligations and audience policy] --> Build[Protected review-context builder]
+  Output[Immutable output artifact] --> Build
+  Evidence[Accepted inputs and observed evidence] --> Build
+  Build -->|Scoped manifest and minimized view| Review[Read-only semantic verifier CC]
+  Review -->|Authorized evidence reference| Broker[Protected evidence broker]
+  Broker -->|Bounded immutable read| Review
+  Review --> Findings[Findings and evidence references]
+  Findings --> Host[Host validates and commits]
+  Build -->|Necessary data cannot be disclosed| Stop[Non-advancing outcome]

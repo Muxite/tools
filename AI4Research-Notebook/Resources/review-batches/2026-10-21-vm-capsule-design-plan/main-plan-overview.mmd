@@ -1,0 +1,31 @@
+flowchart TB
+    BASE["Tested master AI4R base<br/>source, factory and CC version pins"]
+    subgraph A["Lab VM A - project P"]
+        direction TB
+        AI_A["Independent AI4R A<br/>own evolving worktree"]
+        FACT_A["Local capability factory A"]
+        IMG_A["Local Docker images<br/>pinned CC versions"]
+        RUN_A["CC invocation containers<br/>project inputs and outputs"]
+        AI_A --> FACT_A
+        FACT_A -->|build and qualify| IMG_A
+        AI_A -->|bind and run| RUN_A
+        IMG_A --> RUN_A
+    end
+    subgraph B["Lab VM B - project Q"]
+        direction TB
+        AI_B["Independent AI4R B<br/>own evolving worktree"]
+        FACT_B["Local capability factory B"]
+        IMG_B["Local Docker images<br/>pinned CC versions"]
+        RUN_B["CC invocation containers<br/>project inputs and outputs"]
+        AI_B --> FACT_B
+        FACT_B -->|build and qualify| IMG_B
+        AI_B -->|bind and run| RUN_B
+        IMG_B --> RUN_B
+    end
+    REVIEW["Central qualification<br/>review, rebuild and independent checks"]
+    NEXT["Next tested base release"]
+    BASE -->|provision or explicit update| AI_A
+    BASE -->|provision or explicit update| AI_B
+    AI_A -.->|candidate CCs and platform changes with evidence| REVIEW
+    AI_B -.->|candidate CCs and platform changes with evidence| REVIEW
+    REVIEW -->|selected compatible improvements| NEXT

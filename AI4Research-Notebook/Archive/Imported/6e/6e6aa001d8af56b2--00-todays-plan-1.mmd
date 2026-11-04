@@ -1,0 +1,19 @@
+flowchart LR
+    P[/Current design package/] --> I[Inspect compiler evidence and failures]
+    I --> H{What needs to change?}
+    H -->|design| D[Linked design additions or corrections]
+    H -->|code or checks| T
+    H -->|unclear| U[Investigate affected work]
+    U --> I
+    D --> C[Bounded AI CI and targeted alerts]
+    C --> T[Existing implementation records and coding work]
+    T --> E[/New evidence for the next decision/]
+    E --> I
+    classDef record fill:#e8f1fe,stroke:#1d4f91,color:#123d70
+    classDef tool fill:#e0f5ef,stroke:#1b7f72,color:#12554a
+    classDef human fill:#fff4d8,stroke:#b58100,color:#694b00
+    classDef unresolved fill:#ffe9e9,stroke:#b63636,color:#7f2020
+    class P,E record
+    class I,D,C,T tool
+    class H human
+    class U unresolved

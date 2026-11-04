@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai4r:design:0.3:common",
+  "$defs": {
+    "ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256"
+      ]
+    },
+    "oci": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "oci-image"
+        },
+        "image": {
+          "type": "string",
+          "pattern": "^[^\\s@]+@sha256:[a-f0-9]{64}$"
+        },
+        "platform": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+/[a-z0-9_]+(?:/[a-z0-9_]+)?$"
+        }
+      },
+      "required": [
+        "format",
+        "image",
+        "platform"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "tree": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      },
+      "required": [
+        "repository",
+        "commit",
+        "tree"
+      ]
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "build-recipe"
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "tree": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            }
+          },
+          "required": [
+            "repository",
+            "commit",
+            "tree"
+          ]
+        },
+        "recipe": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "uri",
+            "sha256"
+          ]
+        },
+        "environment_lock": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "uri",
+            "sha256"
+          ]
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "build_context": {
+          "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+        },
+        "base_image": {
+          "$ref": "urn:ai4r:design:0.3:common#/$defs/oci"
+        }
+      },
+      "required": [
+        "format",
+        "source",
+        "recipe",
+        "environment_lock",
+        "target",
+        "build_context",
+        "base_image"
+      ]
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "pattern": "^urn:.+"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "must_understand": {
+          "type": "boolean"
+        },
+        "schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "uri",
+            "sha256"
+          ]
+        },
+        "data": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "namespace",
+        "version",
+        "must_understand",
+        "schema",
+        "data"
+      ]
+    }
+  }
+}

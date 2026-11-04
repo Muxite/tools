@@ -1,0 +1,2322 @@
+
+
+===== page 1 =====
+FactReview: Evidence-Grounded Peer Review with Execution-Based Claim
+Verification
+Ling Yue1,*, Chaoqian Ouyang2,*, Hang Xu3,*, Ruijun Huang3, Yuchen Liu4
+Libin Zheng2, Wei Liu2, Shaowu Pan1,†, Shimin Di3,†, Min-Ling Zhang3
+1Rensselaer Polytechnic Institute
+2Sun Yat-sen University
+3Southeast University
+4The Hong Kong University of Science and Technology
+Abstract
+Large language model (LLM)-based reviewing systems typ-
+ically assess manuscripts in isolation, leaving literature- and
+code-dependent claims difficult to verify. We present FactRe-
+view, an audit pipeline that extracts review-relevant claims,
+grounds them in related work and reference checks, and,
+when code is available, executes released artifacts under a
+fixed repair budget. On 26 paper-disjoint test papers with 354
+human-verified claims, FactReview achieves 84.3% F1 for
+claim recovery. In a same-backend, evidence-matched com-
+parison, FactReview scores 4.72/5 overall, outperforming a
+direct LLM reviewer by 0.74 points. Removing execution ev-
+idence changes 17.0% of claim statuses, more than remov-
+ing any other single evidence source. In a reviewer-assistance
+study, FactReview reduces mean review time by 58% while
+increasing benchmark-claim coverage from 87% to 99%. Fac-
+tReview supports evidence-based claim auditing, with accep-
+tance decisions reserved for human reviewers. The code is
+public at https://github.com/DEFENSE-SEU/FactReview.
+1
+Introduction
+These checks draw on different sources and take consider-
+able time. Literature search, citation reading, and artifact
+inspection are particularly difficult to carry out consistently
+as submission volume grows and the pool of qualified re-
+viewers remains under pressure (Stelmakh et al. 2020; Shah
+et al. 2018).
+Large language model reviewers can already produce flu-
+ent and structured feedback (Gao, Brantley, and Joachims
+2024; Zhu et al. 2025b; Sahu et al. 2025). Recent systems
+add literature retrieval, external tools, or multi-agent delib-
+eration to direct review generation. Reproducibility agents
+address another part of the process by reconstructing envi-
+ronments and executing released research code (Starace et al.
+2025; Hua et al. 2026). These lines of work bring more ma-
+terial into the review process. Their outputs usually remain a
+paper-level review or a repository-level execution report, and
+the link between a manuscript claim and the evidence used
+to assess it is rarely explicit.
+That link matters because evidence has to be interpreted
+within the scope of the claim. A paper may cite genuine
+∗Equal contribution.
+†Corresponding authors: shimin.di@seu.edu.cn;
+pans2@rpi.edu
+Polished /
+Overclaimed Paper
+PROBLEM
+FACTREVIEW
+Claim Extraction
+This paper is the first...
+We outperform all
+baselines...
+Claim Verification
+Literature
+Positioning
+LIMITATION OF CURRENT REVIEWERS
+Execution-Based
+Verification
+Evidence-aware comments
+Actionable decision support
+Current LLM Reviewer
+Well-written.
+Strong results.
+Promising.
+CONSEQUENCE
+Accept or Reject?
+Uninformative 
+review
+Supported by evidence and 
+reproducible ... 
+This is not the first approach
+in the domain ...
+SOTA on all tasks!
+Overclaims 
+unflagged
+Figure 1: Motivation. Manuscript-only review can leave
+literature- and code-dependent claims unchecked; FactRe-
+view audits them against external evidence and presents
+evidence-linked findings.
+prior work and release runnable code while its novelty or
+performance claims remain unresolved. A close precedent
+may narrow a novelty claim, and a cited paper can discuss
+the same topic without supporting the statement in which it
+appears. For an empirical claim, a recovered score may use a
+differentdataset split, metric,or baseline. Asuccessfulsmoke
+test establishes executability; reproducing the reported result
+requires the reported task and measurement. Evidence from
+one setting can also be applied too broadly to a claim that
+covers several.
+The consequence for the review depends on the source and
+scope of the evidence. The manuscript establishes the word-
+ing of the claim. Related work informs novelty, technical
+overlap, and citation support. Repository execution can test
+an empirical result when the task, dataset, metric, baseline,
+and evaluation setting match those reported in the paper. A
+claim-level record therefore has to show where each piece
+of evidence came from, what part of the claim it covers,
+and what remains unresolved. Such a record gives review-
+ers a concrete basis for checking or revising an assessment.
+Figure 1 illustrates this claim–evidence link.
+FactReview builds these records explicitly. It extracts
+arXiv:2604.04074v4  [cs.AI]  16 Aug 2026
+
+
+===== page 2 =====
+System
+Retrieved
+literature
+Claim
+assessment
+Evidence-linked
+review
+Code
+execution
+No final
+recommendation
+MARG
+–
+✓
+△
+–
+✓
+OpenReviewer
+–
+✓
+△
+–
+–
+AgentReview
+–
+△
+–
+–
+–
+ReviewerToo
+✓
+✓
+✓
+–
+–
+DeepReviewer 2.0
+✓
+–
+✓
+–
+–
+PaperBench
+–
+–
+–
+✓
+✓
+FactReview
+✓
+✓
+✓
+△
+✓
+Table 1: ✓explicit; △partial or conditional; “–” outside the reported task. Execution includes experiments or released code;
+decision output is a score or recommendation.
+review-relevant claims and preserves their locations in the
+manuscript. For each claim, it gathers manuscript evidence,
+retrieves and examines related work, checks reference in-
+tegrity, and, when code is available, executes the released
+repository under a fixed repair budget. Execution results en-
+ter the record after they have been aligned with the claim’s
+dataset, metric, and scope. Each record stores the evidence
+source, the scope of the check, and one of four outcomes:
+Supported, Partially supported, In conflict, or Inconclusive.
+FactReview uses these records to produce a concise review in
+which each finding can be traced to the underlying evidence.
+Acceptance decisions remain with human reviewers.
+Contributions. We introduce FactReview, a framework for
+claim-level evidence auditing in LLM-assisted peer review.
+Its provenance-preserving workflow carries each claim from
+extraction through literature positioning, reference checking,
+bounded artifact execution, and final review synthesis. Fac-
+tReview receives higher ratings for groundedness, specificity,
+and coverage than direct LLM review generation. The ex-
+ecution ablation shows that removing execution evidence
+changes 17.0% of claim outcomes.
+2
+Related Work
+LLM-based reviewing. Recent work surveys the rapidly
+growing literature on LLM-based automated scholarly pa-
+per review (Zhuang et al. 2025). Automated reviewers range
+from direct prompting to multi-agent, retrieval-augmented,
+and fine-tuned systems, including Reviewer2, MARG, Open-
+Reviewer, DeepReview, and ReviewerToo (Gao, Brantley,
+and Joachims 2024; D’Arcy et al. 2024; Idahl and Ahmadi
+2025; Zhu et al. 2025b; Sahu et al. 2025). Table 1 compares
+the reported capabilities of representative reviewing systems
+with FactReview. Related work models reviewer disagree-
+ment and discussion (Jin et al. 2024; Kumar, Ghosal, and Ek-
+bal 2023) or studies bias, sycophancy, and prompt-injection
+risks (Li et al. 2025; Wang et al. 2026b; Zhu et al. 2025a;
+Bergstrom and Bak-Coleman 2025; Baumann et al. 2026).
+Automated review also serves as iterative feedback in au-
+tonomous research systems such as CycleResearcher (Weng
+et al. 2024). These systems focus on review generation or
+iterative feedback. FactReview organizes review around ex-
+ternally auditable claims.
+Evidence-grounded scientific assistance. Scientific claim
+verification retrieves evidence for or against a claim (Wad-
+den et al. 2020, 2022; Soleimani, Monz, and Worring 2020;
+Wang et al. 2025), while PaperQA, OpenScholar, and PT-
+RAG emphasize literature-grounded answers and provenance
+(Lála et al. 2023; Asai et al. 2024; Yu et al. 2026). Repro-
+ducibility studies further show that released artifacts contain
+evidence absent from papers but are difficult to execute re-
+liably (Raff 2019; Pineau et al. 2021; Arbel and Zouaoui
+2024). CLAIMCHECK audits whether an already written
+critique is grounded in manuscript claims (Ou et al. 2025);
+FactReview acts earlier by constructing external evidence
+before synthesizing the review.
+Execution and reproducibility agents. PaperBench, Au-
+toReproduce, ResearchCodeBench, and CORE-Bench eval-
+uate agents that reconstruct computational environments or
+reproduce published results (Starace et al. 2025; Zhao et al.
+2026; Hua et al. 2026; Siegel et al. 2024). Complementary
+benchmarks evaluate agents on broader machine-learning
+experimentation and engineering tasks (Huang et al. 2024;
+Chan et al. 2025). FactReview explicitly aligns observed ar-
+tifacts with the paper’s dataset, metric, baseline, and claim
+scope; when this link cannot be established, it assigns an
+Inconclusive outcome.
+3
+Method
+FactReview maps a manuscript and, when provided, its
+repository to claim-level evidence records. Figure 2 shows
+the end-to-end workflow from document parsing and claim
+extraction through literature positioning, execution-based
+verification, claim assessment, and evidence-linked outputs.
+3.1
+Document Parsing and Claim-Centered
+Extraction
+An auditable review first needs atomic claims that remain
+traceable to the manuscript. MinerU converts the PDF into
+section-aware text, tables, equations, captions, citation an-
+chors, and page locations (Wang et al. 2026a). An LLM con-
+strained to a fixed claim schema then extracts major claims,
+reported results, datasets, baselines, metrics, source spans,
+and evidence targets. Broad statements that cover several
+tasks, datasets, or metrics are split so that support for one lo-
+cal result cannot validate a broader statement automatically.
+Each retained record preserves the manuscript location
+and the evidence needed to assess it. This makes claim selec-
+tion and later verification separable: the extractor proposes
+
+
+===== page 3 =====
+Input
+Submitted
+Manuscript
+Code
+Repository
+Document Parsing
+and Claim Extraction
+A. Structured manuscript parsing
+document
+structure
+section
+boundaries
+tables
+equations
+figures
+citation
+anchors
+B. Claim-centric extraction
+major claims
+reported results
+datasets
+baselines
+metrics
+claim locations
+Evidence Construction
+Literature Positioning
+Retrieve
+nearby work
+cited methods
+baselines
+similar papers
+metadata /
+abstracts
+RefCopilot
+Reference Verification
+arXiv
+Semantic Scholar
+OpenReview
+OpenAlex
+lookup and repair
+Technical positioning table
+Execution-Based Claim Verification
+Claim Assessment
+Manuscript evidence
+(from parsing)
+Assign one of four labels
+Supported
+Partially supported
+In conflict
+Inconclusive
+Final Outputs
+Concise Review
+Linked Evidence Report
+1. Metadata
+2. Technical 
+Positioning
+3. Claims
+4. Evidence
+5. Experimental 
+Results
+repository alignment
+environment configuration
+task derivation
+sandboxed execution
+metric alignment
+execution outcome
+Sandboxed execution workflow
+Literature evidence
+(from positioning)
+Execution evidence
+(from verification)
+claim
+status
+•••
+Research
+domain
+Related methods
+Novelty A
+Novelty B
+Novelty C
+domain 1
+Method 1
+✓
+✓
+—
+domain 1
+Method 2
+✓
+—
+—
+domain 2
+Method 3
+✓
+✓
+✓
+Figure 2: FactReview extracts review-relevant claims, constructs manuscript, literature, reference-integrity, and optional execu-
+tion evidence, assigns conservative outcomes, and links the review to evidence.
+an atomic target, while subsequent stages decide whether
+manuscript, literature, reference-integrity, or execution evi-
+dence supports the target at its stated scope.
+The extractor also assigns each claim a coarse Type under
+fixed definitions: Theoretical, Empirical, or Methodologi-
+cal. Type supports descriptive, type-stratified analysis; claim
+matching and evidence routing remain type-agnostic.
+3.2
+Literature Positioning and Reference
+Verification
+Manuscript evidence alone cannot validate novelty, overlap,
+or reference-integrity claims. FactReview therefore builds a
+comparison set from cited methods, named baselines, pa-
+per metadata, abstracts, and semantically related work. For
+higher-risk novelty or overlap claims, the review agent per-
+forms targeted paper search and reading. Neighboring work
+is then organized by method family and submission-specific
+comparison axes. The structured literature source is Semantic
+Scholar, whose literature graph links papers, authors, venues,
+and citation relations to support scientific-document discov-
+ery (Ammar et al. 2018). RefCopilot normalizes citations
+against scholarly indexes, flags unresolved, withdrawn, mis-
+matched, or incomplete records, and returns evidence plus
+repairs when citation integrity affects positioning. This stage
+grounds literature judgments beyond title familiarity. The
+implementation additionally uses OpenAlex as a scholarly
+metadata index; OpenAlex provides a fully open knowl-
+edge graph of works, authors, venues, institutions, and con-
+cepts (Priem, Piwowar, and Orr 2022). Retrieval is claim-
+conditioned. The archived configuration requires at least
+three paper-search calls, three distinct queries, and ten ev-
+idence annotations before finalization. Full-paper reading is
+reserved for cases unresolved by abstracts and stops once fur-
+ther calls add no decision-relevant evidence. Retained papers
+are compared on mechanism, target setting, and evaluation
+protocol. The axes combine manuscript baselines with re-
+trieved neighbors. In the archived runs, Semantic Scholar
+Graph API v1 uses a retrieval depth of eight and a 20-second
+timeout. These settings remain fixed across papers.
+3.3
+Execution-Based Claim Verification
+Repository access becomes review evidence only when ob-
+served outputs can be aligned with a specific claim. For
+papers with released code, FactReview creates a run-specific
+workspace and derives candidate tasks from documentation,
+configuration files, entry scripts, and repository structure. Its
+stateful workflow follows prepare, plan, run, judge,
+fix, and finalize. The judge compares observed metrics
+and artifacts with extracted claims, so successful execution
+counts as evidence only when the output matches the claim’s
+dataset, metric, and scope. When no comparable result is re-
+covered, the claim assessment proceeds using the remaining
+evidence sources.
+Each job records commands, return codes, environments,
+configurations, logs, artifacts, metrics, alignment decisions,
+accepted repairs, runtime, token cost, and archived outputs.
+Run–Review–Fix (RRF) repeats execution, judgment, and
+bounded repair for at most K = 3 rounds. The repair allowlist
+permits changes to dependencies, paths, launch arguments,
+and wrappers, while prohibiting changes to architectures,
+losses, datasets, evaluation logic, and baselines. Compli-
+ance is evaluated in the independent audit. A repository-level
+
+
+===== page 4 =====
+smoke test without claim-linked metrics remains Inconclu-
+sive. Fixed-harness comparisons measure backend sensitiv-
+ity, not cross-harness robustness.
+The execution ledger separates three questions that are
+otherwise easy to conflate: whether code can run, whether
+the expected metric can be recovered, and whether the re-
+covered value is comparable with a specific paper claim.
+Repairs address the first question only. Metric extraction and
+claim alignment remain separate evidence judgments. Exe-
+cution evidence is ranked by auditability: machine-readable
+metric files aligned to paper tables; completed logs identify-
+ing dataset, checkpoint, and metric; then checkable artifacts.
+Free-text notes supply weak context. The judge returns pass
+for aligned evidence within tolerance, fail for aligned con-
+tradiction, and inconclusive for missing, ambiguous, or
+unaligned output. When the verdict is inconclusive, the
+judge records the missing evidence and proposes targeted
+checks of metric files, JSON values, or CSV aggregations
+before the next execution round.
+3.4
+Claim Assessment and Review Synthesis
+FactReview aligns each claim with the available manuscript,
+literature, reference-integrity, and execution evidence. Sup-
+ported requires direct evidence at the stated scope. Partially
+supported indicates that only a decomposed portion or subset
+of settings is supported. In conflict requires reliable contra-
+dictory evidence. Inconclusive records insufficient, ambigu-
+ous, or weakly aligned evidence. Outcome and provenance
+remain distinct: the outcome summarizes the assessment,
+while provenance identifies the evidence supporting it.
+The final output reports technical positioning, claim as-
+sessments, supporting evidence, and execution findings; ac-
+ceptance and rejection recommendations remain outside its
+scope. This exposes the review’s factual basis and uncertainty
+for human inspection. The reusable prompts for extraction,
+claim auditing, execution, and reference verification are pro-
+vided in Appendix D. Review synthesis uses the structured
+claim records and preserves the evidence source and scope
+of each outcome.
+4
+Experiments
+We evaluate evidence-linked review quality, reference-claim
+recovery and outcome agreement, claim-aligned code evi-
+dence, and reviewer assistance. We first describe the evalua-
+tion setup and main results, then report execution, reviewer
+assistance, ablations, harder cases, and pipeline cost.
+4.1
+Evaluation Setup
+Benchmark construction. The benchmark contains 35
+machine-learning papers and 495 human-verified reference
+claims. CompGCN and eight related papers form the devel-
+opment set. These nine papers were used for workflow design,
+prompt revision, and threshold selection. Before any test run,
+we froze the claim schema, prompts, matching threshold,
+retrieval policy, evidence-status rules, execution tolerance,
+and repair allowlist. The remaining 26 papers form a paper-
+disjoint test set comprising 24 OpenReview submissions with
+retained final outcomes: 5 accepted, 15 rejected after review,
+and 4 desk rejected, together with two arXiv papers without
+venue decisions. Related versions, shared repositories, and
+forks were grouped before splitting, with no group cross-
+ing the development and test sets. Eight development and
+12 test papers are execution eligible; the others lack usable
+artifacts. The test inventory was finalized without access to
+FactReview outputs.
+Reference claims are retained only when they are atomic,
+independently checkable, localizable to manuscript evi-
+dence, consequential to review, and assessable with available
+evidence. Compound assertions are split when their compo-
+nents require different evidence or could receive different
+outcomes; routine implementation details, isolated hyperpa-
+rameters, background statements, and semantic duplicates
+are excluded. Appendix A.1 gives the complete construction
+and granularity protocol.
+The held-out test inventory contains 354 claims from 26
+papers: 128 Supported, 185 Partially supported, 26 In con-
+flict, and 15 Inconclusive. Together with 141 claims from
+the nine-paper development set, the complete 35-paper col-
+lection contains 495 claims: 178 Supported, 261 Partially
+supported, 35 In conflict, and 21 Inconclusive. All primary
+claim-recovery results and the controlled reviewer compari-
+son use only the held-out test set. Results over the complete
+collection are reported only as descriptive or diagnostic anal-
+yses. Three annotators verified claim selection, wording, and
+status. Across 23 independently comparable blocks and 292
+aligned claims, paper-macro inventory F1 is 0.948, Jaccard
+is 0.903, four-way agreement is 94.18%, and nominal Krip-
+pendorff’s α (Hayes and Krippendorff 2007) is 0.896. A
+shared-provenance comparison between two annotators is
+reported separately and excluded from these aggregate co-
+efficients. The complete collection contains 51 Theoretical,
+319 Empirical, and 125 Methodological claims; two annota-
+tors audited the automatically assigned Type metadata. Type
+is used only for stratified analysis and does not enter claim
+matching or evidence routing. Appendix A.2 reports the an-
+notation procedure and agreement breakdown.
+Human review-quality protocol. The native-configuration
+comparison evaluates five AI systems on all 35 papers. For
+the OpenReview row, 93 public comments from 24 pa-
+pers are grouped into paper-level panels. Twenty evaluators,
+comprising 8 PhD students and 12 master’s students with
+prior machine-learning reviewing experience, completed 480
+source-blinded evaluations under random assignment. Sys-
+tem identities were hidden, presentation order was random-
+ized, and each output retained its native format. Ratings were
+averaged within paper and then macro-averaged over 35 pa-
+pers for each AI system and 24 papers for OpenReview.
+Groundedness, Specificity, and Coverage use 1 to 5 scales,
+Overall is their arithmetic mean, and ordinal Krippendorff’s
+α is 0.62. OpenReview serves as an observational reference
+because paper coverage and output format differ.
+The controlled comparison uses the 26 test papers and
+pairs FactReview with an evidence-matched direct reviewer.
+Both conditions receive the same manuscript text, retrieved
+literature, reference-integrity report, execution ledger, back-
+end, maximum token allowance, and output template. The
+direct condition omits structured claim records, state tran-
+
+
+===== page 5 =====
+sitions, and evidence-status aggregation. The same 20 eval-
+uators complete this study in a separate session before the
+native comparison. Each of the 52 outputs receives ratings
+from three distinct evaluators, yielding 156 evaluations; 16
+evaluators rate eight outputs and four rate seven. A random-
+ized incomplete-block assignment ensures that each evalu-
+ator sees at most one condition for a paper. Linear mixed-
+effects models include condition as a fixed effect and crossed
+random intercepts for paper and evaluator (Baayen, David-
+son, and Bates 2008). We report marginal-mean differences
+with 95% confidence intervals and Holm-adjusted p-values
+(Holm 1979). Cumulative-link mixed models provide an or-
+dinal sensitivity analysis for Groundedness, Specificity, and
+Coverage (Tutz and Hennevogl 1996).
+Independent execution audit. Two auditors, blinded to
+pipeline verdicts and repair rounds, independently inspected
+all 96 execution claims using archived logs, metrics, align-
+ment records, and repair diffs. They evaluated execution suc-
+cess, metric comparability, claim alignment, and repair com-
+pliance. A third blinded auditor adjudicated disagreements.
+Claim and execution metrics. Claim recovery uses a frozen
+one-to-one matcher combining Jaccard similarity (0.65) and
+maximum directional overlap (0.35) with a threshold of 0.55.
+Inventory metrics include unmatched claims, while test-set
+status agreement is conditional on a match. Separately, four-
+way status classification is evaluated on all 495 frozen refer-
+ence claims with their human labels withheld. The execution
+study covers 96 claims and uses at most three RRF rounds
+on a server with eight RTX 4090 GPUs. Paper success re-
+quires claim-aligned evidence for every primary task in the
+benchmark.
+Implementation. Unless stated otherwise, FactReview uses
+the default Codex backend with model alias gpt-5.5. The
+pipeline uses MinerU for PDF parsing and Semantic Scholar
+for literature retrieval, with targeted paper search, reference
+checking, execution, and teaser generation enabled when ap-
+plicable. The backend-sensitivity analysis varies the back-
+end model and keeps the FactReview orchestration, execu-
+tion/review harness, claim-alignment rule, and three-round
+repair budget fixed. Results are tied to the archived run out-
+puts and this fixed orchestration.
+Reviewer-assistance protocol. The same 20-person cohort
+took part in the exploratory assistance study, which cov-
+ers five papers and three conditions: paper only, paper plus
+the FactReview report, and paper plus the report and teaser.
+Review time starts when a participant begins reading the
+assigned paper and condition materials and ends at review
+submission. It includes reading, writing, revision, and in-
+spection of the report or teaser, but excludes instruction and
+setup. Coverage is the share of benchmark major claims ad-
+dressed in the submitted review under the reported aggrega-
+tion. Because only aggregate condition means are retained,
+the analysis is descriptive.
+4.2
+Main Results
+Controlled review-quality comparison. Table 2 reports the
+controlled comparison on the 26 held-out test papers. Fac-
+tReview scores 4.79 in Groundedness, 4.74 in Specificity,
+Criterion
+FR
+Direct
+∆[95% CI]
+pH
+Ground.
+4.79
+3.86
+0.93 [0.68, 1.18]
+< .001
+Spec.
+4.74
+3.92
+0.82 [0.57, 1.07]
+< .001
+Cover.
+4.62
+4.15
+0.47 [0.22, 0.72]
+.002
+Overall
+4.72
+3.98
+0.74 [0.56, 0.92]
+< .001
+Table 2: Controlled ratings on 26 held-out test papers. FR de-
+notes FactReview. Differences are estimated marginal-mean
+contrasts from mixed-effects models with crossed paper and
+evaluator intercepts. pH denotes Holm-adjusted p-values.
+4.62 in Coverage, and 4.72 Overall. The evidence-matched
+direct reviewer scores 3.86, 3.92, 4.15, and 3.98, respectively.
+All confidence intervals exclude zero, and all Holm-
+adjusted p-values are below .01. The cumulative-link mixed
+models yield results in the same direction and with the same
+significance pattern for the three ordinal dimensions. With
+the evidence package, backend, token allowance, and output
+template held constant, the 0.74-point Overall difference esti-
+mates the combined contribution of structured claim records,
+state transitions, and evidence-status aggregation.
+4.3
+Native-Configuration and Claim-Level
+Results
+Native-configuration comparison. In the broader descrip-
+tive comparison, FactReview obtains an Overall mean of
+4.86, DeepReviewer 2.0 obtains 4.17, and the strongest di-
+rect reviewer obtains 3.63. Table 8 in Appendix B.2 reports
+the complete native-configuration comparison.
+Claim-level agreement. On the 26-paper held-out test set,
+FactReview outputs 315 claims and matches 282 one to one
+with the 354 reference claims. The 33 unmatched outputs
+and 72 unmatched reference claims yield 89.5% precision,
+79.7% recall, and 84.3% F1. Among the 282 matched claims,
+267 receive the reference status, giving 94.7% conditional
+status agreement. Together, these metrics distinguish claim
+recovery from status assignment.
+In the separate reference-conditioned diagnostic over the
+complete 35-paper collection, FactReview assigns the refer-
+ence status to 447 of 495 claims, yielding 90.3% accuracy.
+Table 3 reports class-wise precision and recall. Class-wise
+recall is 91.0% (162/178) for Supported, 92.0% (240/261)
+for Partially supported, 82.9% (29/35) for In conflict, and
+76.2% (16/21) for Inconclusive. Nineteen errors occur be-
+tween Supported and Partially supported, the most frequent
+label-pair confusion.
+4.4
+Execution-Based Verification
+Figure 5(b) traces pipeline-assigned outcomes across RRF
+budgets. Paper success rises from 11/20 (55.0%) without
+repair to 13/20 (65.0%) at K ≤2, while the execution-
+claim pass rate rises from 65/96 (67.7%) to 79/96 (82.3%).
+The
+ledger contains 20 initial attempts and 26 repair at-
+tempts, giving 2.30 attempts. Relative to the execution, run-
+time and token use increase by factors of 1.45 and 1.58.
+Independent execution audit results. The two auditors
+agreed on 92 of 96 claim-level judgments before adjudi-
+
+
+===== page 6 =====
+Status
+Precision
+Recall
+Supported
+92.6%
+91.0%
+Partially supported
+94.1%
+92.0%
+In conflict
+80.6%
+82.9%
+Inconclusive
+55.2%
+76.2%
+Table 3: Class-wise precision and recall for reference-
+conditioned status assignment over all 495 human-verified
+claims from the complete 35-paper collection.
+50
+55
+60
+65
+Paper success (%)
+Full
+No fix loop
+No planning
+No alignment
+No baseline
+Workflow setting
+−10%
+−15%
+−5%
+−5%
+65%
+55%
+50%
+60%
+60%
+Component ablation
+Full workflow
+Component removed
+Figure 3: Paper success over 20 code-available papers for
+the full workflow and four execution-component ablations.
+Difference labels show percentage-point changes from the
+full workflow.
+cation (nominal Krippendorff’s α = 0.86). After adjudi-
+cation, 76 claims and 12 of 20 papers were classified as
+passing. Pipeline verdicts matched the adjudicated outcomes
+for 91 claims and 19 papers; at the paper level, the sole dis-
+agreement corresponds to 12 adjudicated passes versus 13
+pipeline-assigned passes. Of the 26 repair diffs, 25 complied
+with the predefined repair allowlist.
+Of the five claim-level disagreements, four were false
+passes, arising from two metric-aggregation mismatches, one
+checkpoint-identity mismatch, and one repair-policy viola-
+tion. The remaining disagreement was a false failure caused
+by an unrecognized metric alias. These cases identify met-
+ric aggregation, checkpoint verification, alias handling, and
+repair-policy enforcement as concrete targets for improving
+the execution judge.
+Figure 3 shows that paper success falls from 13/20 (65.0%)
+to 10/20 (50.0%) without planning and 11/20 (55.0%) with-
+out the fix loop; removing alignment or baseline checks
+yields 12/20 (60.0%) in each case.
+Across the repair rounds, environment blockers fall from
+four to three and runtime blockers from two to one, while
+metric and alignment blockers remain unchanged. The ob-
+served changes are concentrated in environment and wrap-
+per failures covered by the repair policy. Execution-failure
+provenance and the execution funnel use different counting
+units. The provenance analysis contains 36 assignments: 10
+environment, 8 runtime, 6 unavailable-metric, 5 missing-
+baseline, 4 import, and 3 alignment issues. A paper may
+receive multiple provenance labels. The pre-repair funnel as-
+signs each code-available paper to its earliest blocker. After
+Reviewer assistance
+Paper
++ report
++ teaser
+20
+30
+40
+50
+Time (min)
+50.6 min
+31.6 min
+21.3 min
+Review time
+Paper
++ report
++ teaser
+85%
+90%
+95%
+100%
+86.9%
+97.8%
+98.9%
+Claim coverage
+Figure 4: Reviewer-assistance results for 20 participants and
+five papers. Left: mean review time. Right: benchmark-claim
+coverage. Time excludes instruction and setup; coverage is
+the proportion of benchmark major claims addressed.
+RRF, the seven unresolved papers comprise three environ-
+ment, one runtime, two metric, and one alignment blockers.
+Panels (a) and (c) of Figure 5 present these two views.
+Under the fixed workflow and harness, backend suc-
+cess ranges from 41.7% to 83.3% across 12 episodes; Ap-
+pendix B.4 reports the complete fixed-harness comparison.
+4.5
+Reviewer Assistance
+Figure 4 summarizes the reviewer-assistance results. Across
+the paper-only, paper-plus-report, and paper-plus-report-and-
+teaser conditions, mean completion times are 50.6, 31.6, and
+21.3 minutes, while the corresponding benchmark-claim cov-
+erage rates are 86.9%, 97.8%, and 98.9%, respectively. The
+same 20 participants (8 PhD students and 12 master’s stu-
+dents, all with prior experience reviewing machine-learning
+papers) participated in both human studies. Because the as-
+sistance study covers only five papers and retains aggregate
+condition means, the results are descriptive. Review quality
+is evaluated separately in the controlled comparison.
+Participants
+with
+experience
+reading
+or
+reviewing
+machine-learning papers were recruited by direct invitation.
+Participation was voluntary, and participants were instructed
+to produce independent judgments. No participant reviewed a
+paper for which a known conflict of interest was reported. The
+analyzed records include condition labels, review times, and
+claim-coverage measurements. Appendix A.4 gives the study
+instructions and data-handling details, and Appendix B.3 re-
+tains the exact condition results.
+Figure 6 quantifies evidence-source sensitivity as the frac-
+tion of claim statuses that change when each source is re-
+moved. Removing execution changes 17.0% of statuses, com-
+pared with 5.7% for literature search and reading and 8.4%
+for Semantic Scholar retrieval; removing all external evi-
+dence changes 26.1%. Figure 3 reports the complementary
+paper-level effects of removing execution components.
+Claim Type provides a stratified profile of benchmark com-
+position: Empirical claims comprise 319/495 (64.4%) of the
+inventory, Methodological claims 125/495 (25.3%), and The-
+oretical claims 51/495 (10.3%). Because downstream evi-
+dence routing is type-agnostic, we use these proportions to
+characterize the benchmark composition.
+
+
+===== page 7 =====
+0
+2
+4
+6
+8
+10
+12
+Number of failure labels
+Env failure
+Runtime failure
+Metric unavailable
+Baseline missing
+Import error
+Alignment mismatch
+Failure label
+10
+8
+6
+5
+4
+3
+Total
+36
+27.8%
+22.2%
+16.7%
+13.9%
+11.1%
+8.3%
+Env failure
+Runtime failure
+Metric unavailable
+Baseline missing
+Import error
+Alignment mismatch
+No
+repair
+K ≤1
+K ≤2
+K ≤3
+0
+25
+50
+75
+100
+Rate (%)
+11/20
+12/20
+13/20
+13/20
+67.7%
+77.1%
+80.2%
+82.3%
+Paper success
+Claim pass
+0
+5
+10
+15
+20
+Papers reaching each stage
+Environment
+Run
+Metric
+Alignment
+20→16
+16→14
+14→12
+12→11
+Environment
+Run
+Metric
+Alignment
+Did not pass
+(a) Execution failure label counts
+(b) Repair budget
+(c) Pre-repair execution funnel
+Figure 5: Execution diagnostics. (a) Multi-label failure provenance over 36 assignments, where a paper may receive multiple
+labels. (b) Paper success over 20 code-available papers and the pass rate over 96 execution claims across RRF budgets. (c) The
+pre-repair execution funnel, where each code-available paper is assigned to its earliest blocker.
+4.6
+Case Study
+CompGCN (Vashishth et al. 2019) is the development-
+set trace. FactReview links its architectural and empirical
+claims to technical-positioning evidence, released code, and
+reproduced-result checks. The case separates the broad con-
+tribution claim from a narrower empirical result. The repro-
+ducible local result supports only its stated scope; the broader
+claim remains Partially supported. Technical positioning and
+execution remain separate evidence channels for architec-
+tural novelty and empirical performance. The trace records
+the evidence source used for each judgment and keeps the
+two claim scopes distinct.
+We
+complement
+this
+favorable
+trace
+with
+Bio-
+ProBench (Liu et al. 2026), Unsupervised Data Augmenta-
+tion (UDA) (Xie et al. 2020), and the Structure-Aware Convo-
+lutional Network (SACN) (Shang et al. 2019) as three harder
+fixed-harness diagnostics. For BioProBench, FactReview ex-
+ecutes 4/5 evaluated task families and aligns evidence for 6/8
+claims; for UDA, it executes 4/6 tasks and aligns evidence
+for 3/6 claims; for SACN, it executes 5/6 tasks and aligns
+evidence for 5/7 claims. Their respective outcome counts are
+2/3/3, 1/2/3, and 3/2/2 for Supported, Partially supported,
+and Inconclusive.
+Across these four fixed-harness cases, task completion
+supports a claim only when the observed output matches
+its dataset, metric, and scope; Appendix C.3 reports the ag-
+gregate case summaries. CLeVER is an external qualitative
+trace excluded from the 35-paper benchmark, the 20-paper
+execution subset, and all aggregate metrics. The initial at-
+tempt failed because conda was unavailable. A subsequent
+smoke test failed when main_dino.py could not import
+NumPy. A later retry passed the repository-level smoke test
+and produced no paper-reported metric or claim-aligned ev-
+idence. The final outcome remained Inconclusive. The trace
+separates repository executability from claim verification.
+4.7
+Pipeline Cost
+Across the 20 execution-eligible papers, the complete Fac-
+tReview pipeline is estimated at approximately 1.0M tokens
+and 2,315 seconds (38.6 minutes) per paper, with a total cost
+of $4.0–$6.2. The separately measured text-processing por-
+tion averages 357K tokens and 773 seconds (12.9 minutes)
+across all 35 papers, corresponding to $1.5–$2.2; report gen-
+0
+25
+50
+75
+100
+Share of claim statuses (%)
+Full FactReview
+No execution
+No literature
+No S2 retrieval
+Manuscript only
+100%
+0%
+83%
+-17%
+94.3%
+-5.7%
+91.6%
+-8.4%
+73.9%
+-26.1%
+Status retained
+Status changed
+Figure 6: Claim-status changes relative to full FactReview
+after removing each evidence source. Manuscript-only re-
+moves all external evidence; Table 10 gives the exact values.
+eration accounts for most of both resources. Appendix B.5
+gives the non-execution stage breakdown.
+5
+Conclusion
+FactReview organizes automated peer review around ex-
+plicit claims and links each judgment to evidence from the
+manuscript, related literature, reference checks, and code
+execution. On 26 test papers, it achieves 84.3% F1 for
+claim recovery and 94.7% status agreement among matched
+claims, and it obtains the highest mean score in the native-
+configuration comparison. Its execution trace counts support
+only when reproduced output matches the claimed dataset,
+metric, and scope. This claim-level record makes automated
+assessments inspectable while preserving human responsi-
+bility for final decisions. It also lets reviewers revisit dis-
+puted judgments without reducing incomplete or conflicting
+evidence to a binary verdict.
+6
+Limitations
+The 26-paper test set is purposively selected and limited to
+machine-learning papers. Claim-recovery estimates depend
+on an author-constructed reference inventory. The controlled
+comparison uses one backend and one evidence packet per
+paper, while the reviewer study covers one cohort and retains
+aggregate outcomes. Execution covers 20 artifact-eligible pa-
+pers with one bounded harness. Independent auditing checks
+archived verdicts and repair diffs, while repeated runs under
+alternative harnesses remain outside the present evaluation.
+Broader paper and reviewer populations are part of ongoing
+evaluation across additional domains and review settings.
+
+
+===== page 8 =====
+References
+Ammar, W.; Groeneveld, D.; Bhagavatula, C.; Beltagy, I.;
+Crawford, M.; Downey, D.; Dunkelberger, J.; Elgohary, A.;
+Feldman, S.; Ha, V.; Kinney, R.; Kohlmeier, S.; Lo, K.; Mur-
+ray, T.; Ooi, H.-H.; Peters, M.; Power, J.; Skjonsberg, S.;
+Wang, L. L.; Wilhelm, C.; Yuan, Z.; van Zuylen, M.; and
+Etzioni, O. 2018. Construction of the Literature Graph in
+Semantic Scholar. In Bangalore, S.; Chu-Carroll, J.; and
+Li, Y., eds., Proceedings of the 2018 Conference of the North
+American Chapter of the Association for Computational Lin-
+guistics: Human Language Technologies, Volume 3 (Indus-
+try Papers), 84–91. New Orleans - Louisiana: Association
+for Computational Linguistics.
+Arbel, M.; and Zouaoui, A. 2024. MLXP: A framework for
+conducting replicable experiments in Python. In Proceedings
+of the 2nd ACM Conference on Reproducibility and Replica-
+bility, ACM REP ’24, 134–144. New York, NY, USA: Asso-
+ciation for Computing Machinery. ISBN 9798400705304.
+Asai, A.; He, J.; Shao, R.; Shi, W.; Singh, A.; Chang, J. C.;
+Lo, K.; Soldaini, L.; Feldman, S.; D’arcy, M.; et al. 2024.
+Openscholar: Synthesizing scientific literature with retrieval-
+augmented lms. arXiv preprint arXiv:2411.14199.
+Baayen, R. H.; Davidson, D. J.; and Bates, D. M. 2008.
+Mixed-effects modeling with crossed random effects for sub-
+jects and items. Journal of memory and language, 59(4):
+390–412.
+Baumann, J.; Pei, J.; Koyejo, S.; and Hovy, D. 2026. Stop
+automating peer review without rigorous evaluation. arXiv
+preprint arXiv:2605.03202.
+Bergstrom, C. T.; and Bak-Coleman, J. 2025. AI, peer review
+and the human activity of science. Nature.
+Chan, J. S.; Chowdhury, N.; Jaffe, O.; Aung, J.; Sherburn, D.;
+Mays, E.; Starace, G.; Liu, K.; Maksin, L.; Patwardhan, T.;
+et al. 2025. Mle-bench: Evaluating machine learning agents
+on machine learning engineering. In International Confer-
+ence on Learning Representations, volume 2025, 50466–
+50494.
+D’Arcy, M.; Hope, T.; Birnbaum, L.; and Downey, D. 2024.
+Marg: Multi-agent review generation for scientific papers.
+arXiv preprint arXiv:2401.04259.
+Gao, Z.; Brantley, K.; and Joachims, T. 2024. Reviewer2:
+Optimizing review generation through prompt generation.
+arXiv preprint arXiv:2402.10886.
+Hayes, A. F.; and Krippendorff, K. 2007. Answering the call
+for a standard reliability measure for coding data. Commu-
+nication methods and measures, 1(1): 77–89.
+Holm, S. 1979. A simple sequentially rejective multiple test
+procedure. Scandinavian journal of statistics, 65–70.
+Hua, T.; Hua, H.; Xiang, V.; Klieger, B.; Truong, S.; Liang,
+W.; Sun, F.-Y.; and Haber, N. 2026. Researchcodebench:
+Benchmarking llms on implementing novel machine learning
+research code. Advances in Neural Information Processing
+Systems, 38.
+Huang, Q.; Vora, J.; Liang, P.; and Leskovec, J. 2024. MLA-
+gentBench: evaluating language agents on machine learning
+experimentation. In Proceedings of the 41st International
+Conference on Machine Learning, ICML’24. JMLR.org.
+Idahl, M.; and Ahmadi, Z. 2025. OpenReviewer: A Special-
+ized Large Language Model for Generating Critical Scien-
+tific Paper Reviews. In Dziri, N.; Ren, S. X.; and Diao, S.,
+eds., Proceedings of the 2025 Conference of the Nations of
+the Americas Chapter of the Association for Computational
+Linguistics: Human Language Technologies (System Demon-
+strations), 550–562. Albuquerque, New Mexico: Association
+for Computational Linguistics. ISBN 979-8-89176-191-9.
+Jin, Y.; Zhao, Q.; Wang, Y.; Chen, H.; Zhu, K.; Xiao, Y.;
+and Wang, J. 2024. AgentReview: Exploring Peer Review
+Dynamics with LLM Agents. In Al-Onaizan, Y.; Bansal, M.;
+and Chen, Y.-N., eds., Proceedings of the 2024 Conference on
+Empirical Methods in Natural Language Processing, 1208–
+1226. Miami, Florida, USA: Association for Computational
+Linguistics.
+Kumar, S.; Ghosal, T.; and Ekbal, A. 2023.
+When Re-
+viewers Lock Horns: Finding Disagreements in Scientific
+Peer Reviews. In Bouamor, H.; Pino, J.; and Bali, K., eds.,
+Proceedings of the 2023 Conference on Empirical Methods
+in Natural Language Processing, 16693–16704. Singapore:
+Association for Computational Linguistics.
+Lála, J.; O’Donoghue, O.; Shtedritski, A.; Cox, S.; Ro-
+driques, S. G.; and White, A. D. 2023. Paperqa: Retrieval-
+augmented generative agent for scientific research. arXiv
+preprint arXiv:2312.07559.
+Li, R.; Gu, J.-C.; Kung, P.-N.; Xia, H.; Kong, X.; Sui, Z.;
+Peng, N.; et al. 2025. LLM-REVal: Can We Trust LLM
+Reviewers Yet? arXiv preprint arXiv:2510.12367.
+Liu, Y.; Lv, L.; Zhang, X.; Yuan, J. W. L.; and Tian, Y.
+2026.
+BioProBench: Comprehensive Dataset and Bench-
+mark in Biological Protocol Understanding and Reasoning.
+arXiv:2505.07889.
+Ou, J.; Walden, W.; Sanders, K.; Jiang, Z.; Sun, K.; Cheng,
+J.; Jurayj, W.; Wanner, M.; Liang, S.; Morgan, C.; Han,
+S.; Wang, W.; May, C.; Recknor, H.; Khashabi, D.; and
+Van Durme, B. 2025. CLAIMCHECK: How Grounded are
+LLM Critiques of Scientific Papers? In Christodoulopoulos,
+C.; Chakraborty, T.; Rose, C.; and Peng, V., eds., Findings
+of the Association for Computational Linguistics: EMNLP
+2025, 21712–21735. Suzhou, China: Association for Com-
+putational Linguistics. ISBN 979-8-89176-335-7.
+Pineau, J.; Vincent-Lamarre, P.; Sinha, K.; Larivière, V.;
+Beygelzimer, A.; d’Alché Buc, F.; Fox, E.; and Larochelle,
+H. 2021.
+Improving reproducibility in machine learning
+research (a report from the NeurIPS 2019 reproducibility
+program). J. Mach. Learn. Res., 22(1).
+Priem, J.; Piwowar, H.; and Orr, R. 2022. OpenAlex: A fully-
+open index of scholarly works, authors, venues, institutions,
+and concepts. arXiv preprint arXiv:2205.01833.
+Raff, E. 2019. A step toward quantifying independently re-
+producible machine learning research. Red Hook, NY, USA:
+Curran Associates Inc.
+Sahu, G.; Larochelle, H.; Charlin, L.; and Pal, C. 2025.
+ReviewerToo: Should AI Join The Program Committee?
+A Look At The Future of Peer Review.
+arXiv preprint
+arXiv:2510.08867.
+
+
+===== page 9 =====
+Shah, N. B.; Tabibian, B.; Muandet, K.; Guyon, I.; and
+Von Luxburg, U. 2018. Design and analysis of the NIPS
+2016 review process. Journal of machine learning research,
+19(49): 1–34.
+Shang, C.; Tang, Y.; Huang, J.; Bi, J.; He, X.; and Zhou, B.
+2019. End-to-end structure-aware convolutional networks
+for knowledge base completion. In Proceedings of the AAAI
+conference on artificial intelligence, volume 33, 3060–3067.
+Siegel, Z. S.; Kapoor, S.; Nadgir, N.; Stroebl, B.; and
+Narayanan, A. 2024. Core-bench: Fostering the credibility
+of published research through a computational reproducibil-
+ity agent benchmark. Transactions on Machine Learning
+Research.
+Soleimani, A.; Monz, C.; and Worring, M. 2020. BERT
+for Evidence Retrieval and Claim Verification. In Advances
+in Information Retrieval: 42nd European Conference on IR
+Research, ECIR 2020, Lisbon, Portugal, April 14–17, 2020,
+Proceedings, Part II, 359–366. Berlin, Heidelberg: Springer-
+Verlag. ISBN 978-3-030-45441-8.
+Starace, G.; Jaffe, O.; Sherburn, D.; Aung, J.; Chan, J. S.;
+Maksin, L.; Dias, R.; Mays, E.; Kinsella, B.; Thompson, W.;
+et al. 2025. PaperBench: Evaluating AI’s Ability to Replicate
+AI Research. arXiv preprint arXiv:2504.01848.
+Stelmakh, I.; Shah, N. B.; Singh, A.; and Daumé III, H.
+2020.
+A novice-reviewer experiment to address scarcity
+of qualified reviewers in large conferences. arXiv preprint
+arXiv:2011.15050.
+Tutz, G.; and Hennevogl, W. 1996. Random effects in or-
+dinal regression models. Computational Statistics & Data
+Analysis, 22(5): 537–557.
+Vashishth, S.; Sanyal, S.; Nitin, V.; and Talukdar, P. 2019.
+Composition-based multi-relational graph convolutional net-
+works. arXiv preprint arXiv:1911.03082.
+Wadden, D.; Lin, S.; Lo, K.; Wang, L. L.; van Zuylen, M.;
+Cohan, A.; and Hajishirzi, H. 2020. Fact or Fiction: Verifying
+Scientific Claims. In Webber, B.; Cohn, T.; He, Y.; and Liu,
+Y., eds., Proceedings of the 2020 Conference on Empirical
+Methods in Natural Language Processing (EMNLP), 7534–
+7550. Online: Association for Computational Linguistics.
+Wadden, D.; Lo, K.; Wang, L. L.; Cohan, A.; Beltagy, I.; and
+Hajishirzi, H. 2022. MultiVerS: Improving scientific claim
+verification with weak supervision and full-document con-
+text. In Carpuat, M.; de Marneffe, M.-C.; and Meza Ruiz,
+I. V., eds., Findings of the Association for Computational
+Linguistics: NAACL 2022, 61–76. Seattle, United States: As-
+sociation for Computational Linguistics.
+Wang, B.; He, T.; Ouyang, L.; Wu, F.; Zhao, Z.; Chu, T.; Qu,
+Y.; Jin, Z.; Zeng, W.; Miao, Z.; et al. 2026a. MinerU2. 5-Pro:
+Pushing the limits of data-centric document parsing at scale.
+arXiv preprint arXiv:2604.04771.
+Wang, J.; Liu, Y.; Xu, H.; Hu, K.; Di, S.; Ni, W.; Yue, L.;
+Zhang, M.-L.; Ren, K.; and Chen, L. 2026b. When AI re-
+views science: Can we trust the referee?
+The Innovation
+Informatics, 2(1): 100030.
+Wang, S.; Foulds, J. R.; Gani, M. O.; and Pan, S. 2025. Llm-
+based corroborating and refuting evidence retrieval for sci-
+entific claim verification. arXiv preprint arXiv:2503.07937.
+Weng, Y.; Zhu, M.; Bao, G.; Zhang, H.; Wang, J.; Zhang,
+Y.; and Yang, L. 2024.
+Cycleresearcher: Improving au-
+tomated research via automated review.
+arXiv preprint
+arXiv:2411.00816.
+Xie, Q.; Dai, Z.; Hovy, E.; Luong, T.; and Le, Q. 2020. Un-
+supervised data augmentation for consistency training. Ad-
+vances in neural information processing systems, 33: 6256–
+6268.
+Yu, R.; Wang, T.; Liu, R.; and Wang, Y. 2026. PT-RAG:
+Structure-Fidelity Retrieval-Augmented Generation for Aca-
+demic Papers. arXiv preprint arXiv:2602.13647.
+Zhao, X.; Sang, Z.; Li, Y.; Shi, Q.; Zhao, W.; Wang, S.;
+Zhang, D.; Han, X.; Liu, Z.; and Sun, M. 2026. AutoRepro-
+duce: Automatic AI Experiment Reproduction with Paper
+Lineage. In Liakata, M.; Moreira, V. P.; Zhang, J.; and Ju-
+rgens, D., eds., Proceedings of the 64th Annual Meeting of
+the Association for Computational Linguistics (Volume 1:
+Long Papers), 21920–21942. San Diego, California, United
+States: Association for Computational Linguistics.
+ISBN
+979-8-89176-390-6.
+Zhu, C.; Xiong, J.; Ma, R.; Lu, Z.; Liu, Y.; and Li, L.
+2025a. When your reviewer is an llm: Biases, divergence,
+and prompt injection risks in peer review. arXiv preprint
+arXiv:2509.09912.
+Zhu, M.; Weng, Y.; Yang, L.; and Zhang, Y. 2025b. DeepRe-
+view: Improving LLM-based Paper Review with Human-like
+Deep Thinking Process. In Che, W.; Nabende, J.; Shutova,
+E.; and Pilehvar, M. T., eds., Proceedings of the 63rd Annual
+Meeting of the Association for Computational Linguistics
+(Volume 1: Long Papers), 29330–29355. Vienna, Austria:
+Association for Computational Linguistics.
+ISBN 979-8-
+89176-251-0.
+Zhuang, Z.; Chen, J.; Xu, H.; Jiang, Y.; and Lin, J. 2025.
+Large language models for automated scholarly paper review:
+A survey. Inf. Fusion, 124(C).
+
+
+===== page 10 =====
+A
+Evaluation Details
+A.1
+Benchmark Construction
+Scope and source composition.
+The benchmark contains 35 machine-learning papers and
+495 human-verified reference claims. CompGCN and eight
+related papers form the nine-paper development set used for
+workflow design, prompt revision, and threshold selection.
+Before any test run, we froze the claim schema, prompts,
+matching threshold, retrieval policy, evidence-status rules,
+execution tolerance, and repair allowlist.
+The remaining 26 papers form a paper-disjoint test set
+containing 24 OpenReview submissions with retained final
+outcomes: 5 accepted, 15 rejected after review, and 4 desk
+rejected, together with two arXiv papers without venue deci-
+sions. Related paper versions, shared repositories, and forks
+were grouped before splitting, with no group crossing the
+development and test sets. Eight development papers and
+12 test papers are execution eligible. The test inventory was
+finalized without access to FactReview outputs.
+The 24 OpenReview papers are associated with 93 public
+reviews. Candidate inclusion was determined by the authors,
+so the benchmark is a purposively selected diagnostic collec-
+tion. Review outcomes are retained as source metadata and
+are not used as labels of technical correctness.
+By primary contribution, the benchmark contains 29
+method papers (82.9%), three resource papers (8.6%), and
+three empirical or diagnostic studies (8.6%). This composi-
+tion reflects the intended use case.
+Exact paper-level venue metadata are stated only when
+retained project records support them.
+Claim inclusion and granularity.
+The inclusion criterion is review relevance; a major bench-
+mark claim is an inventory item retained under that criterion.
+A claim is retained when it is an atomic and independently
+checkable author assertion, localizable in the paper, assess-
+able against available evidence, and consequential enough to
+affect a reviewer’s assessment of novelty or positioning, tech-
+nical validity, empirical support, contribution, reproducibil-
+ity, efficiency, artifacts, or scope. Routine implementation
+details, isolated hyperparameters, generic background state-
+ments, and semantic duplicates are excluded. Compound as-
+sertions that require different evidence or could receive dif-
+ferent statuses are split.
+These rules require human judgment and are applied con-
+sistently across the development and test sets. The complete
+inventory contains 178 Supported, 261 Partially supported,
+35 In conflict, and 21 Inconclusive claims, corresponding to
+36.0%, 52.7%, 7.1%, and 4.2%. The held-out test inventory
+contains 128, 185, 26, and 15 claims in the same categories,
+for a total of 354.
+Paper-level metadata.
+Tables 4 and 5 list every benchmark paper, its retained
+source platform, the venue identifiable from the retained in-
+put PDF, and its source group. “Development” denotes the
+CompGCN workflow-development case; “Anchor” denotes
+the eight additional first-stage papers; “OpenReview” de-
+notes the 24 second-stage submissions, whose retained final
+outcomes comprise 5 Accept, 15 Reject, and 4 Desk Re-
+jection decisions; and “arXiv” denotes the two second-stage
+source-diversity papers without venue decisions. The venue
+column records the publication venue or submission platform
+retained in the benchmark metadata; “UR” denotes under re-
+view.
+A.2
+Annotation and Agreement
+Reference construction.
+Three human annotators re-examined assigned paper
+blocks and verified claim selection, wording, and four-way
+evidence-status labels. The retained audit uses a pairwise de-
+sign. A/B contains 12 paper blocks, A/C contains 11 usable
+blocks, and B/C contains 11 blocks with shared source prove-
+nance. The aggregate reliability estimate therefore uses the
+23 independently comparable A/B and A/C blocks; B/C is
+reported only as a descriptive consistency check. The pa-
+per is the assignment and paper-macro aggregation unit,
+whereas an aligned claim is the unit for status agreement.
+Table 6 reports both open-ended inventory agreement and
+post-alignment status agreement under their proper units.
+The retained aggregate audit does not preserve the paper-
+ID mapping or overlap among A/B, A/C, and B/C. We there-
+fore report comparison-block counts and do not infer the
+number of unique papers covered from their sum.
+Count MAE and Within-1 measure agreement on the num-
+ber of claims selected per paper. Inventory F1 and Jaccard
+measure overlap in the open-ended inventories, while token
+Jaccard and exact match measure wording consistency after
+alignment. The resulting coefficients quantify consistency
+within the retained author-curated audit blocks; they are not
+reliability estimates for a probability-sampled independent
+gold benchmark or for all 495 reference claims.
+Claim type at inference and in the benchmark.
+At inference time, the extraction language model jointly
+emits a Type field with each claim; no author-provided or
+reference Type label is supplied as an input. Type is not used
+for hard routing: evidence acquisition does not branch on
+it, and the execution stage attempts alignment for every ex-
+tracted claim when executable artifacts are available. For the
+reference benchmark, a language model first proposed the
+Type metadata, after which two human annotators reviewed
+each proposal and disagreements were resolved by adjudi-
+cation. The final human-reviewed Type metadata describe
+benchmark composition; they do not measure the accuracy
+of the model’s Type prediction.
+The complete inventory contains 51 Theoretical, 319 Em-
+pirical, and 125 Methodological claims, corresponding to
+10.3%, 64.4%, and 25.3% of the 495 reference claims. Type
+is used to describe benchmark composition and does not en-
+ter evidence routing or status assignment. Table 7 reports the
+complete status results.
+A.3
+Evaluation Rubrics and Configuration
+Evidence-status rubric.
+• Supported: the available evidence directly supports the
+full statement at its stated scope.
+
+
+===== page 11 =====
+ID Paper title
+Source group Platform
+Venue
+1
+Prompts to Proxies: Emulating Human Preferences via a Compact LLM Ensemble
+OpenReview OpenReview ICLR 2026
+2
+KITE: Kernelized and Information Theoretic Exemplars for In-Context Learning
+OpenReview OpenReview ICLR 2026
+3
+FAME: Factor-Aware Mixture-of-Experts with Pretrained Encoder for Combinatorial
+Generalization
+OpenReview OpenReview ICLR 2026
+4
+ExPLAIND: Unifying Model, Data, and Training Attribution to Study Model Behavior
+OpenReview OpenReview ICLR 2026
+5
+PFEDBBN: A Personalized Federated Test-Time Adaptation with Balanced Batch
+Normalization for Class-Imbalanced Data
+OpenReview OpenReview ICLR 2026
+6
+Explainable Evidential Clustering
+OpenReview OpenReview ICLR 2026
+7
+Probability of Matching for Pareto Coverage
+OpenReview OpenReview ICLR 2026
+8
+Echoing: Identity Failures When LLM Agents Talk to Each Other
+OpenReview OpenReview ICLR 2026
+9
+xTrimoABFold: De Novo Antibody Structure Prediction without MSA
+OpenReview OpenReview ICLR 2023
+10 Ransomware Detection on Android: Performance and Energy
+OpenReview OpenReview ICLR 2026
+11 Can LLMs Reconcile Knowledge Conflicts in Counterfactual Reasoning?
+OpenReview OpenReview ICLR 2026
+12 ORGEval: Graph-Theoretic Evaluation of LLMs in Optimization Modeling
+OpenReview OpenReview ICLR 2026
+13 MORSE-500: A Programmatically Controllable Video Benchmark to Stress-Test Multimodal
+Reasoning
+arXiv
+arXiv
+arXiv
+14 ss-Mamba: Semantic-Spline Selective State-Space Model
+arXiv
+arXiv
+arXiv
+15 LADIR: Latent Diffusion Enhances LLMs for Text Reasoning
+OpenReview OpenReview ICLR 2025
+16 A Descriptor-Based Multi-Cluster Memory for Test-Time Adaptation
+OpenReview OpenReview ICLR 2026
+17 Towards Autonomous Experimentation: BioProBench, a Corpus and Benchmark for Biological
+Protocol Comprehension
+OpenReview OpenReview ICLR 2026
+18 BMAS: A Brain-Inspired Multi-Agent System with PFC-Guided Task Coordination and
+Hippocampus-Neocortex Dual Memory for Scalable Multi-Step Reasoning
+OpenReview OpenReview ICLR 2026
+Table 4: Benchmark papers 1 to 18: titles, source groups, platforms, and venues.
+ID Paper title
+Source group Platform
+Venue
+19 CACTUS: Context-Aware Clustering using Large Language Models
+OpenReview OpenReview TMLR
+20 DiagramDiff: A Diagram Reconstruction and Recognition Method to Enhance Large
+Language Models’ Diagram Understanding
+OpenReview OpenReview ICLR 2026
+21 RPS: Information Elicitation with Reinforcement Prompt Selection
+OpenReview OpenReview ICLR 2026
+22 A Diagnostic Benchmark for Transformer Training Failures: Establishing Baseline
+Methods and Quantifying the Accuracy-Interpretability Tradeoff
+OpenReview OpenReview TMLR
+23 CausalSteward: An Agentic Divide-Conquer-Combine Copilot for Causal Discovery
+OpenReview OpenReview ICLR 2026
+24 QUART: Agentic Reasoning to Discover Missing Knowledge in Multi-Domain
+Temporal Data
+OpenReview OpenReview ICLR 2026
+25 PEL-NAS: Search Space Partitioned Architecture Prompt Co-Evolutionary
+LLM-Driven Hardware-Aware Neural Architecture Search
+OpenReview OpenReview ICLR 2026
+26 Fair Graph Message Passing
+OpenReview OpenReview TMLR
+27 Composition-Based Multi-Relational Graph Convolutional Networks
+Development arXiv
+ICLR 2020
+28 Do Transformers Really Perform Bad for Graph Representation?
+Anchor
+arXiv
+NeurIPS 2021
+29 End-to-End Structure-Aware Convolutional Networks for Knowledge Base Completion Anchor
+arXiv
+AAAI 2019
+30 BEiT: BERT Pre-Training of Image Transformers
+Anchor
+arXiv
+ICLR 2022
+31 FixMatch: Simplifying Semi-Supervised Learning with Consistency and Confidence
+Anchor
+arXiv
+NeurIPS 2020
+32 Long-Term Recurrent Convolutional Networks for Visual Recognition and Description Anchor
+arXiv
+CVPR 2015
+33 Unsupervised Data Augmentation for Consistency Training
+Anchor
+arXiv
+NeurIPS 2020
+34 BERT: Pre-Training of Deep Bidirectional Transformers for Language Understanding
+Anchor
+arXiv
+NAACL 2019
+35 Prefix-Tuning: Optimizing Continuous Prompts for Generation
+Anchor
+arXiv
+ACL-IJCNLP 2021
+Table 5: Benchmark papers 19 to 35: titles, source groups, platforms, and venues. UR denotes under review.
+• Partially supported: the direction is supported, but the
+magnitude, scope, conditions, or component coverage is
+weaker than stated.
+• In conflict: reliable evidence directly contradicts the
+claim.
+• Inconclusive: evidence is insufficient, ambiguous, anec-
+dotal, unavailable, or lacks a direct comparator.
+Rating rubric.
+Evaluators used 1 to 5 scales for Groundedness, Speci-
+ficity, and Coverage. Groundedness measures whether sub-
+stantive judgments are supported by valid and traceable evi-
+dence. Specificity measures whether a review identifies con-
+crete issues, points to checkable locations, and gives clear
+implications or actionable suggestions. Coverage measures
+whether the review addresses the paper’s important claims
+and major review-relevant issues. Scores of 1, 2, 3, 4, and
+5 denote largely unmet, limited, moderate, strong, and com-
+prehensive fulfillment. Overall is the arithmetic mean of the
+three dimension scores.
+Experimental configuration.
+
+
+===== page 12 =====
+Comparison
+Papers
+Count
+MAE / W1
+Inventory
+F1 / Jaccard
+Wording
+Token-J / Exact
+End-to-end
+concordance
+Matched
+Status agreement /
+coefficient
+A/B
+12
+.833 / 83.3%
+.964 / .934
+.752 / .303
+.921
+160
+98.75% / κ = .978
+A/C
+11
+.182 / 100%
+.929 / .869
+.728 / .281
+.766
+132
+88.64% / κ = .791
+B/C†
+11
+.000 / 100%
+1.000 / 1.000
+.967 / .943
+1.000
+139
+100.00% / κ = 1.000
+Overall usable blocks
+23
+.522 / 91.3%
+.948 / .903
+.741 / .292
+.847
+292
+94.18% / α = .896
+Table 6: Retained pairwise human-reference agreement audit. W1 denotes Within-1 claim count agreement. End-to-end concordance is
+descriptive and does not use a standard IAA coefficient. †B/C shares source provenance and is excluded from the aggregate reliability
+estimates. Status coefficients are pairwise Cohen’s κ and aggregate nominal Krippendorff’s α.
+All experiments run on one local server with eight
+NVIDIA RTX 4090 GPUs. FactReview v0.1.0 from the
+anonymized artifact snapshot was run from July 10 to July 14,
+2026 using the Codex model alias gpt-5.5. Each job per-
+mits two runtime sessions of at most 1000 turns. Temperature
+and maximum output tokens are left unset. Finalization re-
+quires at least three paper-search calls, three distinct queries,
+and ten evidence annotations.
+MinerU API v4 uses the vlm parsing mode. Semantic
+Scholar Graph API v1 uses a retrieval depth of eight and
+a 20-second timeout. RefCopilot verification and OpenAlex
+are enabled. The controlled direct reviewer uses the same
+backend and tool configuration with a 360K per-paper token
+ceiling. Paired controlled outputs were generated consec-
+utively in randomized and counterbalanced order. Prompt
+snapshots, retrieval responses, search traces, matching out-
+puts, requests, and execution artifacts were archived per pa-
+per.
+DeepReviewer 2.0 uses commit 1c19a232c062 with
+AGENT_MODEL=gpt-5.2, two resume attempts, the Re-
+sponses API disabled, and DeepXiv search at depth eight
+with arXiv as the default source. Other native-comparison
+systems retain their reported models and output formats.
+Backend-sensitivity experiments change only the model.
+For claim matching, HTML entities and line breaks are
+normalized, text is lowercased, and alphanumeric tokens of
+length greater than one are retained after removing a fixed
+stopword list. Within each paper, every reference and Fac-
+tReview pair receives
+0.65 J(A, B) + 0.35 max
+|A ∩B|
+|A|
+, |A ∩B|
+|B|
+
+,
+where A and B are token sets and J is Jaccard similarity.
+Pairs below 0.55 are discarded; the remainder are sorted by
+decreasing score and greedily selected subject to one-to-one
+assignment. Exact ties are resolved deterministically by the
+indexed input-row order in the retained matching script. Type
+and status do not enter the score or matching eligibility.
+A.4
+Reviewer Study Protocol
+The exploratory reviewer-assistance study covers five papers
+and uses the same 20-person cohort as the review-quality
+evaluation: 8 PhD students and 12 Master’s students, all
+with prior experience reviewing machine-learning papers.
+The study compares three conditions: paper only, paper with
+the FactReview report, and paper with both the report and
+teaser figure. Participants were instructed to write a short
+technical review focused on main claims, evidence, limita-
+tions, and reproducibility concerns, and to make their own
+judgments without copying the system output.
+Mean review time is wall-clock time from the point at
+which a participant began reading the assigned paper and
+condition-specific materials until the completed review was
+submitted. It includes reading, writing, and revision; in as-
+sisted conditions it also includes inspection of the FactRe-
+view report and teaser. Task instructions and setup time are
+excluded.
+Recruitment, instructions, and data handling. Partici-
+pants were recruited by direct invitation from researchers
+with experience reading or reviewing machine-learning pa-
+pers. Participation was voluntary and compensated. Partic-
+ipants were informed about the study and consented to ag-
+gregate use of their task outputs. No participant evaluated a
+paper with a reported conflict of interest. The retained data
+contain condition labels, review times, and claim-coverage
+measurements.
+In the paper-only condition, participants used only the
+manuscript. In the report condition, they could inspect the
+extracted claims, evidence labels, literature links, and ex-
+ecution notes. The report-plus-teaser condition added the
+compact visual summary derived from the same evidence
+records. Participants were told that FactReview was an as-
+sistance tool and that they must make their own judgments.
+Only aggregate condition means are retained.
+B
+Additional Results
+B.1
+Complete Claim-Level Results
+On the 26-paper held-out test set, FactReview produces 315
+claims and matches 282 to the 354 reference claims. The 33
+unmatched outputs and 72 unmatched references give 89.5%
+precision, 79.7% recall, and 84.3% F1. Status agrees for
+267/282 matched claims, or 94.7%.
+Separately, the complete diagnostic analysis evaluates sta-
+tus assignment on all 495 frozen reference claims. Each refer-
+ence claim receives exactly one predicted status. Predictions
+agree with the reference status for 447 claims, yielding an
+overall accuracy of 90.3%. The remaining 48 predictions are
+off-diagonal outcomes in the four-class confusion matrix.
+The 48 off-diagonal outcomes comprise 19 confusions
+between Supported and Partially supported, 10 between Par-
+tially supported and Inconclusive, seven between Partially
+supported and In conflict, six between Supported and In-
+conclusive, four between Supported and In conflict, and two
+
+
+===== page 13 =====
+Status
+Reference n
+Predicted n
+Correct n
+Precision
+Recall
+F1
+Supported
+178
+175
+162
+92.6
+91.0
+91.8
+Partially supported
+261
+255
+240
+94.1
+92.0
+93.0
+In conflict
+35
+36
+29
+80.6
+82.9
+81.7
+Inconclusive
+21
+29
+16
+55.2
+76.2
+64.0
+Overall
+495
+495
+447
+90.3
+90.3
+90.3
+Table 7: Status classification over all 495 reference claims in the complete diagnostic collection (percent). Precision, recall, and F1 are reported
+by status; the Overall row gives micro-averaged values.
+between In conflict and Inconclusive. These counts combine
+both directions within each label pair.
+B.2
+Native-Configuration Comparison
+The native comparison evaluates five AI systems on all
+35 papers. The OpenReview row contains 93 public com-
+ments grouped into 24 paper-level panels. Twenty evalu-
+ators, comprising 8 PhD students and 12 master’s students
+with machine-learning reviewing experience, completed 480
+source-blinded evaluations under random assignment. Sys-
+tem identities were hidden, presentation order was random-
+ized, and each output retained its native format. Ratings were
+averaged within paper and then macro-averaged by system.
+Ordinal Krippendorff’s α is 0.62.
+System
+Ground.
+Spec.
+Cover.
+Overall
+OpenReview (observ.)
+2.96
+3.17
+3.88
+3.33
+GPT-5.2
+3.17
+3.14
+4.20
+3.51
+GPT-5.4-mini
+2.94
+2.89
+3.97
+3.27
+GPT-5.4
+3.26
+3.26
+4.37
+3.63
+DeepReviewer 2.0
+4.23
+4.26
+4.03
+4.17
+FactReview
+4.97
+4.94
+4.66
+4.86
+Table 8: Descriptive human ratings under native system configura-
+tions. AI-system rows cover 35 papers; the observational OpenRe-
+view row covers 24 paper-level panels.
+B.3
+Reviewer Assistance Results
+Across the three reported conditions, mean time is 50.6, 31.6,
+and 21.3 minutes, while coverage of the study’s retained five-
+paper claim set is 86.9%, 97.8%, and 98.9%, respectively.
+The main paper visualizes these results, and Table 9 retains
+the exact values.
+Condition
+Time (min)
+Coverage (%)
+Paper only
+50.6
+86.9
+Paper + report
+31.6
+97.8
+Paper + report + teaser
+21.3
+98.9
+Table 9: Exact reviewer-assistance results for 20 participants and
+five papers. Time excludes instruction and setup; coverage is the
+share of claims in the retained five-paper study set addressed in the
+submitted review.
+B.4
+Ablations and Backend Sensitivity
+Evidence sources.
+Table 10 reports the fraction of final claim statuses in the
+retained ablation records that change when each evidence
+source is removed. Removing execution, literature search and
+reading, Semantic Scholar retrieval, or all external evidence
+changes 17.0%, 5.7%, 8.4%, and 26.1% of statuses.
+Removed evidence
+Statuses changed (%)
+Execution
+17.0
+Literature search and reading
+5.7
+Semantic Scholar retrieval
+8.4
+All external evidence
+26.1
+Table 10: Reported evidence-source ablation relative to full FactRe-
+view. The final row is the manuscript-only condition; percentages
+denote changed claim statuses, not generic accuracy losses.
+Execution components.
+Removing the fix loop returns claim pass to 65/96 (67.7%).
+Removing planning, alignment, or baseline checks yields
+70/96 (72.9%), 71/96 (74.0%), and 74/96 (77.1%), respec-
+tively, compared with 79/96 (82.3%) for the complete work-
+flow. All variants use the same harness and the same 96
+execution-relevant claims.
+Backend sensitivity.
+Table 11 reports success rate, runtime, and cost under
+the fixed FactReview orchestration and execution/review har-
+ness. This comparison measures backend sensitivity, not ro-
+bustness to a different coding agent or repository-execution
+harness. A controlled cross-harness comparison remains fu-
+ture work.
+Backend
+Success
+Runtime (min)
+API cost ($)
+Claude Opus 4.6
+83.3%
+24.1
+0.68
+GPT-5.4
+75.0%
+25.7
+0.55
+Claude Sonnet 4.5
+66.7%
+27.4
+0.33
+GPT-4.1
+58.3%
+28.9
+0.42
+GPT-4o
+50.0%
+27.8
+0.28
+Claude Haiku 4.5
+41.7%
+26.2
+0.16
+Table 11: Backend comparison on 12 fixed-harness execution-
+verification episodes. FactReview orchestration and the execu-
+tion/review harness are held fixed.
+B.5
+Pipeline Cost
+Table 12 reports the average cost of the non-execution stages
+over the complete 35-paper collection.
+
+
+===== page 14 =====
+Stage
+Tokens (K)
+Runtime (s)
+Report
+321.09
+633.00
+Analysis
+36.24
+82.29
+Parse
+0
+57.44
+Teaser
+0
+0.42
+Total
+357.33
+773.14
+Table 12: Average per-paper cost of the non-execution stages over
+the 35-paper benchmark. Runtime is wall-clock time; the displayed
+total is computed before row-level rounding.
+C
+Execution Audit and Case Studies
+C.1
+Independent Execution Audit
+Two auditors independent of system development inspected
+all 96 execution claims while blinded to pipeline verdicts
+and repair rounds. They reviewed archived commands, en-
+vironments, logs, metric artifacts, claim-alignment records,
+and repair diffs. Each audit recorded execution success, met-
+ric recovery and comparability, claim alignment, and repair-
+policy compliance. A third blinded auditor adjudicated dis-
+agreements.
+Before adjudication, the auditors agreed on 92/96 claims,
+with nominal Krippendorff’s α = 0.86. Adjudication marked
+76/96 claims and 12/20 papers as passing. Pipeline decisions
+agreed with adjudication on 91/96 claim verdicts and 19/20
+paper outcomes. Four pipeline false passes comprised two
+aggregation mismatches, one checkpoint mismatch, and one
+repair-policy violation. One metric alias caused the false
+failure. Auditors judged 25/26 repair diffs compliant with
+the allowlist.
+Audit quantity
+Result
+Pre-adjudication agreement
+92/96
+Nominal Krippendorff’s α
+0.86
+Adjudicated claim pass
+76/96
+Adjudicated paper success
+12/20
+Pipeline agreement, claims
+91/96
+Pipeline agreement, papers
+19/20
+Compliant repair diffs
+25/26
+Table 13: Independent audit of archived execution evidence and
+repair diffs.
+C.2
+Repair Trajectory and Failure Analysis
+Run, Review, and Fix (RRF) permits bounded depen-
+dency, path, launch-argument, and wrapper fixes. It excludes
+changes to model architectures, losses, datasets, evaluation
+logic, and baselines. This policy preserves fidelity to the
+released artifact. The repair boundary follows prior artifact-
+audit practice.
+The first two repair rounds each recover one paper and
+seven execution-relevant claims; the third produces no fur-
+ther gain. After repair, the seven remaining earliest blockers
+comprise three environment, one runtime, two metric, and
+one alignment failure. The ledger contains 20 initial attempts
+and 26 repair attempts. Table 14 reports the trajectory and
+resource trade-off.
+Metric
+No repair
+RRF
+Change
+Paper success
+11/20
+13/20
++10.0 points
+Claim pass
+65/96
+79/96
++14.6 points
+Recovered failed papers
+N/A
+2/9
+N/A
+Attempts
+1.00
+2.30
++1.30
+Runtime
+1.00
+1.45
++0.45
+Tokens
+1.00
+1.58
++0.58
+Table 14: RRF recovery and overhead relative to the no-repair
+execution pass.
+Failure modes, provenance, and funnel.
+The main paper presents two complementary views of ex-
+ecution failure. Provenance is multi-label and contains 36 as-
+signments: 10 environment, 8 runtime, 6 unavailable-metric,
+5 missing-baseline, 4 import, and 3 alignment labels. The
+pre-repair funnel counts each code-available paper once at
+its earliest blocking stage. These denominators must not be
+combined. Together, they explain why an accessible reposi-
+tory may still fail to yield claim-aligned evidence: environ-
+ment and runtime problems are common, but metric avail-
+ability, baseline recovery, imports, and alignment also inter-
+vene. RRF may repair only dependency, environment, path,
+launch-argument, and wrapper problems; it cannot repair
+missing scientific evidence.
+The retained aggregate records do not provide an auditable
+instance-level causal allocation of held-out claim-recovery
+errors or the 48 status errors in the complete collection across
+pipeline stages. We therefore report claim recovery, status
+classification, and execution provenance separately and do
+not infer a stage-of-origin breakdown.
+C.3
+Case Studies
+CompGCN.
+CompGCN (Vashishth et al. 2019) is retained as a fa-
+vorable qualitative example. It does not represent the full
+range of difficult repository execution. FactReview connects
+the paper’s architectural and empirical claims to technical-
+positioning evidence, released code, and reproduced-result
+checks. The example demonstrates how a broad contribution
+claim can remain only partially supported even when a nar-
+rower empirical result is reproducible. The accompanying
+text reports the claim assessments; the architecture diagram
+contains only structural information.
+Three
+harder
+fixed-harness
+cases.
+We
+use
+Bio-
+ProBench (Liu et al. 2026), Unsupervised Data Augmenta-
+tion (UDA) (Xie et al. 2020), and the Structure-Aware Convo-
+lutional Network (SACN) (Shang et al. 2019) as harder coun-
+terpoints to the favorable CompGCN case. BioProBench ex-
+ecutes four of five evaluated task families and aligns evidence
+for six of eight audited claims, yielding two Supported, three
+Partially supported, and three Inconclusive outcomes. UDA
+executes four of six tasks and aligns three of six claims,
+yielding one Supported, two Partially supported, and three
+Inconclusive outcomes. SACN executes five of six tasks and
+aligns five of seven claims, yielding three Supported, two
+Partially supported, and two Inconclusive outcomes.
+Execution counts as support only when output matches the
+claim’s dataset, metric, and scope.
+
+
+===== page 15 =====
+D
+Prompt Templates
+The following reusable templates determine FactReview’s
+extraction, audit, execution, teaser, and reference-integrity
+behavior. Angle-bracketed fields denote paper-specific run-
+time inputs. Fully instantiated prompts are retained with their
+corresponding runtime jobs.
+D.1
+Main Extraction Prompt
+P1. System Role and Evidence Policy
+SYSTEM:
+You are a paper-information extraction agent. Extract factual
+manuscript information and organize it into a fixed structured
+report. Always operate on the bound paper only.
+PRIMARY OBJECTIVE:
+- Extract manuscript-grounded information reliably supported by
+paper text, tables, figures, equations, and captions.
+- If a field is absent, write “Not found in manuscript”.
+- Do not invent missing items, reviewer scores, acceptance or
+rejection recommendations, or administrative summaries.
+- Do not add sections beyond the required schema.
+RUNTIME EVIDENCE:
+- Paper markdown: <PAPER_MARKDOWN>
+- Semantic Scholar retrieval: <SEMANTIC_SCHOLAR_CONTEXT>
+- Publication cutoff: <CUTOFF_DATE>
+- External search state: <PAPER_SEARCH_STATUS>
+RETRIEVAL RULE:
+If external paper search is available, combine the retrieval
+block with targeted paper_search calls and use read_paper only
+for close-overlap papers whose mechanism or protocol could
+change the positioning matrix. If search is unavailable, use
+only injected evidence and mark novelty/comparison conclusions
+as requiring manual verification.
+P1. Required Report Sections
+OUTPUT SECTIONS, IN ORDER:
+1. metadata
+2. technical_positioning
+3. claims
+4. summary
+5. experiment
+SUBMISSION PROTOCOL:
+- Submit exactly one section per review_final_markdown_write
+call.
+- After each call, inspect next_required_section and submit
+that section.
+- Stop only when the tool returns status=ok or
+task_completed=true.
+METADATA CONTRACT:
+Return exactly Title, Task, and Code. If the manuscript does
+not provide a code link, write “Not found in manuscript”.
+P1. Tool and Runtime Discipline
+TOOL POLICY:
+- Use mcp_status_update only for concise progress updates.
+- Use paper_search only when external search is available and
+the result can change novelty or comparison judgment.
+- Use read_paper only after paper_search discovers relevant
+papers and only for selected overlap-risk papers.
+- Do not use reviewer-style PDF annotations as the main
+extraction output.
+- Avoid repeated search loops. If a required field cannot be
+confirmed after one scan, write “Not found in manuscript” and
+continue.
+SEARCH BUDGET:
+- Run one to three focused paper_search calls for technical
+positioning when search is available.
+- Use read_paper for one to three selected papers when
+title/abstract evidence is insufficient.
+- Stop retrieval when new calls no longer add decision-relevant
+evidence.
+ANTI-STALL RULE:
+Complete reasoning and evidence gathering for one section
+before submitting that section. Do not interleave unfinished
+evidence gathering across sections.
+P1. Technical Positioning Contract
+Output one concise caption and one niche-positioning matrix.
+STEP 1: From Introduction and Related Work, extract declared
+baselines and author self-positioning.
+STEP 2: Build an objective related-work set from Semantic
+Scholar retrieval plus paper_search results. Use read_paper
+selectively for close-overlap mechanisms or protocols.
+STEP 3: Compare declared and objective sets, then choose matrix
+rows and dimensions from the combined evidence.
+TABLE RULES:
+- The first two columns are Research domain and Method.
+- External related works appear first; This Work is the final
+row.
+- The self-row method is the named method or proposed-method
+phrase.
+- Never put the current paper title in an external row.
+- Later columns are capability or ecological-niche dimensions.
+- The matrix is descriptive evidence, not proof of novelty.
+P1. Technical Positioning Scratchpad
+INTERNAL REASONING, DO NOT OUTPUT AS TEXT:
+1. Contribution decomposition: for each core contribution,
+identify its core mechanism, target setting, evaluation
+protocol, and claimed gain.
+2. Per-paper gap analysis: identify one or two distinguishing
+capabilities for each relevant paper and compare them with the
+manuscript’s mechanism and setting. Use read_paper evidence for
+close-overlap candidates.
+3. Dimension selection: choose three to eight niche dimensions
+that expose both overlap and difference. Do not select axes
+merely because only This Work wins them.
+OUTPUT ONLY: caption, table, and one short Gap line when
+important related work is missing.
+P1. Claim Extraction and Verdict Contract
+Extract reviewer-salient author claims, not a generic summary.
+Include novelty or positioning claims, central method claims,
+artifact claims, main empirical effects and null results,
+efficiency or ceiling claims, and causal claims.
+Exclude neutral architecture mechanics, routine settings,
+generic dataset descriptions, and related-work summaries unless
+they are contribution claims.
+TABLE COLUMNS:
+Claim | Type | Importance | Evidence | Assessment | Location
+TYPE: empirical / methodological / theoretical
+IMPORTANCE: primary drives novelty or validity; secondary
+remains review-relevant.
+EVIDENCE: Supporting gives exact support; Missing states
+evidence needed for the claim scope.
+ASSESSMENT: end with exactly one tag: supported,
+partially_supported, inconclusive, or in_conflict.
+P1. Claim Granularity Examples
+Too broad: “We present the first X method over a 36K corpus and
+improve Pass@1.”
+Better: split first-method, corpus-size, and Pass@1-improvement
+assertions.
+Too broad: “The method improves Pass@1 and reaches 84% of the
+oracle ceiling.”
+Better: separate the improvement and oracle-ceiling ratio.
+Too fine: “Stage 1 has R@1000=0.905; Stage 2 mean reciprocal
+rank (MRR)=0.587; Stage 3 MRR=0.634.”
+Better: “Each stage progressively improves ranking quality,”
+unless a stage is itself a headline contribution.
+P1. Conservative Claim Checks
+Before each assessment, check numerical consistency,
+consistency between text and tables, causal validity,
+granularity, and evidence source. Causal attributions require
+an ablation or controlled experiment; otherwise the verdict is
+at most partially_supported.
+VERDICT RULES:
+supported = evidence directly proves the claim verb.
+partially_supported = direction is supported but magnitude,
+scope, or components are weaker than asserted.
+inconclusive = evidence is weak, unavailable, anecdotal, or too
+close to decide.
+in_conflict = reliable evidence contradicts the claim.
+P1. Summary and Experiment Contract
+Write a short summary, then Strengths and Weaknesses. Each
+strength cites a manuscript anchor. Each weakness follows
+Problem -> Root cause -> Validity or novelty impact -> Repair
+direction.
+Use two experiment subsections: Main Result and Ablation
+Result.
+Main table: Task | Dataset | Metric | Best Baseline | Paper
+Result | Difference.
+Ablation table: Ablation Dimension | Configuration | Full Model
+| Paper Result | Difference.
+Main results compare against external baselines. Ablation rows
+come only from explicit ablation or analysis sections.
+
+
+===== page 16 =====
+D.2
+Claim Audit and Report Revision Prompts
+P2. Claim-Row Audit Prompt
+SYSTEM: audit an academic-paper review report. For each claim
+row, decide whether cited evidence rigorously supports the
+claim. Across methodological claims and the ablation block,
+list enumerated components that the ablation tables do not
+cover. Be conservative.
+INPUT: <CLAIM_ROWS>, <ABLATION_SECTION>, <POSITIONING_CONTEXT>,
+<EXECUTION_MATCHES>.
+OUTPUT JSON:
+verdicts: list of {id, verdict, reason}
+ablation_missing_components: list of component names
+VERDICT SET: supported | partially_supported | inconclusive |
+in_conflict.
+Comparative claims require named baselines and numeric results.
+Novelty claims require positive positioning evidence.
+Theoretical claims require formal anchors. Execution evidence
+overrides optimistic wording when outputs contradict the claim.
+P2. Type-Specific Audit Rules
+THEORETICAL: supported requires a formal proof, theorem,
+numbered equation, lemma, or proposition.
+METHODOLOGICAL: supported requires an explicit named section,
+figure, algorithm, or equation anchor.
+NOVELTY: absence of contradiction alone does not establish
+novelty.
+COMPARATIVE: supported requires numeric results for named
+baselines and the paper method, with a gap larger than reported
+uncertainty.
+P2. Ablation Coverage Audit
+List any component named in a methodological claim that the
+ablation block does not exercise. Return an empty list when all
+components are covered, when claims enumerate no components, or
+when no component-specific causal claim is made. Do not infer
+coverage from vague analysis text or main-result comparisons.
+P3. Final-Report Audit Prompt
+SYSTEM: compare a generated final review against source paper
+markdown and find only evidence-grounded mismatches. The source
+paper is the sole truth.
+FLAG ONLY: factual error, overclaim, understatement, missing
+condition, causal overreach, wrong number, dataset, setting,
+result, or conclusion.
+DO NOT invent evidence, flag insufficient-evidence cases, or
+rewrite style.
+OUTPUT JSON: audit_summary and issues containing problem_type,
+severity, section, review_excerpt, paper_evidence,
+suggested_fix, and should_fix.
+P3. Final-Report Revision Prompt
+Return valid JSON only. Revise only content implicated by
+audited issues. Keep the exact headings, section order,
+subheadings, table headers, and row counts. Do not rewrite
+unrelated text.
+INPUT: <AUDIT_ISSUES>, <PAPER_MARKDOWN>, <FINAL_REVIEW>.
+OUTPUT: revision_summary and revised_markdown.
+P3. Final-Report Revision Guardrails
+Preserve section order, titles, subheadings, table headers,
+rows, and columns. Edit only spans implicated by audit issues.
+Every replacement must be supported by the paper or an explicit
+evidence block; never strengthen a claim during revision. If a
+fix would require a structural change, express it within the
+existing cell or paragraph.
+D.3
+Execution and Teaser Prompts
+P4. Execution Task-Inference Prompt
+SYSTEM: generate a safe, reproducible tasks.yaml for a research
+repository.
+GOAL: create tasks for running or evaluating the repository
+reproducibly.
+INPUT: repository root, top-level files, README and
+requirements excerpts, entrypoints, arguments, example
+commands, datasets, paper excerpt, and mode.
+CONSTRAINTS: return JSON only; derive commands from README;
+prefer dependency setup, optional preprocessing, run/eval, then
+artifact collection; include a fast smoke task; disable heavy
+tasks unless full mode is requested; do not propose scientific
+source edits; use argv arrays compatible with shell=False; use
+paths relative to <paper_root>; avoid absolute paths.
+OUTPUT: tasks with id, enabled, cwd, cmd, timeout_sec,
+use_conda, and artifact_paths; plus notes.
+P4. Task-Inference Output Schema
+TASK OBJECT: stable id; enabled boolean; cwd under
+<paper_root>; argv-array cmd; integer timeout_sec; use_conda
+boolean; artifact paths or globs.
+REQUIRED TYPES: dependency check when needed; smoke task such
+as --help, version, import, or tiny run; evaluation command
+when the README provides one; artifact or metric export when
+available.
+SAFETY: disable large downloads, long training, proprietary
+assets, or heavy GPU jobs unless full mode is requested.
+P4. Execution Judge Prompt
+Judge whether a reproduction run matches claimed results.
+Return JSON only. If evidence is insufficient, keep the verdict
+inconclusive and propose concrete baseline checks.
+INPUT: paper key, PDF path, repository, run id, success,
+result, artifacts, paper excerpt, and baseline checks.
+OUTPUT: verdict pass | fail | inconclusive; confidence;
+reasons; suggested artifacts; suggested baseline checks.
+P4. Execution Judge Evidence Rules
+EVIDENCE PRIORITY: machine-readable metric files aligned to
+paper tables; completed-evaluation logs with dataset,
+checkpoint, and metric; checkable artifacts; free-text
+self-notes only as weak context.
+pass = aligned reproduced evidence within tolerance.
+fail = reproduced evidence contradicts the claim.
+inconclusive = output cannot be aligned or evidence is missing
+or ambiguous.
+When inconclusive, propose file, JSON-value, or CSV-aggregation
+checks.
+P4. Bounded Fix-Plan Prompt
+Produce a safe, reproducible fix plan in JSON. Permit only
+dependency, environment, path, launch-argument, and wrapper
+repairs. Do not change model architectures, losses, datasets,
+metrics, baselines, evaluation logic, or other scientific
+source behavior.
+INPUT: attempt number, paper root, failed task, stdout tail,
+stderr tail.
+OUTPUT: category (env | deps | path | encoding | data | runtime
+| other), root_cause, actions with reasons, and confidence.
+P5. Teaser Figure Prompt
+Create one polished teaser figure for a machine-learning paper
+review summary. Use extracted report content as authoritative;
+preserve factual wording, numbers, and labels; invent nothing.
+If execution was not performed, do not infer an execution
+status.
+Treat the reference image as a hard layout target, preserve
+module positions, show both strengths and weaknesses, and reuse
+the technical-positioning panel. Inputs are title, task,
+legend, positioning matrix, selected claims, audited claims,
+summary, strengths, weaknesses, main results, and ablations.
+P5. Teaser Claim and Status Rules
+Always show fixed legend badges for Supported, Partially
+supported / Inconclusive, and In conflict; these are template
+elements, not counts. Show up to three core claim rows,
+prioritizing novelty, conflict, partial, inconclusive, or
+missing-evidence claims. Individual rows retain exact audited
+labels. Preserve all experiment values and signs.
+D.4
+Reference-Integrity Prompts
+P6. Reference Extraction Prompt
+Output JSON only. Extract references from bibliography text and
+split numbered or author-year entries that may span lines.
+Return authors, title, venue, year, URL, DOI, arXiv id, and raw
+text. Use exact titles, repair line wrapping, skip bare URLs,
+ignore non-reference prose, and never fabricate missing
+metadata.
+P6. Citation Verification and Non-Academic Recheck
+Given a citation and candidate records, return LIKELY for a
+likely hallucination, UNLIKELY when it refers to a real paper,
+and UNCERTAIN otherwise. When a real paper is missing from
+candidates, provide a canonical suggestion without inventing
+identifiers. For unresolved references, separately test whether
+the item is a legitimate system card, model card, dataset card,
+documentation, standard, white paper, government report,
+technical report, or vendor announcement; default to false
+under uncertainty.

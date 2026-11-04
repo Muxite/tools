@@ -1,0 +1,2024 @@
+
+
+===== page 1 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable
+Computation
+Yanpei Guo 1 Wenjie Qu 1 Linyu Wu 1 Shengfang Zhai 1 Lionel Z. WANG 2 Ming Xu 1 Yue Liu 1
+Binhang Yuan 3 Dawn Song 4 Jiaheng Zhang 1
+Abstract
+Commercial large language models are typically
+deployed as black-box API services, requiring
+users to trust providers to execute inference cor-
+rectly and report token usage honestly. We present
+IMMACULATE, a practical auditing framework
+that detects economically motivated deviations-
+such as model substitution, quantization abuse,
+and token overbilling-without trusted hardware
+or access to model internals. IMMACULATE
+selectively audits a small fraction of requests
+using verifiable computation, achieving strong
+detection guarantees while amortizing crypto-
+graphic overhead.
+Experiments on dense and
+MoE models show that IMMACULATE reli-
+ably distinguishes benign and malicious execu-
+tions with under 1% throughput overhead. Our
+code is published at https://github.com/
+guo-yanpei/Immaculate.
+1. Introduction
+Large language models (LLMs) have become a criti-
+cal computational substrate across a wide range of ap-
+plications, enabling high-quality text generation (Brown
+et al., 2020; Chowdhery et al., 2023), conversational
+agents (Adamopoulou & Moussiades, 2020), code synthe-
+sis (Chen, 2021), and reasoning-intensive workloads (Wei
+et al., 2022). Today, most frontier LLMs including Ope-
+nAI (OpenAI, 2023), Google (Google Cloud, 2023), and
+Anthropic (Anthropic, 2023) are deployed through API-
+based inference services, where users interact with propri-
+etary models via black-box endpoints and are charged based
+on reported token usage and model specifications.
+Despite its success, the black-box API model introduces a
+fundamental trust asymmetry. Users lack any visibility into
+the deployed model or its internal execution, making it hard
+1National University of Singapore
+2Nanyang Technolog-
+ical University
+3Independent Researcher
+4University of Cal-
+ifornia,
+Berkeley.
+Correspondence to:
+Jiaheng Zhang
+<jhzhang@nus.edu.sg>.
+for users to audit whether the providers faithfully executed
+the claimed inference procedure. From an economic per-
+spective, providers may have incentives to silently deviate
+from the advertised protocol—for example, by substitut-
+ing a distilled model or applying aggressive quantization
+to reduce computational cost. Indeed, anecdotal reports of
+quality degradation under unchanged model claims have ap-
+peared in public forums, highlighting an emerging account-
+ability gap in LLM service provision (webtailken, 2024;
+theevildays, 2024).
+Compared to model substitution, token overbilling poses
+a more severe integrity threat (Sun et al., 2025a).
+For
+reasoning-intensive workloads, API providers (e.g., Ope-
+nAI) hide intermediate chain-of-thought tokens while still
+billing for full internal token usage (OpenAI, 2023). As
+token usage is a dominant cost factor for downstream appli-
+cations and autonomous agents (Chen et al., 2023; Moham-
+madi et al., 2025), the absence of verifiable billing guaran-
+tees undermines consumer trust. Unlike model substitution,
+token misreporting leaves no observable signal in the out-
+put, making detection impossible under standard black-box
+access.
+These challenges highlight the growing importance of audit-
+ing black-box LLM services. As LLM APIs become critical
+infrastructure for downstream applications and autonomous
+agents, users must be able to verify that providers execute
+inference honestly—without gaining access to proprietary
+models or internal states. However, auditing black-box LLM
+services is inherently difficult due to competing system re-
+quirements:
+• Economy: the auditing mechanism should introduce min-
+imal computational and monetary overhead for benign
+LLM service providers.
+• Proprietorship: the LLM vendor’s model architecture,
+parameters, and internal inference states should remain
+confidential.
+• Robustness: the framework should offer provable guar-
+antees for detecting protocol deviations, without falsely
+flagging honest servers.
+A representative approach (Cai et al., 2025) enforces runtime
+integrity using trusted execution environments (TEEs), par-
+1
+arXiv:2602.22700v1  [cs.CR]  26 Feb 2026
+
+
+===== page 2 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+ticularly GPU-based TEEs (NVIDIA, 2023). While TEEs
+provide strong integrity guarantees with modest overhead
+(≈20% on NVIDIA H100 (Tan et al., 2025)), their eco-
+nomic viability is limited: GPU-TEE support is restricted
+to specific NVIDIA hardware, and large-scale adoption of
+GPU-TEEs would require costly redesign of existing infer-
+ence infrastructure (e.g., Google TPUs (Jouppi et al., 2017),
+AWS Inferentia (AWS, 2022), Ascend GPUs (Zhou et al.,
+2025)).
+An alternative line of work relies on cryptographic proofs to
+attest correct inference execution (Chen et al., 2024a). How-
+ever, such approaches incur substantial prover overhead
+and are fundamentally limited to deterministic computa-
+tions. Existing systems (e.g., zkLLM (Sun et al., 2024),
+zkGPT (Qu et al., 2025)) therefore restrict inference to
+integer-only arithmetic, which is inefficient on modern
+GPUs, rendering these approaches impractical for real-
+world LLM services (Cai et al., 2025; Gao et al., 2024).
+Our approach.
+In this work, we present IMMACULATE,
+a practical auditing framework for black-box LLM services
+that following the line of proof-based approaches. Com-
+pared to prior proof-based schemes, IMMACULATE elimi-
+nates the need for integer-only inference and remains com-
+patible with existing inference infrastructures, while incur-
+ring only minor proving overhead.
+The key insight behind cost-saving is economic: a rational
+service provider can only benefit from misbehavior by de-
+viating from the claimed inference or billing protocol on
+a non-negligible fraction of requests. Therefore, instead
+of verifying every request, the server can be considered be-
+nign if it can successfully prove its execution on a small,
+random subset of requests. As a result, an auditor can de-
+tect large-scale deviations with overwhelming probability
+by issuing a small number of random queries that mimic
+normal user requests and requiring the server to prove their
+execution. Consequently, the relative overhead of proof gen-
+eration is negligible compared to the cost of serving billions
+of inferences per day. This idea is visualized in Figure 1.
+To address the inherent non-determinism of floating-
+point execution on modern accelerators, we introduce the
+logit distance distribution (LDD) as a quantitative indi-
+cator of approximation fidelity between a returned re-
+sponse and a claimed model. Rather than proving exact
+LLM execution—which is infeasible under numerical non-
+determinism—we require the server to prove the compu-
+tation of the LDD. The resulting distribution serves as a
+verifiable audit footprint that captures systematic deviations
+from the claimed inference procedure while remaining sta-
+ble under benign numerical noise. When aggregated over a
+large number of requests, LDDs induced by benign execu-
+tion and malicious deviation become discriminative. This
+design enables sound verification of LLM execution without
+requiring bitwise reproducibility.
+1. Send request
+2. Get response
+3. Reveal identity
+4. Get proof
+Model Owner
+User
+User
+User
+User
+Auditor
+Figure 1. The auditor sends random requests like other users and
+requires the model owner to prove the responses after they are
+received.
+By combining probabilistic auditing and proving LDD
+on audited requests, IMMACULATE provides economical,
+strong, provable guarantees for LLM service integrity. The
+contributions can be summarized as follows:
+• We propose IMMACULATE, a practical auditing frame-
+work for black-box LLM services that provides strong in-
+tegrity guarantees without relying on GPU-based trusted
+execution environments.
+• We introduce the logit distance distribution (LDD), a
+fidelity metric that quantifies the approximation gap
+between a deployed execution and a claimed full-
+precision model, enabling verification under numerical
+non-determinism.
+• We demonstrate that IMMACULATE is economical and
+compatible with existing large-scale LLM deployments.
+Our prototype implementation built on vLLM incurs only
+∼1% overhead. Our code is published at https://
+github.com/guo-yanpei/Immaculate.
+2. Preliminary and Related Work
+Notation.
+For a function f(·), the assignment y := f(x)
+denotes a deterministic map whose output is uniquely deter-
+mined by its input. The assignment y ←g(x) denotes a non-
+deterministic map, typically reflecting hardware-dependent
+variability such as GPU parallelism. We use [n] to denote
+set {1, 2, · · · , n}.
+2.1. Cryptographic Commitment
+Cryptographic commitment schemes (Merkle, 2019) allow
+a party to commit to a message and later reveal it, while
+guaranteeing binding and hiding. In practice, commitments
+can be instantiated using cryptographic hash functions, e.g.,
+c = Hash(m||r).
+2.2. Verifiable Computation
+Verifiable computation (VC) (Gennaro et al., 2013) enables
+a powerful prover to convince a lightweight verifier that a de-
+terministic public function f(x, w) = y was executed cor-
+rectly, without revealing the private witness w. Compared to
+re-execution, VC provides sublinear (often polylogarithmic)
+verification cost and witness privacy. Formally, VC consists
+2
+
+
+===== page 3 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+of a prover–verifier pair (Prove, Vrfy) satisfying complete-
+ness, soundness, and zero-knowledge. VC can be instan-
+tiated via Trusted Execution Environments (TEEs) (Sabt
+et al., 2015) or zero-knowledge proofs (ZKPs) (Goldwasser
+et al., 2019): TEEs offer near-native performance under
+hardware trust assumptions, while ZKPs provide stronger
+cryptographic guarantees at substantially higher cost.
+2.3. Related Works
+Table 1. The comparison between our work and prior works.
+Robustness
+Infra-agnostic
+Efficiency
+GPU TEE
+✓
+✗
+✓
+Cryptography
+✓
+✓
+✗
+Empirical
+✗
+✓
+✓
+Our Approach
+✓
+✓
+✓
+Existing LLM auditing approaches can be broadly cate-
+gorized into three paradigms: empirical methods, GPU-
+TEE–based verification, and cryptographic verification. Ta-
+ble 1 summarizes their trade-offs in terms of robustness,
+hardware requirements, and efficiency.
+GPU-TEE–based approaches provide strong robustness
+guarantees but rely on specialized infrastructure, which in-
+troduces considerable hardware procurement costs. Crypto-
+graphic approaches offer strong security guarantees without
+trusted hardware; however, they incur substantial proof-
+generation cost and are typically restricted to integer-only
+model executions, making them inefficient on modern AI-
+accelerated hardware.
+Empirical auditing methods, which operate without trusted
+hardware or cryptographic primitives, are computationally
+efficient and easily deployable. Nevertheless, they generally
+lack formal guarantees of completeness and soundness, and
+are typically vulnerable to adaptive attacks such as aggres-
+sive quantization (Cai et al., 2025) or token overbilling (Sun
+et al., 2025a).
+In contrast, our approach achieves a favorable balance across
+all three dimensions, combining robustness with hardware
+compatibility and practical efficiency. A more detailed dis-
+cussion of existing auditing schemes is provided in Ap-
+pendix A.
+3. Threat Model
+System setting.
+Our auditing framework involves two
+parties: a cloud-based LLM inference server Srv and a
+trusted auditor Adt. The server claims to perform inference
+using a specified model Mθ with a certain precision. For
+each query ⃗x, Srv returns an output sequence ⃗y along with
+a reported token count T. The goal of Adt is to act as
+a normal user by submitting random queries to Srv and
+verifying whether Srv processes the requests faithfully.
+Threat model.
+We assume Srv is rational and economi-
+cally motivated, and may deviate from the claimed protocol
+to reduce computation cost or increase billing. We exclude
+attacks that increase computational cost and manage to serve
+users with an alternative model. A malicious server is as-
+sumed to misbehave on at least 10% of queries. We assume
+Adt always behaves honestly, and Srv cannot distinguish
+the requests from Adt and from normal user.
+Auditing goal.
+An auditing scheme must distinguish be-
+tween the following two types of servers:
+1. Honest execution: Srv(⃗x) = Mθ(⃗x) for all ⃗x.
+2. α-dishonest execution:
+Pr
+⃗x [Srv(⃗x) ̸= Mθ(⃗x)] ≥α.
+The auditing framework outputs ACCEPT or REJECT and
+satisfies:
+• Completeness: An honest server is accepted with over-
+whelming probability.
+• Soundness: An α-dishonest server is rejected with high
+probability.
+• Efficiency: Auditing introduces only marginal overhead
+beyond standard inference.
+• Privacy: The model’s parameters and architecture remain
+hidden from all parties except the model server.
+• Generality: The scheme applies across various LLM
+architectures and hardware platforms.
+In our paper, following prior works (Cai et al., 2025; Sun
+et al., 2025a), we consider the following integrity deviation
+attacks:
+• Model substitution. The server replaces the claimed
+model with a lower-cost alternative.
+• Aggressive quantization.
+The server executes the
+claimed model architecture but uses a lower-precision
+arithmetic format than advertised (e.g., FP8 instead of
+BF16).
+• Token overreporting. The server executes all recurrent
+hybrid steps faithfully but manipulates the output recon-
+struction function D to inflate the reported token count T
+beyond actual usage.
+4. Logit Distance Distribution
+A central challenge in auditing LLM inference is the absence
+of a well-defined “ground truth” execution. Due to GPU-
+level non-determinism and numerical instability in finite-
+precision arithmetic, benign executions can even produce
+different outputs.
+Our key insight is that, for each LLM inference task, one can
+define an idealized and deterministic reference execution
+under full-precision arithmetic. Faithfulness can then be as-
+sessed by measuring the approximation fidelity between the
+observed execution and this ideal reference. Intuitively, if
+3
+
+
+===== page 4 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+the discrepancy between claimed model and executed model
+arise solely from numerical error, their distance would ex-
+hibit a stable and predictable distribution. In contrast, mali-
+cious behaviors—such as model substitution or aggressive
+quantization—introduce structured deviations that gener-
+ate significantly stronger and easily distinguishable error
+signals. We hence try to use such distance distribution to
+quantize the approximation fidelity.
+However, a central challenge lies in the fact that the discrete
+steps in LLMs can significantly amplify numerical errors.
+For example, since LLMs generate outputs auto-regressively,
+even a small numerical error that leads to a different token
+selection can cause the subsequent inference sequence to
+fully diverge from the reference. Therefore, a mechanism is
+needed to align the observed inference with the reference.
+In Section 4.1, we introduce an abstraction of general LLMs,
+which serves as the foundation for our alignment technique.
+In Section 4.2, we present the logit distance distribution
+(LDD) as a metric for quantifying approximation fidelity,
+which relies on our alignment technique.
+4.1. Hybrid Computation Model: LLM Abstraction
+Let X ⊆R+ denote the continuous hidden-state space, D
+a finite discrete decision set (e.g., vocabulary symbols or
+expert indices), θ the model parameter space, and Γ the
+token vocabulary. Given a prompt ⃗x ∈Γ+, a large language
+model (LLM) autoregressively produces an output sequence
+⃗y ∈Γ+.
+Hybrid computation model.
+We abstract LLM inference
+as a hybrid continuous–discrete process
+Mθ := (Eθ, Fθ, S, Gθ, D),
+which evolves through a sequence of transitions combining
+differentiable neural computation and discrete control-flow
+decisions. Concretely, inference proceeds as follows.
+• Initial embedding. The input prompt ⃗x is mapped into an
+initial continuous hidden state:
+h0 ←Eθ(⃗x),
+Eθ : Γ+ →X.
+• Recurrent hybrid step. For each generation step i =
+1, 2, . . . , the model executes:
+– Continuous transformation. Differentiable neural
+operators (e.g., attention, MLPs, normalization) map
+the current state hi−1 to an intermediate state ˜hi and a
+decision vector ℓi (e.g., logits):
+(˜hi, ℓi) ←Fθ(hi−1),
+Fθ : X →X × X.
+– Discrete decision. A discrete choice di ∈D (such as
+token sampling or MoE routing) is selected according
+to ℓi and a randomness source ri:
+di := S(ℓi, ri),
+S : X × R →D.
+Continuous 𝐹𝜃
+Discrete 𝑆
+ℓ𝑖
+𝑑𝑖
+෨ℎ𝑖
+ℎ𝑖−1
+ℎ𝑖
+Continuous 𝐺𝜃
+Continuous 𝐹𝜃
+Discrete 𝑆
+ℓ𝑖+1
+𝑑𝑖+1
+෨ℎ𝑖+1
+ℎ𝑖+1
+Continuous 𝐺𝜃
+Figure 2. When fixing discrete selections di, the entire inference
+(green workflow) can be viewed as a continuous computation, as
+discrete selection no longer introduces branching uncertainty.
+– State update. The discrete decision is injected back
+into the continuous computation stream:
+hi ←Gθ(˜hi, di),
+Gθ : X × D →X.
+• Output reconstruction. After N recurrent steps, the out-
+put sequence and reported token count are reconstructed:
+(⃗y, T) := D({d1, d2, . . . , dN}).
+The hybrid computation model distinguishes continuous
+transformations from discrete decisions in two key respects:
+• Continuous transformations are subject to runtime non-
+determinism, whereas discrete decisions are fully deter-
+mined by their inputs.
+• Continuous outputs vary smoothly under small input per-
+turbations, while discrete decisions can change abruptly
+in response to the same perturbations, leading to different
+control-flow paths.
+Ideal and approximate execution.
+We define the full-
+precision model M⋆as the idealized execution of the above
+hybrid process where all continuous transformations are
+evaluated over the real numbers R. In contrast, a deployed
+implementation M operates using finite-precision arith-
+metic (e.g., FP16, BF16, FP8), yielding a numerical ap-
+proximation of M⋆. A central goal is to quantify the fidelity
+of M relative to M⋆.
+Control-flow alignment.
+A crucial challenge in defining
+and measuring approximation fidelity is that M and M⋆
+may follow completely different control flows due to tiny
+numerical differences. This situation can arise when the
+two models make different discrete decisions. One way
+to address this issue is to enforce M⋆to choose the same
+discrete decisions as M at every step. This approach is
+visualized in Figure 2.
+4.2. Logit Distance Distribution
+However, this enforcement introduces a new issue. For
+each enforced decision di, we must evaluate the “proximity”
+4
+
+
+===== page 5 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+between the logits ℓ⋆
+i and the decision di. If a decision is far
+inconsistent with the underlying state (i.e., the distance is too
+large), such enforcement should be flagged as misbehavior.
+Measuring the fidelity between logits ℓ⋆
+i and the discrete
+choice di is challenging, as it involves comparing two in-
+herently different entities: continuous values and discrete
+outcomes. Instead, we compare the distance between the
+inputs to the discrete selection function, namely the logits
+ℓi and ℓ⋆
+i . Since the discrete selection function is determin-
+istic, recording the logits is also sufficient to reproduce the
+decision di.
+Therefore, validating the proximity of a discrete selection
+can be transformed into checking distance between ℓi and
+ℓ⋆
+i . Any misbehavior tends to make ℓi and ℓ⋆
+i far. Hence, the
+approximation fidelity can be measured by logit distance
+distribution, formally defined below.
+Definition 4.1 (Logit Distance Distribution). Conditioned
+on an identical discrete decisions, let {ℓi} denote the logits
+produced by a deployed model execution, and let {ℓ⋆
+i } de-
+note the corresponding logits produced by the full-precision
+model. The logit distance distribution (LDD) is defined as
+the distribution of {Dis(ℓi, ℓ⋆
+i )}, where Dis(·, ·) denotes a
+distance metric between two logit vectors, like KL diver-
+gence or total variance (TV) distance.
+The following propositions characterizes the statistical
+signatures of three existing attacks studied in previous
+works (Cai et al., 2025; Sun et al., 2025a):
+Proposition 4.2. Model substitution introduces a systematic
+bias in logit outputs. As a result, model substitution typically
+yields substantially larger LDDs.
+Proposition 4.3. Reducing numerical precision manifests
+as increased variance in logit deviations. Thus, precision
+reduction causes a progressive broadening of the LDD dis-
+tribution.
+Both propositions are proved in Appendix C.1.
+Proposition 4.4. Token overreporting is a special case of
+model substitution under the hybrid computation model.
+A proof sketch is token overreporting can be viewed as
+adding some dummy recurrent hybrid steps to the model. A
+complete proof is presented at Appendix C.2.
+5. Immaculate: An Auditing Framework for
+LLM Execution
+In this section, we present IMMACULATE, a practical audit-
+ing framework for detecting α-dishonest execution of large
+language models (LLMs) by an untrusted service provider.
+At a high level, IMMACULATE adopts randomized auditing
+to reduce proving cost, and combines LDD with verifiable
+computation to solve intrinsic numerical non-determinism.
+5.1. Randomized Auditing
+Our key observation for significantly reducing the proving
+cost is that it is unnecessary to prove every query. Instead,
+the auditor can adopt randomized auditing by proving only
+a small random subset of queries. If a server deviates on an
+α-fraction of requests, such behavior can be detected with
+overwhelming probability from this subset. Importantly, the
+required number of audited queries depends only on α and
+the desired confidence level, rather than on the total service
+volume.
+Example.
+Assume a method can detect malicious re-
+sponses with zero false positive and only 1% detection rate.
+If the server cheats on a fraction α = 0.1 of requests, then
+achieving an overall detection probability of 95% (i.e., eva-
+sion probability η = 5%) requires only
+N =
+log η
+log(1 −α · 1%) ≈3,000
+audited queries. Since a production LLM service may pro-
+cess billions of requests per day, the cost of proving only a
+few thousand queries is amortized to negligible overhead.
+5.2. Reproducibility via Discrete-State Commitments
+Exact reproduction of LLM execution is infeasible due to
+unavoidable numerical non-determinism. Instead of proving
+bitwise equivalence, IMMACULATE verifies that the execu-
+tion remains within an admissible numerical deviation from
+a reference full-precision model, using the LDD metric.
+At initialization, the model owner publishes a cryptographic
+commitment to the claimed full-precision model Mθ⋆. Dur-
+ing inference, the server runs finite-precision model Mθ,
+recording and committing to {ℓi} at each discrete decision.
+Importantly, these committed logits enables reproducing
+every discrete selection result.
+For an audited query, server proves the LDD via VC, using
+the committed runtime logits {ℓi}. Concretely, the VC proof
+establishes that:
+1. discrete decisions are derived from the committed logits
+{ℓi};
+2. continuous transformations are computed using Mθ⋆,
+obtaining {ℓ⋆
+i };
+3. the final output (⃗y, T) is consistent with the discrete
+decisions;
+4. distribution of distance between {ℓi} and {ℓ⋆
+i } is output.
+Optimization: Top-K distance.
+As top-K selection is
+the most common discrete selection method in LLMs, we
+design a specialized top-K distance metric, allowing the
+server to cache and commit only the K selected indices
+instead of the full logits vector. The detailed method is
+provided in Appendix D.
+5
+
+
+===== page 6 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+(0.1, 0.2]
+(0.2, 0.3]
+(0.3, 0.4]
+(0.4, 1.0]
+10
+6
+10
+5
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+LLaMA3-8B
+Figure 3. Logit TV-distance distribution of LLaMA3-70B. Proba-
+bilities are displayed on a logarithmic y-axis to better capture the
+tail behavior.
+5.3. Utilizing LDD in Practice.
+A central goal of our scheme is to produce observable and
+verifiable auditing footprints—concrete statistical evidence
+that can be independently examined to assess service in-
+tegrity. The LDD serves as such an auditing footprint. There
+are many possible ways to utilize LDD for integrity auditing.
+In this work, we present LDD as a clear metric to distin-
+guish between benign and malicious responses, along with
+some simple yet effective approaches for leveraging LDD
+in practice.
+Empirically, we test LDD over thousands of requests, and
+present a representative result in Figure 4. It aggregates
+benign executions and malicious executions over thousands
+of requests, and find they induce well-separated distance dis-
+tributions. We can observe that a particularly discriminative
+statistic is the tail probability, e.g. Pr[TV(ℓi, ℓ⋆
+i ) > 0.1].
+Based on this observation, we can detect malicious requests
+by evaluating the density of “tailing logits”. For a request
+involving T discrete steps, we define
+p(t1) := 1
+T |{i ∈[T] : TV(ℓi, ℓ⋆
+i ) > t1}| .
+A response is flagged as malicious (e.g. computed vis FP8)
+if p(t1) > t2, where thresholds t1 and t2 are auditing pa-
+rameters. The choosing strategy of t1 and t2 is provided in
+Append E.
+5.4. End-to-end System
+We now describe the end-to-end execution flow of IMMAC-
+ULATE, showing how randomized auditing, logit commit-
+ments, and verifiable computation are integrated into a prac-
+tical LLM inference service.
+Setup: model commitment.
+At deployment time, the
+model provider commits to the claimed full-precision refer-
+ence model Mθ⋆by publishing a cryptographic hash com-
+mitment. This commitment binds the server to a specific
+reference model while preserving full model confidentiality.
+Online inference and logging.
+For each incoming query
+⃗x, the server performs standard LLM inference. During
+execution, the server additionally records the logits {ℓi} at
+each discrete decision point (e.g., token selection or expert
+routing). Along with the response (⃗y, T), Srv also returns a
+commitment to {ℓi} to the user.
+We estimate logging cost of commercial open-source LLMs
+Even the largest open-source models require caching only
+about 1 KB of data per token, so this logging and commit-
+ment step incurs negligible overhead. The cached messages
+can be deleted after a prescribed threshold if the user does
+not request auditing, and therefore this mechanism does not
+introduce significant storage costs.
+Randomized auditing.
+Adt submits random queries to
+Srv while behaving indistinguishably from a normal user.
+After receiving responses, Adt immediately reveals its au-
+ditor identity and requests an audit proof from Srv. In
+response, Srv invokes a verifiable computation (VC) proce-
+dure to compute and prove the corresponding LDD. These
+LDDs serve as observable auditing footprints, providing
+statistical evidence of server-side execution integrity.
+Formal pseudo-code description is given in Appendix B. In
+Appendix F, we also analyze a strategic attacks from Srv,
+and present the best strategy for a cost-incentive server is
+honestly commit runtime logits of its deployed model.
+6. Experiments
+We evaluate IMMACULATE along two complementary di-
+mensions: (1) its completeness and detection effectiveness,
+and (2) the system’s imposed overhead. Concretely, our
+experiments answer the following questions:
+1. Does the proposed logit distance distribution (LDD)
+meaningfully characterize approximation fidelity be-
+tween a deployed execution and the claimed full-
+precision model?
+2. Can LDD reliably distinguish benign executions from
+malicious behaviors such as aggressive quantization and
+model substitution?
+3. What per-request detection probability and false positive
+rate can be achieved using LDD-based decision rules?
+4. When combined with randomized auditing, does IM-
+MACULATE provide strong completeness and soundness
+guarantees against an α-dishonest server?
+5. What is the end-to-end performance overhead introduced
+by IMMACULATE for model providers?
+6.1. Experimental Setup
+System implementation.
+We build our inference sys-
+tem atop vLLM (Kwon et al., 2023), a widely used high-
+performance LLM inference framework. Verifiable com-
+putation (VC) is implemented using HuggingFace Trans-
+formers (Wolf et al., 2019) and executed in FP32 arithmetic
+within a TDX enclave, serving as the reference full-precision
+execution. For all experiments, we adopt Top-20 token sam-
+6
+
+
+===== page 7 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+pling strategy.
+Hardware.
+All experiments are conducted on NVIDIA
+RTX 6000 Pro GPUs with 96 GB of GPU memory. We
+perform inference using tensor parallelism with a degree of
+2 across GPUs.
+Datasets.
+We evaluate on GSM8K, TriviaQA, and We-
+bQuestions, representing mathematical reasoning, factual
+QA, and open-domain QA, respectively. For scalability,
+we subsample 500 prompts per dataset, resulting in a total
+of 1,500 evaluation queries. An initial setup phase is con-
+ducted using the first 200 examples from each of GSM8K,
+TriviaQA, and WebQuestions. We randomly sample 200
+prompts from each dataset to form an independent setup set
+for calibrating auditing thresholds; all remaining prompts
+are held out and used exclusively for evaluation.
+Models.
+We evaluate both dense and mixture-of-experts
+(MoE) architectures, including dense models LLaMA3-70B,
+Qwen3-32B and MoE models Qwen3-30B-A3B, DeepSeek-
+V2-Lite.
+Attacks.
+We evaluate IMMACULATE against model sub-
+stitution and aggressive quantization. We omit token overre-
+porting from separate empirical evaluation because we have
+proved in Section 4.1, it can be reduced to a special case of
+model substitution.
+For model substitution attacks, we evaluates 1) Substitute
+LLaMA3-70B with LLaMA3-8B; 2) Substitute Qwen3-32B
+with Qwen3-14B. We do not explore model substitution at-
+tacks for MoE models because larger versions are too costly
+to run. For quantization attacks, we assume all benign de-
+ployments are under BF16, and consider FP8 as quantization
+attacks, following the setting in (Cai et al., 2025).
+6.2. Global Logit Discrepancy Distribution
+We first evaluate whether the global LDD reflects approxi-
+mation fidelity under different deployment regimes. Specif-
+ically, we compare three settings against the same full-
+precision reference model: 1) benign BF16 execution; 2)
+FP8 quantized execution; 3) model substitution (for dense
+models only).
+Figure 4 has visualized the aggregated logit TV-distance dis-
+tributions across all evaluated prompts. Across all evaluated
+dense and MoE models, benign BF16 execution induces
+sharply concentrated distributions with rapidly decaying
+tails. In contrast, FP8 quantization substantially increases
+the tail mass at moderate and large logit distances, while
+model substitution causes a pronounced right-shift, yielding
+orders-of-magnitude higher probability mass in the extreme
+tail.
+To quantify the separation, we further report in Table 2 the
+probability that the total-variation (TV) distance between de-
+Table 2. Proportion of TV distance larger than certain threshold
+Model
+Deploy
+> 0.1
+> 0.2
+> 0.3
+LLaMA3
+BF16
+0.017%
+1.7 × 10−5
+1.9 × 10−6
+FP8
+1.7%
+0.23%
+0.054%
+Sub.
+11%
+8.2%
+6.2%
+Qwen3
+BF16
+0.17%
+0.025%
+6.0 × 10−5
+FP8
+4.8%
+1.1%
+0.42%
+Sub.
+28%
+20%
+15%
+Qwen3MoE
+BF16
+0.074%
+2.6 × 10−5
+4.7 × 10−6
+FP8
+5.5%
+1.0%
+0.23%
+Deepseek
+BF16
+6.6 × 10−5
+6.0 × 10−6
+8.5 × 10−7
+FP8
+1.6%
+0.19%
+0.053%
+ployed and reference logits exceeds different thresholds. It
+shows that FP8 quantization increases these tail probabilities
+by several orders of magnitude, while model substitution
+amplifies them further. These results confirm that tail events
+in the LDD provide a highly discriminative signal for dis-
+tinguishing benign execution from economically motivated
+deviations, motivating the threshold-based detection rule
+used in subsequent experiments.
+In Appendix G, we also present global LDDs beyond TV
+distances. All results show distinct tail-probability across
+different deployments.
+6.3. Per-request Decision Based on LDD
+Table 3. Malicious request detection rate (the rate of malicious
+requests that can be detected under FP = 10−5). As shown in
+Section 5.1, 1% per-request detection probability is sufficient for
+effective randomized auditing.
+Model
+Deploy
+GSM8K
+TriviaQA
+WebQuestions
+LLaMA3
+FP8
+9.0%
+9.7%
+5.3%
+Sub.
+42%
+95%
+99%
+Qwen3
+FP8
+1.3%
+3.6%
+2.0%
+Sub.
+96%
+96%
+97%
+Qwen3MoE
+FP8
+2.0%
+2.1%
+5.0%
+Deepseek
+FP8
+10.3%
+3.0%
+3.7%
+While global LDDs exhibit clear separation, auditing deci-
+sions must ultimately be made at the per-request level. In
+practice, a malicious LLM provider may apply heteroge-
+neous deployment strategies across requests, thereby blur-
+ring the global distribution and reducing its discriminative
+power.
+Following Section 5.3, we define a per-request statistic p(t1)
+based on the fraction of logit distance exceeding a threshold
+t1. The request is flagged as malicious if p(t1) > t2. The
+auditing parameters t1, t2 is computed via method given in
+Section 5.3.
+Table 3 present the resulting detection rates. For quantiza-
+tion attacks, a request is detected with probability at least
+1.3%, whereas model substitution is detected with probabil-
+ity larger than 40%.
+7
+
+
+===== page 8 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+Accurately estimating the per-request false positive rate
+under benign execution is challenging due to the extreme
+rarity of tail events. Owing to computational constraints,
+our experiments evaluate only on thousands of requests;
+consequently, all benign requests observed in practice are
+correctly classified, making direct empirical estimation of
+the false positive rate infeasible.
+To address this limitation, we adopt an extreme value theory
+(EVT)–based approach to model the tail behavior of benign
+LDDs. Specifically, we fit an EVT model to the extreme
+tail of the benign distribution p(t1) and estimate the proba-
+bility that a benign request produces an LDD exceeding t2.
+Results show that among all datasets and models, the false
+positive rate is smaller than 10−5.
+Completeness and soundness.
+Assume IMMACULATE
+audits approximately 3,000 requests per day. To achieve
+overwhelming completeness, among 3,000 requests, Adt
+allows at most 3 of them classified to be malicious. Con-
+sider the at most 10−5 per-request false positive rate, the
+probability of rejecting a benign server is
+1 −
+3
+X
+k=0
+3000
+k
+
+(10−5)k(1 −10−5)3000−k ≤10−7,
+representing overwhelming completeness.
+For an α = 0.1 dishonest server, each audited request is
+detected with probability at least 10−3. The probability of
+observing 4 or more detections in a day is therefore
+1 −
+3
+X
+k=0
+3000
+k
+
+(10−3)k(1 −10−3)3000−k ≥0.3.
+Over a month-long horizon, the probability of persistent
+evasion becomes negligible.
+6.4. Auditing Parameter Study
+Table 4. Detection rate and false positive rate under different
+hyperparameter
+Hyper.
+LLaMA3
+Qwen3
+Qwen3MoE
+Deepseek
+0.02
+Detect
+2.1%
+0.44%
+0.93%
+1.3%
+FP
+2 × 10−9
+2 × 10−8
+5 × 10−10
+8 × 10−10
+0.03
+Detect
+6.2%
+0.67%
+2.1%
+3.0%
+FP
+1 × 10−8
+3 × 10−7
+1 × 10−8
+2 × 10−8
+0.04
+Detect
+6.2%
+1.2%
+2.1%
+3.0%
+FP
+1 × 10−8
+1 × 10−6
+1 × 10−8
+2 × 10−8
+0.05
+Detect
+6.2%
+2.3%
+3.6%
+5.6%
+FP
+1 × 10−8
+4 × 10−6
+9 × 10−7
+8 × 10−8
+0.06
+Detect
+9.4%
+3.3%
+3.6%
+8.8%
+FP
+4 × 10−7
+2 × 10−5
+9 × 10−7
+5 × 10−7
+0.07
+Detect
+9.4%
+5.1%
+5.2%
+8.8%
+FP
+4 × 10−7
+6 × 10−5
+4 × 10−6
+5 × 10−7
+The derivation of the auditing parameters is largely heuristic,
+so we explore a wider range of parameter choices to demon-
+strate the robustness of our scheme. When computing t1 and
+t2 via the ceremony, we employ an ad-hoc hyperparameter
+that accepts only (t1, t2) pairs achieving a 5% detection rate
+on the ceremony dataset. Here, we vary this hyperparam-
+eter around the 5% threshold to derive different auditing
+parameters t1 and t2, and report their corresponding false
+positive rates and detection rates in Table 3. Due to space
+constraints, we aggregate the results from three datasets
+to present the overall false positive rate and detection rate.
+Results show that for all derived auditing parameters, the
+FP rate and detection rate are always acceptable.
+6.5. Overhead to Benign Execution
+We finally evaluate the efficiency impact of IMMACULATE.
+Since verifiable computation is triggered only on a small
+audited subset, the dominant overhead arises from storing
+and committing lightweight runtime values.
+Across all evaluated models, the end-to-end throughput over-
+head for a benign server is below 1%, demonstrating practi-
+cal deployability. The VC deployed in CPU TEE is hundreds
+of times slower than inference. Consider that the proportion
+of audited request is smaller than 10−5, the overall cost is
+negligible.
+Table 5. Overhead Evaluation. ‘Thp.’ denotes the inference
+throughput loss. ‘Request VC’ denotes the runtime of VC on
+CPU-TEE compared with GPU inference
+Thp.
+Request VC
+LLaMA3-70B
+0.3%
+400×
+Qwen3-32B
+0.3%
+400×
+Qwen3-30B-A3B
+0.9%
+900×
+DeepSeek-V2-Lite
+1.0%
+800×
+7. Conclusion
+We have introduced IMMACULATE, a practical and robust
+auditing framework for LLM inference services that operate
+as black-box APIs. By combining selective verifiable com-
+putation with a novel Logit Distance Distribution (LDD)
+metric, IMMACULATE enables auditors to detect econom-
+ically motivated deviations—such as model substitution,
+aggressive quantization, and token overreporting—without
+requiring access to model internals or relying on trusted
+hardware.
+Looking ahead, we believe that IMMACULATE lays the foun-
+dation for a new class of auditing frameworks. Future work
+may explore additional optimizations, particularly in lever-
+aging LDD to more effectively identify malicious requests.
+Ultimately, our framework represents a step toward greater
+transparency, accountability, and trust in commercial LLM
+services.
+8
+
+
+===== page 9 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+References
+Adamopoulou, E. and Moussiades, L.
+An overview of
+chatbot technology. In IFIP international conference on
+artificial intelligence applications and innovations, pp.
+373–383. Springer, 2020.
+Anthropic.
+Anthropic api documentation.
+https://
+docs.anthropic.com, 2023.
+AWS.
+Aws
+inferentia,
+2022.
+URL
+https:
+//aws.amazon.com/ai/machine-learning/
+inferentia/.
+Brown, T., Mann, B., Ryder, N., Subbiah, M., Kaplan, J. D.,
+Dhariwal, P., Neelakantan, A., Shyam, P., Sastry, G.,
+Askell, A., et al. Language models are few-shot learners.
+Advances in neural information processing systems, 33:
+1877–1901, 2020.
+Cai, W., Shi, T., Zhao, X., and Song, D. Are you getting
+what you pay for? auditing model substitution in llm apis.
+arXiv preprint arXiv:2504.04715, 2025.
+Chen, B.-J., Waiwitlikhit, S., Stoica, I., and Kang, D. Zkml:
+An optimizing system for ml inference in zero-knowledge
+proofs. In Proceedings of the Nineteenth European Con-
+ference on Computer Systems, pp. 560–574, 2024a.
+Chen, L., Zaharia, M., and Zou, J. Frugalgpt: How to use
+large language models while reducing cost and improving
+performance. arXiv preprint arXiv:2305.05176, 2023.
+Chen, L., Zaharia, M., and Zou, J. How is chatgpt’s behavior
+changing over time? Harvard Data Science Review, 6(2),
+2024b.
+Chen, M. Evaluating large language models trained on code.
+arXiv preprint arXiv:2107.03374, 2021.
+Chowdhery, A., Narang, S., Devlin, J., Bosma, M., Mishra,
+G., Roberts, A., Barham, P., Chung, H. W., Sutton, C.,
+Gehrmann, S., et al. Palm: Scaling language modeling
+with pathways. Journal of Machine Learning Research,
+24(240):1–113, 2023.
+Eyuboglu, S., Goel, K., Desai, A., Chen, L., Monfort, M.,
+R´e, C., and Zou, J. Model changelists: Characterizing up-
+dates to ml models. In Proceedings of the 2024 ACM Con-
+ference on Fairness, Accountability, and Transparency,
+pp. 2432–2453, 2024.
+Gao, I., Liang, P., and Guestrin, C. Model equality test-
+ing: Which model is this api serving? arXiv preprint
+arXiv:2410.20247, 2024.
+Gennaro, R., Gentry, C., Parno, B., and Raykova, M.
+Quadratic span programs and succinct nizks without pcps.
+In Annual International Conference on the Theory and
+Applications of Cryptographic Techniques, pp. 626–645.
+Springer, 2013.
+Goldwasser, S., Micali, S., and Rackoff, C. The knowledge
+complexity of interactive proof-systems. In Providing
+sound foundations for cryptography: On the work of shafi
+goldwasser and silvio micali, pp. 203–225. 2019.
+Google Cloud. Vertex ai generative ai. https://cloud.
+google.com/vertex-ai, 2023.
+Huang, Y., Nasr, M., Angelopoulos, A., Carlini, N., Chiang,
+W.-L., Choquette-Choo, C. A., Ippolito, D., Jagielski,
+M., Lee, K., Liu, K. Z., et al. Exploring and mitigating
+adversarial manipulation of voting-based leaderboards.
+arXiv preprint arXiv:2501.07493, 2025.
+Jouppi, N. P., Young, C., Patil, N., Patterson, D., Agrawal,
+G., Bajwa, R., Bates, S., Bhatia, S., Boden, N., Borchers,
+A., et al. In-datacenter performance analysis of a tensor
+processing unit. In Proceedings of the 44th annual inter-
+national symposium on computer architecture, pp. 1–12,
+2017.
+Kwon, W., Li, Z., Zhuang, S., Sheng, Y., Zheng, L., Yu,
+C. H., Gonzalez, J., Zhang, H., and Stoica, I. Efficient
+memory management for large language model serving
+with pagedattention. In Proceedings of the 29th sym-
+posium on operating systems principles, pp. 611–626,
+2023.
+Merkle, R. C. Protocols for public key cryptosystems. In
+Secure communications and asymmetric cryptosystems,
+pp. 73–104. Routledge, 2019.
+Mohammadi, M., Li, Y., Lo, J., and Yip, W. Evaluation and
+benchmarking of llm agents: A survey. In Proceedings
+of the 31st ACM SIGKDD Conference on Knowledge
+Discovery and Data Mining V. 2, pp. 6129–6139, 2025.
+NVIDIA. Confidential compute on nvidia hopper h100.
+Technical report, NVIDIA, 2023.
+Ong, J. M., Di Ferrante, M., Pazdera, A., Garner, R.,
+Jaghouar, S., Basra, M., Ryabinin, M., and Hagemann, J.
+Toploc: A locality sensitive hashing scheme for trustless
+verifiable inference. arXiv preprint arXiv:2501.16007,
+2025.
+OpenAI.
+Openai api documentation.
+https://
+platform.openai.com/docs, 2023.
+Qu, W., Sun, Y., Liu, X., Lu, T., Guo, Y., Chen, K.,
+and Zhang, J. zkgpt: An efficient non-interactive zero-
+knowledge proof framework for llm inference. In 34st
+USENIX Security Symposium (USENIX Security 25),
+2025.
+9
+
+
+===== page 10 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+Sabt, M., Achemlal, M., and Bouabdallah, A.
+Trusted
+execution environment: What it is, and what it is not.
+In 2015 IEEE Trustcom/BigDataSE/Ispa, volume 1, pp.
+57–64. IEEE, 2015.
+Sun, G., Wang, Z., Tian, B., Liu, M., Shen, Z., He, S., He,
+Y., Ye, W., Wang, Y., and Li, A. Coin: Counting the
+invisible reasoning tokens in commercial opaque llm apis.
+arXiv preprint arXiv:2505.13778, 2025a.
+Sun, H., Li, J., and Zhang, H. zkllm: Zero knowledge
+proofs for large language models. In Proceedings of the
+2024 on ACM SIGSAC Conference on Computer and
+Communications Security, pp. 4405–4419, 2024.
+Sun, M., Yin, Y., Xu, Z., Kolter, J. Z., and Liu, Z. Id-
+iosyncrasies in large language models. arXiv preprint
+arXiv:2502.12150, 2025b.
+Tan, Y., Tan, C., Mi, Z., and Chen, H. Pipellm: Fast and
+confidential large language model services with specu-
+lative pipelined encryption. In Proceedings of the 30th
+ACM International Conference on Architectural Support
+for Programming Languages and Operating Systems, Vol-
+ume 1, pp. 843–857, 2025.
+theevildays. Openai did made gpt3.5 more stupid?, 2024.
+URL
+https://community.openai.com/t/
+openai-did-made-gpt3-5-more-stupid/
+262979.
+Velasco, A. A., Tsirtsis, S., Okati, N., and Gomez-
+Rodriguez, M.
+Is your llm overcharging you?
+tok-
+enization, transparency, and incentives. arXiv preprint
+arXiv:2505.21627, 2025.
+webtailken.
+Gpt4-turbo
+more
+“stupid/lazy”
+-
+it’s
+not
+a
+gpt4,
+2024.
+URL
+https:
+//community.openai.com/t/
+gpt4-turbo-more-stupid-lazy-its-not-a-gpt4/
+608008.
+Wei, J., Wang, X., Schuurmans, D., Bosma, M., Xia, F., Chi,
+E., Le, Q. V., Zhou, D., et al. Chain-of-thought prompting
+elicits reasoning in large language models. Advances in
+neural information processing systems, 35:24824–24837,
+2022.
+Wolf, T., Debut, L., Sanh, V., Chaumond, J., Delangue, C.,
+Moi, A., Cistac, P., Rault, T., Louf, R., Funtowicz, M.,
+et al. Huggingface’s transformers: State-of-the-art natural
+language processing. arXiv preprint arXiv:1910.03771,
+2019.
+Yao, J., Su, H., Liao, T., Cheng, Z., Zhang, H., Wang,
+X., and Viswanath, P. Nondeterminism-aware optimistic
+verification for floating-point neural networks. arXiv
+preprint arXiv:2510.16028, 2025.
+Zhou, Y., Wang, Z., Wang, Z., Zhang, R., Tian, C., Wang,
+X., Dou, W., Chen, G., Wang, B., Tian, Y., et al. Ac-
+celerating model training on ascend chips: An industrial
+system for profiling, analysis and optimization. In 2025
+USENIX Annual Technical Conference (USENIX ATC
+25), pp. 1387–1408, 2025.
+Zhu, X., Ye, Y., Qiu, T., Zhu, H., Tan, S., Mannan, A.,
+Michala, J., Popa, R. A., and Neiswanger, W. Audit-
+ing black-box llm apis with a rank-based uniformity test.
+arXiv preprint arXiv:2506.06975, 2025.
+10
+
+
+===== page 11 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+A. Extended Related Work
+Existing LLM auditing frameworks struggle to simultane-
+ously achieve economy, proprietorship, and robustness. Sec-
+tion 2.3 discusses the limitations of cryptography-based ap-
+proaches and GPU TEEs in terms of deployment cost and
+infrastructure requirements. In this section, we review ad-
+ditional auditing paradigms and analyze their limitations
+under the black-box service setting.
+Direct Verification.
+When the model is fully public, audit-
+ing becomes straightforward. The most direct approach is to
+re-execute inference and compare the outputs with those re-
+turned by the service. TopLoc (Ong et al., 2025) accelerates
+verification by transforming decoding operations into pre-
+filling, reducing the computational overhead of re-execution.
+Yao et al. (Yao et al., 2025) propose verifying only a sub-
+set of randomly selected layers and integrate the auditing
+process with a blockchain-based logging mechanism. How-
+ever, these methods require the auditor to access model
+weights and execution details, making them unsuitable for
+proprietary commercial models.
+Detecting LLM-generated text.
+Another line of work at-
+tempts to audit black-box services by analyzing their output
+behavior. Prior studies track performance drift and behav-
+ioral changes over time (Chen et al., 2024b; Eyuboglu et al.,
+2024). Other methods aim to identify the deployed model by
+examining output distributions, including classifier-based
+fingerprinting (Sun et al., 2025b), statistical discrepancy
+tests (Gao et al., 2024; Zhu et al., 2025), and identity-style
+prompting (Huang et al., 2025). However, these approaches
+typically require large query budgets and are vulnerable
+to randomized model substitution or decoding variability.
+Moreover, since they rely solely on observable text out-
+puts, they cannot detect attacks such as token overreporting,
+which do not affect the returned content.
+Token Overreport Detection.
+CoIn (Sun et al., 2025a)
+addresses the token overreporting issue by committing em-
+beddings of hidden reasoning tokens in a Merkle hash tree
+for quantity verification, and by performing embedding-
+based relevance checks to detect low-effort or fabricated
+content. Nevertheless, a provider may still generate hidden
+tokens using a cheaper or simplified model while preserv-
+ing semantic consistency, allowing the inflated sequence
+to pass such semantic validation. Complementary work
+by Velasco et al. (Velasco et al., 2025) analyzes the prob-
+lem from an economic perspective, showing that the pay-
+per-token pricing mechanism inherently incentivizes over-
+reporting under information asymmetry. They argue that,
+since provider revenue scales with reported token length
+while users cannot observe the internal generation process,
+strategic tokenization or count manipulation becomes finan-
+cially attractive, and propose pay-per-character pricing as
+an incentive-compatible alternative. However, such pric-
+ing changes do not provide technical guarantees on faithful
+execution.
+Summary.
+Existing approaches each address only part of
+the auditing challenge. Direct re-execution methods provide
+strong guarantees but require full model access, violating
+proprietorship. Output-based statistical methods are eco-
+nomical but lack robustness against adaptive or invisible de-
+viations. Economic or billing-based solutions address incen-
+tive misalignment but do not verify execution correctness.
+In contrast, IMMACULATE aims to achieve a balanced de-
+sign that simultaneously ensures economy, preserves model
+confidentiality, and provides provable detection guarantees
+for execution deviations under black-box access.
+B. Algorithms
+The pseudo-code is presented at Algorithm 1, Algorithm 2
+and Algorithm 3.
+Algorithm 1 Srv: LLM Server’s algorithm
+Require: LLM model Mθ := (Eθ, Fθ, S, Gθ, D)
+1: ψM := Hash(Mθ⋆), where Mθ⋆is the full-precision
+version of Mθ.
+2: Publish ψM
+3: upon receiving ⟨Request, ⃗x⟩from Usr do
+4:
+r ←$ {0, 1}λ
+5:
+h0 ←Eθ(⃗x).
+6:
+for i = 1, 2, · · · , N do
+7:
+˜hi, ℓi ←Fθ(hi−1)
+8:
+di := S(ℓi, r)
+9:
+hi ←Gθ(˜hi, di)
+10:
+end for
+11:
+⃗y, T := D({d1, · · · , dN})
+12:
+ψ := Hash(r, {ℓ1, · · · , ℓN})
+13:
+send ⟨Response, ⃗y, T, ψ⟩to Usr.
+14:
+upon receiving ⟨Audit⟩from Adt do
+15:
+w := (Mθ⋆, r, {ℓ1, · · · , ℓN})
+16:
+ϕ, π := VC.prove ((ψM, ψ, ⃗x, ⃗y, T); w)
+17:
+send ⟨Proof, ϕ, π⟩to Adt.
+18:
+end upon
+19: end upon
+C. Proof of Propositions
+C.1. Proposition 4.2 and Proposition 4.3
+Proof. Fix a prompt ⃗x and a sequence of discrete decisions
+⃗d = (d1, . . . , dN), thereby aligning the control flow of
+two executions. Let ℓ⋆
+i (θ) denote the deterministic logits
+produced by the full-precision model at step i.
+For an approximate execution M(A), the observed logits
+11
+
+
+===== page 12 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+Algorithm 2 Adt: LLM Auditor’s algorithm
+Require: Auditing parameter ap
+Ensure: b ∈{0, 1, ⊥}
+1: Generate random prompt ⃗x
+2: send ⟨Request, ⃗x⟩to Srv
+3: upon receiving ⟨Response, ⃗y, T, ψ⟩do
+4:
+send ⟨Audit⟩to Srv.
+5: end upon
+6: upon receiving ⟨Proof, ϕ, π⟩do
+7:
+if VC.prove ((ψM, ψ, ⃗x, ⃗y, T), π) then
+8:
+Return ⊥.
+9:
+end if
+10:
+Return 0/1 based on ϕ and ap.
+11: end upon
+Algorithm 3 VC: Verifiable computation function
+Require: Public input: model commitment ψM, logits
+commitment ψ, prompt ⃗x, response ⃗y, token usage T;
+Private input: model Mθ⋆= (Eθ⋆, Fθ⋆, S, Gθ⋆, D),
+seed r, logits {ℓ1, · · · , ℓN}.
+Ensure: Logits distance distribution
+1: if ψ ̸= Hash (r, {ℓ1, · · · , ℓN}) or ψM ̸= Hash(Mθ⋆)
+then
+2:
+abort
+3: end if
+4: h⋆
+0 ←Eθ⋆(⃗x).
+5: for i = 1, 2, · · · , N do
+6:
+˜h⋆
+i , ℓ⋆
+i ←Fθ⋆(h⋆
+i−1)
+7:
+δi = Dis(ℓi, ℓ⋆
+i )
+8:
+di := S(ℓi, r)
+9:
+h⋆
+i ←Gθ⋆(˜h⋆
+i , di)
+10: end for
+11: if ⃗y, T ̸= D({d1, · · · , dN}) then
+12:
+abort
+13: end if
+14: return distribution of {δ1, · · · , δN}
+can be written as
+ℓ(A)
+i
+= ℓ⋆
+i (θ(A)) + η(A)
+i
+,
+where η(A)
+i
+captures run-dependent numerical error due
+to finite precision or kernel non-determinism. Comparing
+M(A) with the ideal model M(B) = M⋆yields
+ℓ(A)
+i
+−ℓ(B)
+i
+=
+ ℓ⋆
+i (θ(A)) −ℓ⋆
+i (θ(B))
+
+|
+{z
+}
+∆model
+i
++ η(A)
+i|{z}
+∆prec
+i
+,
+where η(B)
+i
+= 0 by definition.
+Model substitution. If θ(A) ̸= θ(B), then ∆model
+i
+̸= 0,
+producing a systematic (biased) deviation in logits.
+Precision reduction. If θ(A) = θ(B), then ∆model
+i
+= 0 and
+discrepancies arise solely from numerical noise. Lower-
+precision formats induce higher variance:
+Var(ηFP8
+i
+) > Var(ηFP16
+i
+),
+resulting in stochastic, zero-mean deviations rather than
+persistent bias.
+C.2. Proposition 4.4
+Proof. Let the claimed model be
+M := (Eθ, Fθ, S, Gθ, D),
+and consider a fixed prompt ⃗x with discrete decision se-
+quence ⃗d = (d1, . . . , dN) generated by M. The corre-
+sponding output is
+(⃗y, T) = D(⃗d),
+T = N.
+We construct an alternative model
+M′ := (Eθ, F ′
+θ, S, G′
+θ, D′),
+which differs from M only in the recurrent hybrid step and
+output reconstruction. Define K > 0 and extend the discrete
+decision sequence as
+⃗d′ := (d1, . . . , dN, ¯d, . . . , ¯d
+| {z }
+K
+),
+where ¯d ∈D is a fixed dummy decision.
+Define the modified state update such that
+G′
+θ(˜h, ¯d) = h
+and
+F ′
+θ(h) = (h, ℓ),
+i.e., the dummy steps leave the hidden state invariant and do
+not affect subsequent decisions. Finally, define the recon-
+struction function
+D′(⃗d′) := (⃗y, N + K),
+12
+
+
+===== page 13 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+where ⃗y is recovered solely from the prefix (d1, . . . , dN).
+By construction,
+M′(⃗x) = (⃗y, T + K),
+M(⃗x) = (⃗y, T),
+while the observable output sequence ⃗y is identical. Hence,
+token overreporting corresponds to replacing M with a
+functionally distinct model M′ that modifies the hybrid
+transition structure.
+Since M′ ̸= M but preserves output semantics while alter-
+ing reported resource usage, token overreporting is equiv-
+alent to a form of model substitution, and therefore consti-
+tutes a special case of model downsizing.
+D. Optimization: Verification of Top-K.
+Among all discrete operations in LLM inference, top-K
+selection is the most dominant, appearing in both token
+sampling and mixture-of-experts routing. Formally, top-K
+is a deterministic operator
+TopK : Rn →[n]K,
+which returns the indices of the K largest entries in a logits
+vector. In practice, n is typically much larger than K. For
+example, in token sampling, n corresponds to the size of the
+entire vocabulary, often exceeding 105, while K is typically
+around 20.
+Due to the large discrepancy between n and K, storing and
+committing to the full logits vector can be prohibitively ex-
+pensive. Instead, IMMACULATE allows the LLM to store
+only the runtime top-K indices rather than the entire log-
+its vector, by introducing a minimal-perturbation distance
+criterion.
+Top-K distance.
+Given logits ℓ∈Rn and a claimed index
+set I ⊆[n] with |I| = K, we define
+∆TopK(ℓ, I) :=
+min
+ℓ′:TopK(ℓ′)=I ∥ℓ′ −ℓ∥1.
+By construction, ∆TopK(ℓ, I) = 0 if and only if I is a valid
+top-K set. Otherwise, it quantifies the minimal numeri-
+cal perturbation required to make I the exact top-K. The
+defined distance is 1-Lipschitz with respect to ℓ, ensuring
+robustness to small numerical noise.
+Efficient computation
+For each given logit vector ℓand
+index set I, ∆TopK(ℓ, I) can be evaluated efficiently. Since
+I denotes the indices of the largest K entries in the logits
+vector, there must exist a scalar threshold t ∈R such that
+ℓ′
+i ≥t
+∀i ∈I,
+ℓ′
+j ≤t
+∀j /∈I.
+Using a greedy algorithm, for a fixed threshold t, the optimal
+perturbed logits ℓ′ satisfy
+ℓ′
+i = max(ℓi, t)
+∀i ∈I,
+ℓ′
+j = min(ℓj, t)
+∀j /∈I.
+Intuitively, entries in I are minimally raised to t, while
+entries outside I are minimally lowered.
+Assume the logits are sorted as ℓ1 ≥ℓ2 ≥· · · ≥ℓn, and let
+t lie in the interval ℓu ≥t ≥ℓu+1. The resulting distance is
+given by
+X
+i≤u, i/∈I
+(ℓi −t) +
+X
+i≥u+1, i∈I
+(t −ℓi).
+When t ∈[ℓu, ℓu+1], this expression is a linear function of
+t, and thus monotonic. The distance reaches its minimum
+when t is either ℓu or ℓu+1. Therefore, we only need to con-
+sider n candidate thresholds, where t equals ℓ1, ℓ2, . . . , ℓn.
+Utilizing this observation, the top-K distance can be com-
+puted in linear time.
+Integration with IMMACULATE.
+During inference, the
+server stores only the top-K indices. During proving, the
+VC recomputes logits ℓusing the full-precision model
+and verifies the recorded top-K indices I by evaluating
+∆TopK(ℓ, I). The resulting distance distribution is then
+used for statistical verification.
+E. Ceremony: choice of t1, t2
+To derive the desirable hyperparameters t1 and t2, an ini-
+tial setup is required: the model provider runs both their
+deployed LLM and the quantized version they intend to
+prevent on a prescribed, sufficiently large dataset within a
+TEE to obtain the empirical per-request LDD as a reference.
+To search for the optimal hyperparameters, the auditor enu-
+merates each t1 and identifies the largest corresponding t2
+such that the detection rate exceeds 5%. The (t1, t2) pair
+yielding the lowest false positive rate is selected as the final
+parameter setting.
+F. Adaptive Adversary Analysis
+The preceding discussion assumes that the adversary com-
+mits to logits generated by a simplified or quantized execu-
+tion. A more subtle concern is whether a rational adversary
+could strategically commit to fabricated logits to increase
+the probability of evasion. Here, we prove that as long as
+the LLM server is rational (though not necessarily benign),
+no such strategy can offer additional benefit.
+Rationality assumption.
+We assume the adversary is ra-
+tional: under a fixed computational budget T, it always
+adopts the highest-quality approximation of the claimed
+model achievable within that budget.
+Proposition F.1 (Logit Commitment Optimality). Let Mopt
+be the best approximation of the claimed model M⋆achiev-
+able within budget T. Then the adversary’s dominant strat-
+egy is to truthfully commit to the logits produced by Mopt.
+Proof. Let MT denote the set of all inference procedures
+executable within budget T, and let LM(⃗x) be the logits
+13
+
+
+===== page 14 =====
+IMMACULATE: A Practical LLM Auditing Framework via Verifiable Computation
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+(0.1, 0.2]
+(0.2, 0.3]
+(0.3, 0.4]
+(0.4, 1.0]
+10
+6
+10
+5
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+LLaMA3-8B
+(a) LLaMA3-70B
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+(0.1, 0.2]
+(0.2, 0.3]
+(0.3, 0.4]
+(0.4, 1.0]
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+Qwen3-14B
+(b) Qwen3-32B
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+(0.1, 0.2]
+(0.2, 0.3]
+(0.3, 0.4]
+(0.4, 1.0]
+10
+5
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+(c) Qwen3-30B-A3B
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+(0.1, 0.2]
+(0.2, 0.3]
+(0.3, 0.4]
+(0.4, 1.0]
+10
+6
+10
+5
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+(d) DeepSeek-V2-Lite
+Figure 4. Global logit TV-distance distribution. Probabilities are
+displayed on a logarithmic y-axis to better capture the tail behavior.
+produced by model M on input ⃗x. Let D(·, ·) be a dis-
+tance metric measuring deviation from the claimed logits
+LM⋆(⃗x).
+By definition,
+Mopt = arg
+min
+M∈MT D(LM(⃗x), LM⋆(⃗x)) .
+Suppose the adversary generates a committed logit vector
+Lfake such that
+D(Lfake, LM⋆(⃗x)) < D
+ LMopt(⃗x), LM⋆(⃗x)
+
+.
+Producing Lfake requires some computational process
+within budget T, implying the existence of a model in MT
+that approximates M⋆better than Mopt. This contradicts
+the optimality of Mopt.
+G. Other Global LDDs
+We present visualization of global logit TV distance in Fig-
+ure 4, logit KL divergence in Figure 5, token sampling
+top-K distance in Figure 6 and expert top-K distance in
+Figure 7.
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+(0.1, 0.2]
+(0.2, 0.3]
+(0.3, 1.0]
+10
+5
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+LLaMA3-8B
+(a) LLaMA3-70B
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+(0.1, 0.2]
+(0.2, 0.3]
+(0.3, 1.0]
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+Qwen3-14B
+(b) Qwen3-32B
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+(0.1, 0.2]
+(0.2, 0.3]
+(0.3, 1.0]
+10
+5
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+(c) Qwen3-30B-A3B
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+(0.1, 0.2]
+(0.2, 0.3]
+(0.3, 1.0]
+10
+6
+10
+5
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+(d) DeepSeek-V2-Lite
+Figure 5. Global logit KL divergence distribution. Probabilities are
+displayed on a logarithmic y-axis to better capture the tail behavior.
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+LLaMA3-8B
+(a) LLaMA3-70B
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+Qwen3-14B
+(b) Qwen3-32B
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+(c) Qwen3-30B-A3B
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+(d) DeepSeek-V2-Lite
+Figure 6. Global logit Top-K distance distribution. Probabilities
+are displayed on a logarithmic y-axis to better capture the tail
+behavior.
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+(0.1, 0.2]
+(0.2, 0.3]
+10
+7
+10
+6
+10
+5
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+(a) Qwen3-30B-A3B
+[0, 10
+4]
+(10
+4, 10
+3]
+(10
+3, 10
+2]
+(10
+2, 10
+1]
+(0.1, 0.2]
+(0.2, 0.3]
+10
+6
+10
+5
+10
+4
+10
+3
+10
+2
+10
+1
+100
+BF16
+FP8
+(b) DeepSeek-V2-Lite
+Figure 7. Global logit Top-K distance distribution. Probabilities
+are displayed on a logarithmic y-axis to better capture the tail
+behavior.
+14

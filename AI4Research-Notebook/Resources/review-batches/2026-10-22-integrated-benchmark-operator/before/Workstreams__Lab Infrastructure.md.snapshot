@@ -1,0 +1,59 @@
+---
+id: workstream-lab
+status: active
+source: Sources/Research Intent; Designs/cc-containerization-and-lab-isolation
+last_reviewed: 2026-10-22
+next_action: Use the optional Spark setup prompt for immediate deployment; keep M2 VM/factory work separate
+---
+# Lab infrastructure
+
+**Problem:** long-lived research/startup projects need durable independent environments to run and evolve AI4Research without mixing data, credentials, code or results. Each lab must be able to contribute useful changes back to the central project.
+
+The first lab runs on one host. Its manager creates sandboxes from pinned code and images, gives each separate runtime resources, observes them, and exports evidence outside disposable state. A sandbox may contain an AI4Research instance that evolves during its own work; its published candidate must identify what changed from the starting pin.
+
+## Durable project labs
+
+[[Designs/Durable Project Labs]] is the current lifecycle entrypoint. A lab accumulates a brief, knowledge, code, datasets, capabilities and evidence, can change models and evolve through bounded RSI, and exports versioned project/demo checkpoints. Identity/data survive compute replacement; backup/restore and state migration are core work. Next: one persistent lab through stop/start, restore and a model change before scaling autonomous improvements.
+
+## Initial boundary
+
+[[Resources/lab/README|The lab CLI]] is an operator tool outside the product hot path. Product agents do not receive the Docker socket or manager credentials. Existing sidecar and RSI contracts remain the reference for integration; this local prototype does not amend them.
+
+| Capability | Required evidence |
+|---|---|
+| Create pinned experiments | Exact commit, image digest, limits, and independent paths recorded |
+| Run simultaneously | Two sandboxes with distinct state; exclusive measurement jobs serialize |
+| Inspect and stop | Attributable lifecycle state and termination result |
+| Export | Logs, reports, artifacts, provenance, and integrity checks survive cleanup |
+| Recover | Interrupted operations reconciled without silently creating duplicate runs |
+| Contribute back | Patch or branch plus evidence; central adoption recorded separately |
+
+## Validation order
+
+Validate manager logic locally, then [[Resources/Lab Host Validation|real Docker lifecycle and isolation]], then the actual M1 image and API, and finally GB10 resources. GPU capability and performance findings require host-specific checks. A mock test cannot establish containment or GPU availability.
+
+The first prototype excludes distributed scheduling and automatic central promotion. Multi-owner labs and a lab network stay future extensions once this boundary is demonstrated.
+
+## Current target
+
+[[Designs/Lab Capsule and Factory Design Plan]] defines one evolving AI4R and independent factory/image store per VM, separate projects and selected contributions to a tested central base. The single-host prototype remains bounded evidence and reusable tooling. Next: Spark resource admission, ARM64 CPU guest qualification and M2 carrier/factory implementation.
+
+## M2 scope
+
+The user explicitly places VM labs, container CCs and independent factories in M2. [[Designs/Docker Architecture Review and Feasibility]] and [[Designs/Lab Capsule and Factory Design Plan]] now own feasibility, provisioning and development order. Earlier M1 references remain migration context, not scope restrictions on this work.
+
+## Spark development capacity
+
+[[Designs/Spark Shared Services and Storage]] replaces generic host assumptions with central models/inference and bounded VM-local images/caches on the supplied 128 GB/2 TB Spark. Next: real host inventory, ARM64 CPU VM qualification and resource admission before unattended growth.
+
+## Spark as a benchmark host
+
+[[Activities/2026-10-22 Spark Benchmark Host Direction]] records the updated direction: build images and prepare campaign inputs on development machines or a build service, stage only required images and inputs on Spark, run and inspect benchmarks there, then transfer verified results back. Spark is execution hardware, not the main development workstation. The benchmark prompt was already sent and remains unchanged; apply this to future Spark prompts and M2 sandbox planning. No transfer workflow has been tested.
+
+## Immediate Spark benchmark setup
+
+[[Resources/Coder Prompts/spark-benchmark-setup]] is the practical direct-host deployment handoff for the existing app and benchmark tooling. It uses Docker/Compose, isolated target state and bounded storage. It does not require VM qualification, a factory, a registry or the full M2 capacity controller. Benchmarking remains available on another compatible Docker host through [[Resources/Coder Prompts/benchmark-runner]]. The M2 sections above describe the longer-term architecture, not prerequisites for this setup.
+
+## Current app/runner deployment boundary
+
+For immediate task execution, AI4R builds exactly two images: `ai4r` (app) and `benchmark-runner` (CLI sidecar). [[Resources/Coder Prompts/benchmark-runner]] owns submission and durable artifact collection into user-selected output bind mounts; [[Resources/Coder Prompts/spark-benchmark-setup]] deploys that pair. This supersedes native-host runner installation and additional app replicas as requirements for the immediate setup. M2 VM/factory architecture remains separate.

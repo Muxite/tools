@@ -1,0 +1,84 @@
+{
+  "review_date": "2026-10-23",
+  "scope": "Read-only final/current artifact routing audit; report file only is new",
+  "source_hashes": {
+    "Home.md": "2c346ca1fb00d4fd7ff4bcbf1207a32a1918795c385b175849350a472fedf7d4",
+    "Designs/Design Library.md": "fd3e9ea6b34b1000eace366abca34ac7430703e3756435e559d0bd81e5b0b6fc",
+    "Resources/Artifact Library.md": "25e6154fde5a0aebe7a53a3aa1af19ea0c34d5c0098f927ec24d0f53c50a158c",
+    "Presentation Library/Deck Catalog.md": "59b8086aa9b76b7f941bc0a6314668460fc1d1ce2b395f76b9d94589ba79070a",
+    "Presentation Library/README.md": "9fc4f58ad9fc11a0f3786a65d207757abf70c9d69342ef484f759f2689652c3c",
+    "Designs/Paper2Agent Briefing/presentation/README.md": "0430d696be88ea5e3e52af704c0d986dc5b77d5022378193b3d13a7aa79ed032",
+    "Designs/Nuwa Briefing/presentation/README.md": "6a6d0a814cee33fad86973bf4ca8c3135e373f646104a984e5148548386d5bd1",
+    "Resources/tools/collect_artifacts.py": "0a8d273fce098bf6c46e25d7dc25b9d6356d7a4364c8ceb6824b660b3adb00d6",
+    "Sources/Prompts/2026-10-23-paper2agent-final-rev8.txt": "8372cc5b5c96a2cf83bb1567660d715157bba0666ba0f19e0ad0e3845e92fbe9"
+  },
+  "passes": [
+    {
+      "claim": "Paper2Agent rev8 is final; rev9 deliberately retired",
+      "evidence": [
+        "Sources/Prompts/2026-10-23-paper2agent-final-rev8.txt:1",
+        "Designs/Paper2Agent Briefing/presentation/README.md:10-12",
+        "Presentation Library/Deck Catalog.md:13",
+        "Resources/tools/collect_artifacts.py:224-228"
+      ],
+      "result": "No current route examined asks to recover or rebuild rev9. Historical build_pptx.py targets rev9 but README clearly labels it historical."
+    },
+    {
+      "claim": "Nuwa current alias matches human-interface-reviewed version",
+      "sha256": "0f53d6a8944053acd33dcca1f5493667c36514fcfa5438de7d5c2ca0cdf8bf93",
+      "evidence": [
+        "Designs/Nuwa Briefing/presentation/output/Nuwa Talk rev3.pptx",
+        "Designs/Nuwa Briefing/presentation/output/Nuwa Talk rev3 human-interface-reviewed.pptx",
+        "Designs/Nuwa Briefing/presentation/.build-orange/Nuwa Talk rev3 human-interface-reviewed.validation.json:finalSha256",
+        "Designs/Nuwa Briefing/presentation/README.md:68-70"
+      ],
+      "result": "Both file hashes equal receipt. Logical slide order parsed from presentation relationships and contents match human-to-skill current scope. This is byte/content inspection, not fresh visual render."
+    },
+    {
+      "claim": "Older decks retained",
+      "evidence": [
+        "Presentation Library/Deck Catalog.md:19-31"
+      ],
+      "result": "History and intermediate output decks are indexed; no recommendation to remove them."
+    }
+  ],
+  "findings": [
+    {
+      "priority": "medium",
+      "file": "Designs/Nuwa Briefing/presentation/README.md",
+      "line": 48,
+      "issue": "Active note still says validator retains missing-rev9 errors and older project unchanged. Later user confirmation retires rev9 and current routes have been repaired.",
+      "recommendation": "Date that earlier validation observation as history or replace its current-tense statement; retain original receipts."
+    },
+    {
+      "priority": "medium",
+      "file": "Resources/Artifact Library.md",
+      "line": 29,
+      "issue": "Important PRD and architecture documents are locally collected only through ZIP package lists; no direct curated document entrypoints.",
+      "recommendation": "Add Current documents table for PRD V10, architecture overview, CC contract and RSI note, with owner/status and direct local byte snapshots. Keep ZIPs for package-relative links/assets and label standalone source snapshots."
+    },
+    {
+      "priority": "low",
+      "file": "Designs/Design Library.md",
+      "line": 61,
+      "issue": "Historical collection table labels older native Paper2Agent presentation as current personal research presentation work, while user-confirmed final is vault rev8.",
+      "recommendation": "Label this separate earlier source briefing/history and keep final route directed to rev8."
+    },
+    {
+      "priority": "medium",
+      "file": "Presentation Library/Deck Catalog.md",
+      "line": 10,
+      "issue": "Workload Profiling checked r9 is collected but absent from Quick open and buried in bulk paths.",
+      "evidence": [
+        "../jiuwenswarm/docs/research/resource-aware-planning/presentation/README.md:15"
+      ],
+      "recommendation": "Add source-documented checked Workload Profiling Dense 2026-10-19 r9 Quick open route with date/scope; do not infer user-final status solely from filename."
+    }
+  ],
+  "limitations": [
+    "No exhaustive historical artifact semantic review",
+    "No changes to existing files during this audit",
+    "No visual render or native PowerPoint execution",
+    "Standalone reference snapshots may need package context for original relative links"
+  ]
+}

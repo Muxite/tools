@@ -1,0 +1,100 @@
+---
+id: nuwa-speaker-script
+status: planned-unrehearsed
+source: output/Nuwa Talk rev2.pptx
+last_reviewed: 2026-10-22
+next_action: Rehearse aloud and trim to the six-minute slot
+---
+# Nuwa speaker script
+
+Planned time: 5:50. Eight shown slides; two hidden backups. Not rehearsed aloud.
+
+## 1. Main slide
+
+TIME 0:20. Nuwa offers a way to turn documented thinking into reusable research methods. For AI4Research, the value is an authoring pattern: collect evidence, extract decision rules, and package them for repeated use. Today I will show the idea, one example, and how it could fit our capability factory. The integration is proposed; no accuracy gain has been measured.
+
+SOURCES
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/SKILL.md
+
+## 2. Main slide
+
+TIME 0:45. There are two kinds of value. The idea is to turn a useful way of thinking into something an agent can repeatedly apply: which questions to ask, which evidence to seek, and when a rule fails. That can support technical review, hypothesis critique, or experiment planning. The methodology gives us a repeatable authoring process, with research files, decision rules, contradictions, and limits. This could reduce repeated prompt writing and make a review easier to inspect. Paper2Agent packages operations; Nuwa packages analysis and judgment methods. Those are complementary kinds of reusable capability. Whether Nuwa improves our research outputs remains a testable hypothesis.
+
+SOURCES
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/SKILL.md
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/references/extraction-framework.md
+LOCAL CONTEXT
+Designs/skills-to-cc-mapping.md; Designs/Capability Capsule Factory Feature.md
+
+## 3. Main slide
+
+TIME 0:50. The workflow starts with a named person, topic, or need. Sources may be public, supplied locally, or restricted to the supplied corpus. Six research streams cover writings, conversations, expression, outside criticism, decisions, and the timeline. Each saves a research file. Synthesis then selects a small number of mental models and decision rules. A model should recur across domains, generate reasoning on new questions, and be distinctive. The output combines those rules with an answer workflow, source references, and limitations. Separate agents test known positions, unfamiliar questions, and style, followed by refinement. This is a set of instructions executed by the host agent, with helper scripts; it is not a standalone orchestration engine.
+
+SOURCES
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/SKILL.md
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/references/extraction-framework.md
+
+## 4. Main slide
+
+TIME 0:40. What do we actually get? A directory containing a skill file, research notes, and available source material. The skill states when to activate, which models and rules to apply, how to gather facts, and what its boundaries are. The research files let an author inspect where the rules came from. At use time, the agent classifies the question, obtains facts when necessary, and applies the framework. The repository calls this distillation, but there is no model training or weight change. A person skill also includes speaking style. A topic skill combines methods from several schools using neutral language, which is a useful option for AI4Research.
+
+SOURCES
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/references/skill-template.md
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/SKILL.md
+
+## 5. Main slide
+
+TIME 0:55. Here is a concrete use. The repository's Karpathy skill asks about the gap between a demo and reliable deployment, actual implementation evidence, and difficult edge cases. Suppose our research question is whether an agent method is ready for a long-running research workflow. The reusable method would ask for the task distribution, failure and recovery evidence, and reproducible code or evaluation records. Its output could be a structured review: a readiness judgment, supporting claims, unresolved risks, and suggested tests. For AI4Research I would package those useful questions and rules as an engineering-reliability review capability. Speaking in Karpathy's voice is optional. The research task, output schema, and capsule are illustrative proposals. We have not built or tested this conversion.
+
+SOURCES
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/examples/andrej-karpathy-perspective/SKILL.md
+LOCAL CONTEXT
+Designs/skills-to-cc-mapping.md
+
+## 6. Main slide
+
+TIME 1:00. The proposed fit has two separate flows. At authoring time, prepared and versioned sources enter a Nuwa-inspired workflow. It produces a candidate method package and an evidence bundle. Sources remain resources; the authoring stages and the generated product have separate identities. Before the product becomes an agent CC, define typed inputs and outputs, explicit needs and effects, budgets, failure behavior, and independent checks. It then goes through ordinary admission. At run time, the planner selects an admitted capability for a bounded task; current task evidence is supplied to it, and its structured output goes through the existing review and host-check paths. This is a proposed M2 factory extension, not current M1 behavior. A lightweight first step is to author and compare one framework package before building factory automation.
+
+SOURCES
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/SKILL.md
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/references/skill-template.md
+LOCAL CONTEXT
+Designs/skills-to-cc-mapping.md; Designs/Capability Capsule Factory Feature.md; Designs/Per Lab Capability Factory Design.md; Designs/CC Reference.md. Semantic verifier remains declaration + output only; input-dependent checks are separate.
+
+## 7. Main slide
+
+TIME 0:50. There is a useful evaluation idea here, but a limit. The same public material can supply both the extracted rules and the known-position questions. A pass then shows agreement on familiar material, with limited evidence of transfer. Different answering and judging agents reduce direct self-evaluation, but may still share model assumptions. The structural checker is weaker: our deliberately empty placeholder skill passed all six checks, including the source check without a source section. That is a test of the checker, not of persona quality. The right response is to preserve known-position checks while adding held-out source passages, genuinely new tasks, independent evidence checks, and a matched baseline. The repository's high fidelity scores are project-reported, not demonstrated AI4Research gains.
+
+SOURCES
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/references/fidelity-scorecard.md
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/scripts/quality_check.py
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/examples/elon-musk-perspective/FIDELITY.md
+
+## 8. Main slide
+
+TIME 0:30. The value is to make useful research and review methods explicit, inspectable, and reusable. The fit is a factory authoring pattern whose product becomes a bounded agent capsule after adaptation and admission. The next step is one technical-review framework, with a matched comparison against the same evidence without the framework. Continue if the method improves blinded task judgments at acceptable cost. The goal is better research behavior; resemblance to a famous person is only a secondary property.
+
+SOURCES
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/SKILL.md
+LOCAL CONTEXT
+Designs/skills-to-cc-mapping.md; Designs/Capability Capsule Factory Feature.md
+
+## 9. Backup
+
+BACKUP. Compare three arms: plain agent, agent with the same evidence, and agent with that evidence plus the Nuwa-derived framework. The second versus third isolates the framework contribution. Use matched model, tools, task inputs and budgets. Freeze held-out tasks and scoring criteria before generation; keep scorer keys unavailable to the authoring workflow. Assess supported conclusions, source correctness, calibration, failure behavior, cost, and latency. Persona-recognition scores are secondary. A small pilot establishes feasibility and useful failure cases; it cannot prove broad superiority.
+
+SOURCES
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/references/fidelity-scorecard.md
+LOCAL CONTEXT
+Designs/skills-to-cc-mapping.md; Experiments/CC Accuracy Study.md (context only; this is a separate Nuwa proposal).
+
+## 10. Backup
+
+BACKUP. Keep sources as versioned resources and the method as a separately pinned body. Add typed ports, explicit capabilities and effects, caps, failure behavior, and independently assigned checks. The semantic verifier sees declaration and output only. Input-dependent citation or source-presence checks belong in the separate host-check path. Adapt runtime-specific paths rather than hardcoding Claude's directory. The Nuwa instructions also need a clear policy for fact research versus source cutoff. This deck does not modify the maintained architecture or authorize automatic installation or promotion.
+
+SOURCES
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/SKILL.md
+https://github.com/alchaincyf/nuwa-skill/blob/7812110bf7e5a2b01b6aa5a738568044121bbfa2/references/skill-template.md
+LOCAL CONTEXT
+Designs/skills-to-cc-mapping.md; Designs/CC Reference.md; Designs/Capability Capsule Factory Feature.md; Designs/Lab Capsule and Factory Design Plan.md.
+

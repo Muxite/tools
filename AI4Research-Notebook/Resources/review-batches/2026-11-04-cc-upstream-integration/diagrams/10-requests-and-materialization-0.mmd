@@ -1,0 +1,11 @@
+flowchart TB
+    template["Reusable CC template"] --> request["Request: fixed contract and open choices"]
+    request --> implement["Coder in bounded workspace"]
+    implement --> resolved["Resolved declaration and implementation"]
+    resolved --> build["Factory build and validation"]
+    build --> release["Immutable CC release"]
+    release --> admission["Consumer admission and resource binding"]
+    admission --> instance["Call and execution attempt"]
+    instance --> receipt["Outputs and receipt"]
+    request -.-> resolution["Resolution: decisions and deliverable references"]
+    release --> resolution

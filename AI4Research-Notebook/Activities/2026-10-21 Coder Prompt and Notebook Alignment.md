@@ -1,0 +1,14 @@
+---
+id: activity-coder-prompt-notebook-alignment
+status: completed-documentation
+source: Sources/Prompts/2026-10-21-notebook-organization-request.txt; Sources/Prompts/2026-10-21-m1-benchmark-prompt-directions.txt
+last_reviewed: 2026-10-21
+next_action: Send the M1 prompt from Resources/Coder Prompts and retain actual implementation evidence
+---
+# Coder prompt placement and notebook alignment
+
+Moved the standalone workspace-root M1 benchmark/CI prompt into [[Resources/Coder Prompts/benchmark-runner]]. The coder-facing body is byte-identical; only notebook YAML metadata was added. The source was removed by the requested move, not duplicated. The move receipt and pre-edit hashes are in Resources/review-batches/2026-10-21-notebook-alignment.
+
+M2 design files were already correctly located in Designs and were not relocated. Consolidated their Home/design-index routes and linked the separate M1 handoff from the workstream, stage and agent reading guide. Clarified that working M1 code on another machine is user-reported, while local Docker receipts are dated/machine-specific. No code, acceptance evidence, original prompt or archived import was rewritten.
+
+Preserved exact user requests and earlier note bytes. No coder was messaged, and no runtime, deployment or cleanup test was performed. Notebook validation is recorded separately in the batch receipt.

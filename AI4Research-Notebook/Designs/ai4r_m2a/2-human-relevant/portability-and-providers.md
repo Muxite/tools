@@ -1,0 +1,53 @@
+---
+id: ai4r-m2a-2-human-relevant-portability-and-providers
+status: proposed-runtime-unverified
+source: ai4r_m2a/3-agent-reference/source-manifest.json
+last_reviewed: 2026-10-30
+next_action: Implement against the acceptance matrix and attach measured evidence
+---
+# Portable packages and explicit providers
+
+[Home](../README.md) · [Capsule overview](../1-human-required/02-capsules.md)
+
+## Package contract
+
+A package includes a manifest, member declarations, execution entrypoints, input/output schemas, required check definitions/implementations, fixtures, dependency lock, digest-pinned container image and build recipe, license/data-use metadata and concise usage guidance. Its immutable digest covers these files through a canonical file manifest; it cannot hash a mutable “latest” pointer. Category identity stays stable across releases; a changed member or checker creates a new release digest. Multiple releases may coexist for reproducibility.
+
+The capsule declaration supplies shared provider dependencies, effect ceilings and checks. Each member supplies its operation-level inputs, outputs, semantics, effects and checks. Effective permissions are the intersection of package ceiling, member declaration, caller authorization and hosting policy. Mandatory checks are the union of applicable package and independently bound task obligations. A member cannot expand the ceiling or remove checks.
+
+Capabilities can expose a skill/program, tool, MCP method, specialist agent, workflow or data retrieval/query interface. Data capability declarations include license, allowed audiences, provenance, modality and access conditions. A “data capsule” does not bypass permission or integrity checks just because it does not generate code. Category packages may combine kinds where their purpose is coherent.
+
+## Provider interfaces
+
+| Provider role | Minimum contract | Missing capability behavior |
+|---|---|---|
+| Artifact store | Scoped read, stage, seal/hash, persist receipt, publish manifest, resolve immutable ref | Block publication; retain recoverable staged work |
+| Model | Model identity/settings, scoped inference, usage, deadline/cancel semantics | MISSING_PROVIDER before model-dependent work |
+| Execution | Start, stable job ID, observe, cancel, reconcile, resource/effect enforcement, environment identity | Block unsupported side effects; never simulate completion |
+| Retrieval | Search/fetch with source identity/time, permitted snapshots and access controls | Return no evidence / unavailable with reason |
+| Human input | Ask, checkpoint, resume with answer identity | NEEDS_INPUT in headless mode unless an assumption was explicitly allowed |
+| Native agent | Bounded specialist task, scoped tools/context, child budget, receipts/output | Block delegated mode; do not silently swap to unverified free text |
+
+These are replaceable interfaces, not six mandatory new services. A local implementation may combine them. Secrets are injected by the host and never embedded in portable packages or public manifests. The standalone adapter must enforce declared effects in the real process/container/provider boundary; checking an effect string in JSON is insufficient.
+
+## Distribution and invocation
+
+Produce an installable portable runtime and package format with no import dependency on private research pipeline internals. Keep it in the existing repository if convenient. The default example should run in a clean environment with explicitly declared dependencies. Python, CLI and MCP adapters dispatch into the identical guarded runtime. An external caller can provide a simple local artifact store and environment; no agent platform is required for calculation, formatting or similar pure operations.
+
+Model/agent/executor-backed members document their external dependency honestly and provide a runnable configured example. Full standalone acceptance requires those examples to execute with real providers during qualification; canned provider fixtures only establish contract behavior. Delegated JiuwenSwarm can be an explicit provider, but ordinary capabilities must not acquire this dependency by accident.
+
+The external invocation context contains a caller/session ID, exact capability release, input refs/payload, acceptance-policy profile, effect authorization, budget/deadline and output destination under a caller-owned root. AI4R extends it with project/contract/evidence references. External profile minimum checks cannot be weaker than the member's mandatory requirements. A policy authority may add checks, never waive the package's mandatory ones through a convenience flag.
+
+Stable error codes and immutable receipts cross transports. CLI nonzero status accompanies rejected/blocked operations; MCP errors carry the same structured reason; Python returns a typed result or documented exception retaining the receipt. Long-running calls return a tracked job and require finalization. None treats successful HTTP/process exit as scientific acceptance.
+
+## Compatibility and interchange
+
+Use a new explicit schema namespace/version for M2a. Preserve legacy readers through adapters; never reinterpret a legacy version number with incompatible semantics. Versioned contract IDs cover structural shape plus declared units, modality and constraints. Start with equality and named admitted adapters. Rich subtyping and optimized vector routing are later improvements, not requirements for a sound first build.
+
+Optional benchmark result interchange and research packets are ordinary output contracts. Portability is proven by an independent caller without the AI4R package installed; AI4R integration is proven separately. Packaging a readme around a hidden dependency is not portability.
+
+## Container and lifecycle requirement — 30 October amendment
+
+The M2a release contract now requires an OCI-compatible image pinned by digest **and** a dependency lock. This sharpens the earlier “lock or environment recipe” wording: source-only packaging and local tests do not satisfy release qualification. External Python/CLI/MCP/subagent entrypoints invoke the same checked image through an ordinary compatible container runtime. AI4R remains optional. A skill may expose instructions and examples, but its verified execution uses the guarded entrypoint.
+
+[Packaging and trust](capsule-packaging-and-trust.md) defines host requirements, remote-provider limitations, clean add/remove, shared dependency ownership, retained reproduction assets and the protected evolution policy. Container setup reuses existing infrastructure; it does not require building a new lab controller.

@@ -1,0 +1,169 @@
+--- a/Home.md
++++ b/Home.md
+@@ -2,10 +2,15 @@
+ id: home
+ status: active
+ source: Sources/Prompt Register
+-last_reviewed: 2026-10-22
+-next_action: Use the M1 coder prompt for benchmark tooling and the M2 roadmap for Spark sandbox design
++last_reviewed: 2026-10-23
++next_action: Read the delivery-status note for current code, branch ownership and unverified runtime checks
+ ---
+ # Muk's AI4Research notebook
++
++## October 23 delivery status
++
++[[Activities/2026-10-23 Delivery and Verification Status]] separates pushed deployment tooling, the separate local Planner/capsule branches, passing software checks and unverified live execution. Start there for current implementation status; the older design/prompt routes below remain context.
++
+ 
+ This is the working home for your research, designs, code activities, experiments, presentations, and decisions. Start here to understand what matters now, then follow the evidence when you need detail.
+ 
+--- a/Active Stage.md
++++ b/Active Stage.md
+@@ -2,10 +2,15 @@
+ id: stage-cc-lab
+ status: active
+ source: Sources/Prompt Register
+-last_reviewed: 2026-10-21
+-next_action: Review the CC accuracy amendment and captured M1 baseline before implementation
++last_reviewed: 2026-10-23
++next_action: Run a real Docker campaign and qualify selected features without treating tests as research outcomes
+ ---
+ # CC effectiveness and a personal research lab
++
++## October 23 implementation checkpoint
++
++[[Activities/2026-10-23 Delivery and Verification Status]]: no-sudo deployment tooling is pushed through `6a70305`; the required typed Planner is separately committed at `9d8f21b` and is not merged into current M1. Local software checks pass within their stated scope. A live authenticated campaign and actual Spark validation remain outstanding; no CC effectiveness result is established.
++
+ 
+ **October 21 priority:** start with [[Project Overview]], [[Designs/CC Reference]], [[Experiments/CC Accuracy Study]], and [[Amendments/README]]. Accuracy is the first CC value claim. The semantic verifier remains declaration-and-output-only; input-dependent host checks are separate. [[Designs/Lab Progression]] tracks actual lab evidence independently. Earlier milestones below remain useful, but earlier two-arm pilot designs are superseded for the accuracy claim.
+ 
+--- a/Activities/Activity Register.md
++++ b/Activities/Activity Register.md
+@@ -71,3 +71,5 @@
+ - [[Activities/2026-10-23 Nuwa Orange Revision|Nuwa rev3]] — orange person-to-skill talk centered on AI4R methodological value; additional factory pipeline, Luna adversarial review and revised trial.
+ 
+ - [[Activities/2026-10-23 Capsule Branches and Factory Direction|Capsule branches and factory direction]] — separate committed features, fresh-checkout Windows/Linux checks, explicit qualification limits and hybrid factory recommendation.
++
++- 2026-10-23: [[Activities/2026-10-23 Delivery and Verification Status]] — reconciled pushed deployment revisions, separate Planner/capsule branches, actual verification scope and unresolved Docker/model/Spark work; original notes and exact prompts preserved.
+--- a/Resources/M1 Readiness.md
++++ b/Resources/M1 Readiness.md
+@@ -2,10 +2,15 @@
+ id: resource-m1-readiness
+ status: observed
+ source: Resources/review-batches/personal-collections-and-readiness.md
+-last_reviewed: 2026-10-21
+-next_action: Qualify the captured M1 runtime using its populated native task register
++last_reviewed: 2026-10-23
++next_action: Establish live campaign evidence and separately review the required Planner merge
+ ---
+ # M1 readiness
++
++## October 23 status update
++
++[[Activities/2026-10-23 Delivery and Verification Status]] is the current implementation/evidence summary. Deployment is pushed at `6a70305`; the Planner and optional capsules remain separate branches. Selected host/CLI and controlled Planner checks passed; live Docker/model/Spark and integrated M1 acceptance remain unverified. The following October 20/21 audit is preserved historical evidence and does not describe the newest checkout.
++
+ 
+ **October 21 update:** start at [[Resources/Current Baseline]] and [[Designs/Project Authority]]. The captured M1 source is d3d7f56; the old 98bd9d9 checkout remains intact. The populated register lives under `docs/code/Missions/M1/TASKS.md`. Registration-pending and compiler-only observations below concern older sources, not current implementation scope.
+ 
+@@ -38,7 +43,7 @@
+ 
+ Historical integrated snapshot heads are recorded in the review batch. Some snapshots have local modifications, so do not treat them as interchangeable trial bases.
+ 
+-## Status by evidence level
++## Historical status by evidence level (October 20/21)
+ 
+ | Level | Current assessment |
+ |---|---|
+--- a/Resources/Current Baseline.md
++++ b/Resources/Current Baseline.md
+@@ -2,10 +2,15 @@
+ id: resource-current-baseline
+ status: source-reviewed
+ source: Resources/verification/baseline-2026-10-21.json
+-last_reviewed: 2026-10-21
+-next_action: Qualify a runnable candidate before comparison and check remote drift at handoff
++last_reviewed: 2026-10-23
++next_action: Use dated source receipts and recheck the Docker engine before claiming runtime readiness
+ ---
+ # Current baseline and source delta
++
++## October 23 source and host update
++
++[[Activities/2026-10-23 Delivery and Verification Status]] records current source identities: pushed deployment implementation `6a70305`, separate local Planner `9d8f21b`. The latest engine probe cannot connect to Docker's Linux pipe. The available-engine observation below belongs to October 21 and is retained as history, not current readiness. Prior captured checkouts and receipts are preserved.
++
+ 
+ The original development checkout is preserved at **98bd9d913f9ddae5f0d6a3ae256bff10f25ee743**. The branch captured at implementation start is **d3d7f565c6c05ccf764fe0780fde149b7dc89b95**, in [the separate review worktree](../../AI4Research-Development/jiuwenswarm-m1-review-d3d7f56). Both remain available; no checkout files were edited. The [receipt](verification/baseline-2026-10-21.json) records changed paths and selected source hashes. A shallow-fetch update message does not establish ancestry; this review compares the exact two trees.
+ 
+@@ -29,6 +34,6 @@
+ | Verified | Notebook tests and separate lab receipts only; neither implies M1 acceptance |
+ | Accepted | No new integrated M1 acceptance or CC accuracy gain established |
+ 
+-## Host observation
++## Historical host observation (October 21)
+ 
+ On this continuation Docker Desktop responds with Linux server 29.8.0, x86_64, 16 CPUs and approximately 8 GB daemon memory. Ubuntu-24.04 resolves the Windows Docker CLI through WSL. This supersedes the earlier unavailable-daemon observation; it does not establish a native Ubuntu daemon or GB10 support. Real lab smoke checks belong in [[Designs/Lab Progression]]. A small lab container is not an M1 production runtime.
+--- a/Workstreams/M1 Design Code and Tests.md
++++ b/Workstreams/M1 Design Code and Tests.md
+@@ -2,10 +2,15 @@
+ id: workstream-m1
+ status: active
+ source: Resources/M1 Readiness; Sources/Research Intent
+-last_reviewed: 2026-10-21
+-next_action: Send the M1 benchmark/CI prompt and record the actual candidate and container evidence
++last_reviewed: 2026-10-23
++next_action: Follow current delivered-code status, then verify one real campaign and separately integrate feature branches
+ ---
+ # M1 design code and tests
++
++## October 23 implementation progress
++
++[[Activities/2026-10-23 Delivery and Verification Status]] records the actual delivered code and limits. The repository-owned sequential benchmark operations and no-sudo existing-image launch are pushed; required typed planning and optional work capsules remain separately committed. Follow the current runbook and distinguish local tests from a completed campaign or M1 acceptance.
++
+ 
+ **Problem:** the next research stage needs usable code and trustworthy test evidence. A coherent design package does not prove that its implementation exists or matches the current contracts.
+ 
+--- a/Sources/Prompt Register.md
++++ b/Sources/Prompt Register.md
+@@ -123,3 +123,7 @@
+ - [[Sources/Prompts/2026-10-23-nuwa-pipeline-order-explicit-value.txt|Nuwa pipeline order and explicit AI4R-value answer]] — slide 2 answers directly; exploration precedes extracted models/rules.
+ 
+ - [[Sources/Prompts/2026-10-23-nuwa-human-to-skill-critical-scope.txt|Nuwa critical scope correction]] — borrow the human-to-skill research interface; retain AI4R capability evidence and qualification.
++
++## October 23 delivery documentation
++
++[[Activities/2026-10-23 Delivery and Verification Status]] answers the exact request in `2026-10-23-document-delivery-and-extent.txt`; the capture hash and pre-edit/source receipts are retained.
+--- a/Sources/capture-manifest.json
++++ b/Sources/capture-manifest.json
+@@ -446,5 +446,12 @@
+     "sha256": "04b20770de9362f8a6745032423d5aab6a658effe822fa124991fa66764b5a46",
+     "capture_method": "exact visible user message as UTF-8 LF with terminal newline; not a transport export",
+     "captured_date": "2026-10-23"
++  },
++  {
++    "path": "Sources/Prompts/2026-10-23-document-delivery-and-extent.txt",
++    "sha256": "7c088e9543875a53beb274fbb2e3cba8868e9ae37bfcf5131f0195cdff38473a",
++    "capture_method": "exact visible individual user message as UTF-8 LF; terminal newline included; not a transport export",
++    "captured_date": "2026-10-23",
++    "original_message_timestamp": "unavailable; date denotes capture"
+   }
+ ]
+--- a/Designs/Agent Reading and Freshness.md
++++ b/Designs/Agent Reading and Freshness.md
+@@ -2,10 +2,15 @@
+ id: agent-reading-and-source-freshness
+ status: active
+ source: ../AGENTS.md; Project Authority.md; jiuwenswarm/docs/architecture/design-package/README.md
+-last_reviewed: 2026-10-22
++last_reviewed: 2026-10-23
+ next_action: Refresh only the source rows affected by a changed receipt; keep user intent and authority gaps explicit
+ ---
+ # Agent reading route and source freshness
++
++## Current delivery reading route
++
++For code status, exact branch/commit ownership and what was actually tested, start at [[Activities/2026-10-23 Delivery and Verification Status]]. Then follow its repository runbook or feature handoff. Earlier captured source and host observations stay dated; do not infer that a local feature branch was deployed because the deployment branch was pushed.
++
+ 
+ This page is a short route into the AI4Research knowledge library. It does not replace the maintained PRD, architecture, native task register, or runtime stores. Use it to find the owner for a question, then make claims from that owner’s current receipt.
+ 

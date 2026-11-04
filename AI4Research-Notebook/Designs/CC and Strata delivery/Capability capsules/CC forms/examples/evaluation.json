@@ -1,0 +1,108 @@
+{
+  "schema_version": "0.2.0-proposal",
+  "form": "evaluation",
+  "identity": {
+    "id": "cc.strata.storage-evaluation",
+    "revision": 1,
+    "issuer": "fixture-research-team"
+  },
+  "purpose": "Synthetic contract example. Artifact, result-tree and product references and numerical gates are illustrative; only the baseline Strata Git commit is inspected.",
+  "tags": [
+    "strata",
+    "gb10"
+  ],
+  "relations": [
+    {
+      "predicate": "evaluates",
+      "target": {
+        "uri": "implementation-patch.json",
+        "sha256": "bf7503f4283ae434d137c3f5d12fdbac5b47a69ca32a2fe6587e3d8034d53917",
+        "media_type": "application/vnd.ai4r.cc+json"
+      }
+    }
+  ],
+  "profiles": [],
+  "payload": {
+    "baseline": {
+      "uri": "fixture:baseline-lock",
+      "sha256": "daa7605b7967edf2686e454adc3992bfc4c62fc09f705780cb03c5f7edd45f28",
+      "media_type": "application/json"
+    },
+    "candidate": {
+      "uri": "implementation-patch.json",
+      "sha256": "bf7503f4283ae434d137c3f5d12fdbac5b47a69ca32a2fe6587e3d8034d53917",
+      "media_type": "application/vnd.ai4r.cc+json"
+    },
+    "request": {
+      "uri": "change-request.json",
+      "sha256": "83d5cde39d755159f7010833caa71a71aa1e65222ac8346ad4b4f68c1cf20e10",
+      "media_type": "application/vnd.ai4r.cc+json"
+    },
+    "workload": {
+      "uri": "fixture:paired-workload",
+      "sha256": "5db6f7de7d16c783bd4fee2c8a46195ed004c32f939942252367207f1322d73c",
+      "media_type": "application/json"
+    },
+    "request_tape": {
+      "uri": "fixture:prompt-tape",
+      "sha256": "b4418e9faedb6b3924faf445e2e24346223303961505cecd6f730e837da57097",
+      "media_type": "application/json"
+    },
+    "target_profile": {
+      "uri": "fixture:gb10-profile",
+      "sha256": "b9761aea2750ef5275a11e7a430344ef6863e5941beb57bdedbe94d2debd2665",
+      "media_type": "application/json"
+    },
+    "gates": [
+      {
+        "id": "disk",
+        "metric": "serving.unique-bytes",
+        "unit": "By",
+        "baseline": "locked-baseline",
+        "operator": "ratio-at-most",
+        "threshold": 0.85,
+        "evaluator": {
+          "uri": "fixture:protected-disk-check",
+          "sha256": "4271945a4bf1eeadf1024ca6ba97a00fa54ca32b4554b06fb15914fc4b2c814f",
+          "media_type": "application/json"
+        }
+      },
+      {
+        "id": "decode",
+        "metric": "decode.rate",
+        "unit": "token/s",
+        "baseline": "locked-baseline",
+        "operator": "ratio-at-least",
+        "threshold": 0.95,
+        "evaluator": {
+          "uri": "fixture:protected-speed-check",
+          "sha256": "4868cd81a50eb68808b4cd6a5ebca80cc7d456bb51a9018a213ed864dca6f012",
+          "media_type": "application/json"
+        }
+      },
+      {
+        "id": "quality",
+        "metric": "heldout.score",
+        "unit": "fraction",
+        "baseline": "locked-baseline",
+        "operator": "difference-at-least",
+        "threshold": -0.005,
+        "evaluator": {
+          "uri": "fixture:protected-quality-check",
+          "sha256": "0dc89e0be0bd860ed78be87241a4fb222d1ac0c899fd7c6d8a95db084283f84e",
+          "media_type": "application/json"
+        }
+      }
+    ],
+    "evidence_policy": {
+      "uri": "fixture:protected-evidence-policy",
+      "sha256": "2295d84b894473e34baff7a211841069fd53361bf214c6eecf3bb0e7420ebee6",
+      "media_type": "application/json"
+    },
+    "missing_evidence": "inconclusive",
+    "execution_requirements": {
+      "requires_resolved_product_lock": true,
+      "exclusive_host": true
+    }
+  }
+}

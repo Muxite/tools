@@ -1,0 +1,10 @@
+TIME 1:15
+SAY: Main points:
+- This is what a profile record would hold, using real numbers from the test machine, each task run alone
+- Decode reads the whole model per token, so memory is busy and tensor cores are not
+- Prefill and training lean on compute and tensor cores
+- Speech-to-text and NVENC leave the GPU almost idle in the test, so pairing them costs little
+- Which pairs collide follows from these fingerprints, and the pair matrix agrees in direction
+Supplemental points:
+- Kernel median 2.5 us for 3B decode, 77 us for CNN training fp32, from table B.4
+- Percentages are device counters during a solo run, so they belong to that task only because nothing else ran

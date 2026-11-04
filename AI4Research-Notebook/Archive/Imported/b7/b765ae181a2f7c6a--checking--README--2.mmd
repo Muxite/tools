@@ -1,0 +1,8 @@
+flowchart LR
+  Policy[Approved obligations and audience policy] --> Build[Protected review-context builder]
+  Output[Immutable output artifact] --> Build
+  Evidence[Protected host evidence; not disclosed] --> Build
+  Build -->|Declaration + exact output only| Review[Read-only semantic verifier CC]
+  Review --> Findings[Findings and evidence references]
+  Findings --> Host[Host validates and commits]
+  Build -->|Host Tier 1 or binding obligation unavailable| Stop[Non-advancing outcome]

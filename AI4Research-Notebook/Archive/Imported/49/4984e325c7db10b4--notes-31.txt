@@ -1,0 +1,8 @@
+TIME 1:15
+SAY: Main points:
+- DCGM says its profiling counters are device-level and conflict with Nsight
+- Per-process memory and kernel timelines survive sharing, but kernel durations include time the GPU spent on others (report.md:286)
+- So the quiet window is for SM, tensor and DRAM counters, not for everything
+- DCGM job statistics and MIG might give more attribution, the Spark preflight decides
+Supplemental points:
+- Clouds attach pod labels to DCGM metrics, but the counters stay device-wide

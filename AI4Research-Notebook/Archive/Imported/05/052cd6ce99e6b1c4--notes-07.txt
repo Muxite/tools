@@ -1,0 +1,10 @@
+TIME 1:15
+SAY: Main points:
+- In the vision every agent capsule's model calls run on a local model, so most of the GPU work is LLM prefill and decode
+- The verifier adds many short calls after every node, which is where batching matters
+- The builder and benchmark run experiment code, which have not been measured
+- The router decides which local models stay resident, which is a memory and quality trade-off
+- Parallel nodes and RSI put several jobs on the GPU at once, which is where the contention data applies
+- None of this is measured on AI4Research, it is the expected use
+Supplemental points:
+- Resource facts for the benchmark and builder come from the example declarations in the design package

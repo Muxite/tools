@@ -1,0 +1,52 @@
+---
+id: sandbox-lab-diagram-set-m2
+status: m2-proposal-for-discussion
+source: Designs/Sandbox Lab Design; Resources/review-batches/2026-10-26-sandbox-design-refresh/build_diagrams.py
+last_reviewed: 2026-10-26
+next_action: Walk through the seven views with the sandbox and CC proposal
+---
+# Sandbox Lab Diagrams
+
+**October 27 deployment selection:** use [the selected VM-per-lab view](../Lab%20Design%20Comparison/02-vm-per-lab.svg) and [[Designs/Sandbox Lab Design]] for current placement and selective JiuwenBox reuse. View 2 below retains the earlier optional-VM/shared-host proposal and is superseded for deployment choice. The other views remain supporting logical diagrams, not runtime evidence.
+
+Seven supporting views of the [M2 sandbox design](../Sandbox%20Lab%20Design.md). Start with view 4: persistent goals, revisable strategy and durable execution. The [replacement delivery plan](../Lab%20Capsule%20and%20Factory%20Design%20Plan.md) prioritizes a useful adaptive workload experiment. The lab model supports workload profiling, robotics and future domains. Blue boxes are research/application work, amber is infrastructure control, purple is qualification, and green is retained data. Containment boxes describe the scope named in each view; they do not prove an isolation property.
+
+The `.mmd` files define the diagrams. PNG and scalable SVG files are rendered projections; [hash manifest](manifest.json) records their identities. The [current render script](../../Resources/review-batches/2026-10-26-adaptive-sandbox/render_current_diagrams.py) reads these current definitions and renders this set; `--stem 04-adaptive-work` renders just the research loop. The older generator contains historical definitions and is not the current refresh command.
+
+| View | Question answered | Editable source | Scalable view |
+|---|---|---|---|
+| 1 Lab context | How do independent labs relate to master and central qualification? | [Mermaid](01-lab-context.mmd) | [SVG](01-lab-context.svg) |
+| 2 Runtime | Who controls execution, applications and storage? | [Mermaid](02-runtime-boundary.mmd) | [SVG](02-runtime-boundary.svg) |
+| 3 CC package | How do several operations share a version and bind to an application? | [Mermaid](03-cc-package.mmd) | [SVG](03-cc-package.svg) |
+| 4 Adaptive work | How do new findings revise future work while execution stays checked? | [Mermaid](04-adaptive-work.mmd) | [SVG](04-adaptive-work.svg) |
+| 5 Storage and recovery | What survives deployment replacement? | [Mermaid](05-storage-recovery.mmd) | [SVG](05-storage-recovery.svg) |
+| 6 Factory adoption | How does a candidate become available automatically? | [Mermaid](06-factory-adoption.mmd) | [SVG](06-factory-adoption.svg) |
+| 7 Domain profiles | How do profiling and robotics use the same contracts? | [Mermaid](07-domain-profiles.mmd) | [SVG](07-domain-profiles.svg) |
+
+## 1 Lab context and ownership
+
+![Lab context](01-lab-context.png)
+
+## 2 Runtime and infrastructure boundary
+
+![Runtime boundary](02-runtime-boundary.png)
+
+## 3 CC package and operation bindings
+
+![CC package](03-cc-package.png)
+
+## 4 Adaptive research and invocation acceptance
+
+![Adaptive work](04-adaptive-work.png)
+
+## 5 Persistent state and recovery
+
+![Storage and recovery](05-storage-recovery.png)
+
+## 6 Factory qualification and automatic local adoption
+
+![Factory adoption](06-factory-adoption.png)
+
+## 7 Shared contracts across domain applications
+
+![Domain profiles](07-domain-profiles.png)

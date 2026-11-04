@@ -1,0 +1,41 @@
+---
+id: ai4r-m2a-2-human-relevant-runtime-and-discovery
+status: proposed-runtime-unverified
+source: ai4r_m2a/3-agent-reference/source-manifest.json
+last_reviewed: 2026-10-29
+next_action: Implement against the acceptance matrix and attach measured evidence
+---
+# Runtime and discovery contract
+
+[Home](../README.md) · [Capsule overview](../1-human-required/02-capsules.md)
+
+## Research loop and state
+
+Native JiuwenSwarm owns the reasoning loop, delegation and existing session/job mechanics. AI4R exposes capsule discovery/invocation as governed native tools and attaches a durable research context. Avoid a shadow agent loop inside the capsule registry. Agent-local planning is advisory; no planner has authority to change permissions, data-use constraints, mandatory acceptance criteria or the budget ceiling.
+
+At each meaningful boundary the agent reads the current objective/contract revision, valid evidence, unresolved questions, pending jobs and remaining budget. It chooses a next action or a short batch, binds the call, examines checked observations and updates the agenda. It need not re-plan after a harmless internal token or every loop iteration. Parallel research branches may run when their effects and evidence dependencies do not conflict; the existing scheduler executes them. The binder records dependency versions, and the evidence store uses compare-and-swap on project revision to prevent two branches silently replacing the agenda or spending the same budget reservation.
+
+The project contract contains objective, user constraints, permitted effects, scientific acceptance obligations, deliverables, allowed uncertainty, budget limits and an escalation policy. Clarification is explicit: interactive mode may request a human answer and checkpoint; headless mode must either follow a pre-authorized assumption with provenance or return NEEDS_INPUT. Missing scientific parameters are not invented defaults. Intent compilation is optional for already structured requests; contract binding is never optional for consequential work.
+
+## Discovery and call binding
+
+1. Build a query from the immediate need and available input contracts, never from an entire unrestricted private history by default.
+2. Apply hard constraints: installed admitted release, matching input/output contracts, semantic constraints such as units, permitted effects/audience, provider/environment availability, qualification scope and budgets.
+3. Rank eligible declarations using semantic search plus contextual reliability evidence. Keep rejection reasons and candidate IDs so routing is auditable. A deterministic list/filter baseline must work without a vector service.
+4. Let the agent select or request a named adapter. Adapter chains are explicit, checked, budgeted work. Never hide conversion behind a compatibility label.
+5. Before effects, bind exact package/member/check/provider/environment versions, input references, task obligations, scopes, budget reservation and idempotency key. Revalidate eligibility and payload to prevent selection/dispatch races.
+6. Route all invocation surfaces through this same boundary. Discovery metadata is not execution authority.
+
+No eligible result is a useful observation: explain exclusions, request inputs, select a different approach or ask for capability acquisition. The system does not route to the nearest incompatible tool. Optional generated candidates enter admission before use. Capability discovery must not expose secrets or private data through public embeddings.
+
+## Interface responsibilities
+
+The portable boundary consists of `discover(query, constraints)`, `invoke(bound_call)`, `inspect(receipt_or_job)`, and `cancel(job)` semantics. Names and transports can follow the hosting SDK; behavior is normative. Discovery itself can live in AI4R, while packages remain directly callable without it. A registry records immutable release IDs/digests and mutable eligibility projections derived from admission and lifecycle events.
+
+Returning an asynchronous job handle means the dispatch was accepted, not that research output passed. Job observations and terminal receipts are separate. A completion call resolves the final output through the original bound obligations; a new contract cannot retroactively accept it. Polling/cancellation uses native infrastructure.
+
+Delegated specialists receive scoped inputs, effect ceilings, child budgets and output obligations. Their calls remain attributable to a parent invocation. Aggregate budgets include all children and checking costs. Generalist is not an unrestricted escape hatch, and recursive delegation has explicit depth/work limits.
+
+## Scope changes and knowledge freshness
+
+Invalidate evidence by explicit dependency links when a dataset, assumption, tool or protocol changes; do not erase the old result. A new library or model is a new candidate environment/release. Requalification can permit future calls while in-flight calls retain their pins. If exact historical dependencies become unavailable, disclose that reproduction limitation and retain inspectable snapshots/receipts. Record the publication/source retrieval date for claims about changing external facts.

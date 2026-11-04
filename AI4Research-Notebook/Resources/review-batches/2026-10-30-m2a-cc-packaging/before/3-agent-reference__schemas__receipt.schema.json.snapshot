@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai4r.local/schemas/m2a/receipt",
+  "title": "AI4R M2a receipt",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "2.0.0-m2a.1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "call_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "bound_call_ref": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "terminal": {
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "running",
+        "accepted",
+        "rejected",
+        "blocked",
+        "cancelled",
+        "unknown"
+      ]
+    },
+    "required_check_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+          },
+          "checker_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "verdict": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "UNAVAILABLE",
+              "INCONCLUSIVE"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "uri",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "id",
+          "checker_digest",
+          "verdict",
+          "evidence_refs"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "output_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+          },
+          "uri": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "media_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "audience": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "reproduction": {
+            "enum": [
+              "exact_replay",
+              "controlled_replication",
+              "evidence_inspection_only"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "uri",
+          "sha256",
+          "media_type",
+          "bytes",
+          "audience",
+          "reproduction"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "observed_effects": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "effect_state": {
+      "enum": [
+        "none",
+        "confirmed",
+        "unknown"
+      ]
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "cost_units": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wall_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "cost_units",
+        "wall_seconds",
+        "attempt"
+      ],
+      "additionalProperties": false
+    },
+    "reason_code": {
+      "type": "string",
+      "minLength": 1
+    },
+    "job_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parent_call_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "call_id",
+    "bound_call_ref",
+    "terminal",
+    "status",
+    "required_check_ids",
+    "checks",
+    "output_refs",
+    "observed_effects",
+    "effect_state",
+    "usage",
+    "reason_code",
+    "job_id",
+    "parent_call_id"
+  ],
+  "additionalProperties": false
+}

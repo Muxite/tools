@@ -1,0 +1,242 @@
+show how the agent could be in 1 corner and thus is closer to some capability capsules than others, some are far away and not that relevant.
+
+
+
+
+
+
+
+Wednesday 5:38 PM
+
+
+
+
+
+
+Worked for 28s
+
+
+
+
+Distance now represents relevance to the current task, which changes as the work evolves.
+
+[PNG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.png) · [Editable SVG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.svg)
+
+  
+Wednesday 5:39 PM
+
+
+
+
+
+
+
+each CC call goes through filter in the way that its success rang and issues can change and thus they may need reevaluation. less relevant now should be generalized, skills mcps agents are relevant, so just say like 1 is skill A the other is skill B, and they also have different colors so we can sort by type (cuz we know the inputs and outputs too). the pool filter shouldnt really be the CC verifiers. each CC has features, like a pool floatie has handles. perhaps the verifiers in CCs are handles, they make the tool easier to use. the pool probably shouldnt be the whole research state, the agent lives outside the pool. but when it comes to selecting what it needs to do and tools its gonna use (am i gonna make a python script, do i need a full program? do i need to run benchmarks, do i need to ask questions? so the agent sits outside the pool and dives in when it has things to do.
+
+
+
+
+
+
+
+Wednesday 5:53 PM
+
+
+
+
+
+
+Worked for 1m
+
+
+
+
+[PNG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.png) · [Editable SVG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.svg)
+
+  
+Wednesday 5:54 PM
+
+
+
+
+
+
+
+AI4Research Meeting Summary Topic: Capability Capsules (CC), tool validation, t…
+
+can you show the relation between capabilities and capaiblity capsules?
+
+
+
+
+
+
+
+Wednesday 5:57 PM
+
+
+
+
+
+
+Worked for 43s
+
+
+
+A capability is something the agent can use. A Capability Capsule packages related capabilities with their declarations, checks, verifiers, and shared dependencies.
+
+[PNG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capabilities-and-capsules.png) · [Editable SVG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capabilities-and-capsules.svg)
+
+  
+Wednesday 5:58 PM
+
+
+
+
+
+
+
+instead of color showing type, i mean color should be used as a shorthand to say its easy to filter for what ability can do what. if the input doesnt match what we need, we cant use it. make it more like a pool and less like a thin pptx flowchart
+
+
+
+
+
+
+
+Wednesday 6:42 PM
+
+
+
+
+
+
+Worked for 1m 8s
+
+
+
+Color now shows compatibility, while distance shows relevance among eligible capsules. Each floatie contains capabilities and has verification handles.
+
+[Download illustration](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool-illustrated.png) · [ImageGen prompt](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool-illustrated-prompt.txt)
+
+
+
+
+
+
+
+
+  
+Wednesday 6:43 PM
+
+
+
+
+
+
+
+" take all these failures and draft up a "super internal report" which is just …AI4Research Meeting Summary Topic: Capability Capsules (CC), tool validation, t…Capsule broken tools -> verified tools, present more positively. Routing tokens…
+
+use all this information to make a "ai4r_m2a" design, the design will outline, kinda like a micro version of the design package. its a 3 level structure with the human-requried reading at top, human relevant in 2nd level, and 3rd level is ai relevant schemas and other things. it is for making a super flexible system for ai4r that finally turns CCs into capsules of capabilities (needs potential schema adjustment and code changes) it makes CCs reusable as tools outside AI4R (all CC must become reusable outside AI4R, this means at worst they are like good tools and good skills, and when plugged into their intended system they are great). use diagrams. it should be in my library for now as an obsidian viewable package of some files linked together. it should be enough information for a coding agent to look back on and ask "am i actually following the plan? am i done building?" and be able to answer. This will also use a less node oreitned system, we will let jiuwenswarm do a lot of the planning and movement, and just supply a large good selection pool via CCs. be careful, be thorough, make adjustments where needed to make the design better. try to keep it testable so it can be coded reletively qucikyl and we can determine its quality and failure modes. it must be very very reliable. it must also produce artifacts. design this system, the 1st level of design must have diagrams for each area, like exampels of a flow, who is responsible for what, what things it supports, what initial capsules are gonna be converted to thsi system etc.
+
+here were some meeting notes
+
+
+
+
+
+
+
+Thursday 12:20 PM
+
+
+
+
+
+
+Worked for 32m 1s
+
+
+
+Created [**ai4r_m2a in your library**](C:/Users/m50066326/huawei/AI4Research-Notebook/Designs/ai4r_m2a/README.md), with three reading levels:
+- Human-required: system, capsules, reliability, artifacts and build scope—with diagrams.
+- Human-relevant: detailed behavior and a separate conversion guide.
+- Agent reference: seven schemas, fixtures and fourteen testable completion obligations.
+The core is independent of today’s code diff. It centers JiuwenSwarm’s adaptive research loop, portable CCs, scientific verification, durable recovery and reproducible artifacts.
+
+Covers 10 initial capsules and 20 capabilities. Package, notebook and portable-copy checks pass; runtime qualification remains explicitly NOT_RUN.
+
+[Portable ZIP](C:/Users/m50066326/huawei/AI4Research-Notebook-Backups/ai4r_m2a-20261029-design.zip)
+
+Automatic approval review blocked generated-cache cleanup (“blocked by policy”); the cache is excluded from the ZIP.
+
+  
+Thursday 12:52 PM
+
+
+
+
+
+
+
+make sure we have a "stage 1" as the first thing a coding agent should build towards, and then it can build the rest of the contents. 
+
+
+
+
+
+
+
+Thursday 1:31 PM
+
+
+
+
+
+
+Worked for 2m 36s
+
+
+
+Added [**Stage 1 — one dependable research loop**](C:/Users/m50066326/huawei/AI4Research-Notebook/Designs/ai4r_m2a/1-human-required/00-stage-1.md) as the mandatory first coding target.
+
+It delivers:
+- Two CCs: calculation and reporting, with three capabilities.
+- A real JiuwenSwarm-driven task with enforced checks and bounded recovery.
+- Checked results, a report, receipts and reproduction instructions.
+- Seven explicit exit criteria before proceeding to the remaining build.
+Updated the entrypoints, build diagram and machine-readable checklist. Package and notebook checks pass.
+
+[Updated portable ZIP](C:/Users/m50066326/huawei/AI4Research-Notebook-Backups/ai4r_m2a-20261029-stage1.zip)
+
+  
+Thursday 1:34 PM
+
+
+
+
+
+
+
+ architectured capability capsule line prolly doesnt need to include the CI stuff, we can say more about the CC. because it acts like a package of tools/skills/mcp (capabilities), it also includes gates, tracability, guards, and verfiers to enhance performance. functionally, the agent lives in a sanddbox and does a huge variety of things, and the capsules help it do that. unlike regular tools skills and mcps, the capsules are heavilly vetted to do their declared tasks. historical performance of capabilities is also tracked to ensure they reach a certain quality threshold and a trust level. effects are declared too. this keeps the agent tool space clena and high quality. at the same time, each capability brings its dedicated verifeirs along with it to increase accuracy. and best of all they arent proprietary to AI4R, they can be used outside AI4R like tools/skills/mcps/subagents even. the trade off is a higher upfront cost of development. the packaging format also allows them to be used in RSI loops and permisions for what can be RSIed or what its optimizing for cna be decided based on hisotircal evidence the capsules carry. you can write this down and figure out an angle that would work best for talking about this. i dont have benchmarks for each of these, but the design is backed by research and i have indeed made the design and its being built and trialed now in our project. also CCs pin depedencies for themselves too. they also allow efficienctly removing and adding from the tool space so to speak, its supposed to be a lil like spatiotemporal composability, tho thats an intended feature and im holdding that implementation for months in the future as its really not a big prioirty. we just allow removal and adding cleanly including dep removal. CCs are cotainerized and the usage of images allows us to really enhance repro (repro is quite important in RnD), and also cleanly set it up when they need to be used.
+
+try to make sure this is part of what our design can do
+
+
+
+
+
+
+
+12:48 AM
+
+
+
+
+
+
+Working for 16s
+
+
+
+I’ll fold this into the design and frame CCs as portable, vetted capability packages for a sandboxed research agent. I’ll make the dependency isolation, container images, performance history, trust thresholds and evidence-guided RSI boundaries explicit, while keeping measured results separate from intended benefits.

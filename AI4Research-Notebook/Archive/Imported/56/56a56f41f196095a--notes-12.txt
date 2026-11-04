@@ -1,0 +1,7 @@
+TIME 1:00
+SAY: Claims are picked out of paper text by a word rule, words like 'improves' or 'found', not by a model. Each claim is then judged by this table, top to bottom. Take a real test case: 'Reranker A improves ranking quality over reranker B.' The word 'improves' matches, the sentence and its section are hashed, and there's no experiment, so the table stops at 'partially supported', 0.85. That verdict certifies that the sentence is in its cited section, so a wrong or retracted paper passes. That's provenance, not truth. A claim judged insufficient still becomes a conclusion in the report, so the list of unsupported claims stays empty. And a claim the word rule misses never appears anywhere, so nothing shows it was missed.
+IF ASKED:
+- Cue words match by prefix, so 'founded' counts as 'found', and any digit makes a claim testable, a year too
+- A quoted span that no longer matches its hash is dropped silently; no gate reads the flag
+- The report's conclusions are filtered on evidence ids rather than verdicts (delivery.py:256-261)
+- The rules are English only

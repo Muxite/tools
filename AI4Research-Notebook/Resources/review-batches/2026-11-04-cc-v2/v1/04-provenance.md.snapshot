@@ -1,0 +1,85 @@
+---
+id: cc-protocol-04-provenance
+status: proposed-runtime-unverified
+source: November 3 single-CC workshop, M2a contracts and reviewed Muse addendum
+last_reviewed: 2026-11-04
+next_action: Replay against a qualified carrier before deployment
+---
+# Provenance and evidence
+
+## Evidence relationships
+
+```mermaid
+flowchart LR
+    output["Output"] -->|recorded by| receipt["Receipt"]
+    receipt -->|references| boundCall["Bound call and attempt"]
+    boundCall -->|pins instrument| cc["CC release"]
+    cc -->|resolved executable| tool["Tool image"]
+    build["Factory build record"] -->|subject| cc
+    boundCall -->|pins inputs| subject["Attempt subject manifest"]
+    subject --> engine["Candidate engine identity"]
+    subject --> data["Model and workload identities"]
+    subject --> env["Environment and lease"]
+    engine --> parent["Factory parent image"]
+    engine --> delta["Patch or configuration delta"]
+    engine --> restart["Binary identity and restart event"]
+```
+
+## Record ownership
+
+| Producer | Record and identity | What to verify |
+|---|---|---|
+| Factory | Build record `{release,builder,declaration_source,materials,products}`. Release is the manifest digest, builder is an authenticated identity, declaration_source pins original YAML, materials contains immutable source/recipe/base/lock descriptors and products lists resolved image subjects. For imported images retain upstream provenance or record its absence. | Check attestation issuer and subject against policy, verify retrieved bytes, Git commit/tree and image platform. Missing upstream lineage can limit qualification. The build record is external to its digest subject. |
+| Independent qualifier | Decision `{release,scope,policy,checks,evidence,decision}`. Scope fixes target and workload class, policy and evidence are Refs, checks name checker digests and outcomes, decision is admit or deny. | Verify authority, scope, freshness and revocation at dispatch. A successful build cannot attest to its own acceptance. |
+| Runner | Immutable bound call, attempt number, input-map Ref, effective environment and provider grants. Store ordered start/stop observations, job ID, UTC timestamps, checker identity and evidence. | Recompute stored hashes. Join each output to its named port, exact call and attempt. Attribute observations to their collector. Keep artifact bytes in scoped stores and identifiers in the ledger. |
+| Tool | Native output plus domain evidence the host cannot infer, such as trace coverage, sampling gaps, counter definitions, measurement units or software revision observed in-process. | Treat claims as observations. Missing samples remain missing. Preserve logs and raw data behind the policy's audience grants. |
+| Evaluator | Evaluation referencing candidate, baseline, workload, frozen rules, eligible receipts and limitations. | A complete measurement can yield a negative performance verdict. Missing host evidence can leave the comparison inconclusive even when the CC returned valid data. |
+
+## Minimum for a CPU call
+
+- Factory stores source and carrier identities once per release.
+- Host stores exact request, release, environment, checked output and receipt per attempt.
+- The author writes no provenance fields for data the host already owns.
+- Inline values are stored as exact UTF-8 JSON bytes with an artifact digest, just as files are hashed as exact bytes.
+- A locator finds bytes; an expected digest verifies them.
+- Restrict read scope before retrieval and never place credentials in evidence.
+
+## A locally adjusted Muse candidate
+
+- Register one attempt-input manifest with these subjects before measurement: parent Factory engine image, model index and shard set, tokenizer/configuration, workload/seed, effective run settings, hardware and host environment, and exclusive lease identity.
+- If the Lab adjusts source or configuration, persist the exact patch/config delta against that parent, resulting executable hash or immutable filesystem snapshot, and process restart event with observed executable identity.
+- Freeze that workspace for the scored attempt.
+- Pin the manifest as the input to the benchmark CC.
+- Keep the Lab agent's own inference provider separate from the engine under test.
+
+- Correlate raw per-request timings, host memory samples and engine counters using attempt ID and a common time basis.
+- Record sensor gaps.
+- A cache miss, logical file read and physical storage read are different observations.
+- After a crash, retain known input pins and partial traces with the final effect state.
+- Restoring a workspace or re-running a workload creates a new attempt with fresh authority.
+- A mutable path, PID alone, an image tag or a parent image alone cannot identify the software that actually ran.
+
+## Worked join · fixture `frozen-muse-attempt`
+
+Consider a Factory engine F and a separately released sampler P. A Lab agent changes one residency setting, restarts the endpoint and measures process generation 8. An evaluator starting from the raw samples must be able to recover these joins:
+
+| Look up | Required finding for that attempt |
+|---|---|
+| Samples → receipt → bound call | Port `samples`, attempt 1, CC release P, operation `run`, immutable input named `subject`. |
+| Subject → actual engine | Factory parent F, exact configuration delta, resulting configuration digest, unchanged binary digest, restart event and generation 8. A source edit additionally pins patch and rebuilt binary. |
+| Subject → comparison inputs | Model revision and shard-manifest digest, tokenizer/config digest, workload digest plus seed, batch/context limits, reserved GB10 environment and baseline arm identity. |
+| Receipt → evidence → evaluation | Raw timed requests and host samples from generation 8, accepted independent checks, units, aggregation window and any collection gaps. Compare using the frozen policy. |
+
+For example, a measured peak of 96 GiB against a 90 GiB baseline fails a requirement to reduce peak memory, even if quality passes. Those values are illustrative. If the change was never restarted or the host sample window missed the peak, the corresponding comparison is inconclusive.
+
+## Missing or conflicting lineage
+
+For native engine products, source-only delivery, anchored Git changes, multi-worker inference and JIT-generated code, apply the [Factory to Lab handoff](11-factory-lab-handoff.md). The actual loaded candidate and configuration are measurement subjects; a successful build or requested image alone does not identify them.
+
+Mismatched bytes fail verification. Missing prerequisites before dispatch block the call. Missing semantic evidence after dispatch makes the assessment inconclusive and prevents policy acceptance. It does not erase completed execution. Uncertain effects take precedence. Unknown optional telemetry remains an explicit limitation. Retain original observations and append any reconciliation record. Promotion requires independent comparison against the frozen policy.
+
+## New receipt interpretation
+
+Use document 03 for execution state, result completeness and semantic assessment. Baseline-valid outputs can be retained even when semantic assessment fails. A partial trace carries its precise coverage and can support a limited diagnosis. Consumers must record that limitation and cannot promote it to a full-window performance result.
+
+For an MCP or A2A provider, retain transport correlation, actual endpoint/deployment identity, adapter release and remote task identity where present. Keep opaque target handles in agent arguments and their resolved lease, process/workspace generation and immutable subjects in the host ledger.

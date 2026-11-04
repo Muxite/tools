@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant U as Local interactive user
+    participant C as Advanced compiler
+    participant H as Protected run control
+    participant V as Evaluator Gate
+    H->>C: Original request and frozen clarification budget
+    C-->>H: Material missing or conflicting requirement
+    alt Interactive and budget available
+        H-->>U: Attributable bounded clarification question
+        U->>H: Source-attributed answer
+        H->>C: Recorded answer within declared compilation
+        C->>V: Candidate intent or Brief plus source evidence
+        V-->>H: Independently checked acceptance or halt
+    else Headless or exhausted or failed prerequisite
+        H->>H: Record non-advancing outcome - never wait
+    end

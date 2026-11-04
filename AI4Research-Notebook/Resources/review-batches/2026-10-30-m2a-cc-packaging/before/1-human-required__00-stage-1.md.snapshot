@@ -1,0 +1,52 @@
+---
+id: ai4r-m2a-stage-1
+status: proposed-runtime-unverified
+source: ai4r_m2a/3-agent-reference/sources/stage-1-request.txt
+last_reviewed: 2026-10-29
+next_action: Build Stage 1 and prove each exit criterion before expanding scope
+---
+# Stage 1 — one dependable research loop
+
+[Package home](../README.md) · [Full build plan](05-build-and-done.md) · [Machine exit criteria](../3-agent-reference/stage-1.json)
+
+**This is the first implementation target for every coding agent. Complete its exit criteria before starting the remaining build waves.** Stage 1 makes the portable capsule core useful through native JiuwenSwarm, with a real checked artifact delivery. Passing it permits continuation; it does not mean M2a is complete.
+
+![Stage 1 before the remaining build](../diagrams/06-build.svg)
+
+## The demonstration to build
+
+Give the native JiuwenSwarm agent a small local numerical dataset and a structured research request: compute a specified summary and deliver a report supported by the calculation. Supply a prepared, versioned acceptance contract so building the intent and contract compilers is not on the critical path.
+
+Install two category capsules: **calculation**, exposing `calculate` and `normalize_table`, and **reporting**, exposing `markdown_report`. The agent selects compatible members using a simple declared-contract filter. It chooses whether normalization is needed and can repair a failed call within the bound budget. Do not hard-code a global normalize → calculate → report workflow. Use a clean dataset and a variant needing supported normalization to show different action choices.
+
+Produce actual `result.json`, `report.md`, `manifest.json`, call/check receipts and reproduction instructions. Every numeric claim in the report must match checked calculation evidence. A deterministic independent fixture oracle checks the answer; a real model-backed native agent drives the workflow. Mocked orchestration does not satisfy this demonstration.
+
+## Build only what this slice needs
+
+1. Load immutable category/member declarations, pins and a durable admission record for this local environment. Use real qualification fixtures; no caller-controlled bypass.
+2. Implement one guarded invocation path with actual input validation, effect limits, bound required checks, budgets, named errors and receipts. Bind it through Python, CLI, MCP and native JiuwenSwarm tools.
+3. Supply a small local artifact provider and trusted calculation/report checks. Store sealed output bytes and receipts before publishing the accepted manifest. No private research pipeline imports or fabricated stage context.
+4. Add a minimal durable project/call journal. Exercise restart at the receipt-to-publication boundary: recover the same checked delivery without losing evidence or publishing unchecked output.
+5. Run the positive, rejection, repair, portability and restart scenarios below. Record evidence against the Stage 1 IDs.
+
+This is the concrete exit definition of the previous Wave A, with the minimum discovery and restart behavior needed to prove a useful vertical slice. Reuse native agent/session/tool mechanisms. A local transactional store, ordinary files and deterministic filtering are sufficient.
+
+## Stage 1 exit criteria
+
+| ID | Required proof |
+|---|---|
+| S1-01 | Both category packages and all three members execute in a clean external environment without AI4R research internals. Dependencies and checks are explicit. |
+| S1-02 | Python, CLI, MCP and the native binding use the same guarded path. Wrong input, forbidden effects and missing/failed required checks cannot produce accepted output. |
+| S1-03 | A real JiuwenSwarm agent completes the clean and normalization-needed tasks; observed traces show input-dependent choice, checked results and the declared budget. |
+| S1-04 | An injected repairable failure produces a named rejection and bounded correction or alternative. Persist both attempts; reject unsupported values rather than inventing them. |
+| S1-05 | A real delivery contains the result, evidence-linked report, manifest, receipts and reproduction instructions. Independent recomputation matches the accepted result. |
+| S1-06 | Restart between durable receipt and manifest publication recovers exactly one accepted delivery; missing or changed output bytes prevent publication. |
+| S1-07 | Record exact code/environment/model/checker pins, runnable commands and observed results for all six preceding criteria. A reviewer can rerun the deterministic checks and inspect the native traces. |
+
+All seven must PASS. A named rejection can satisfy a negative test, but cannot substitute for the successful positive demonstration. Only actual results update runtime status; design fixtures and schemas are not evidence that Stage 1 works. [Stage 1 status](../3-agent-reference/implementation-status.json) starts at NOT_RUN.
+
+## After Stage 1
+
+Continue to Wave B (intent, contract, literature and richer research revision), then Wave C (all remaining members, durable asynchronous jobs and complete delivery), then Wave D (full fault qualification and matched research trials). The full M2A obligations remain open until independently proven across their complete scope.
+
+Defer learned/vector routing, the other capsule members, factory/RSI automation, general-purpose remote execution, the 24-hour run and the 36-run comparison to their existing later milestones. Stage 1 proves a small local slice, not unattended long-run reliability or scientific superiority. Do not add these deferred features before the Stage 1 exit unless a concrete failing exit criterion requires the dependency.

@@ -1,0 +1,536 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai4r:design:0.3:cc",
+  "title": "One installable capability capsule",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.3.0-proposal"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "draft",
+        "qualified"
+      ]
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "takes": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "unknown"
+            },
+            "question": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "status",
+            "question"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "suggested",
+                "required"
+              ]
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                  },
+                  "contract": {
+                    "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+                  }
+                },
+                "required": [
+                  "name",
+                  "contract"
+                ]
+              },
+              "minItems": 0,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "status",
+            "items"
+          ]
+        }
+      ]
+    },
+    "gives": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "unknown"
+            },
+            "question": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "status",
+            "question"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "suggested",
+                "required"
+              ]
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                  },
+                  "contract": {
+                    "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+                  }
+                },
+                "required": [
+                  "name",
+                  "contract"
+                ]
+              },
+              "minItems": 0,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "status",
+            "items"
+          ]
+        }
+      ]
+    },
+    "needs": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "unknown"
+            },
+            "question": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "status",
+            "question"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "suggested",
+                "required"
+              ]
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                  },
+                  "constraint": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reader_abi": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "min_memory_mib": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "device_class": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "provider",
+                  "constraint"
+                ]
+              },
+              "minItems": 0,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "status",
+            "items"
+          ]
+        }
+      ]
+    },
+    "changes": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "unknown"
+            },
+            "question": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "status",
+            "question"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "suggested",
+                "required"
+              ]
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "scope": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                  },
+                  "action": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scope",
+                  "action"
+                ]
+              },
+              "minItems": 0,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "status",
+            "items"
+          ]
+        }
+      ]
+    },
+    "guarantees": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "unknown"
+            },
+            "question": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "status",
+            "question"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "suggested",
+                "required"
+              ]
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                  },
+                  "definition": {
+                    "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+                  }
+                },
+                "required": [
+                  "id",
+                  "definition"
+                ]
+              },
+              "minItems": 0,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "status",
+            "items"
+          ]
+        }
+      ]
+    },
+    "carriers": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "urn:ai4r:design:0.3:common#/$defs/oci"
+          },
+          {
+            "$ref": "urn:ai4r:design:0.3:common#/$defs/recipe"
+          }
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "entrypoint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "carrier_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "takes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "gives": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "needs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "changes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "id",
+          "description",
+          "entrypoint",
+          "carrier_index",
+          "takes",
+          "gives",
+          "checks",
+          "needs",
+          "changes"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "qualification": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:ai4r:design:0.3:common#/$defs/profile"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "version",
+    "state",
+    "purpose",
+    "tags",
+    "takes",
+    "gives",
+    "needs",
+    "changes",
+    "guarantees"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "qualified"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "carriers",
+          "operations",
+          "qualification"
+        ],
+        "properties": {
+          "takes": {
+            "properties": {
+              "status": {
+                "const": "required"
+              }
+            }
+          },
+          "gives": {
+            "properties": {
+              "status": {
+                "const": "required"
+              },
+              "items": {
+                "minItems": 1
+              }
+            }
+          },
+          "needs": {
+            "properties": {
+              "status": {
+                "const": "required"
+              }
+            }
+          },
+          "changes": {
+            "properties": {
+              "status": {
+                "const": "required"
+              }
+            }
+          },
+          "guarantees": {
+            "properties": {
+              "status": {
+                "const": "required"
+              },
+              "items": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "qualification"
+          ]
+        }
+      }
+    }
+  ]
+}

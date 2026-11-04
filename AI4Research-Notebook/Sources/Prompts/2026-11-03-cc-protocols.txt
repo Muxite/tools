@@ -1,0 +1,52 @@
+based on the CC schemas and use of CCs and the most recent presentation, try to make semantics or a central protocol for CC. it needs to be light enough and unified. it cant be too overly demanding beyond the needs of the majority of its tools. so CC will have its own kind of syntax. it must serve all the use cases of CC. such that you could make CC factory into a CC "compiler" it takes the syntax and it builds the package (image?) that does the exact thing. the communications in and out of a CC also must be standardized. maybe its a container and it has specific inputs and outputs and error cases. so it needs to be generalized, but most importantly it must fit our strata muse spark open system. so we need syntax for a CC contract formalized and standardized. the declarations, the ids, all the fields must be determined and made into a central CC semantics document (CC protocols) as a folder of md files. 
+
+
+also provennance
+
+
+when testing it must work for a wide variety of CCs and use cases, say a profiler that a lab agent will use. the format of CC must be something thats very easy to have as a standard and is of good quality without conflicts or repetition in fields, and declarations are clean. for the readme of the protocol document, there should be alteast 1 diagram that will show the connections to CC. what is CC and what does it do? we already ahve design for declarations and we gotta improve it and make it unified semantics. we need something good that we can improve later. the user of the CC must have a very clear idea of what each CC is gonna do. atleast make sure these semantics work for software factory and the strata muse spark project.
+
+
+PLEASE IMPLEMENT THIS PLAN:
+# CC Protocols — a unified declaration and invocation standard
+
+Create a self-contained `CC Protocols/` folder under **Designs → CC and Strata delivery**. Use the November 3 single-CC declaration as the starting point, the M2a call and receipt contracts for runtime behavior, and the reviewed Strata/Muse Spark presentation for the Factory and Lab workflows.
+
+**A Capability Capsule (CC) is a versioned, installable package that exposes one or more related operations.** Before calling an operation, a person or Lab agent should be able to tell what it does, what it needs, what it can change, what it returns, and what its result establishes. That is the usability test for the standard.
+
+## Keep the declaration small and unambiguous
+
+- Retain the existing vocabulary: `takes` for inputs, `gives` for outputs, `needs` for execution prerequisites, `changes` for permitted effects, and `guarantees` for checkable commitments. Define the boundary of each term with examples. For a profiler, the target process is an input, permission to inspect it is a prerequisite, attaching instrumentation is a possible effect, and a sampled trace is an output. A complete trace can satisfy a guarantee even when it reveals poor performance.
+- Give each fact **one authoritative location**. Define a port or check once and reference it by ID wherever it is shared. Derive package summaries and discovery views from operations. Keep granted permissions on the bound call, observed effects on the receipt, and scientific verdicts on the evaluation. Authors should never have to keep duplicate lists in sync.
+- Specify a compact YAML form for one operation and a named-operation form for bundles. Both expand to the same JSON model. Publish an exhaustive field table covering meaning, type, scope, requiredness, default, and validation. Define identifier scope, versioning, digest subjects, and the differences between omitted, empty, and unresolved values.
+- Keep domain details in typed inputs, outputs, or versioned profiles. A CPU tool should need no GPU fields. A profiler must still be able to declare attachment privileges, supported targets, sampling limits, possible perturbation, and partial-trace behavior. Unknown mandatory semantics must be rejected explicitly.
+
+## Markdown deliverables
+
+| Document | Contents |
+|---|---|
+| `README.md` | Answer “What is a CC and what does it do?” Open with a diagram connecting author → declaration → Software Factory → immutable release → catalog → Lab agent → runner → outputs and receipt. Show the provenance links back to the build and call, and where independent evaluation consumes evidence. Follow the diagram with a small declaration and the caller-facing description derived from it. |
+| `01-declaration.md` | Normative YAML syntax, field dictionary, identifier rules, single- and multi-operation expansion, and compatibility rules. Include a crosswalk showing what was retained, simplified, derived, or moved from the existing declaration. |
+| `02-compiler-and-release.md` | Define how the Factory resolves bindings, checks declarations, packages a pinned executable or builds a pinned recipe, identifies the result, and reports errors. Separate build success, qualification, and eligibility for installation. Preserve the existing case where a Factory brief yields a software product and zero reusable CCs. |
+| `03-calls-and-receipts.md` | Define request, result, and error envelopes with a concrete JSON process binding. Cover typed inline data and artifact references, short calls and long-running jobs, deadlines, cancellation, partial results, duplicate requests, uncertain effects, and retry rules. Map them to M2a call and receipt states. |
+| `04-provenance.md` | Identify which facts the Factory, runner, and tool each record. Trace an output through its attempt, inputs, configuration, operation, CC release, implementation, and build materials. For a locally modified Muse candidate, include the parent image, patch or configuration change, resulting binary or snapshot, and restart associated with the measurement. |
+| `05-examples-and-conformance.md` | Include complete declarations, caller views, calls, receipts, and expected failures across the use cases below. Map the existing CC inventory to these cases and add a case wherever an existing behavior is otherwise uncovered. |
+
+## Test against different kinds of CCs
+
+| Case | What the protocol must demonstrate |
+|---|---|
+| Small CPU transformation | A short declaration is sufficient. A caller can distinguish invalid input, execution failure, and a valid empty result. |
+| Profiler operated by a Lab agent | The agent can decide whether it may attach to a particular target, identify what sampling may disturb, start a bounded capture, and interpret a complete, partial, or unavailable trace. The receipt identifies the target and attempt. |
+| Multi-operation diagnostic package | An inspector and a benchmark can share a carrier and port definitions while keeping different prerequisites, effects, and guarantees. Selecting the inspector does not grant benchmark permissions. |
+| Factory-built Strata tool | A pinned source recipe resolves to a specific executable release. A mutable reference, incompatible ABI, or missing implementation produces a specific diagnostic. |
+| Strata/Muse Spark measurement | A Lab agent binds an eligible operation to the candidate, model, workload, and qualified GB10 environment. A result identifies exactly which revision ran, including local adjustments. A valid measurement can show that the candidate missed its target. |
+| Cross-domain and legacy CCs | Replay representative existing CC fixtures, including a non-Strata tool and an older declaration. Preserve their input, output, failure, effect, and provenance meanings or identify the exact incompatibility. |
+
+## Acceptance criteria
+
+1. Parse the embedded examples, expand the compact declarations, and validate the normalized records against existing schemas wherever compatibility is claimed. Include rejecting fixtures for duplicate IDs, conflicting definitions, undeclared effects, unresolved references, and unsupported required profiles.
+2. Apply a **caller comprehension check** to every example. Using only the published CC description, a reviewer must be able to choose the operation, supply valid inputs, predict its observable effects, find the outputs, and distinguish success, partial evidence, and failure.
+3. Apply a **field ownership check** across the corpus. Every required author field must serve a demonstrated use. No example should require the same fact to be authored twice. Record any necessary compatibility duplication as compiler-generated output.
+4. Verify the README diagram against the worked Factory and Lab flows, check the folder’s internal links, and distinguish schema validation, fixture replay, and actual hardware execution in the reported results.
+

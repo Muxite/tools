@@ -1,0 +1,13 @@
+# Architecture entry
+
+The [design-package / build-package](build-package/README.md) is the maintained project architecture. Read its overview for module intent, connections, readiness and future seams, with the PRD alongside it.
+
+The [very condensed design](very-condensed-design.md) is a preserved comparison experiment from before the three-level revision. It is not current guidance for the restored shared contracts. The maintained package defines the bounded Intent Compilation and Verification Slice and complete M1 architecture.
+
+Product requirements belong to the PRD; detailed realization and evidence belong to TASKS/TASK/Spec Kit. Superseded architecture and generated snapshots are retained only as optional [pinned history](build-package/history.md). Local editor workspace state is not a project document.
+
+Extra intent and evolving context may be kept in the Git-ignored local `notes/` folder as Obsidian-compatible Markdown. Notes are outside the review package and main delivery; material decisions must be reflected in the maintained design. Shared vault settings remain versioned, while pane/session state stays local.
+
+## Current design-depth experiment
+
+The [full-M1 comparison protocol](experiments/README.md) pins a compressed snapshot with identical contracts and source decisions. It is an experimental input, not maintained architecture. The older very-condensed design remains unchanged. Design authors use [design method](build-package/design-method.md) for depth, tiered human review and change impact.

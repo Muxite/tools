@@ -1,0 +1,19 @@
+flowchart TD
+    G[/GitHub design or system-info change/] --> S[CI scripts: mechanical checks]
+    S --> W[Agent worker: review using skills and tools]
+    W --> F[/Findings and affected areas in GitHub/]
+    F --> B[Bot routes alert to affected contacts]
+    B -->|mapped and delivered| D[/Discord action link/]
+    B -->|unmapped or delivery failed| U[Visible GitHub triage finding]
+    D --> H{Contributors resolve findings}
+    U --> H
+    H -->|correction needed| G
+    H -->|ready| R[/Recorded decision and next action/]
+    classDef record fill:#e8f1fe,stroke:#1d4f91,color:#123d70
+    classDef tool fill:#e0f5ef,stroke:#1b7f72,color:#12554a
+    classDef human fill:#fff4d8,stroke:#b58100,color:#694b00
+    classDef unresolved fill:#ffe9e9,stroke:#b63636,color:#7f2020
+    class G,F,D,R record
+    class S,W,B tool
+    class H human
+    class U unresolved

@@ -1,0 +1,12 @@
+flowchart TB
+    I[Accepted Intent and original context] --> R[Requirements CC]
+    Policy[Authorized defaults and template obligations] --> R
+    R --> Brief[Candidate Research Brief: requirements contract]
+    Brief --> D{Deterministic contract checks}
+    D -->|valid| V[Requirements verifier CC]
+    D -->|invalid or unavailable| G[Protected Requirements gate]
+    I --> V
+    Policy --> V
+    V -->|verdict, findings and reasons| G
+    G -->|durably accepted| P[Static binder or Phase 3 planner must fulfil contract]
+    G -->|failed or unclear| H[Visible halt; do not plan]

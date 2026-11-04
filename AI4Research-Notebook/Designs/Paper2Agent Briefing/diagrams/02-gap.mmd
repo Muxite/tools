@@ -1,0 +1,29 @@
+flowchart LR
+  subgraph CURRENT["OUR M1 POLICY — current design"]
+    direction TB
+    M["One research journey<br/>required stages + Delivery"]
+    C["Reusable CC contracts<br/>agent / tool only"]
+    R["RSI: bounded<br/>Screening changes"]
+  end
+  subgraph CHANGE["SMALLEST USEFUL GENERALIZATION — proposed"]
+    direction TB
+    P["Workflow profiles"]
+    P --> S["Research<br/>scientific result"]
+    P --> F["Capability factory<br/>candidate tools + resources"]
+    P --> E["System change<br/>candidate release"]
+    H["Shared protected runtime<br/>binder · runner · checks · gate · records"]
+    S --> H
+    F --> H
+    E --> H
+  end
+  M -.->|"generalize plan policy"| P
+  C -.->|"flat stages first; composite later"| F
+  R -.->|"separate evaluation and promotion"| E
+  classDef now fill:#EFF1F5,stroke:#667489,color:#24344B,stroke-width:2px;
+  classDef work fill:#E9F1FF,stroke:#3264A5,color:#142C4A,stroke-width:2px;
+  classDef host fill:#FFF0CD,stroke:#AA7424,color:#573A14,stroke-width:2px;
+  class M,C,R now;
+  class P,S,F,E work;
+  class H host;
+  style CURRENT fill:#F8F9FB,stroke:#8A95A6;
+  style CHANGE fill:#F8FBFF,stroke:#3264A5,stroke-dasharray:6 4;

@@ -1,0 +1,16 @@
+flowchart LR
+    subgraph App[Application container]
+        EXP[(Record export)]
+        INB[(Admission inbox)] --> ADM[Admission command, run by a human]
+        ADM --> L[(Library: child stored inactive)]
+        L --> ACT[Human activation or rollback]
+    end
+    subgraph WB[RSI workbench container]
+        PRO[Target profile and session] --> P[Proposer: one bounded change per attempt]
+        P --> G[Mutation check and isolated child runner]
+        G --> R[Referee and hidden fixture custodian: separate process and identity]
+        R -->|passed, total and queries left only| P
+        R --> C[Candidate package with paired evidence]
+    end
+    EXP -->|parent export and development cases| PRO
+    C --> INB

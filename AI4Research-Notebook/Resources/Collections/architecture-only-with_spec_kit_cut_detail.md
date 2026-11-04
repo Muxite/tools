@@ -1,0 +1,42 @@
+---
+id: collection-018
+status: indexed
+source: "workspace/architecture-only-with_spec_kit_cut_detail"
+last_reviewed: 2026-10-21
+next_action: "Use the source map to open an item; resolve authority before reuse"
+---
+# architecture-only-with_spec_kit_cut_detail
+
+[[Resources/Source Collections|All collections]] · [[Home]]
+
+**4,903 indexed entries.** copied: 3; duplicate: 710; excluded: 19; linked: 4,171.
+
+Exact source bytes and original paths are kept distinct from current implementation authority. Browse batches below; the range labels follow original source paths.
+
+| Batch | First source | Last source |
+|---|---|---|
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-001\|1]] | `architecture-only-with_spec_kit_cut_detail/.agents` | `architecture-only-with_spec_kit_cut_detail/.doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_cancel.md` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-002\|2]] | `architecture-only-with_spec_kit_cut_detail/.doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_command_add_dir.md` | `architecture-only-with_spec_kit_cut_detail/.doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_session_rewind_full/actual-behavior.md` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-003\|3]] | `architecture-only-with_spec_kit_cut_detail/.doc_project_maintainer/code/jiuwenswarm/server/agent_ws_server.py/Class AgentWebSocketServer/AgentWebSocketServer._handle_session_rewind_full/risks.md` | `architecture-only-with_spec_kit_cut_detail/docs/architecture/build-package/sources/product/prd-m1-current-2026-10-06.txt` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-004\|4]] | `architecture-only-with_spec_kit_cut_detail/docs/assets/images/ACP插件.png` | `architecture-only-with_spec_kit_cut_detail/docs/assets/images/current-ui/26-创建定时任务.png` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-005\|5]] | `architecture-only-with_spec_kit_cut_detail/docs/assets/images/current-ui-en/01-Work-Page.png` | `architecture-only-with_spec_kit_cut_detail/docs/code/Missions/M0/source/Architecture_context/design-package/reference/examples/Gate_Science_Pass.json` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-006\|6]] | `architecture-only-with_spec_kit_cut_detail/docs/code/Missions/M0/source/Architecture_context/design-package/reference/examples/Gate_Topic_Halt.json` | `architecture-only-with_spec_kit_cut_detail/docs/en/browser-extension/BrowserExtensionGuide.md` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-007\|7]] | `architecture-only-with_spec_kit_cut_detail/docs/en/browser-extension/BrowserExtensionInstall.md` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/agents/__init__.py` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-008\|8]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/agents/harness/__init__.py` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/agents/harness/common/rails/permissions/url_safety.py` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-009\|9]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/agents/harness/common/rails/permissions/_auto_permission/__init__.py` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/browser/frontend/tsconfig.json` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-010\|10]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/browser/frontend/vite.config.ts` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/config.ts` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-011\|11]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/tui/frontend/src/core/commands/builtins/context.ts` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/src/assets/delete.svg` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-012\|12]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/src/assets/edit.svg` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/src/assets/work-mode/zoom-in.svg` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-013\|13]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/src/components/ExternalCliAgentsSection.tsx` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/src/components/SessionSidebar/SessionSidebar.css` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-014\|14]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/src/components/SessionSidebar/index.tsx` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/src/features/chatTimeline/index.ts` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-015\|15]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/src/features/chatTimeline/projectTimelineItems.ts` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/JsonTree.tsx` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-016\|16]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/src/features/trajectory/primitives/Menu.module.css` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/tests/crossSessionMessage.test.mjs` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-017\|17]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/channels/web/frontend/tests/desktopSave.test.mjs` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/common/stage_timer.py` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-018\|18]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/common/startup_diagnostics.py` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_file_service.py` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-019\|19]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/gateway/channel_manager/im_platforms/wecom/wecom_im_adapter.py` | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/server/runtime/a2ui/prompt_instructions.py` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-020\|20]] | `architecture-only-with_spec_kit_cut_detail/jiuwenswarm/server/runtime/a2ui/protocol.py` | `architecture-only-with_spec_kit_cut_detail/plugins/spec-kit/upstream.json` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-021\|21]] | `architecture-only-with_spec_kit_cut_detail/plugins/spec-kit/assets/icon.webp` | `architecture-only-with_spec_kit_cut_detail/tests/unit_tests/test_desktop_file_download.py` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-022\|22]] | `architecture-only-with_spec_kit_cut_detail/tests/unit_tests/test_desktop_local_file_picker.py` | `architecture-only-with_spec_kit_cut_detail/tests/unit_tests/agentserver/test_session_git_snapshot.py` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-023\|23]] | `architecture-only-with_spec_kit_cut_detail/tests/unit_tests/agentserver/test_session_history_path_safety.py` | `architecture-only-with_spec_kit_cut_detail/tests/unit_tests/channel/test_ssh_channel.py` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-024\|24]] | `architecture-only-with_spec_kit_cut_detail/tests/unit_tests/channel/test_telegram_channel.py` | `architecture-only-with_spec_kit_cut_detail/tests/unit_tests/rsi/test_workspace_recovery.py` |
+| [[Resources/Collections/Details/architecture-only-with_spec_kit_cut_detail-025\|25]] | `architecture-only-with_spec_kit_cut_detail/tests/unit_tests/runtime/__init__.py` | `architecture-only-with_spec_kit_cut_detail/third_party/playwright-mcp/package.json` |

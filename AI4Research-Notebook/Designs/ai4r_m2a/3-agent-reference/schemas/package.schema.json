@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai4r.local/schemas/m2a/package",
+  "title": "AI4R M2a package",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "2.0.0-m2a.2"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "category": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "release_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "required_providers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "effect_ceiling": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "shared_check_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "qualification_scope": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "file_manifest": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "const": "oci"
+        },
+        "image": {
+          "type": "string",
+          "pattern": "^.+@sha256:[a-f0-9]{64}$"
+        },
+        "platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "dependency_lock_ref": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "uri",
+            "sha256"
+          ],
+          "additionalProperties": false
+        },
+        "resource_ownership_ref": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "uri",
+            "sha256"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "format",
+        "image",
+        "platform",
+        "host_requirements",
+        "dependency_lock_ref",
+        "resource_ownership_ref"
+      ],
+      "additionalProperties": false
+    },
+    "quality_policy_ref": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "history_key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evolution_policy": {
+      "type": "object",
+      "properties": {
+        "policy_ref": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "uri",
+            "sha256"
+          ],
+          "additionalProperties": false
+        },
+        "allowed_targets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "objectives": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "protected_targets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "promotion_requires_independent_admission": {
+          "const": true
+        }
+      },
+      "required": [
+        "policy_ref",
+        "allowed_targets",
+        "objectives",
+        "protected_targets",
+        "promotion_requires_independent_admission"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "category",
+    "version",
+    "release_digest",
+    "members",
+    "required_providers",
+    "effect_ceiling",
+    "shared_check_ids",
+    "qualification_scope",
+    "file_manifest",
+    "license",
+    "execution",
+    "quality_policy_ref",
+    "history_key",
+    "evolution_policy"
+  ],
+  "additionalProperties": false
+}

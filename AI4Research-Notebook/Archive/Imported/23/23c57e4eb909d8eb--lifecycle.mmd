@@ -1,0 +1,19 @@
+flowchart TD
+    E[/Next week's verifier/code evidence/] --> D[Set required M1 design detail]
+    D --> R{Review with affected contributors}
+    R -->|changes needed| D
+    R -->|reviewed| M[/Finalized main M1 design revision/]
+    M --> C[Scheduled M1 coding]
+    C --> F[/Coder feedback, code and run diagnostics/]
+    F --> X[Joint diagnosis and scoped fixes]
+    X -->|design correction| D
+    X -->|code or check correction| C
+    N[/New PRD requirements/] --> B[Draft linked M2 design]
+    M -.->|baseline| B
+    F -.->|lessons| B
+    classDef record fill:#e8f1fe,stroke:#1d4f91,color:#123d70
+    classDef tool fill:#e0f5ef,stroke:#1b7f72,color:#12554a
+    classDef human fill:#fff4d8,stroke:#b58100,color:#694b00
+    class E,M,F,N record
+    class D,C,X,B tool
+    class R human

@@ -1,0 +1,74 @@
+PLEASE IMPLEMENT THIS PLAN:
+# One Capability Capsule model for the Strata Software Factory and research lab
+
+## 1. Restore the original CC definition
+
+**A Capability Capsule is an installable, versioned package of related capabilities. Its declaration tells a harness what each capability takes, gives, needs, changes and guarantees. It identifies how to obtain or build the implementation and how to check its behavior.**
+
+I found the earlier team guide. It identifies Muk as the schema owner, points to the normative JSON schema and explains the original five-part declaration. That is the starting point for the revision. Use the later M2a package model to group related capabilities and qualify releases. [Original schema guide](</C:/Users/m50066326/huawei/capsule-openjiuwen/team/SCHEMA-EXPLAINED.md>) · [Original schema](</C:/Users/m50066326/huawei/capsule-openjiuwen/merged/capsule.schema.json>)
+
+**Use one CC type.** A factory request, a software release and a lab evaluation already have distinct purposes and owners. They can carry or reference capsules without each becoming a new capsule type. The same CC can serve three roles, depending on where someone uses it:
+
+| Role in a particular job | What it contributes | Strata example |
+|---|---|---|
+| **Available tool** | A qualified capability the agent can discover and invoke | Inspect an expert index, package an engine or measure decode throughput. |
+| **Requested capability** | A complete or partial declaration communicating the behavior the builder should deliver | “Produce a reader that accepts this expert layout, preserves routing and passes these compatibility checks.” |
+| **Delivered capability** | A built, checked implementation that another harness can install | A versioned reader and inspection tool with pinned carriers, declared effects and qualification evidence. |
+
+These are relationships to a job. A capsule delivered today can enter the available tool pool tomorrow. A whole Strata modification can also ship as a Git change and engine release. It becomes a CC when there is a useful capability to declare, install and invoke independently.
+
+## 2. Give the Software Factory a human brief and optional CC attachments
+
+The Software Factory accepts a human-readable objective, a pinned starting repository, constraints and success criteria. It also accepts **available CC references** and **requested capability declarations**. This distinction matters: attaching an existing benchmark tool means “you may use this,” while attaching a desired reader declaration means “build something that satisfies this.”
+
+For the workshop, use one brief throughout:
+
+> Make this Strata revision serve the pinned IQ3_S model from less storage on one DGX Spark. Preserve the inference API, routing behavior and agreed quality and speed floors. You may change the packer, loader, kernels or packaging. Return reviewable source and a reproducible candidate.
+
+The builder receives a qualified index inspector and benchmark CC. The requester can optionally attach a partial reader declaration or an MoE-specific constraint. The builder can inspect the code and pursue a different storage strategy when the brief leaves that choice open.
+
+- **Keep the CC declaration small.** Retain package identity, purpose and members. Each member declares typed inputs and outputs, prerequisites, effects and checks. A tagged carrier reference selects a pinned image or a pinned build recipe with source, build context, base image, dependency lock and target platform. Several members may share one carrier.
+- **Give drafts and releases different completeness rules.** A draft may omit the entrypoint, implementation digest or build recipe. Preserve which fields the requester supplied as requirements, which are suggestions and which are unknown. A draft can guide a builder. Admission to the callable pool requires resolved bindings, effect declarations and qualification evidence.
+- **Make MoE an optional namespaced profile.** The base schema provides a profile ID, pinned schema reference, payload and required-reader flag. An outcome-directed request can omit a rank, algorithm or tensor selector. A request for a specific transformation supplies those fields. A receiver reports an unsupported required profile before attempting the work.
+- **Reuse the useful parts of the 0.2 proposal.** Keep the structured brief, source-delivery alternatives, evaluation contract and digest-bound relations as companion records. Map earlier form examples into these records and preserve the original examples as design history. The lab always evaluates a resolved product lock, whether the builder supplied a patch, commit, bundle or image.
+- **Separate qualification from held-out evaluation.** Ship public contract tests or pinned references with the CC. Reference protected checks by identity and policy. The independent evaluator owns hidden fixtures and returns a scoped receipt identifying the release, environment, check version and outcome.
+
+The CC Factory owns Paper2CC and project-to-CC qualification. It produces reusable packages from scientific methods and upstream software. The higher-level Software Factory owns repository exploration, source changes, builds and candidate delivery. It can consume many CCs and produce useful software even when the output has no reason to become a reusable tool.
+
+## 3. Make discovery and installation work during a live agent session
+
+Give the Software Builder and the in-lab JiuwenSwarm agent the same discovery semantics, with different permissions and catalogs.
+
+1. **Filter before ranking.** Exclude inactive releases and incompatible input/output contracts, platforms, reader ABIs, data permissions, effects and resource requirements. Then rank eligible operations by purpose, relevance and qualification evidence for the target. Return compact declarations first and fetch detailed references only for shortlisted candidates.
+2. **Bind the selected operation.** A stable discovery/invocation adapter resolves the capability ID to an exact release and carrier. Record the input digests, permissions, checks and budget for that call. Use the existing JiuwenSwarm tool interface or an MCP adapter. An external harness can invoke the documented carrier binding independently.
+3. **Change the pool without restarting the harness.** Publish a new catalog generation atomically. New selections see the new membership. In-flight calls retain their bound release. Withdrawal prevents new calls, drains existing leases and later reclaims unreferenced layers, processes and volumes. Demonstrate this behavior on the actual JiuwenSwarm integration before claiming hot installation works.
+4. **Let agents branch on evidence.** If storage improves and decode slows, the lab agent may select a qualified profiler, inspect an existing trace, request a factory revision or finish with a negative result. Fix the order inside operations where comparability depends on it, such as validation, warmup and timing. Record actual calls and receipts so another agent can reconstruct the investigation.
+5. **Version RSI changes explicitly.** A modified container can yield a candidate image. Capture the corresponding source or recipe changes and replay the build before release. Requalify the candidate against its declaration and independent checks. Expanded permissions, effects or behavior require a revised declaration and admission decision.
+
+## 4. Prove the design exposes the data Strata actually needs
+
+The first integration should trace **one expert projection from source bytes to a measured result**. This is the test of whether the ontology is sufficient. Strata already has a native index and reader, so the CC can reference them and expose an inspection operation instead of reproducing a large tensor inventory in JSON. [Pinned local Strata fixture](</C:/Users/m50066326/huawei/Strata/tests/data/native_experts/iq3_s.txt>) · [Spark benchmark harness](</C:/Users/m50066326/huawei/Strata/tools/dgx_bench.py>)
+
+| Boundary | Data the design must make accessible | Proof of access |
+|---|---|---|
+| **Source and model** | Strata commit, model revision, exact GGUF shards, hashes and native index version | Worker stages the pinned files read-only. Inspector resolves one layer, expert and gate/up/down projection to the correct shard, byte range, shape and encoding using native metadata. |
+| **Requested change** | Target selector, protected invariants, optional transformation parameters, reader compatibility and acceptance obligations | Builder can explain which bytes or code may change, which behavior must be preserved and which choices remain open. A specified transform with missing required parameters is rejected. |
+| **Candidate** | Base and changed source identities, patch or commit, reproducible recipe, engine-component manifest, model-pack manifest, image and reader ABI | A clean builder materializes the source change, verifies the expected tree and emits the product lock. A wrong base, missing shard or incompatible reader fails before measurement. |
+| **Lab execution** | Host and driver identity, shared-memory budget, context, batch, cache settings, warmup, actual prompt tape and output path | Lab replays baseline A/A on one exclusive Spark. Strata’s harness generates fresh nonces and appends output, so the adapter captures or replays requests and assigns each attempt a clean directory. |
+| **Research evidence** | All unique bytes required to serve, peak shared memory, prefill, decode, held-out quality, raw rows and missing sensors | Checker counts retained source GGUF files as well as any new pack. A smaller sidecar alone cannot establish a storage win. Missing required evidence produces an inconclusive verdict. |
+
+The lab uses the previously selected pilot architecture: a protected worker controls Incus on each Spark, a private Docker runtime launches qualified carriers, and JiuwenSwarm operates inside the guest. Central owns admission, reservations, gateway policy and restore. Give large artifacts a separate data path from control messages. Correlate host, agent and benchmark observations through OpenTelemetry and preserve raw scientific evidence by digest. Qualify one Spark first, then the remaining Sparks and the Mac CPU lane independently.
+
+## 5. Build the handoff and presentation around the same example
+
+Produce two attachable Obsidian folders and a matching editable workshop deck. The **CC and Software Factory** folder owns the declaration, request attachment rules, discovery and release lifecycle. The **Strata Research Lab** folder owns materialization, data access, JiuwenSwarm execution, observation, restore and acceptance. Both use the same worked request and artifact identities.
+
+Allocate **half the discussion time to the Software Factory and CCs and half to the lab**. Use two opening diagrams that can sustain discussion on their own:
+
+- **Factory opening:** Put the human brief at the center. Show desired declarations entering from the requester, verified tools entering from the CC Factory, and a source change plus product lock leaving the Software Factory. Follow one declaration through discovery, implementation and qualification.
+- **Lab opening:** Put the actual Spark experiment at the center. Show which process can read the model bytes, which agent chooses the next action, which service owns the GPU, where held-out evaluation happens and how a receipt leads to a new factory request.
+
+The remaining slides expand those diagrams with the actual declaration excerpt, multilayer discovery, source-versus-image materialization, native expert lookup, adaptive lab tool use and recovery. Update both decks and their shared design bundle together.
+
+**Acceptance for the design handoff:** an independent implementer can distinguish “use this CC” from “build this capability,” resolve a Strata projection to real input data, explain how to install and withdraw a tool during a session, materialize a source-only candidate, and identify who can see held-out tests. **Acceptance for the runtime pilot:** demonstrate those operations, one rejected incompatible call, one interrupted-and-restored benchmark arm, baseline repeatability and one independently scored candidate. A negative candidate result is a valid research outcome.
+

@@ -1,0 +1,27 @@
+flowchart TB
+    I[Qualified original request] --> C
+    subgraph Compiler[Intention Compiler node]
+        C[Intention work subnode: candidate Intent IR]
+    C --> D1{Deterministic Intent checks}
+    D1 -->|valid| V1[Intent verifier subnode: fidelity and usability verdict]
+    D1 -->|invalid| G1[Protected Intent gate]
+    V1 --> G1
+    G1 -->|durably accepted| R[Requirements work subnode: Research Brief contract]
+    G1 -->|blocked| H[Visible halt: reason and retained artifact]
+    R --> D2{Deterministic Brief checks}
+    D2 -->|valid| V2[Requirements verifier subnode: completeness and consistency]
+    D2 -->|invalid| G2[Protected Requirements gate]
+    V2 --> G2
+    G2 -->|internally accepted| NG[Protected node finalization]
+    NG -->|incomplete or failed commit| H
+    end
+    NG -->|durably released Brief| P[Static binder or bounded Phase 3 planner]
+    G2 -->|blocked| H
+    P --> F[Protected plan check and freeze]
+    F --> S[Search and ideation]
+    S --> O[Screen one opportunity]
+    O --> B[Register hypothesis and protocol]
+    B --> K[Build bounded POC]
+    K --> M[Measure baseline then treatment]
+    M --> E[Scientific evaluation]
+    E --> T[Deliver report and evidence]

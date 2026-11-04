@@ -1,0 +1,9 @@
+ 6802          "evaluation_binding": {
+ 6803              "deterministic_gate_ids": deterministic_gate_ids,
+ 6804              "semantic_evaluator_ids": semantic_evaluator_ids,
+ 6805          },
+ 6806          "evaluator_gate": copy.deepcopy(node.get("evaluator_gate") or {}),
+ 6807          **({"retrieval_contract": copy.deepcopy(node["retrieval_contract"])} if node.get("retrieval_contract") else {}),
+ 6808          "evaluation_policy": copy.deepcopy(node_policy),
+   ...
+ 6842  "test_policy": copy.deepcopy(task_graph.get("test_policy") or {}),

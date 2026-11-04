@@ -1,0 +1,202 @@
+PLEASE IMPLEMENT THIS PLAN:
+# AI4R Lab Manager: a simple system on one machine
+
+## Summary and selected approach
+
+Build a **small, host-side Lab Manager over Docker Compose**. Each lab is a persistent project containing an independent, writable copy of AI4R, its CCs, installed software, research state and optional private models.
+
+Lab Manager connects central AI4R to the labs: it starts and stops environments, forwards requests, tracks progress and returns results. Each lab’s AI4R makes its own research decisions.
+
+All execution runs on our infrastructure. Changes return to mother AI4R through a human-controlled Git workflow.
+
+**Why Compose:** the repository already has a Docker deployment. Compose supplies grouped lifecycle, networks, volumes, logs and GPU device configuration. OpenSandbox would add another service while leaving us to implement the AI4R communication adapter. JiuwenBox remains useful for existing tool execution inside a lab.
+
+## System design
+
+### Central machine and Lab Manager
+
+The machine holds:
+
+- **Mother AI4R:** the maintained source and selected releases.
+- **Lab Manager:** one Python service, a small SQLite database, a simple web page and a CLI.
+- **Shared inference:** our existing API-model abstraction connected to a model server we operate.
+- **Lab directories and Docker resources:** separate source, configuration and persistent state for each lab.
+
+Run Lab Manager as a systemd service outside all lab containers. Its operation must not depend on a healthy mother AI4R process or a healthy lab.
+
+Use one Compose project per lab, named from a stable lab ID. A lab normally contains one AI4R worker container. Add an application or private-model sidecar only when dependency separation requires it; every CC does not need its own container.
+
+```mermaid
+flowchart TB
+    Mother["Mother AI4R\nMaintained source and releases"]
+    User["Researcher / central AI4R"]
+    Manager["Lab Manager\nWeb page + CLI + relay\nSQLite lab records"]
+    Shared["Our shared inference API"]
+
+    User --> Manager
+    Mother -->|"Copy selected revision"| Manager
+
+    subgraph A["Lab A: Compose project"]
+        AI_A["Writable AI4R copy\nCCs + application software"]
+        Data_A["Persistent source and research state"]
+        AI_A --- Data_A
+    end
+
+    subgraph B["Lab B: Compose project"]
+        AI_B["Writable AI4R copy\nCCs + application software"]
+        Private["Private model / fine-tuning\nLab-owned checkpoints"]
+        Data_B["Persistent source and research state"]
+        AI_B --- Private
+        AI_B --- Data_B
+    end
+
+    Manager <-->|"Requests, progress, results"| AI_A
+    Manager <-->|"Requests, progress, results"| AI_B
+    AI_A --> Shared
+    AI_B --> Shared
+    AI_A -.->|"Human-selected export"| Review["Manual review and merge"]
+    AI_B -.->|"Human-selected export"| Review
+    Review -.-> Mother
+```
+
+### Lab creation and independence
+
+Creating a lab records its base AI4R revision, runtime image, CC selection, resource settings and model routes.
+
+Create an **independent Git checkout**, including its own Git metadata, in the lab’s directory. Mount that checkout into its worker. Do not expose mother AI4R’s writable directory or Git metadata.
+
+Add a development-oriented target alongside the existing Docker build:
+
+- Reuse its dependency installation, language runtimes and launch tooling.
+- Run Python from the lab checkout through an editable installation.
+- Keep lab dependencies independent from other labs.
+- Record additional OS dependencies in the lab’s image recipe.
+- Preserve source, configuration, results, checkpoints and application state outside the container’s writable layer.
+
+Stopping and starting preserves the environment. Rebuilding uses the recorded recipe; the UI must explain that unrecorded package installations may be lost during recreation.
+
+Lab Manager never updates an existing lab when mother AI4R changes. Updating a lab is an explicit operator action.
+
+### Lifecycle and recovery
+
+Provide `create`, `start`, `stop`, `inspect`, `logs`, `export` and `archive` through the same service API used by the web page and CLI.
+
+Track both **requested state and observed state**. Show provisioning, running, stopped, failed and unavailable states with their last error.
+
+- Serialize lifecycle changes per lab.
+- Use deterministic Compose project names and ownership labels.
+- Reconcile database records against Docker after manager restart and periodically thereafter.
+- If a lab exits unexpectedly, report failure. Do not automatically replay research or repeatedly restart a broken lab.
+- Graceful stop first requests AI4R cancellation/checkpointing, then stops the lab’s Compose services after a bounded grace period. Provide an explicit force-stop command.
+- If Docker is unreachable, show unavailable rather than claiming that the lab stopped.
+- Stop and archive retain data. Permanent deletion is a separate explicit action.
+
+Use ordinary Docker isolation, scoped mounts, CPU/memory limits and bounded logs. Lab containers receive neither mother AI4R’s writable files nor the host Docker socket. This provides practical separation without a custom security framework.
+
+### Communication between central AI4R and labs
+
+Lab Manager is a **relay and status service**, not another research agent.
+
+Its public interface provides:
+
+- Lab registration, lifecycle, health and logs.
+- Submission of a request to a selected lab.
+- Request/run status, progress, result references and cancellation.
+- Human-directed export of selected changes and artifacts.
+
+Reuse AI4R’s existing submission, status and cancellation machinery. Add a thin lab-facing adapter around it rather than creating another research scheduler.
+
+Assign a stable request ID before forwarding. Store the mapping from central request ID to the lab’s run ID. Following an interruption, query that ID before retrying submission. Keep scientific run records authoritative inside the lab; Lab Manager stores routing and summary information.
+
+The first web page shows the lab list, resource mode, health, current work and lifecycle actions. A lab detail page allows request submission and inspection of progress, logs and results. Use simple polling initially.
+
+### Shared and private models
+
+Keep the existing model abstraction and inject routes through lab configuration.
+
+**Shared models**
+
+- Run shared inference outside lab Compose projects.
+- Labs access the shared API without writable access to its weights.
+- Stopping a lab leaves shared inference running.
+- Preserve explicit model identity; do not introduce silent fallback.
+
+The inspected API provider currently requires HTTPS. Serve the internal endpoint through a small TLS reverse proxy using a local trusted certificate, preserving that interface.
+
+**Private experimental models**
+
+- Place serving or training processes inside the lab’s Compose project.
+- Keep mutable weights, adapters, optimizer state and checkpoints in lab-owned storage.
+- Read immutable starting weights from a shared read-only store where possible.
+- Do not publish experimental models into shared inference automatically.
+
+The first version uses **exclusive GPU sessions**, enforced by Lab Manager’s single-host admission record. Docker device reservations alone are not the exclusivity mechanism.
+
+For a private GPU experiment: drain shared inference, stop conflicting GPU services, confirm release, then start the lab’s GPU work. Restore shared inference after the GPU work ends.
+
+On a single GPU, use phased operation: plan with shared inference, run the training/evaluation script, release the GPU, then resume inference for analysis. Agent reasoning waits during the exclusive phase; no additional fallback model is required. If a lab requires simultaneous training and model reasoning, report that requirement as unsupported in the first release.
+
+### Manual contribution back to mother AI4R
+
+Provide an export action that produces a review directory containing:
+
+- Base revision and current lab revision.
+- Git patch, including a binary-capable diff where needed, plus selected new files.
+- CC declarations, dependency/image recipes and selected configuration changes.
+- Test commands, results and selected research evidence.
+- A manifest identifying included artifacts and checksums.
+
+Keep large model weights separate and explicitly selected. Exclude credentials.
+
+A person inspects the export, applies it to a review branch, runs appropriate checks and merges manually. Lab Manager neither judges changes for central adoption nor writes them into mother AI4R. No merge agent, automatic promotion or automatic update propagation is included.
+
+## Reuse and sources of inspiration
+
+| Source | Reuse decision |
+|---|---|
+| Docker Compose | Actual implementation foundation for each lab’s services, networks, storage and lifecycle |
+| Existing AI4R deployment | Reuse dependency builds, launch tooling and compatible deployment configuration |
+| Existing lab CLI prototype | Reuse ownership labels, reconciliation, export/checksum utilities and useful tests; replace its one-shot/read-only experiment assumptions |
+| JiuwenBox | Retain compatible native tool/file/background-job execution inside labs; avoid a mandatory second sandbox layer |
+| Kubernetes | Borrow stable resource identity, ownership labels and desired-state/observed-state reconciliation; do not deploy Kubernetes |
+| Ansible | Use a small playbook for repeatable host prerequisites, directories and systemd setup; keep it outside the runtime request path |
+| Lor | Outcome-based campaigns, separation of agents from workers, bounded parallel tasks and visible controls |
+| ArkenOS | Persistent goals/workspaces, explicit completion criteria, task inspection and cheap event checks |
+
+Ansible already provides a Compose management module, but Lab Manager should use Compose directly for its live operations. Ansible remains an installation and repair tool. Kubernetes becomes relevant only if we later need several execution machines and already have someone operating a cluster. [Compose project isolation](https://docs.docker.com/compose/how-tos/project-name/), [Kubernetes controllers](https://kubernetes.io/docs/concepts/architecture/controller/), [Ansible Compose module](https://docs.ansible.com/projects/ansible/latest/collections/community/docker/docker_compose_v2_module.html)
+
+## Design delivery and presentation
+
+Prepare the system design before changing runtime code. Preserve the existing document as history and explicitly supersede its VM-per-lab selection.
+
+The design package will contain the architecture, responsibility boundaries, lifecycle/communication sequences, model placement, manual contribution workflow, reuse inventory and acceptance scenarios.
+
+Then revise the existing presentation around the selected design:
+
+1. Requirements and the simplicity tradeoff.
+2. Lor and ArkenOS investigation and selected methods.
+3. Complete single-host architecture.
+4. Anatomy of a writable lab.
+5. Lab Manager lifecycle and request relay.
+6. Shared inference and exclusive private-model experiments.
+7. Manual contribution to mother AI4R.
+8. Reused components and what we still implement.
+9. First demonstration and remaining compatibility checks.
+
+Retain useful option comparisons as supporting slides. Label effort estimates and untested compatibility clearly. Render and visually review all changed slides.
+
+## Acceptance scenarios and assumptions
+
+The first implementation demonstration must show:
+
+- Two independent labs created from the same base, with different CC/software selections.
+- A lab modifying its own AI4R without changing mother AI4R or the other lab.
+- Central submission, progress inspection, result retrieval and cancellation through Lab Manager.
+- Manager restart without duplicate containers or duplicate research submission.
+- Lab stop/start with source, results and checkpoints retained.
+- Shared inference serving both labs, followed by an exclusive private-model GPU session and restoration of shared inference.
+- Failure reporting when Docker or a lab is unavailable.
+- Export, human review and manual application of a lab change to a separate mother-AI4R review branch.
+
+Defaults are one Linux host, trusted internal operators, ordinary containers, no external execution cloud, no cluster scheduler and no automated merge-back. Linux/ARM64 dependencies and GPU access must be qualified on the actual machine; existing documents identify DGX Spark as a possible target, not a verified deployment.
+

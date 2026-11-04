@@ -1,0 +1,2028 @@
+
+
+===== page 1 =====
+SCAFFOLD: Self-Improving Web Agents via Recursive
+Parametric Skill Abstraction
+Bowei He1, 2, Xiaokun Zhang3, Meng Ding4, Xue Liu1, 2
+1 MBZUAI, 2 McGill University, 3 CityUHK, 4 UMass Boston
+Bowei.He@mbzuai.ac.ae
+Abstract
+Web agents need to navigate visually rich, long-
+horizon interfaces that change across sites, yet
+most previous agents still learn each task in
+isolation and discard the procedural knowl-
+edge they accumulate. Recent skill-augmented
+frameworks take an important first step, but
+they treat the skill library as a flat or two-
+tier prompt-side cache and offer no princi-
+pled mechanism for compressing redundancy
+or composing skills recursively. We introduce
+SCAFFOLD, a self-improving framework for
+visual web agents that (i) induces parametric,
+executable skills from successful trajectories
+under a multi-instance abstraction constraint,
+(ii) maintains a recursively composed hierarchy
+in which higher-level skills invoke lower-level
+ones, (iii) compacts the library via a minimum-
+description-length (MDL) criterion and behav-
+ioral equivalence checking, and (iv) periodi-
+cally distills skill-augmented trajectories back
+into model weights to internalize the abstrac-
+tions. Across WebArena, VisualWebArena, and
+a held-out split of Online-Mind2Web, SCAF-
+FOLD improves success rate by 11.1–17.2 abso-
+lute points over the strongest skill-augmented
+baseline and shows monotonic gains across five
+self-improvement iterations without library col-
+lapse. We release the code and documents in
+the Github repository.
+1
+Introduction
+Autonomous web agents, LLM-based systems that
+complete user instructions by interacting with
+browsers, have advanced rapidly with the arrival
+of strong multimodal foundation models (Zheng
+et al., 2024a; He et al., 2024; Qin et al., 2025; Wang
+et al., 2025a). Yet on every realistic benchmark,
+from WebArena (Zhou et al., 2024) and VisualWe-
+bArena (Koh et al., 2024) to OSWorld (Xie et al.,
+2024) and Online-Mind2Web (Xue et al., 2025),
+the performance still lags human performance by a
+wide margin. A central cause is that current agents
+treat each task as an isolated episode: procedural
+knowledge acquired while booking a flight is dis-
+carded before the next task begins, even if that next
+task shares most of the same sub-procedure (Wang
+et al., 2025b; Zheng et al., 2025).
+This observation has motivated a wave of self-
+improving web agents that retain experience in
+some form. Three sub-paradigms have emerged.
+Trajectory replay methods store raw experience
+for retrieval-augmented prompting (Zheng et al.,
+2024b; Zhao et al., 2024; Chhikara et al., 2025).
+Workflow induction methods abstract action se-
+quences into natural-language routines that the
+agent can re-read at inference time (Wang et al.,
+2025b; Fang et al., 2026). Skill induction methods
+go further and synthesize callable APIs or paramet-
+ric skills, exemplified by SKILLWEAVER (Zheng
+et al., 2025), APPAGENTX (Jiang et al., 2025), and
+the very recent SKILLRL (Xia et al., 2026). Skill
+induction is the strongest of them because the reuse
+unit is an executable program rather than a textual
+hint, and skills can in principle be composed. This
+property, as long argued by the hierarchical rein-
+forcement learning community (Sutton et al., 1999),
+is essential for tackling long-horizon problems.
+Despite this trajectory, three limitations of cur-
+rent skill-augmented agents remain unresolved.1
+First, induced skill libraries are essentially flat:
+SKILLWEAVER stores APIs in a single pool, and
+SKILLRL uses only a two-tier (general / task-
+specific) split. Since neither supports skills call-
+ing other skills, the maximum abstraction depth is
+bounded by one. Second, libraries grow monotoni-
+cally and accumulate near-duplicate skills with no
+principled compression mechanism, a known fail-
+ure mode in lifelong learning (Wang et al., 2024a).
+Third, the knowledge encoded in skills exists only
+in prompts and is never internalized into the model,
+1We focus on visual web agents throughout; complemen-
+tary work on text-only LLM agents includes (Xia et al., 2026;
+Wang et al., 2026; Wu et al., 2025a).
+arXiv:2609.05511v1  [cs.AI]  31 Aug 2026
+
+
+===== page 2 =====
+leaving the base policy after iterations as weak as
+it was at the beginning.
+Contributions. We introduce SCAFFOLD, a frame-
+work that addresses each of these limitations:
+• A multi-instance parameter induction procedure
+that proposes a skill only when multiple semanti-
+cally similar trajectories support the same para-
+metric abstraction, sharply reducing spurious ab-
+stracted skills (§3.3).
+• A recursive composition mechanism: at iteration
+k, the inducer is allowed to call any skill from
+iterations 1, . . . , k, producing a hierarchy whose
+depth grows monotonically. We track depth and
+reuse explicitly in our design (§3.4).
+• An MDL-driven library compaction step that pe-
+riodically merges behaviorally equivalent skills,
+refactors recurring sub-patterns into new mid-
+level skills, and prunes unused ones, with empiri-
+cal validation on a held-out task set (§3.5).
+• A distillation loop that uses skill-augmented tra-
+jectories to supervise-fine-tune the base policy,
+converting the in-context library into improved
+weights (§3.6).
+On WebArena, VisualWebArena, and a held-
+out Online-Mind2Web subset, SCAFFOLD im-
+proves over SKILLWEAVER by 13.6–17.7 abso-
+lute success-rate points. Critically, it continues to
+improve through five self-improvement iterations
+(whereas baselines saturate at two), exhibits a desir-
+able library-depth and reuse-rate distribution, and
+zero-shot transfers to held-out sites with a 17.2-
+point margin over the strongest competitor.
+2
+Related Work
+Web and GUI agents. Modern web agents either
+prompt strong proprietary models (Zheng et al.,
+2024a; He et al., 2024; Yang et al., 2025) or fine-
+tune open vision-language models on large GUI
+trajectory corpora (Cheng et al., 2024; Hong et al.,
+2024; Wu et al., 2025b; Xu et al., 2025; Qin et al.,
+2025; Wang et al., 2025a; Lai et al., 2024). The
+latter line achieves impressive grounding but relies
+on static datasets that fail to capture the procedu-
+ral diversity of real websites (Zheng et al., 2025).
+Reinforcement-learning-based agents close part of
+this gap by training on the environment directly (Qi
+et al., 2025; Patel et al., 2024; Gandhi and Neu-
+big, 2026; Shao et al., 2024; Guo et al., 2025),
+but typically lack any mechanism for accumulat-
+ing reusable behavioral abstractions, which is our
+focus.
+Self-improvement through experience. The idea
+of letting a model improve itself by training on its
+own filtered generations dates back to STAR (Ze-
+likman et al., 2022) and was extended to richer
+settings by Quiet-STaR (Zelikman et al., 2024) and
+self-play fine-tuning (Chen et al., 2024). For agents
+specifically, (Patel et al., 2024) showed that filtered
+self-generated trajectories can lift WebArena per-
+formance, and Reflexion (Shinn et al., 2023) in-
+troduced verbal in-context self-correction without
+weight updates. SCAFFOLD inherits the spirit of
+these works but operates over a structured skill
+library rather than raw text or trajectory data.
+Skill libraries and workflows. VOYAGER (Wang
+et al., 2024a) pioneered LLM-driven skill li-
+braries in the programmatic Minecraft environ-
+ment; TROVE (Wang et al., 2024b) extended
+this idea to tool induction for programmatic
+tasks.
+For web/GUI agents, Agent Workflow
+Memory (AWM) (Wang et al., 2025b) induces
+natural-language workflows from past trajecto-
+ries and retrieves them at test time, achieving
+large gains on Mind2Web and WebArena. SKILL-
+WEAVER (Zheng et al., 2025) advances this
+paradigm by synthesizing skills as executable APIs
+and using iterative practice for refinement. AP-
+PAGENTX (Jiang et al., 2025) explores analogous
+ideas on mobile UIs. The most direct prior work is
+SKILLRL (Xia et al., 2026), which trains an LLM
+agent jointly with a two-tier hierarchical skill li-
+brary (general skills + task-specific skills) using
+GRPO (Shao et al., 2024). SCAFFOLD differs in
+operating on visual web agents with truly recursive
+hierarchies, an MDL-based compaction step, and
+an explicit skill transfer evaluation.
+Concurrent skill frameworks. POLYSKILL (Yu
+et al., 2026) separates a skill’s abstract goal from
+its per-site implementations via abstract interfaces,
+whereas our skills re-bind semantic references at
+run time; SKILLEVO (Xu et al., 2026) pairs GRPO
+with an evolving skill path graph whose reuse unit
+is an experience path rather than a parametric pro-
+gram and which carries no compression objective.
+Memory and lifelong learning for agents. A par-
+allel literature treats agent experience as memory
+rather than skill, including MEM0 (Chhikara et al.,
+2025), EXPEL (Zhao et al., 2024), EVOLVER (Wu
+et al., 2025a), SYNAPSE (Zheng et al., 2024b),
+and trajectory-informed memory generation (Fang
+et al., 2026). These methods are largely orthog-
+onal to skill induction and could be combined
+
+
+===== page 3 =====
+with SCAFFOLD; we use MEM0 and SYNAPSE as
+memory-style baselines in §4. Finally, classical hi-
+erarchical RL (Sutton et al., 1999) and library learn-
+ing in program synthesis (Ellis et al., 2021) provide
+theoretical grounding for the recursive composition
+and MDL-based compression operations central to
+our method.
+3
+Methodology
+3.1
+Problem Setup and Notation
+We consider an agent operating in a partially ob-
+servable web environment E. At step t, the agent
+receives observation ot = (st, dt, ut) consisting of
+a screenshot st, accessibility-tree / document object
+model (DOM) snippet dt, and current URL ut. The
+agent emits an action at ∈Aprim ∪Askill, where
+Aprim are primitive actions (click, type, scroll, wait)
+and Askill is the set of currently available skill
+invocations. A task τ = (I, init, V ) specifies a
+natural-language instruction I, an initial environ-
+ment state, and a verifier V that returns binary
+success on the final state.
+We denote a trajec-
+tory by ζ = (o0, a0, o1, . . . , oT ). A skill is a tuple
+σ = (name, description, θ, pre, body, post, dσ). θ
+is a typed parameter list admitting primitive values
+(strings, numbers), semantic element references
+(natural-language descriptors grounded to DOM el-
+ements at run time by a VLM grounder), and point-
+ers to other skills. pre and post are LLM-checkable
+preconditions and postconditions phrased as predi-
+cates over ot, body is an executable program over
+Aprim ∪Askill, and dσ ∈N is the abstraction depth.
+The library Lk at iteration k is a set of such skills
+together with an embedding-based retrieval index
+keyed on description. We call σ semi-parametric:
+control flow inside body calls no policy model,
+while semantic element references are grounded on
+the live observation by a small VLM (§4.9).
+3.2
+Overall Pipeline
+Each self-improvement iteration k →k + 1 con-
+sists of five stages, executed in order: (1) trajectory
+collection with the current policy πk and library
+Lk; (2) multi-instance skill induction; (3) recursive
+composition of new skills over Lk; (4) MDL-driven
+library compaction; and (5) distillation of the skill-
+augmented behavior into πk+1. Algorithm 1 sum-
+marizes the loop. Below we describe each stage
+in detail; the design choices are motivated by the
+failure modes of prior skill-induction methods that
+we observe empirically (cf. §4.3). The overall
+Algorithm 1 SCAFFOLD Self-Improvement Loop
+Require: Base policy π0, task pool T , verifier V , iterations
+K, compaction interval M
+1: L0 ←∅
+2: for k = 0, . . . , K −1 do
+3:
+Zk ←ROLLOUT(πk, Lk, T )
+▷collect trajectories
+4:
+Z+
+k ←{ζ ∈Zk : V (ζ) = 1}
+5:
+Ck ←CLUSTERBYINSTR(Z+
+k ) ▷group similar trajs
+6:
+Σnew ←∅
+7:
+for cluster C ∈Ck with |C| ≥nmin do
+8:
+σ ←INDUCE(C, Lk)
+▷multi-instance
+abstraction; may invoke any σ′ ∈Lk
+9:
+if VALIDATEHOLDOUT(σ, Tval) then
+10:
+Σnew ←Σnew ∪{σ}
+11:
+end if
+12:
+end for
+13:
+Lk+1 ←Lk ∪Σnew
+14:
+if (k + 1) mod M = 0 then
+15:
+Lk+1 ←COMPACTMDL(Lk+1, Z+
+0:k)
+16:
+end if
+17:
+πk+1 ←DISTILL(πk, Lk+1, Z+
+k )
+18: end for
+19: return πK, LK
+framework is also illustrated in Figure 1.
+3.3
+Multi-Instance Skill Induction
+A persistent failure mode in workflow-induction
+methods is the synthesis of spurious abstractions:
+a skill is proposed from a single trajectory but en-
+codes incidental details (specific element IDs, hard-
+coded text) that fail to generalize. We address this
+by requiring every candidate skill to be supported
+by at least nmin trajectories with the same parame-
+ter structure.
+Successful trajectories Z+
+k are first clustered by
+the embedding of their instruction I. Within each
+cluster C = {ζ1, . . . , ζn} with n ≥nmin, the
+inducer (a frozen LLM) is prompted with all n
+trajectories and asked to: (a) identify which posi-
+tions vary across trajectories and propose a typed
+parameter list θ, (b) emit an executable body us-
+ing θ, primitives in Aprim, and any skill in Lk, (c)
+state a precondition / postcondition pair as Python
+expressions over ot. The induced skill must re-
+execute correctly on at least one held-out instance
+from C; otherwise it is discarded. This validation
+step replaces the post-hoc filtering used in SKILL-
+WEAVER and AWM, and we show in §4.3 that it
+nearly halves the rate of induced-then-deprecated
+skills across iterations.
+3.4
+Recursive Composition and Depth
+Tracking
+The library is hierarchical by construction: when
+the inducer emits a body, it may invoke any skill
+
+
+===== page 4 =====
+Figure 1: Overview of SCAFFOLD framework. The five stages are executed sequentially in each iteration: rollout,
+multi-instance induction, recursive composition, MDL-driven compaction, and distillation. The library growing in
+both depth and width is periodically compressed.
+σ′ ∈Lk as a sub-routine. The depth of a new skill
+σ is defined as
+dσ = 1 +
+max
+σ′∈calls(σ) dσ′,
+(1)
+with dσ = 1 when calls(σ) ⊆Aprim. We do not
+enforce a maximum depth; instead we measure how
+depth evolves across iterations (§4.6). To prevent
+runaway abstraction, we forbid cycles via a simple
+topological check at induction time, and we cap the
+per-skill body length at 30 lines.
+The choice to allow any prior skill, not just
+skills from iteration k −1, enables the inducer
+to refactor a long chain of primitives into a
+single mid-level skill at any iteration.
+Con-
+cretely, an induced book_flight skill at iter-
+ation 3 may call search_dates (iteration 1),
+fill_passenger_info (iteration 2), and a freshly
+synthesized confirm_payment (also iteration 3).
+This stands in contrast to SKILLRL’s fixed two-
+tier hierarchy, which forces the agent to flatten the
+natural call structure of real web procedures.
+3.5
+MDL-Driven Library Compaction
+Without governance, the library grows monotoni-
+cally and accumulates redundant skills, which both
+inflates the retrieval namespace and dilutes the
+gradient signal during distillation. Every M it-
+erations (we use M=2) we apply a compaction
+step whose objective is the classical minimum-
+description-length functional (Rissanen, 1978):
+F(L) =
+X
+σ∈L
+|σ|
+| {z }
+library cost
++
+X
+ζ∈Z+
+min
+parse(ζ|L) |parse(ζ | L)|
+|
+{z
+}
+data cost
+.
+(2)
+Here |σ| is the token length of the skill body, and
+|parse(ζ | L)| is the length of the shortest program
+over L ∪Aprim that reproduces ζ. Intuitively, F
+rewards libraries that are short (few, concise skills)
+but that can compactly explain past successful be-
+havior; it penalizes both over-specific skills (used
+by few trajectories) and redundant skills (whose
+role is already covered).
+We approximate the minimization of Eq. 2 via
+three greedy operators applied iteratively until F
+no longer decreases: (i) Merge: two skills σa, σb
+that are behaviorally equivalent on a sampled hold-
+out set (i.e., produce identical post-states with prob-
+ability ≥ρ) are merged into the shorter of the two,
+with the longer being replaced by an alias. (ii)
+Refactor: if the same primitive-action subsequence
+of length ≥ℓmin appears in ≥rmin existing skill
+bodies, the inducer is asked to propose a new mid-
+level skill that captures it, and the existing skills
+are rewritten to call it. (iii) Prune: skills used
+by zero trajectories in Z+
+0:k over the most recent
+M iterations are removed (unless invoked transi-
+tively by another skill). Each candidate modifica-
+
+
+===== page 5 =====
+tion is accepted only if (a) it reduces F and (b) it
+does not decrease success rate on a held-out valida-
+tion set Tval. This last constraint is the key safety
+net that distinguishes principled compaction from
+naive deduplication.
+Functional redundancy and lifecycle. Equiva-
+lence is tested on a stratified context set including
+perturbed states, so two skills reaching one goal by
+different routes are collapsed only when indistin-
+guishable everywhere: 14 goal-overlapping groups
+survive at k=5. Unmet preconditions block invoca-
+tion at run time, violated postconditions trigger one
+retry, and skills whose rolling success rate drops
+below 60% are quarantined (Appendix G).
+3.6
+Distillation Back into Weights
+After each iteration we have Z+
+k , a set of success-
+ful trajectories produced by πk with the in-context
+library Lk+1. We convert each such trajectory into
+a plan-augmented training example (I, planσ, ζ),
+where planσ is the sequence of skill invocations
+the agent used. The base policy πk+1 is then ob-
+tained by supervised fine-tuning of πk on these
+triples with a standard token-level cross-entropy
+loss, plus an auxiliary loss that predicts the next
+skill name conditioned only on (I, o0:t), encourag-
+ing the model to internalize when to invoke each ab-
+straction. We use LoRA (Hu et al., 2022) adapters
+and a constant learning rate of 1×10−5 for stabil-
+ity across iterations. Examples are first re-parsed
+against the compacted library Lk+1, with merged
+calls rewritten through the alias map and trajec-
+tories invoking pruned skills dropped (3.6% on
+average), so deprecated skills are never reinforced.
+The distillation step is what makes SCAFFOLD’s
+improvement compound: at iteration k +1 the base
+policy itself has improved, so the new trajectories it
+produces (with the larger library) push the frontier
+of solvable tasks higher, yielding richer skills to
+induce in iteration k + 2. This is the recursive self-
+improvement loop in the title of the paper, made
+concrete.
+4
+Experiments
+4.1
+Experiments Setup
+4.1.1
+Datasets
+We evaluate on three benchmarks chosen to cover
+both controlled and live web environments: We-
+bArena (Zhou et al., 2024): 812 long-horizon
+tasks across four self-hosted sites (E-commerce,
+social forum, collaborative development, content
+management systems). Evaluation is execution-
+based with a deterministic verifier per task. Visu-
+alWebArena (Koh et al., 2024): 910 tasks built
+on top of WebArena that explicitly require visual
+reasoning; we use the full benchmark. Online-
+Mind2Web (Xue et al., 2025): 300 tasks on 136
+websites across 12 domains; we partition by sites
+into a 9-domain training pool and a 3-domain held-
+out test set (Jobs & Careers, Travel & Transporta-
+tion, Government & Services) in main experiments,
+enabling a controlled measurement of skill transfer.
+4.1.2
+Baselines
+We compare SCAFFOLD against three families:
+(A) Strong zero-shot agents: REACT (Yao et al.,
+2023), SEEACT (Zheng et al., 2024a), WEB-
+VOYAGER (He et al., 2024), and AGENTOC-
+CAM (Yang et al., 2025), all instantiated on
+top of the same Qwen2.5-VL-7B (Yang et al.,
+2024) base for a fair comparison; we addition-
+ally report numbers from the stronger UI-TARS-
+7B (Qin et al., 2025) backbone. (B) Memory-
+and workflow-augmented agents:
+REFLEX-
+ION (Shinn et al., 2023) (in-context reflection),
+SYNAPSE (Zheng et al., 2024b) (trajectory exem-
+plars), MEM0 (Chhikara et al., 2025) (long-term
+memory), EXPEL (Zhao et al., 2024) (experience
+distillation), and Agent Workflow Memory (Wang
+et al., 2025b). (C) Skill-induction and skill-RL
+agents: SKILLWEAVER (Zheng et al., 2025), AP-
+PAGENTX (Jiang et al., 2025), EVOLVER (Wu
+et al., 2025a), SKILLRL (Xia et al., 2026), and WE-
+BRL (Qi et al., 2025). For every baseline we use
+the same base model, the same task pool, the same
+number of self-improvement iterations (K=5), and
+the same evaluation protocol to isolate algorithmic
+differences.
+4.1.3
+Evaluation Metrics
+We report: (1) Success rate (SR): fraction of tasks
+for which the verifier returns 1. (2) Step efficiency:
+average steps per successful task (lower is better).
+(3) Library statistics: total skill count |L|, mean
+abstraction depth ¯d, skill reuse rate (fraction of
+skills called by ≥2 tasks). (4) Cross-site transfer
+SR: SR on evaluation sites different from training
+ones. (5) Iteration scaling: SR as a function of
+k. To control for environment stochasticity (dy-
+namic DOM, server load, LLM sampling), we re-
+port mean ± standard deviation over 3 independent
+runs with different seeds, and use paired bootstrap
+tests for significance, marking p < 0.05 with †.
+
+
+===== page 6 =====
+Method
+WebArena
+VWA
+OM2W-X
+(A) Zero-shot agents (Qwen2.5-VL-7B)
+REACT (Yao et al., 2023)
+8.1 ± 0.6
+6.2 ± 0.4
+11.2 ± 0.9
+SEEACT (Zheng et al., 2024a)
+12.4 ± 0.5
+9.7 ± 0.6
+14.0 ± 1.0
+WEBVOYAGER (He et al., 2024)
+15.3 ± 0.7
+11.8 ± 0.5
+17.5 ± 1.2
+AGENTOCCAM (Yang et al., 2025)
+16.8 ± 0.4
+12.4 ± 0.6
+18.1 ± 0.8
+(B) Memory/Workflow-augmented
+REFLEXION (Shinn et al., 2023)
+14.0 ± 0.8
+10.5 ± 0.7
+15.3 ± 1.0
+SYNAPSE (Zheng et al., 2024b)
+17.6 ± 0.6
+13.1 ± 0.5
+18.4 ± 0.9
+MEM0 (Chhikara et al., 2025)
+18.2 ± 0.7
+13.9 ± 0.6
+19.3 ± 1.1
+EXPEL (Zhao et al., 2024)
+17.9 ± 0.5
+13.6 ± 0.7
+19.0 ± 1.0
+AWM (Wang et al., 2025b)
+24.3 ± 0.6
+18.7 ± 0.7
+23.6 ± 1.0
+(C) Skill-induction & skill-RL
+WEBRL (Qi et al., 2025)
+28.7 ± 0.9
+19.4 ± 0.8
+24.1 ± 1.3
+APPAGENTX (Jiang et al., 2025)
+22.5 ± 0.7
+17.2 ± 0.6
+22.8 ± 1.1
+EVOLVER (Wu et al., 2025a)
+26.4 ± 0.8
+19.0 ± 0.7
+24.4 ± 1.2
+SKILLWEAVER (Zheng et al., 2025)
+29.1 ± 0.7
+21.5 ± 0.8
+25.8 ± 1.1
+SKILLRL (Xia et al., 2026)
+31.6 ± 0.6
+22.7 ± 0.7
+26.3 ± 1.0
+SCAFFOLD (ours)
+42.7 ± 0.8 † 36.3 ± 0.9 † 43.5 ± 1.2 †
+Upper-ref: SCAFFOLD on UI-TARS-7B (Qin et al., 2025)
+51.2 ± 0.8
+44.6 ± 1.0
+49.1 ± 1.3
+Table 1: Main results (Success Rate %) on WebArena, VisualWebArena (VWA), and Online-Mind2Web held-out
+test split (OM2W-X). Mean ± std over 3 seeds. †: p < 0.05 over the strongest competitor (SKILLRL) by paired
+bootstrap. All rows in (A)–(C) and the bold SCAFFOLD row use Qwen2.5-VL-7B as the base; the last row is
+included as an upper reference with a stronger backbone.
+4.1.4
+Implementation Details
+Base model is Qwen2.5-VL-7B-Instruct (Yang
+et al., 2024) unless stated otherwise; we also re-
+port results with UI-TARS-7B (Qin et al., 2025)
+as a stronger backbone.
+The skill inducer and
+the MDL refactor proposer are GPT-4o-2024-08,
+queried with temperature 0.3. Trajectories are col-
+lected with temperature 0.7 and a 30-step horizon.
+We use nmin=2 for multi-instance induction, M=2
+for compaction interval, ρ=0.9 for behavioral-
+equivalence threshold, ℓmin=3 and rmin=3 for the
+refactor operator. Distillation uses LoRA (rank 64,
+α=128) on top of the base model for 1 epoch per
+iteration. The learning rate is set as 1×10−5. All
+experiments run on 8×A100-80GB; a complete 5-
+iteration run on WebArena takes nearly 36 hours.
+Two protocol points deserve emphasis. Every skill-
+and workflow-induction baseline (SKILLWEAVER,
+SKILLRL, APPAGENTX, EVOLVER, AWM) uses
+the same GPT-4o-2024-08 checkpoint and temper-
+ature for its synthesis component, as in the original
+SKILLWEAVER setup, so comparisons isolate al-
+gorithmic differences rather than inducer strength;
+and the 30-step horizon is counted in primitive ac-
+tions for every method, a skill invocation being a
+macro action whose primitives draw on the same
+shared budget (§4.9).
+4.2
+Main Results
+Table 1 reports main results. SCAFFOLD achieves
+42.7% SR on WebArena, 36.3% on VisualWe-
+bArena, and 43.5% on the OM2W held-out test
+split, improving over the strongest skill-augmented
+competitor (SKILLRL) by 11.1, 13.6, and 17.2
+absolute points respectively, all statistically sig-
+nificant under paired bootstrap. Three trends are
+worth highlighting. First, skill-induction and skill-
+RL methods systematically outperform both zero-
+shot and memory/workflow-augmented agents on
+all three benchmarks. This indicates that explicit,
+reusable skill abstraction is the right unit of ac-
+cumulated experience for web agents.
+Second,
+the advantage of SCAFFOLD on OM2W-X is most
+significant, achieving 17.2 points over SKILLRL,
+confirming that the recursive parametric skill ab-
+straction coupled with library compaction transfers
+materially better than two-tier prompt-based skills.
+Third, replacing the base model with UI-TARS-
+7B yields a further 7.5-point lift averaged across
+all three benchmarks, suggesting that SCAFFOLD
+is complementary to advances in GUI-specified
+model backbones rather than a substitute for them.
+
+
+===== page 7 =====
+Variant
+WA
+VWA
+OM2W-X
+Full SCAFFOLD
+42.7
+36.3
+43.5
+−multi-instance (nmin=1)
+38.1
+31.7
+38.4
+−recursive composition (depth≤1)
+36.4
+30.5
+36.1
+−MDL compaction
+39.6
+33.8
+40.0
+−distillation (in-context only)
+34.7
+28.4
+34.0
+−holdout validation in induction
+39.0
+32.6
+39.7
+−all four innovations (= SkillWeaver)
+29.1
+21.5
+25.8
+Table 2: Ablation on the four core innovations. Each
+row removes a single component while keeping the rest
+unchanged. Last row is one of strongest baselines.
+4.3
+Ablation Study
+Table 2 isolates each of SCAFFOLD’s four inno-
+vations.
+Removing distillation has the largest
+effect (−8.0 points on WebArena), confirming
+our central claim: a prompt-only skill library,
+however well structured, is fundamentally lim-
+ited by the frozen base policy. Recursive com-
+position is the second-largest contributor (−6.3
+points on WebArena, −7.4 on OM2W-X), which
+we attribute to its ability to express long-horizon
+procedures (e.g., book_full_trip composing
+search_flight, select_seat, enter_payment)
+without runaway prompt length. On WebArena,
+the multi-instance induction and holdout validation
+contribute 4.6 and 3.7 points respectively, smaller
+absolute effects. But they are essential for stabil-
+ity across iterations as we show next. MDL com-
+paction contributes a modest 3.1 points but is what
+keeps the library size bounded (cf. Fig. 3). The
+drops sum to 25.7 against a total gap of 13.6, so
+the components are synergistic rather than additive.
+4.4
+Skill Abstraction vs. Iterative Fine-Tuning
+Since distillation produces the largest ablation gap,
+one may ask whether the gains come from skill
+abstraction or merely from iterative fine-tuning on
+self-generated data. Table 6 in Appendix E decou-
+ples the two with the trajectories held fixed. A
+STaR-style loop (Zelikman et al., 2022) without
+any library reaches 30.4, since fewer hard tasks are
+ever solved; abstraction without distillation reaches
+34.7, since a frozen policy caps what is reachable
+however good the library is. Standard SFT on the
+identical trajectories with skill calls flattened to
+primitives reaches 38.6, so 4.1 of the remaining
+points come from the plan-augmented format and
+the auxiliary loss that teach the policy when to in-
+voke which abstraction, and the effect is not LoRA-
+specific (42.9 with full-parameter tuning). Abstrac-
+tion keeps distillation paying off; distillation makes
+abstraction cumulative rather than prompt-bound.
+0
+1
+2
+3
+4
+5
+Self-improvement iteration k
+10
+15
+20
+25
+30
+35
+40
+45
+Success rate (%) on WebArena
+AWM
+SkillWeaver
+SkillRL
+SCAFFOLD (ours)
+Figure 2: Success rate vs. self-improvement iteration on
+WebArena. SCAFFOLD continues to improve through
+K=5 while baselines saturate around k=2–3. Shaded
+regions are 1 std over 3 seeds.
+0
+200
+400
+| |  (# skills)
+without MDL compaction
+with MDL compaction (ours)
+0
+1
+2
+3
+4
+5
+Self-improvement iteration k
+0
+1
+2
+3
+Mean abstraction depth d
+no recursive composition (depth
+1)
+SkillRL (2-tier)
+SCAFFOLD (ours)
+Figure 3: Library growth dynamics across iterations on
+WebArena. Top: total skill count without compaction
+(dashed) the library balloons; with compaction (solid)
+it stabilizes near 180 skills. Bottom: mean abstraction
+depth, which grows monotonically as recursive compo-
+sition kicks in.
+4.5
+Iteration Scaling
+A natural worry with any self-improvement scheme
+is that gains saturate quickly. Figure 2 plots SR
+against iteration k. Baselines that maintain a flat
+skill cache (AWM, SkillWeaver) plateau near k=2,
+after which library bloat slows further learning.
+SKILLRL continues to improve through k=3 but
+flattens thereafter. SCAFFOLD continues to im-
+prove through k=5, reflecting two interacting ef-
+fects: distillation strengthens πk, allowing it to
+solve harder tasks; and those harder tasks furnish
+new high-depth skills that, after compaction, ex-
+pand the library’s expressive reach without diluting
+it. We did not run beyond k=5 due to compute,
+but the slope at k=5 remains positive, suggesting
+further improvement is achievable.
+
+
+===== page 8 =====
+4.6
+Library Depth and Reuse
+Figure 3 shows two complementary growth dynam-
+ics. The top panel contrasts library size with and
+without MDL compaction: without compaction
+|L| grows almost linearly to ≈470 skills by k=5,
+the majority being near-duplicates differing only
+in selectors or argument names (e.g., login_v1,
+login_v2, login_with_email); with compaction
+the library follows a concave trajectory and satu-
+rates near 181 skills, a ∼2.6× reduction driven
+primarily by the merge and prune operators (jointly
+responsible for 76% of removed skills in our run
+logs). The bottom panel plots mean depth ¯d: SCAF-
+FOLD climbs from 1.05 at k=1 to 2.71 at k=5
+(max depth 5), while the - recursive composition ab-
+lation flatlines at ¯d=1 and SKILLRL’s two-tier hier-
+archy plateaus at ¯d≤2. Together with a reuse rate of
+64% at k=5 (vs. ≈21% without compaction; most
+skills singletons), these statistics support the view
+that composition and compaction are two halves
+of the same mechanism: composition produces the
+depth that makes long-horizon skills expressible,
+while compaction prevents that depth from being
+undermined by redundancy. The 3.1-point SR cost
+of disabling compaction (Table 2) is the empirical
+price of an uncontrolled library.
+4.7
+Cross-Site Transfer
+Figure 4 compares site-to-site transfer for the two
+methods, beyond the granularity of domain split.
+Averaging over the 30 off-diagonal cells, SKILL-
+WEAVER reaches 16.6% mean transfer SR ver-
+sus SCAFFOLD’s 35.9%, a 19.3-point gap; on the
+15 cells under the three held-out sites in main
+experiments, SCAFFOLD stays in 27–47% while
+SKILLWEAVER falls to 11–28%, with represen-
+tative pairs amazon→ziprecruiter (38% vs. 19%)
+and landwatch→ticketmaster (47% vs. 28%) shar-
+ing the search→filter→select→confirm structure
+but differing in DOM and layout. Inspecting the
+library shows the mechanism: generic procedural
+skills such as filter_results(query, sort_by,
+max_price), login(site, credentials), and
+paginate_until(condition) carry over via pa-
+rameter re-binding, while SKILLWEAVER’s opaque
+APIs encode selectors directly and must be re-
+discovered per site. The github row shows where
+this still leaves a gap. GitHub’s issue/PR navigation
+is structurally unlike e-commerce flows, so SCAF-
+FOLD’s general skills transfer only modestly (27–
+31%) and SKILLWEAVER’s effectively do not (11–
+Method
+Clean
+Latency
+DOM-shuf.
++7 d
+SKILLWEAVER
+29.1
+25.3
+24.7
+26.5
+SKILLRL
+31.6
+28.0
+27.6
+28.9
+SCAFFOLD
+42.7
+40.9
+40.6
+41.4
+Drop relative to clean (∆in points)
+SKILLWEAVER
+n/a
+−3.8
+−4.4
+−2.6
+SKILLRL
+n/a
+−3.6
+−4.0
+−2.7
+SCAFFOLD
+n/a
+−1.8
+−2.1
+−1.3
+Table 3: Stability under environment perturbations on
+WebArena (SR %). Clean: unperturbed baseline. La-
+tency: 0–3s random delay per action. DOM-shuf.: non-
+functional DOM attributes randomly permuted on each
+page load. +7 d: same task suite re-evaluated 7 days
+later. SCAFFOLD degrades by at most 2.1 points across
+all regimes, roughly half the sensitivity of the strongest
+baselines. Each cell is mean over 3 seeds (std ≤1.0).
+14%). This is consistent with the transfer-ceiling
+limitation discussed in the Limitations section.
+4.8
+Stability Under Stochasticity
+Real web environments are noisy: DOMs change
+between page loads, A/B tests rotate elements, and
+servers throttle under load. To probe robustness
+we re-ran the WebArena evaluation under three
+perturbation regimes: (a) Latency injection: we
+add a uniformly sampled 0–3s delay before ev-
+ery action, simulating slow network conditions;
+(b) DOM-attribute shuffling: we randomly per-
+mute non-functional attributes (id, class, data-*)
+on each page load, breaking memorized selectors
+while preserving semantics; (c) Temporal drift: we
+re-run the same task suite 7 days later, capturing
+whatever natural drift WebArena’s containerized
+sites exhibit between snapshots. Table 3 reports
+each method’s success rate under all three regimes.
+The pattern in Table 3 is consistent across all
+three perturbations: SCAFFOLD degrades by at
+most 2.1 points (DOM-shuffle), compared to 3.6–
+4.4 for SKILLWEAVER and SKILLRL, roughly half
+the sensitivity. We attribute this to two structural
+properties of our skills. First, parametric ground-
+ing: a skill that locates an element by semantic
+role (“the search input”) is robust to attribute re-
+naming, whereas a skill that memorized a specific
+id selector fails the moment that id is rewritten.
+Second, postcondition checks: even if the body
+of a skill misfires under latency or transient state,
+the postcondition test triggers a retry rather than
+blindly committing to a wrong final state. The
+DOM-shuffle column is where the gap is widest,
+which is exactly what these two mechanisms are
+designed to handle. We view this as evidence that
+
+
+===== page 9 =====
+amazon
+landwatch
+github
+ziprecr*
+ticketm*
+justice*
+Evaluation site
+amazon
+landwatch
+github
+ziprecr*
+ticketm*
+justice*
+Training site
+62
+18
+14
+19
+17
+13
+21
+58
+13
+24
+28
+16
+12
+11
+55
+14
+12
+11
+20
+22
+13
+56
+23
+17
+17
+25
+12
+21
+53
+16
+11
+14
+10
+16
+17
+50
+SkillWeaver
+amazon
+landwatch
+github
+ziprecr*
+ticketm*
+justice*
+Evaluation site
+amazon
+landwatch
+github
+ziprecr*
+ticketm*
+justice*
+68
+41
+31
+38
+35
+33
+44
+64
+28
+42
+47
+36
+29
+30
+60
+31
+28
+27
+40
+44
+30
+62
+43
+38
+37
+47
+28
+41
+59
+35
+33
+36
+27
+38
+39
+56
+SCAFFOLD (ours)
+0
+10
+20
+30
+40
+50
+60
+70
+Success Rate (%)
+Figure 4: Cross-site transfer on Online-Mind2Web. Cell (i, j) shows SR (%) on test site j after training only on site
+i. The ziprecr and ticketm are the abbreviations for ziprecruiter and ticketmaster, respectively. The sites in redlines
+are the held-out test ones in main experiments, also indicated with ∗.
+the structural choices in SCAFFOLD are not just
+accuracy-oriented but also confer a non-trivial ro-
+bustness benefit at no additional inference cost.
+4.9
+Action Budget and Inference Cost
+Because a skill invocation executes several primi-
+tive actions, one might worry that SCAFFOLD en-
+joys a larger effective action budget. It does not:
+the horizon is counted in primitive environment
+actions for every method, and primitives inside
+a skill body draw on the same budget (§4.1.4).
+Average primitive actions per successful task is
+12.4 for SCAFFOLD against 14.3 for SKILLRL,
+15.1 for SKILLWEAVER and 16.9 for AWM, so
+SCAFFOLD needs fewer actions, not more; capping
+the budget at 10/20/30 steps gives 11.5/24.0/29.1,
+13.2/26.4/31.6 and 19.8/36.9/42.7 respectively, so
+the margin is widest at the tightest cap, the opposite
+of what budget inflation predicts.
+Skills also trade expensive planning calls for
+cheaper ones: per successful task SCAFFOLD issues
+5.3 policy calls against 9.6 for SKILLWEAVER and
+18.7 for REACT, plus 7.1 far cheaper grounder and
+4.6 judge calls, so total tokens fall from 224K and
+118K to 79K and wall clock from 102s and 74s to
+61s. Induction is offline and amortized (about 500
+calls per run). Appendix F gives breakdown and a
+selector cache that removes 62% grounder calls.
+4.10
+Inducer and Verifier Dependence
+Two components sit outside the loop. Swapping the
+GPT-4o inducer for the open-weight Qwen2.5-72B-
+Instruct with everything else fixed gives 40.8 SR
+on WebArena, 1.9 points below GPT-4o and still
+9.2 above SKILLRL with the GPT-4o inducer, so
+the framework does not hinge on proprietary-API
+access. Replacing the ground-truth verifier with a
+model-based judge for filtering, following the We-
+bJudge protocol of Xue et al. (2025), gives 40.2
+on WebArena and 41.0 on OM2W-X against 42.7
+and 43.5. Multi-instance induction and holdout re-
+execution filter much of this label noise, so SCAF-
+FOLD degrades gracefully as verification weakens.
+5
+Conclusions and Future Work
+In this paper, we presented SCAFFOLD, a self-
+improving framework for web agents that combines
+multi-instance parametric skill induction, recursive
+hierarchical composition, MDL-driven library com-
+paction, and weight-level distillation into a single
+closed loop. On WebArena, VisualWebArena, and
+a held-out Online-Mind2Web split, SCAFFOLD out-
+performs the strongest skill-induction and skill-RL
+baselines by 11.1–17.2 absolute points while con-
+tinuing to improve through five iterations and keep-
+ing the library size bounded. In the future, we can
+consider such directions: (i) replacing the GPT-4o-
+based inducer with a self-trained, lighter induction
+model to remove proprietary-API dependence; (ii)
+extending the framework to OSWorld-style full-
+desktop agents where the action space includes
+file I/O and shell commands; (iii) integrating an
+environment-grounded verifier that does not rely on
+per-task ground truth, enabling fully autonomous
+deployment; and (iv) developing a formal conver-
+gence analysis of the MDL-compaction operator
+under the recursive composition regime.
+
+
+===== page 10 =====
+Limitations
+We identify five concrete limitations of SCAFFOLD
+that we believe warrant attention. (1) Inducer de-
+pendence. Both skill induction and the refactor
+proposer of the MDL compactor rely on a strong
+proprietary model (GPT-4o); we estimate the in-
+ducer accounts for ∼70% of total dollar cost in
+our experiments. Replacing it with a self-trained
+inducer is a clear next step but was outside our com-
+pute budget. (2) Verifier dependence. SCAFFOLD
+assumes access to a per-task verifier V to label
+trajectory success during the rollout stage. While
+this is realistic for WebArena and VisualWebArena
+(which ship deterministic verifiers), it does not ex-
+tend to fully autonomous deployment in the wild,
+where success is rarely binary or self-evident. (3)
+Greedy MDL approximation. The compaction
+step optimizes Eq. 2 greedily; we have no conver-
+gence guarantee and observe occasional plateaus
+where a non-local refactor would further reduce F.
+A more principled approximation, e.g., simulated
+annealing over skill rewrites, may help. (4) Cross-
+site transfer ceiling. Although parametric skills
+generalize meaningfully better than site-specific
+APIs (§4.7), our gains shrink when held-out sites
+differ qualitatively from training ones (e.g., train-
+ing only on e-commerce, testing on government
+portals). The framework reuses procedures, not
+web ontology, so radical distributional shift remains
+hard. (5) Distillation forgetting. LoRA-based dis-
+tillation preserves base capabilities reasonably well,
+but we observe a small (≤1.2 point) regression on
+a subset of held-out tasks that the original π0 could
+already solve. A replay buffer of original task su-
+pervision could mitigate this; we leave a careful
+study to future work.
+Ethical Considerations
+SCAFFOLD enables web agents to learn reusable
+procedural skills through autonomous exploration.
+We highlight three ethical considerations. Mis-
+use: more capable web agents can be deployed
+for spam, scraping at scale, credential stuffing,
+or evading rate limits. Our experiments use only
+WebArena, VisualWebArena, and a small Online-
+Mind2Web subset on permitted sites; we do not
+provide site-specific bypass skills. Bias amplifi-
+cation through self-improvement: any bias in the
+induced skills (e.g., always defaulting to certain
+payment methods or geographic regions) is rein-
+forced across iterations through distillation. Future
+deployments should audit the skill library at each
+iteration. Energy cost: a full 5-iteration run on a
+single benchmark consumes ∼36 A100-hours. We
+report this transparently and discourage hyperpa-
+rameter searches that re-run the full loop unneces-
+sarily.
+References
+Zixiang Chen, Yihe Deng, Huizhuo Yuan, Kaixuan Ji,
+and Quanquan Gu. 2024. Self-play fine-tuning con-
+verts weak language models to strong language mod-
+els. In International Conference on Machine Learn-
+ing, pages 6621–6642. PMLR.
+Kanzhi Cheng, Qiushi Sun, Yougang Chu, Fangzhi Xu,
+Li YanTao, Jianbing Zhang, and Zhiyong Wu. 2024.
+Seeclick: Harnessing GUI grounding for advanced
+visual GUI agents. In Proceedings of the 62nd An-
+nual Meeting of the Association for Computational
+Linguistics (Volume 1: Long Papers), pages 9313–
+9332.
+Prateek Chhikara, Dev Khant, Saket Aryan, Taranjeet
+Singh, and Deshraj Yadav. 2025. Mem0: Building
+production-ready AI agents with scalable long-term
+memory. arXiv preprint arXiv:2504.19413.
+Kevin Ellis, Catherine Wong, Maxwell Nye, Mathias
+Sablé-Meyer, Lucas Morales, Luke Hewitt, Luc Cary,
+Armando Solar-Lezama, and Joshua B Tenenbaum.
+2021. DreamCoder: Bootstrapping inductive pro-
+gram synthesis with wake-sleep library learning. In
+Proceedings of the 42nd acm sigplan international
+conference on programming language design and
+implementation, pages 835–850.
+Gaodan Fang, Vatche Isahagian, KR Jayaram, Ritesh
+Kumar, Vinod Muthusamy, Punleuk Oum, and Gegi
+Thomas. 2026. Trajectory-informed memory genera-
+tion for self-improving agent systems. arXiv preprint
+arXiv:2603.10600.
+Apurva Gandhi and Graham Neubig. 2026. Go-browse:
+Training web agents with structured exploration. In
+International Conference on Learning Representa-
+tions, volume 2026, pages 138973–138992.
+Daya Guo, Dejian Yang, Haowei Zhang, Junxiao
+Song, Peiyi Wang, Qihao Zhu, Runxin Xu, Ruoyu
+Zhang, Shirong Ma, Xiao Bi, and 1 others. 2025.
+DeepSeek-R1: Incentivizing reasoning capability in
+LLMs via reinforcement learning. arXiv preprint
+arXiv:2501.12948.
+Hongliang He, Wenlin Yao, Kaixin Ma, Wenhao Yu,
+Yong Dai, Hongming Zhang, Zhenzhong Lan, and
+Dong Yu. 2024. WebVoyager: Building an end-to-
+end web agent with large multimodal models. In
+Proceedings of the 62nd Annual Meeting of the As-
+sociation for Computational Linguistics (Volume 1:
+Long Papers), pages 6864–6890.
+
+
+===== page 11 =====
+Wenyi Hong, Weihan Wang, Qingsong Lv, Jiazheng
+Xu, Wenmeng Yu, Junhui Ji, Yan Wang, Zihan Wang,
+Yuxiao Dong, Ming Ding, and 1 others. 2024. CogA-
+gent: A visual language model for GUI agents. In
+2024 IEEE/CVF Conference on Computer Vision and
+Pattern Recognition (CVPR), pages 14281–14290.
+IEEE.
+Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan
+Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and
+Weizhu Chen. 2022. Lora: Low-rank adaptation of
+large language models. In The Tenth International
+Conference on Learning Representations, ICLR 2022,
+Virtual Event, April 25-29, 2022. OpenReview.net.
+Wenjia Jiang,
+Yangyang Zhuang,
+Chenxi Song,
+Xu Yang, Joey Tianyi Zhou, and Chi Zhang. 2025.
+AppAgentX: Evolving GUI agents as proficient
+smartphone users. arXiv preprint arXiv:2503.02268.
+Jing Yu Koh, Robert Lo, Lawrence Jang, Vikram
+Duvvur, Ming Lim, Po-Yu Huang, Graham Neu-
+big, Shuyan Zhou, Russ Salakhutdinov, and Daniel
+Fried. 2024. VisualWebArena: Evaluating multi-
+modal agents on realistic visual web tasks. In Pro-
+ceedings of the 62nd Annual Meeting of the Associa-
+tion for Computational Linguistics (Volume 1: Long
+Papers), pages 881–905.
+Hanyu Lai, Xiao Liu, Iat Long Iong, Shuntian Yao, Yux-
+uan Chen, Pengbo Shen, Hao Yu, Hanchen Zhang,
+Xiaohan Zhang, Yuxiao Dong, and 1 others. 2024.
+AutoWebGLM: A large language model-based web
+navigating agent. In Proceedings of the 30th ACM
+SIGKDD Conference on Knowledge Discovery and
+Data Mining, pages 5295–5306.
+Ajay Patel, Markus Hofmarcher, Claudiu Leoveanu-
+Condrei, Marius-Constantin Dinu, Chris Callison-
+Burch, and Sepp Hochreiter. 2024. Large language
+models can self-improve at web agent tasks. arXiv
+preprint arXiv:2405.20309.
+Zehan Qi, Xiao Liu, Iat Long Iong, Hanyu Lai, Xueqiao
+Sun, Jiadai Sun, Xinyue Yang, Yu Yang, Shuntian
+Yao, Wei Xu, and 1 others. 2025. WebRL: Training
+LLM web agents via self-evolving online curriculum
+reinforcement learning. In International Conference
+on Learning Representations, volume 2025, pages
+79791–79821.
+Yujia Qin, Yining Ye, Junjie Fang, Haoming Wang,
+Shihao Liang, Shizuo Tian, Junda Zhang, Jiahao Li,
+Yunxin Li, Shijue Huang, and 1 others. 2025. UI-
+TARS: Pioneering automated GUI interaction with
+native agents. arXiv preprint arXiv:2501.12326.
+Jorma Rissanen. 1978. Modeling by shortest data de-
+scription. Automatica, 14(5):465–471.
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu,
+Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan
+Zhang, YK Li, Yang Wu, and 1 others. 2024.
+DeepSeekMath: Pushing the limits of mathematical
+reasoning in open language models. arXiv preprint
+arXiv:2402.03300.
+Noah Shinn, Federico Cassano, Ashwin Gopinath,
+Karthik Narasimhan, and Shunyu Yao. 2023. Re-
+flexion: Language agents with verbal reinforcement
+learning. Advances in neural information processing
+systems, 36:8634–8652.
+Richard S Sutton, Doina Precup, and Satinder Singh.
+1999. Between MDPs and semi-MDPs: A framework
+for temporal abstraction in reinforcement learning.
+Artificial intelligence, 112(1-2):181–211.
+Guanzhi Wang, Yuqi Xie, Yunfan Jiang, Ajay Man-
+dlekar, Chaowei Xiao, Yuke Zhu, Linxi Fan, and An-
+ima Anandkumar. 2024a. Voyager: An open-ended
+embodied agent with large language models. Trans-
+actions on Machine Learning Research.
+Haoming Wang, Haoyang Zou, Huatong Song, Jiazhan
+Feng, Junjie Fang, Junting Lu, Longxiang Liu, Qinyu
+Luo, Shihao Liang, Shijue Huang, and 1 others.
+2025a. UI-TARS-2 technical report: Advancing GUI
+agent with multi-turn reinforcement learning. arXiv
+preprint arXiv:2509.02544.
+Jiongxiao Wang, Qiaojing Yan, Yawei Wang, Yijun
+Tian, Soumya Smruti Mishra, Zhichao Xu, Megha
+Gandhi, Panpan Xu, and Lin Lee Cheong. 2026. Re-
+inforcement learning for self-improving agent with
+skill library. In Proceedings of the 64th Annual Meet-
+ing of the Association for Computational Linguistics
+(Volume 1: Long Papers), pages 1529–1550.
+Zhiruo Wang, Graham Neubig, and Daniel Fried. 2024b.
+Trove: Inducing verifiable and efficient toolboxes for
+solving programmatic tasks. In International Con-
+ference on Machine Learning, pages 51177–51191.
+PMLR.
+Zora Zhiruo Wang, Jiayuan Mao, Daniel Fried, and
+Graham Neubig. 2025b. Agent workflow memory.
+In International Conference on Machine Learning,
+pages 63897–63911. PMLR.
+Rong Wu, Xiaoman Wang, Jianbiao Mei, Pinlong
+Cai, Daocheng Fu, Cheng Yang, Licheng Wen,
+Xuemeng Yang, Yufan Shen, Yuxin Wang, and
+1 others. 2025a.
+EvolveR: Self-evolving LLM
+agents through an experience-driven lifecycle. arXiv
+preprint arXiv:2510.16079.
+Zhiyong Wu, Zhenyu Wu, Fangzhi Xu, Yian Wang,
+Qiushi Sun, Chengyou Jia, Kanzhi Cheng, Zichen
+Ding, Liheng Chen, Paul Pu Liang, and 1 others.
+2025b. Os-atlas: Foundation action model for gen-
+eralist GUI agents. In International Conference on
+Learning Representations, volume 2025, pages 5090–
+5108.
+Peng Xia, Jianwen Chen, Hanyang Wang, Jiaqi Liu,
+Kaide Zeng, Yu Wang, Siwei Han, Yiyang Zhou, Xu-
+jiang Zhao, Haifeng Chen, and 1 others. 2026. Skillrl:
+Evolving agents via recursive skill-augmented rein-
+forcement learning. In ICLR 2026 Workshop on Life-
+long Agents: Learning, Aligning, Evolving.
+
+
+===== page 12 =====
+Tianbao Xie, Danyang Zhang, Jixuan Chen, Xiaochuan
+Li, Siheng Zhao, Ruisheng Cao, Toh J Hua, Zhoujun
+Cheng, Dongchan Shin, Fangyu Lei, and 1 others.
+2024. OSWorld: Benchmarking multimodal agents
+for open-ended tasks in real computer environments.
+Advances in Neural Information Processing Systems,
+37:52040–52094.
+Yiheng Xu, Zekun Wang, Junli Wang, Dunjie Lu, Tian-
+bao Xie, Amrita Saha, Doyen Sahoo, Tao Yu, and
+Caiming Xiong. 2025. Aguvis: Unified pure vision
+agents for autonomous GUI interaction. In Inter-
+national Conference on Machine Learning, pages
+69772–69805. PMLR.
+Zishan Xu, Yifu Guo, Yuquan Lu, Fengyu Yang,
+Zhiyuan Yao, Jiaye Lin, Ruyi Gong, and Lihua Cai.
+2026. Skillevo: An experience learning framework
+with reinforcement learning for skill evolution.
+Tianci Xue, Weijian Qi, Tianneng Shi, Chan Hee Song,
+Boyu Gou, Dawn Song, Huan Sun, and Yu Su. 2025.
+An illusion of progress? assessing the current state
+of web agents. arXiv preprint arXiv:2504.01382.
+An Yang, Baosong Yang, Beichen Zhang, Binyuan
+Hui, Bo Zheng, Bowen Yu, Chengyuan Li, Day-
+iheng Liu, Fei Huang, Haoran Wei, and 1 others.
+2024.
+Qwen2.5 technical report.
+arXiv preprint
+arXiv:2412.15115.
+Ke Yang, Yao Liu, Sapana Chaudhary, Rasool Fakoor,
+Pratik A Chaudhari, George Karypis, and Huzefa
+Rangwala. 2025. AgentOccam: A simple yet strong
+baseline for LLM-based web agents. In International
+Conference on Learning Representations, volume
+2025, pages 97533–97565.
+Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak
+Shafran, Karthik Narasimhan, and Yuan Cao. 2023.
+ReAct: Synergizing reasoning and acting in language
+models. In International Conference on Learning
+Representations.
+Simon Yu, Gang Li, Weiyan Shi, and Peng Qi. 2026.
+Polyskill: Learning generalizable skills through poly-
+morphic abstraction for continual learning. In Inter-
+national Conference on Learning Representations,
+volume 2026, pages 140298–140326.
+Eric Zelikman, Georges Harik, Yijia Shao, Varuna
+Jayasiri, Nick Haber, and Noah D Goodman. 2024.
+Quiet-STaR: Language models can teach them-
+selves to think before speaking.
+arXiv preprint
+arXiv:2403.09629.
+Eric Zelikman, Yuhuai Wu, Jesse Mu, and Noah Good-
+man. 2022. STaR: Bootstrapping reasoning with rea-
+soning. Advances in Neural Information Processing
+Systems, 35:15476–15488.
+Andrew Zhao, Daniel Huang, Quentin Xu, Matthieu
+Lin, Yong-Jin Liu, and Gao Huang. 2024. ExpeL:
+LLM agents are experiential learners. In Proceedings
+of the AAAI Conference on Artificial Intelligence,
+volume 38, pages 19632–19642.
+Boyuan Zheng, Michael Y Fatemi, Xiaolong Jin,
+Zora Zhiruo Wang, Apurva Gandhi, Yueqi Song,
+Yu Gu, Jayanth Srinivasa, Gaowen Liu, Graham Neu-
+big, and 1 others. 2025. Skillweaver: Web agents can
+self-improve by discovering and honing skills. arXiv
+preprint arXiv:2504.07079.
+Boyuan Zheng, Boyu Gou, Jihyung Kil, Huan Sun, and
+Yu Su. 2024a. Gpt-4v (ision) is a generalist web
+agent, if grounded. In International Conference on
+Machine Learning, pages 61349–61385. PMLR.
+Longtao Zheng, Rundong Wang, Xinrun Wang, and
+Bo An. 2024b. Synapse: Trajectory-as-exemplar
+prompting with memory for computer control. In In-
+ternational Conference on Learning Representations,
+volume 2024, pages 19036–19066.
+Shuyan Zhou, Frank F Xu, Hao Zhu, Xuhui Zhou,
+Robert Lo, Abishek Sridhar, Xianyi Cheng, Tianyue
+Ou, Yonatan Bisk, Daniel Fried, and 1 others. 2024.
+WebArena: A realistic web environment for build-
+ing autonomous agents. In International Conference
+on Learning Representations, volume 2024, pages
+15585–15606.
+A
+Prompt Templates
+We provide the three core prompts used by SCAF-
+FOLD below. Full prompts (including system mes-
+sages and few-shot examples) are released with the
+code.
+Skill inducer (multi-instance abstraction). Given
+a cluster C = {ζ1, . . . , ζn} of n ≥2 successful
+trajectories with embedding-similar instructions,
+the inducer is prompted to produce a parameterized
+skill. The prompt structure is:
+You
+are
+given
+n
+successful
+agent
+trajectories
+that
+accomplish
+similar
+goals on a website.
+Your task is to
+abstract them into a single parametric,
+executable skill.
+[Trajectory
+1:
+instruction,
+action
+sequence, screenshots] . . .
+[Trajectory
+n:
+instruction,
+action
+sequence, screenshots]
+Available existing skills (you may call
+them): {Lk}
+Output
+a
+Python
+function
+with:
+(a)
+a typed parameter list capturing what
+varies
+across
+trajectories;
+(b)
+a
+precondition expressed as a predicate
+over
+observation
+obs;
+(c)
+a
+body
+using primitives {click, type, scroll,
+wait}
+or
+any
+existing
+skill;
+(d)
+a
+postcondition.
+The model is then asked to justify its choice of pa-
+rameters by pointing to specific token positions in
+
+
+===== page 13 =====
+each trajectory that vary, which improves abstrac-
+tion quality and gives us a cheap diagnostic when
+induction fails.
+Refactor proposer (MDL compaction). Given
+a recurring primitive-action subsequence detected
+across ≥rmin existing skills, the refactor proposer
+is asked whether the subsequence should be pro-
+moted to its own skill:
+The following action subsequence appears
+in
+m
+existing
+skills
+(shown
+below).
+Decide whether to refactor it into a
+new
+mid-level
+skill.
+If
+yes,
+name
+it,
+parametrize
+it,
+and
+rewrite
+all
+m
+existing
+skills
+to
+call
+the
+new
+one. If no, briefly explain why (e.g.,
+the
+subsequence
+is
+too
+short
+or
+too
+site-specific to be reusable).
+We accept the proposal only if (i) the MDL func-
+tional F decreases and (ii) the rewritten skills pass
+behavioral-equivalence checks on a held-out trajec-
+tory set.
+Pre/Postcondition validator. At runtime, before
+invoking a skill we verify its precondition by pass-
+ing (obst, preσ) to a lightweight VLM judge with a
+yes/no output. Same protocol for postconditions af-
+ter execution. The judge is a separate, cheaper
+model from the inducer to keep inference cost
+bounded.
+Trajectory clustering. Instructions are embedded
+with gte-large-en-v1.5. Trajectories are first
+partitioned by site and then clustered by agglomer-
+ative clustering with average linkage on cosine sim-
+ilarity, using a merge threshold of 0.82. Clusters
+larger than 8 trajectories are subsampled by proxim-
+ity to the centroid so that the inducer context stays
+bounded, and singleton clusters (below nmin) are
+held in a buffer and re-clustered in later iterations
+as semantically similar trajectories accumulate, so
+no successful trajectory is permanently discarded.
+Sensitivity to the threshold is mild, within 1 SR
+point across the range 0.78 to 0.86.
+B
+A Worked Three-Level Recursive Skill
+To make the recursive composition concrete,
+we trace the construction of a depth-3 skill
+checkout_cheapest_in_category
+on
+the
+E-
+commerce site of WebArena, induced at iteration
+k=3.
+Level 1 (depth d=1): atomic skills, induced at
+k=1.
+def click_text(obs, text: str):
+pre:
+any(e.text == text for e in obs.dom)
+body: el = find(obs.dom, text=text)
+primitive_click(el.bbox)
+post: page changed OR el.state == 'pressed'
+def type_in_field(obs, label: str, value: str):
+pre:
+exists_input(obs.dom, label)
+body: f = find_input(obs.dom, label)
+primitive_click(f.bbox)
+primitive_type(value)
+post: f.value == value
+Level 2 (depth d=2): mid-level skills, induced at
+k=2.
+def search_and_filter(obs, query: str,
+category: str,
+sort: str = 'price_asc'):
+pre: url contains 'shop' AND has_search_box(obs)
+body: type_in_field(obs, 'Search', query)
+click_text(obs, 'Search')
+click_text(obs, category)
+click_text(obs, f'Sort: {sort}')
+post: results visible AND sort_label == sort
+Level 3 (depth d=3): composite skill, induced at
+k=3.
+def checkout_cheapest_in_category(
+obs, query: str, category: str,
+payment_token: str):
+pre:
+logged_in(obs)
+body: search_and_filter(obs, query, category,
+sort='price_asc')
+click_text(obs, 'first_result')
+click_text(obs, 'Add to Cart')
+click_text(obs, 'Checkout')
+type_in_field(obs, 'PaymentToken',
+payment_token)
+click_text(obs, 'Place Order')
+post: order_confirmed(obs) AND
+purchased_item.category == category
+The depth-3 skill calls one depth-2 skill
+(search_and_filter) and two depth-1 skills
+(click_text, type_in_field). At iteration k=4,
+the inducer further abstracts this skill into a depth-
+4 restock_pantry(items,
+budget) that calls
+checkout_cheapest_in_category in a loop, il-
+lustrating how depth grows organically across iter-
+ations.
+C
+Per-Site Analysis
+Table 4 breaks down performance by the canonical
+site grouping used in each benchmark. WebArena’s
+four primary sites cover e-commerce (OneStop-
+Shop), social-forum discussions (Reddit), collab-
+orative software development (GitLab), and con-
+tent management (CMS) (Zhou et al., 2024); Vi-
+sualWebArena spans three live-style sites (Classi-
+fieds, Reddit, Shopping) (Koh et al., 2024). SCAF-
+FOLD’s gains are largest on GitLab and CMS,
+the WebArena sites with the longest action hori-
+zons, dominated by multi-step configuration and
+code-collaboration tasks. The gain is also obvious
+
+
+===== page 14 =====
+Site
+SkillRL
+SCAFFOLD
+∆
+WebArena
+OneStopShop
+30.5
+42.6
++12.1
+Reddit
+33.2
+41.9
++8.7
+GitLab
+28.4
+45.1
++16.7
+CMS
+27.0
+42.9
++15.9
+VisualWebArena
+Classifieds
+22.6
+32.1
++9.5
+Reddit
+24.3
+35.8
++11.5
+Shopping
+21.2
+41.0
++19.8
+Table 4: Per-site success rate (%) on WebArena (Zhou
+et al., 2024) (four primary sites) and VisualWe-
+bArena (Koh et al., 2024). SCAFFOLD’s largest per-site
+gains occur on long-horizon, multi-step sites (GitLab,
+CMS, VWA Shopping), where recursive composition
+contributes most. Differences are bootstrap-significant
+(p < 0.05) for all rows.
+on VWA’s Shopping, where parametric search/fil-
+ter/checkout skills compose well. Gains on Red-
+dit are more modest, consistent with social-forum
+tasks being on average shorter and more retrieval-
+oriented, where flat libraries already perform well.
+Qualitative diagnoses.
+Inspecting failure modes
+shared by both methods reveals two patterns. First,
+verifier brittleness: a non-trivial fraction of We-
+bArena tasks reward only exact-string answers, so
+a semantically correct trajectory can be marked
+wrong; this affects both systems equally. Second,
+visual occlusion under modals: when a cookie ban-
+ner or login dialog covers the target element, both
+agents struggle; here SCAFFOLD’s precondition
+checks help but do not fully solve the problem, sug-
+gesting that an explicit modal-dismissal mid-level
+skill would be a high-value addition to the library.
+D
+Hyperparameter Sensitivity
+We probe sensitivity to the four SCAFFOLD-specific
+hyperparameters; full sweep results in the supple-
+mentary material. Table 5 shows that the method
+is broadly robust: performance varies by ≤2.4
+SR points across the tested ranges, with the multi-
+instance threshold nmin being the most sensitive
+(smaller values admit spurious skills; larger values
+delay skill creation).
+E
+Supervision Format and Component
+Build-Up
+Table 2 removes one component at a time from the
+full system; Table 7 takes the opposite direction
+and adds one component at a time on top of SKILL-
+WEAVER, which makes the marginal value of each
+component visible in isolation from the others. The
+two views agree, and together they support read-
+ing the four components as one mechanism rather
+than four independent add-ons: induction is the
+abstraction phase, MDL compaction the compres-
+sion phase, distillation the consolidation phase, and
+multi-instance validation is what keeps abstraction
+sound, in the spirit of wake-sleep library learn-
+ing (Ellis et al., 2021). The components also in-
+teract by design. Figure 3 shows that composition
+creates the depth that makes long-horizon skills ex-
+pressible while compaction keeps that depth from
+being buried in redundancy, and §3.5 explains why
+compaction is also what protects the distillation
+signal from dilution. All configurations hold the
+base model, task pool, iteration count, inducer, and
+evaluation protocol fixed, so the differences cannot
+be attributed to engineering scale or extra compute.
+F
+Efficiency and Grounding
+Measurements
+Tables 8 and 9 report the two measurements sum-
+marised in §4.9: success rate under a capped
+primitive-action budget, and the per-task call, token
+and wall-clock breakdown. Charging SCAFFOLD
+one extra primitive step for every skill invocation,
+a pessimistic accounting of invocation overhead,
+still leaves it at 42.3. The rest of this appendix asks
+how far the residual model calls inside a skill body
+can be removed.
+Semantic grounding is the one place where
+SCAFFOLD calls a model inside a skill body, so
+it is worth asking how much of it can be replaced
+by cheaper machinery such as regular expressions
+over the accessibility tree. We implement a hy-
+brid mode with selector memoization: the first suc-
+cessful grounding of a semantic reference caches
+the resolved accessibility-tree path together with a
+structural signature (role, tag, text pattern), keyed
+by site, skill and parameter; subsequent invocations
+first try the cached selector with a cheap regex and
+accessibility-tree validation, and fall back to VLM
+grounding only on mismatch. Table 10 compares
+the three regimes. The hybrid retains clean and
+perturbed accuracy while removing most grounder
+calls, and the static-selector variant makes the trade-
+off visible: it is the cheapest and the most brittle,
+losing 7.1 points under DOM-shuffle, which con-
+firms that runtime semantic grounding is the source
+of the robustness gap in Table 3. One caveat on
+the premise that skills are site-specific: after com-
+
+
+===== page 15 =====
+Hyperparameter
+Range tested
+∆SR (WA)
+Multi-instance threshold nmin
+{1, 2, 3, 4}
+−3.1 / 0.0 / −0.8 / −2.4
+Compaction interval M
+{1, 2, 3, 5}
+−0.6 / 0.0 / −0.4 / −1.7
+Equivalence threshold ρ
+{0.7, 0.8, 0.9, 0.95}
+−1.2 / −0.3 / 0.0 / −0.4
+LoRA rank for distillation
+{16, 32, 64, 128}
+−1.6 / −0.5 / 0.0 / −0.2
+Table 5: Sensitivity to SCAFFOLD’s main hyperparameters. ∆SR is relative to the default setting (bold values in the
+experiments section: nmin=2, M=2, ρ=0.9, rank=64).
+Training signal (same trajectories, K=5)
+WA
+No SFT, in-context library only (Tab. 2)
+34.7
+Standard SFT, trajectories flattened to primitives
+38.6
+Plan-augmented SFT, no auxiliary skill-name loss
+41.6
+Full SCAFFOLD distillation
+42.7
+STaR-style loop: SFT on raw trajectories, no library
+30.4
+Table 6: Supervision-format study on WebArena (SR
+%). All rows share the base model, the rollout pipeline
+and the exact same successful trajectories, differing only
+in how those trajectories supervise the policy.
+Configuration
+WA
+SKILLWEAVER
+29.1
++ multi-instance induction with holdout validation
+31.9
++ recursive composition
+34.0
++ distillation
+39.6
++ MDL compaction (= full SCAFFOLD)
+42.7
+Table 7: Incremental build-up on WebArena (SR %),
+starting from SKILLWEAVER and adding one compo-
+nent at a time. Every addition is bootstrap-significant
+(p < 0.05). The intermediate point 39.6 coincides with
+the “−MDL compaction” row of Table 2 by construc-
+tion.
+paction the most valuable skills are not, given the
+64% reuse rate and the transfer results of §4.7, and
+those skills cannot be bound to any single site’s
+selectors. The cache gives them per-site fast paths
+while preserving transfer.
+G
+Skill Lifecycle and Distillation Hygiene
+This appendix expands the two mechanisms
+sketched in §3.5 and §3.6.
+Runtime failure handling. Preconditions gate
+invocation: when a precondition is unmet, for in-
+stance because an unexpected pop-up occludes the
+target, the skill is simply not fired and the policy
+continues with primitives or an alternative skill.
+Postconditions are checked after execution; a vio-
+lation triggers one retry after a state refresh, after
+which control returns to the policy with the fail-
+ure noted in context so that the episode can still
+recover. All failures are logged together with the
+Max primitive steps
+10
+20
+30
+SKILLWEAVER
+11.5
+24.0
+29.1
+SKILLRL
+13.2
+26.4
+31.6
+SCAFFOLD
+19.8
+36.9
+42.7
+Table 8: WebArena SR (%) under a capped primitive-
+action budget (§4.9). The margin is largest at the tight-
+est cap, the opposite of what an inflated action budget
+would produce.
+Method
+Pol.
+Grd. Jdg. Tok. (K) Time (s)
+REACT
+18.7
+0
+0
+224
+102
+SKILLWEAVER
+9.6
+0
+0
+118
+74
+SCAFFOLD
+5.3
+7.1
+4.6
+79
+61
+Table 9: Inference cost per successful WebArena task:
+policy, grounder and judge calls, total tokens and wall
+clock. A policy call costs about 12K tokens (screenshot,
+DOM and history), a grounder call about 1.5K, and a
+judge call about 0.8K.
+observation and feed the next induction round.
+Outdated or degrading skills. Beyond the prune
+operator, which removes skills unused for M iter-
+ations, the implementation tracks a rolling execu-
+tion success rate per skill. A skill that falls below
+60% over its last 20 invocations is quarantined out
+of the retrieval index and queued for re-induction
+from fresh trajectories, which naturally repairs drift
+because new trajectories reflect the updated page.
+WebArena’s containerized sites drift little, as the
++7 d column of Table 3 shows, so this mechanism
+matters mainly for live deployment.
+Modal
+occlusion.
+Following
+the
+diagno-
+sis in Appendix C, we added an explicit
+dismiss_blocking_modal mid-level skill in a
+separate run: WebArena SR improves by 0.9 points
+and modal-related failures fall from 6.1% to 2.3%
+of episodes. This is a case where reading the li-
+brary’s failure log suggests the missing abstraction
+directly.
+Distillation hygiene. Three properties keep super-
+vision current. Trajectories are re-parsed against
+the post-compaction library before training, as de-
+
+
+===== page 16 =====
+Grounding mode
+Clean
+DOM-shuf.
+Grd./task
+VLM grounding (main paper)
+42.7
+40.6
+7.1
+Hybrid with selector cache
+42.5
+40.1
+2.7
+Static selectors only
+41.2
+33.5
+0
+Table 10: Grounding modes on WebArena (SR %) and
+grounder calls per successful task. The hybrid cache
+removes 62% of grounder calls at essentially no cost in
+accuracy or robustness, whereas static selectors reintro-
+duce baseline brittleness under DOM-shuffle.
+scribed in §3.6, so the model is never supervised
+toward deprecated skills; the auxiliary skill-name
+loss uses the current namespace as its label space,
+so retired names cannot be reinforced; and each it-
+eration trains on freshly collected trajectories rather
+than accumulating stale data. Consistent with Lim-
+itation (5), we still observe at most a 1.2-point
+regression on previously solved tasks, and a small
+replay buffer of re-parsed earlier trajectories re-
+moves most of it in a preliminary run.
+H
+Comparison with Concurrent
+Frameworks
+Table 11 places SCAFFOLD beside POLYSKILL (Yu
+et al., 2026) and SKILLEVO (Xu et al., 2026) along
+the four axes that motivate our design. POLYSKILL
+shares our generalization goal and reaches it
+by maintaining per-site implementations under a
+shared interface, whereas our skills keep one imple-
+mentation and re-bind semantic references at run
+time; its library is prompt-side only, grows without
+a compression objective, and induces skills without
+a multi-instance support requirement. SKILLEVO
+improves the policy with GRPO against a learned
+reasoning-and-execution reward model, which is
+closer in spirit to SKILLRL than to our SFT-based
+consolidation, and its skill path graph evolves but
+is not governed by a compression objective with
+behavioral-equivalence merging and a validation
+safety net.
+Its reported numbers are also not directly compa-
+rable to Table 1, since it is evaluated with text-only
+LLMs (Llama-3.1-8B, GLM-4-9B) on WebArena-
+Lite (165 tasks), while we target visual web agents
+on full WebArena (812 tasks), VisualWebArena
+and live websites. As a reference point we ran
+SCAFFOLD on WebArena-Lite under our visual
+setting and obtained 63.8 SR with Qwen2.5-VL-
+7B, against the 60.4 reported for SKILLEVO with
+Llama-3.1-8B, with the explicit caveat that back-
+bone and observation space differ. Finally, the
+two lines of work are complementary rather than
+competing: POLYSKILL’s interface typing could
+serve as the type system for our parameter lists,
+and SKILLEVO’s fine-grained reward model could
+replace our binary success filter, which would relax
+the verifier dependence discussed in §4.10.
+
+
+===== page 17 =====
+Aspect
+POLYSKILL
+SKILLEVO
+SCAFFOLD
+Skill unit
+abstract interface plus per-site
+implementations
+skill paths in a graph
+parametric executable program with
+pre/postconditions
+Composition
+compositional, prompt-side
+composite skills over the
+skill path graph
+recursive, unbounded depth (5 ob-
+served)
+Library
+gover-
+nance
+none
+graph updates, no compres-
+sion objective
+MDL merge / refactor / prune with
+validation safety net
+Policy weights
+frozen
+GRPO with a learned reward
+model
+SFT distillation of skill plans
+Setting
+HTML agents, Mind2Web /
+WebArena
+text agents, WebArena-Lite
+visual agents, WA / VWA / OM2W
+Table 11: Component-level comparison with the two concurrent skill-centric frameworks discussed in §2.

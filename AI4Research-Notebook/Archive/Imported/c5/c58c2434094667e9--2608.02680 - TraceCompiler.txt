@@ -1,0 +1,1965 @@
+
+
+===== page 1 =====
+TraceCompiler: Skill-Guided Mining and Compilation of LLM
+Agent Traces into Mostly Deterministic Workflows
+Salma El Yadouni1
+Guanyi Li2
+1EPFL, Lausanne, Switzerland
+2Binome Technologies, London, UK
+salma.elyadouni@epfl.ch
+craig@binome.dev
+Abstract. Tool-using language-model agents repeatedly rediscover procedures they have already executed, producing
+traces that mix reusable structure with retries, exploration, accidental ordering, and repeated lookups. We present Trace-
+Compiler, a skill-guided system that mines clusters of noisy agent traces and compiles them into executable, mostly de-
+terministic workflows. It admits an inter-tool dependency only when a consumer argument contains a value attributable
+uniquely to an earlier producer; every hard edge carries an auditable evidence tuple, and ambiguous relations are marked
+suspected and impose no ordering constraint. Bindings are classified as constants, user inputs, copied outputs, trans-
+forms, or residual LLM decisions. On T1, a mechanized form of the rule recovers producer–consumer dependencies at
+0.928 precision and 0.943 recall over 15,775 def–use edges of its training split, against 0.711 F1 for adjacency and 0.712
+for a frequency-thresholded directly-follows measure on identical data; the compiler skill run blind reaches 0.992 on 250
+of those edges. On AppWorld we replay released trajectories in the deterministic simulator to recover masked return
+values and measure the rule against 563 token edges at 0.993 precision — a self-consistency check, since replay injects
+tokens by a related heuristic. We compile two recurring intents: a Venmo money-request intent reduces 34 observed API
+calls to 11 runtime calls and, under leave-one-out execution against the benchmark’s own state tests, passes 15 of 21, the
+failing fold escalating rather than acting because its required branch was never observed; and a Spotify/Todoist intent the
+compiler correctly refuses to compile, because an irreversible side effect is under-determined. We measure call reduction
+but not offline compilation cost, so we claim no net efficiency result.
+1
+Introduction
+Tool-using language-model agents repeatedly pay to redis-
+cover procedures they have already executed. A recurring
+intent — listing open tickets, requesting a payment — is is-
+sued again and again, and on each occurrence the agent re-
+derives the same tool sequence: it re-resolves stable identity
+and configuration, retries equivalent calls with modified pa-
+rameters, reads tool documentation it has read before, and
+carries an expanding reasoning history. Most of this is not
+intrinsic to the task; it is the cost of treating every request
+as new. Recent serving-time work reinforces the premise,
+profitably predicting agents’ upcoming tool calls within a
+session [20, 30]: the regularity such systems exploit tran-
+siently is what compilation can capture persistently.
+An exploratory trace contains both reusable procedure
+and accidental execution history.
+The reusable part in-
+cludes the necessary tools, true data dependencies, branch
+conditions, stable configuration, and value transformations.
+The accidental part includes retries, abandoned exploration,
+stylistic ordering, schema-discovery lookups, and repeated
+resolution of facts stable across requests. Replaying pre-
+serves both; summarizing as textual guidance still asks an
+LLM to reinterpret the procedure at runtime. We ask in-
+stead whether repeated traces can be compiled into an exe-
+cutable workflow in which decisions supported by evidence
+leave the model’s runtime responsibility (Figure 1).
+This differs from conventional process discovery. Event
+order alone is insufficient: two calls may appear consecu-
+tively because the second consumes an identifier the first
+produced, because the agent issued independent operations
+sequentially, or because the first was an unsuccessful at-
+tempt. Agent logs also expose structured arguments whose
+provenance determines whether an ordering is real, and
+observability is often incomplete — exported traces may
+record arguments but not outputs, forcing dependencies to
+be inferred conservatively from the consumer side.
+TraceCompiler
+discovers
+recurring
+intents
+from
+a
+behavior-enriched representation, separates required be-
+havior from retries and exploration,
+and applies an
+argument-level dependency rule: an edge a →b is retained
+only when an argument of b consumes a value attributable
+uniquely to a. Its first implementation is a versioned LLM
+skill — an instruction package a capable agent loads and
+follows — rather than a trained model; it was frozen after
+five adversarial audit passes and required no decision-rule
+changes on corpora it had never seen.
+Contributions.
+(1) We formulate recurring agent-trace
+reuse as a compilation problem over workflow structure,
+parameter provenance, and residual LLM decisions, un-
+der partial observability.
+(2) We present a pipeline for
+unsupervised intent discovery, behavioral denoising, de-
+pendency verification, provenance classification, and exe-
+cutable workflow generation. (3) We formalize and eval-
+uate a conservative argument-level dependency rule with
+non-adjacent producer scanning, explicit evidence tuples,
+and abstention through the suspected relation; producer–
+consumer inference by value and evidence-graded edges
+both have precedents [1, 31], and the piece we claim is ad-
+mission by exclusion of alternative origins with explicit ab-
+1
+arXiv:2608.02680v1  [cs.SE]  3 Aug 2026
+
+
+===== page 2 =====
+Figure 1: Overview. Multiple noisy executions of one intent (1) are grouped by behavioral clustering (2); denoising sepa-
+rates signal from accidental history — collapsing retries, preserving genuine fan-out, detecting pagination, moving schema
+lookups to compile time, dropping unused reads (3); dependency verification admits a HARD edge P →C only when a value
+in C’s argument provably originates from P and no alternative source (4); the result is a typed workflow in which evidence-
+backed decisions are compiled away and only genuinely open choices remain as LLM nodes (5). The bottom band states
+the central principle: observed adjacency does not imply dependency. Tool names are illustrative.
+stention when exclusion fails. (4) We evaluate on open cor-
+pora against two ground truths that share no machinery with
+each other, comparing against order-based and recurrence-
+based baselines on identical data while stating what each
+construction cannot test. (5) We present compilation case
+studies including a refusal to compile, execute a compiled
+workflow on withheld instances, and report two corrections
+our own execution harness forced on us.
+We also specify scope-bound static-context injection —
+a partial evaluation of the workflow, resolving stable values
+at build time and forbidding their discovery tools at runtime
+(Section 3.4) — but do not list it as a contribution, because
+no result here exercises it: neither case study reports an
+injected value. It is a design element awaiting evidence,
+and the same applies to the HUMAN node type, which the
+compiler is specified to emit and never does.
+2
+Problem Definition
+A trace is a tuple τ = (c,u,e1 ...en,y,z) with system con-
+text, user request, execution events, final output, and meta-
+data. An event may be a message; an optional reasoning
+summary; a tool call, comprising a name and structured
+JSON arguments; a tool output or exception; a state update;
+or a human approval.
+Partial observability.
+We explicitly allow traces in
+which arguments are recorded but tool outputs are not —
+common in deployed logging and released benchmark tra-
+jectories. The consequence is direct: dependencies cannot
+be established by matching a producer’s output against a
+consumer’s input, and must be inferred from the consumer
+side by asking whether a value could only have originated
+from an earlier call. Reasoning summaries are auxiliary ev-
+idence, never ground truth.
+Intent clusters.
+The unit of compilation is an intent clus-
+ter C = {τ1 ...τm}: traces that are variants of one task,
+discovered unsupervised (Section 3.1). A single trajectory
+conflates required structure with one agent’s search behav-
+ior, and cross-trace induction outperforms per-trajectory in-
+duction [32, 10]. Traces are noisy in characteristic ways:
+agents retry ill-parameterized calls, read documentation be-
+fore acting, perform lookups whose outputs are never con-
+sumed, interleave exploration with essential work, and oc-
+casionally mix unrelated intents in one conversation.
+2
+
+
+===== page 3 =====
+Output
+workflow.
+The
+compiler
+emits
+W
+=
+(V,E,B,G,I,O):
+typed nodes, control-flow edges, pa-
+rameter bindings, guards, and schemas. Node types are
+START/END, TOOL, TRANSFORM, DECISION, LLM,
+and HUMAN. Every argument binds to a literal, a work-
+flow input, a prior output, a deterministic transform, or an
+LLM result; the binding’s provenance class (Section 3.4)
+determines whether runtime resolution needs a model. A
+HUMAN node is emitted in exactly one circumstance:
+when a node with an irreversible external effect has a bind-
+ing the analysis could not resolve to a provenance class, so
+proceeding would require guessing an unretractable value.
+Neither case study emits one, and we flag that rather than
+let the type list imply coverage. A definition is compiled
+per intent but instantiated per user: bindings stable for
+a user (identity, team, configuration, credentials) resolve
+once at build time.
+Desired properties, and which we measure.
+A useful
+compiled workflow should satisfy fitness (it explains the
+successful traces), precision (it permits no unsupported
+behavior), generalization, minimality, determinism, ro-
+bustness, and auditability. The first four names are bor-
+rowed from process mining’s evaluation quartet [23], and
+we do not measure fitness and precision with that field’s in-
+struments — our artifacts are typed programs with guards
+and transforms rather than Petri nets, so replay measures
+would need a translation whose faithfulness itself needs de-
+fending. What we quantify is minimality (observed versus
+runtime calls), determinism (residual LLM nodes), general-
+ization (execution on withheld instances, Section 6.3), and
+auditability, structurally. We make no conformance claim.
+The compiler’s design priorities trade runtime LLM
+nodes, tool-call cost, structural complexity, and replay er-
+ror against fitness and validation thresholds. We state this
+as a design orientation rather than an objective function: no
+weights are fitted, no thresholds assigned, and no number in
+this paper is the value of such an expression. Its role is only
+to fix which quantities are costs. The premise that a capable
+model may spend effort once, amortized over repeated exe-
+cutions, is likewise a design premise, not a measured result
+— we do not report offline compilation cost.
+3
+Method
+3.1
+Intent discovery
+Each conversation is embedded as one document combin-
+ing the initial request (weighted double as the intent carrier)
+with the agent’s round-by-round execution, each round’s
+reasoning interleaved with its canonicalized tool calls; in-
+terleaving preserves procedural order rather than treating
+tools as a bag.
+Threshold agglomeration (cosine, aver-
+age linkage) gives interpretable control over conservative
+under-merging, its single parameter reading as a minimum
+intra-cluster similarity. Under-merging is less harmful than
+over-merging: two clusters of one intent compile to two
+valid workflows, whereas over-merging contaminates ex-
+traction. Clusters below a support floor are set aside as
+“not yet compilable” rather than forced into neighbors. An
+idempotent pre-pass detects conversations mixing intents
+(coarse embedding drift, then mandatory content reading)
+and splits them; borderline cases are left unsplit.
+One applicability condition surfaced, and it applies to T1
+itself: on corpora whose assistant turns are scripted boil-
+erplate, the interleaved text becomes shared noise that col-
+lapses clusters, so the embedding falls back to request-plus-
+tools. This is a stated condition selected by a corpus prop-
+erty observable before clustering, not a hyperparameter fit-
+ted to the outcome.
+3.2
+Normalization and behavioral denoising
+Raw traces name the same logical operation inconsistently,
+so tool identifiers are mapped to a canonical app.action
+vocabulary — extending to argument paths — before any
+comparison. This has a cost we quantify later: collapsing
+distinct read and write operations on one resource can erase
+the very argument that proves a dependency.
+Each
+action
+is
+labeled
+ESSENTIAL,
+RECOVERY,
+EXPLORATORY,
+REDUNDANT,
+DEAD_OUTPUT,
+POL-
+ICY_REQUIRED,
+or
+UNKNOWN (kept,
+never silently
+dropped). An action is DEAD_OUTPUT when the observ-
+able trace contains no downstream argument, retained
+decision, or final-answer element attributable to its output;
+schema-discovery lookups are the canonical example,
+informing the agent’s next call at run time but binding no
+downstream runtime value.
+The costliest confusion is between repetition-as-noise
+and repetition-as-structure, and call counts cannot separate
+them. The discriminator is argument comparison. Rep-
+etitions whose arguments jitter toward a final successful
+call are retry noise, subsumed by the last occurrence; rep-
+etitions whose arguments are systematically distinct (one
+search per song) are genuine fan-out and compile to paral-
+lel invocations. A literal counter advancing across repeats
+(page_index 0,1,2 with constant query) is a loop, not in-
+dependent calls and not a data dependency. The stage does
+not select the shortest trace and does not delete on suspi-
+cion: removal requires positive evidence.
+3.3
+Argument-level dependency verification
+Observed adjacency is never evidence of dependency; only
+proven data flow constrains the compiled DAG. For calls
+a ≺b we admit a →b only if some argument of b consumes
+a value only a could have produced. Let v be bound to an
+argument path of b; the edge requires (i) v traceable to a’s
+output, and (ii) every alternative origin of v excluded —
+the user’s utterances, embedded static context, tool-schema
+3
+
+
+===== page 4 =====
+defaults, and the outputs of every other call preceding b.
+Condition (ii) separates verification from pattern matching.
+Every retained hard edge carries a tuple ⟨consumer,
+arg_path, value, presumed producer, exclusions⟩, so a re-
+viewer can trace any constraint to concrete values. When
+the evidence admits a plausible alternative — most com-
+monly two type-compatible producers preceding one con-
+sumer, or a value that could have come from an unrecorded
+request — the edge is downgraded to suspected: reported,
+imposing no ordering constraint. The producer scan covers
+all earlier calls: credentials resolved once are consumed
+after unrelated intervening calls, and restricting the scan
+to adjacent pairs would both miss such edges and inflate
+false ones. Each relation receives one of hard, conditional
+hard, suspected, independent/parallel, or arbitrary or-
+der; only the first two constrain the DAG.
+Two evidence regimes arise. When concrete values are
+recorded, consumption is established by value matching.
+When values are opaque, the method falls back on co-
+reference of the opaque value, temporal precedence, and
+elimination of type-compatible alternatives — a strictly
+weaker regime in which the suspected downgrade carries
+the safety burden. Our evaluation exercises both.
+3.4
+Provenance and static context
+Every binding receives one of CONSTANT (stable across
+the intent’s traces,
+not attributable to request text),
+USER_INPUT, COPY_EDGE (the consumer side of a proven
+hard edge), TRANSFORM_EDGE, or LLM_OR_DYNAMIC
+(genuinely semantic bindings, which alone justify a run-
+time LLM node). Classification is behavioral, not name-
+based. Authentication needs care: account credentials are
+scope-stable and may resolve once, but the bearer token
+an auth call returns is a session artifact that can expire,
+so it is a COPY_EDGE, never a CONSTANT. We therefore
+separate a cold path, where a session is initialized, from a
+warm path where the token is already held; reporting reduc-
+tions against the warm path avoids overstating amortization
+a fresh session would not enjoy.
+CONSTANT bindings admit a stronger optimization than
+literal substitution: at build time the compiler executes each
+discovery tool once, embeds resolved values into the parser
+node’s prompt with source and usage annotations, and for-
+bids those tools at runtime, escalating rather than silently
+rediscovering if an embedded value is rejected. Injection is
+an outcome of analysis, not a template — an intent whose
+every argument is USER_INPUT is a legitimate outcome,
+and forcing injection where nothing is stable would be the
+overfitting this stage exists to avoid.
+3.5
+Compilation, validation, and runtime
+The analysis is compiled into an executable definition, then
+treated as a candidate program rather than trusted output.
+Generation is driven by a structured specification stating
+what was proven, never the builder’s syntax. Output is val-
+idated mechanically (schema conformance, topic wiring,
+variable definition before use) and structurally against the
+specification; failures become diagnostics under a bounded
+repair loop, and a candidate that cannot satisfy its specifi-
+cation is rejected. When an irreversible side effect is under-
+determined by the traces, the compiler emits no executable
+graph and escalates.
+The runtime router uses a request-only representation. A
+match above a conservative similarity threshold dispatches
+to the compiled workflow; unmatched requests fall back to
+the general agent. The asymmetry is deliberate: a false neg-
+ative costs one agentic execution, the status quo, whereas a
+false positive may execute the wrong procedure. Routing
+accuracy is not evaluated here, which matters because the
+router gates a workflow whose terminal step moves money.
+4
+The Compiler Skill
+The compiler’s v1 engine is a skill: a versioned instruc-
+tion package a capable LLM agent loads and follows over
+a cluster’s traces. The analysis stages involve judgments
+(retry vs. variation, evidence sufficiency, injection candi-
+dacy) costly to encode exhaustively in symbolic form but
+specifiable as procedure, testable adversarially, and revis-
+able quickly. The method is engine-agnostic, and every
+execution logs the (cluster, workflow, evidence) triple a
+learned compiler could train on. The package carries an ex-
+plicit input contract (stop and report on schema mismatch,
+rather than adapt silently), and identifies its target cluster by
+describing the intent, execution count, dominant tool fam-
+ilies and variants rather than by a numeric id, which is un-
+stable across re-clusterings. It comprises ten steps (0–9),
+condensed in Appendix A; the full package is released with
+the artifact.
+We should be precise about what “frozen” means. The
+released package is versioned (v1.1.0, with a changelog),
+but the v1.0.0 text that produced every result here carried
+no version field and no audit log. The claim that it was
+frozen after five adversarial audit passes is therefore our
+testimony, not a checkable property of that release, and one
+post-freeze commit did touch a helper script’s import path,
+though no decision rule. A reader should treat the freeze
+as an assertion; versioning begins with v1.1.0 so the ambi-
+guity does not recur. The skill’s taxonomies are also finer
+than this paper’s prose, in ways Appendix A sets out.
+5
+Experimental Setup
+Data.
+T1 [3]: template-generated task dialogues across
+nine travel domains whose reference plans are executable
+code. T1 comprises 13,500 dialogues from 60 templates
+per domain family, split 15 train / 5 validation / 40 test tem-
+plates. We use the training split only: our adapter con-
+4
+
+
+===== page 5 =====
+verts its 3,375 dialogues (14,250 plans, zero parse failures)
+and extracts a def–use dependency graph. Where we say
+“the corpus” for T1 we mean that split — 25% of the dia-
+logues and the quarter of the template inventory with least
+structural diversity; the 40-template test split is untouched,
+and running the deterministic evaluation on it is the obvi-
+ous next strengthening. def–use yields 22,850 edge occur-
+rences, deduplicating to 15,775 distinct (conversation, pro-
+ducer, consumer) edges over the 3,350 dialogues contain-
+ing at least one dependency. Every T1 figure is computed
+against the deduplicated 15,775.
+AppWorld [22]: an executable benchmark of nine appli-
+cations and 457 APIs, with released trajectories over 56 re-
+curring scenarios, each instantiated three times. Trajecto-
+ries record arguments but not outputs, placing them in the
+value-opaque regime.
+Hermes-Function-Calling-v1
+[15]:
+a
+single-
+turn
+function-calling
+corpus
+(configuration
+func_calling_singleturn)
+stressing
+argument-
+schema normalization.
+It should not be confused with
+ToolMind [29], which is multi-turn and builds a function
+graph from parameter correlations — close to the opposite
+of the single-turn corpus our negative result concerns, and,
+as we note under Transfer (Section 7), well matched to the
+transfer experiment this paper lacks.
+What is model-dependent.
+The blind protocol of Sec-
+tion 6.5 and the two case studies were executed by a fron-
+tier LLM agent whose version we did not record; an LLM-
+driven compiler is not deterministic across runs or ver-
+sions, so those results are one observation of a stochastic
+procedure, not reproducible constants. Everything else is
+model-free: masking, the mechanized rule and its base-
+lines, replay-established references and their scoring, dis-
+covery metrics, and the end-to-end execution are determin-
+istic released commands. This is the main reason we added
+the mechanized rule — it places the central accuracy claim
+on a footing independent of model version, at the cost of a
+cruder alternative-origin test.
+Discovery
+parameters.
+Conversations
+are
+em-
+bedded
+with
+a
+general-purpose
+sentence
+encoder
+(all-mpnet-base-v2);
+agglomeration
+uses
+cosine
+distance and average linkage at minimum intra-cluster sim-
+ilarity 0.45; the support floor is 5. The evaluated sample is
+a balanced subsample of 80 dialogues per domain (720 of
+3,375), drawn before clustering. We did not tune threshold
+or floor against the labels, but neither did we hold out a set
+for choosing them, so these are defaults rather than tuned
+optima; no sensitivity sweep is reported.
+Uncertainty.
+We attach Wilson 95% intervals to every
+precision and recall figure, since those estimates are in-
+tended to generalize and the normal approximation is unre-
+liable near 1. We do not attach intervals to descriptive pro-
+portions of a fixed artifact (schema-discovery share, replay
+success, purity, coverage): these are censuses of released
+data, not samples, and an interval would imply a sampling
+model that does not exist. ARI and NMI are reported with-
+out intervals for the same reason.
+Where a distribution
+is the honest summary we give median and interquartile
+range. One caveat we do not resolve: T1’s edges are nested
+in templates, so treating them as independent Bernoulli tri-
+als makes our intervals narrower than a template-clustered
+resampling would.
+Research questions.
+RQ1: does the skill compile re-
+curring trajectories into correct specifications, recovering
+true dependencies and refusing unsafe ones? (Section 6.1)
+RQ2: does argument-level verification recover true depen-
+dencies against two reference constructions that share no
+machinery with each other? (Sections 6.5, 6.6) RQ3: does
+compiled structure hold outside the executions it came from
+(Section 6.3), and do the stages transfer to a foreign corpus
+(Transfer, Section 7)? The rule is compared against adja-
+cency, all-pairs, and a recurrence measure on identical data.
+We do not run competing systems’ full pipelines, which
+target different outputs and environments; the comparison
+isolates structural criteria.
+6
+Results
+6.1
+Compiling open AppWorld intents
+We compile two recurring intents chosen for structural con-
+trast: a chain with an alternative branch, and a fan-out co-
+ordinating two applications. Both are drawn from released
+ReAct-agent trajectories, each intent recurring across three
+instances. Because AppWorld records arguments but not
+outputs and masks bearer tokens at source, both are com-
+piled in the value-opaque regime, and we flag every depen-
+dency whose provenance the masking leaves ambiguous.
+Intent 1: request money on Venmo (Figure 2).
+The
+three instances share a skeleton — resolve the request-
+ing account, authenticate, resolve the recipient, create the
+request, report — and differ where the method predicts.
+Across them the agent issues 34 API calls, of which roughly
+half are schema-discovery lookups that bind no runtime
+value and are removed.1 One instance retries an authen-
+tication with a corrected credential (collapsed to one logi-
+cal auth), and one pages through the friend list three times
+(page_index 0,1,2 with constant query — one pagination
+1We do not state an exact schema-discovery count here. Our released
+activity tables for this cluster are incomplete — they enumerate 30 of the
+34 calls — and the counts recoverable from them (11, or 13 by the spec’s
+own summary line) disagree with each other. The reduction to 11 runtime
+calls is unaffected, being fixed by the compiled path rather than by the
+discovery count, but we prefer an approximate figure we can support to a
+precise one we cannot. Completing those tables from the raw trajectory is
+a pending correction, flagged in the released artifact.
+5
+
+
+===== page 6 =====
+Raw agent traces
+3 instances of one intent  ·  34 calls total
+instance 1
+docs
+docs
+docs
+pass
+login
+docs
+friends
+docs
+request
+report
+instance 2
+docs
+docs
+pass
+login
+docs
+docs
+contacts
+docs
+docs
+login
+contacts request
+report
+instance 3
+docs
+docs
+pass
+login
+docs
+friends
+friends
+friends
+docs
+request
+report
+schema-discovery (removed)
+retry / pagination (collapsed)
+compile
+Compiled workflow
+11 runtime calls  ·  noise removed
+passwords
+login
+resolve
+recipient
+request
+report
+access_
+token
+branch
+Figure 2: Compiling the Venmo money-request intent (Ap-
+pWorld 024c982): raw traces (left) versus compiled work-
+flow (right).
+Grey cells are schema-discovery lookups,
+red are retries and pagination, white are essential steps;
+roughly half of this cluster’s calls are removable noise.
+The access_token dependency (red) is recovered as
+a hard edge and recipient resolution left as a branch
+(LLM_OR_DYNAMIC). The three instances’ 34 calls com-
+pile to 11 runtime calls (3, 3, 5).
+loop, not three independent calls). Under a warm authenti-
+cated session the three instances require 3, 3, and 5 runtime
+calls: 34 →11 (Figure 4). The third instance’s 5 counts
+the pagination loop’s three iterations as three issued calls,
+since the runtime still pays for each page; as activities it is
+one node, which is why the workflow specification records
+nine. We count issued calls throughout so the reduction is
+not flattered by folding a loop into a single unit.
+The analysis recovers the token flow as a hard edge:
+venmo.auth produces an access token consumed by
+venmo.payment_requests, absent from every prior call’s
+user-supplied arguments and producible by no other tool.
+A non-adjacent credential edge is also recovered — the
+phone-branch password read from the same multi-account
+bundle nine calls earlier, where an adjacency-only read-
+ing would have attributed it to an intervening documen-
+tation call.
+Recipient resolution is the cluster’s branch:
+two instances resolve through venmo.search_friends
+(Branch A), the third through phone.search_contacts
+(Branch B); we use those labels throughout. Because the
+traces never show which condition selects the branch, the
+compiler marks the selection LLM_OR_DYNAMIC rather
+than baking in a Venmo-first policy — a deliberate absten-
+tion, since for irreversible money movement an automatic
+two-address-book search on a bare first name would be un-
+safe. The recipient-email edges are reported suspected: the
+user request is absent from the export, so “the email could
+not have come from the user” is plausible inference, not
+formal exclusion.
+Intent 2:
+apply a to-do list’s songs to a playlist
+(Figure 3).
+The second intent coordinates two applica-
+tions and is dominated by repetition, stress-testing the
+retry-versus-variation rule.
+The same rule yields oppo-
+site verdicts on tools with nearly identical repeat counts:
+spotify.songs, fired up to seven times per instance with
+a distinct query each time, is genuine fan-out (fully paral-
+lel); todoist.projects, fired twice with byte-identical
+arguments and never consumed, is a dead read and is
+dropped; a credential re-fetch and an authentication repair
+are collapsed as retries.
+Across three instances the intent issues 106 calls, and the
+collapse rule matters enough to give both readings. Remov-
+ing the 36 api_docs lookups (34%) leaves 70; Figure 4 ad-
+ditionally removes 6 dead reads and then 5 retry/pagination
+repeats, reaching 59 logical activities. A stricter reading
+of our own retry rule collapses every byte-identical repeat
+within an instance — such a call being by construction ei-
+ther a retry subsumed by its last occurrence or a dead re-
+read — which removes 25 rather than 11 and leaves 45.
+The 14-call difference is exactly the repeats the conser-
+vative ladder retained. We report both, since the figure is
+meaningless without the rule that produced it. One caveat
+on the stricter reading: it collapses byte-identical calls re-
+gardless of position, so a legitimate re-read after an inter-
+vening mutation would be counted as noise.
+This
+intent
+exposes
+two
+honest
+limits.
+First,
+canonicalization
+cost:
+the
+export
+collapsed
+show_playlist,
+add_song_to_playlist,
+and
+remove_song_from_playlist
+into
+one
+canonical
+action and dropped the playlist and song identifiers, so the
+load-bearing edge — resolved song feeding the playlist
+mutation — can only be reported suspected: sound by
+API semantics but unconfirmable from masked arguments.
+Second, the mutation’s direction — added to or removed
+from the playlist — is under-determined: all three instances
+read both the add and remove documentation, and no call
+records a direction.
+Because these are opposite, irre-
+versible changes to a user’s library, the compiler emits no
+executable graph and reports the ambiguity. Declining to
+compile an unsafe under-specified side effect is robustness,
+not failure.
+6.2
+How much of a trace is removable,
+corpus-wide
+Two intents invite the objection that they were chosen
+because they reduce well.
+We therefore measure the
+two evidence-determined denoising categories — schema-
+discovery calls and byte-identical repeats within an in-
+stance — across all 56 recurring scenarios (14,128 calls).
+Genuine fan-out is excluded by construction, since a per-
+item call carries a distinct argument each time.
+Per scenario the median removable fraction is 51.4%
+(IQR 41.9–74.1%, range 12.1–99.3%); 51 of 56 scenar-
+ios exceed 30% and 33 exceed 50%. We summarize by
+distribution rather than corpus total because a few scenar-
+ios repeat one read hundreds of times and would dominate
+the aggregate (pooled: 10.7% schema discovery, 71.4% re-
+peats). Two caveats bound this. It misses dead reads whose
+arguments differ, jittering retries, and pagination loops, so
+6
+
+
+===== page 7 =====
+Raw agent traces
+3 instances of one intent  ·  106 calls total
+instance 1  (35 calls)
+instance 2  (21 calls)
+instance 3  (35 calls)
+schema-discovery
+retry / pagination
+genuine fan-out (per song)
+compile
+Compiled workflow
+fan-out kept parallel  ·  noise removed
+read task list
+s1
+s2
+s3
+s4
+s5
+×N
+search per song
+(parallel)
+apply to playlist
+  add or remove?  undecidable
+opposite irreversible effects 
+ compiler stops,
+does not emit an executable graph
+Figure 3:
+Compiling the Spotify/Todoist intent (App-
+World 986aa4e): raw traces (left, 106 calls) versus com-
+piled workflow (right).
+Grey is schema-discovery, red
+retry/pagination, blue genuine per-song fan-out, white es-
+sential.
+The workflow keeps per-song searches parallel
+(×N) but reaches a blocking gap: whether each song is
+added to or removed from the playlist is under-determined.
+Because these are opposite irreversible effects, the compiler
+emits no executable graph.
+Figure 4: Call reduction on open AppWorld traces (calls,
+not tokens). Venmo compiles to a runtime path (34 →11
+across three instances). Spotify/Todoist reduces to logical
+activities; no executable runtime count is reported because
+the mutation direction is under-determined.
+it under-counts in that direction; and it counts byte-identical
+repeats regardless of intervening state changes, so it over-
+counts read-after-write verification. Removability is also
+not a realized saving: these are calls a compiled workflow
+need not issue, not a measurement of end-to-end cost.
+Determinism, measured.
+For the one intent compiled to
+an executable graph, tool calls fall from 34 to 11 and the
+residual LLM node count is 1 — the recipient-resolution
+branch the compiler declined to resolve. In the execution
+experiment below that node was replaced by deterministic
+rules, so 0 model invocations were needed at runtime; that
+substitution is scaffolding, not compilation, and the open
+decision remains in the compiled specification.
+6.3
+End-to-end execution on withheld in-
+stances
+Executing on the same three instances the workflow was
+compiled from would establish only that the compiler did
+not corrupt what it read. We therefore report leave-one-
+out: for each instance, the workflow is permitted only the
+recipient-resolution branches the other two exhibited, then
+executed on the held-out instance.
+Where no permitted
+branch resolves the recipient, it must escalate and emit no
+payment request.
+Under this protocol the workflow passes 15 of 21 state
+tests. Two folds pass completely: holding out instance 1
+or 3, the training pair exhibits both paths and the held-out
+instance reaches 7/7. The third fails in the intended di-
+rection: holding out instance 2, both training instances re-
+solve through Branch A, so Branch B is never observed,
+and instance 2’s recipient — not in the Venmo friend list
+— cannot be resolved by any permitted path; the workflow
+escalates (1/7). That failing fold is what makes the proto-
+col worth running: structure from two executions suffices
+when those two exhibited the needed path and not other-
+wise, which is a statement about the support a branch needs
+rather than unconditional generalization.
+A claim we withdraw, and an error in how we withdrew
+it.
+An earlier version asserted the alternative branch was
+empirically necessary. Single-branch execution shows oth-
+erwise: Branch B alone suffices for all three instances, so
+a single-path workflow built on it passes every instance,
+and the two-branch structure is under-determined rather
+than required. Our first correction was itself wrong, and
+the reason is worth recording: it reported that Branch A
+suffices for instance 1 only, an artifact of a harness that
+issued venmo.search_friends with neither query nor
+page_index, matching against the first page of an unfil-
+tered listing — discarding exactly the binding and pagina-
+tion loop this section reports the compiler recovering. With
+those restored, Branch A suffices for instances 1 and 3 (7/7
+each) and only instance 2 requires the phone path (where
+Branch A correctly escalates, 1/7).
+The compiler’s behaviour is unchanged: marking the se-
+lection LLM_OR_DYNAMIC remains right, justified by the
+ambiguity rather than by both paths being required. What
+the episode establishes is narrower and more uncomfort-
+able. Traces record which path an agent took, not which
+would have worked, so observational data bounds claims
+about necessity as tightly as claims about dependency —
+our own principle, which we had applied to ordering and
+not to branching. It also shows an execution harness is it-
+self an inference instrument: ours silently dropped a bound
+argument, and the resulting “falsification” survived a round
+of review before we caught it.
+Scope.
+Argument synthesis at the residual node is per-
+formed by deterministic rules specific to this intent’s phras-
+7
+
+
+===== page 8 =====
+ing; elsewhere they mis-parse rather than erroring, so they
+are scaffolding, not a contribution. This bounds what 15
+of 21 measures: it scores the compiled skeleton together
+with hand-written argument parsing, not the compiled ar-
+tifact in isolation. The structural claim — that the recov-
+ered skeleton, branch and dependencies execute correctly
+against the environment’s own state tests — is unaffected,
+but the number is not a measurement of the compiler alone.
+The harness requires an explicit name match and escalates
+otherwise, which is stricter than falling back to the first
+search result: that fallback would have instantiated exactly
+the unsafe bare-first-name policy this section rejects. One
+intent, three instances, one application pair: an existence
+result about out-of-sample execution and a demonstration
+that the protocol can fail, not a measurement of how often
+compilation preserves correctness.
+Why two scenarios and not fifty-six.
+This is the first
+question the evaluation invites and it deserves a direct an-
+swer rather than a disclaimer. Three costs bind, and only
+the first is incidental.
+Compiling a cluster is one long
+frontier-model run over every trace in it, so 56 clusters
+is a materially larger spend than 2 — but that is money,
+and it does not excuse the gap. Second, and more bind-
+ing: executing a compiled workflow requires a runtime for
+its Workflow IR, and we have none.
+The Venmo result
+was obtained by hand-transcribing the compiled skeleton
+into simulator calls, which is feasible once and does not
+scale; a compile rate over 56 scenarios would be cheap,
+but a correctness rate over 56 would require the interpreter
+we have not built. Third, the argument-synthesis rules at
+residual nodes are per-intent scaffolding, so each new sce-
+nario needs new hand-written parsing that is not part of the
+method.
+The consequence is a real hole and we would rather name
+it than let the two case studies imply coverage. No com-
+pile/decline rate is reported over the 56 scenarios, and
+that rate — not either case study — is the adoption-
+relevant number. It is also the cheapest remaining experi-
+ment: the compile side needs no runtime, only the skill and
+the traces, and it would turn “the compiler declines when
+evidence is insufficient” from an anecdote into a distribu-
+tion.
+6.4
+Intent discovery against reference labels
+Read this section knowing the table does not reproduce.
+The partition scored below was produced by a clustering
+run over a serialization of T1 we no longer have.
+Re-
+running the released sweep over the shipped corpus does
+not reach this operating point, and not by a small margin:
+the closest measured configuration yields 12 clusters at pu-
+rity 0.548, against 50 clusters at 0.930 here, because the
+shipped conversations give a much tighter similarity dis-
+tribution that no threshold under either embedding variant
+Measure
+Value
+Dialogues / clusters
+720 / 50
+Coverage
+0.496
+Purity (over covered)
+0.930
+Label-pure clusters
+42 / 50
+Adjusted Rand Index
+0.235
+Normalized Mutual Information
+0.668
+Table 1: Intent discovery against T1’s nine reference do-
+main labels. High purity with low ARI and intermediate
+NMI is the signature of a partition systematically finer than
+the reference labelling, not one that disagrees with it. This
+partition does not reproduce from the released corpus;
+see the opening of Section 6.4.
+recovers. What survives is narrower than the numbers sug-
+gest. The metrics recompute exactly from the released la-
+belling, and the qualitative failure mode is stable across
+both runs — residual merges join composite domains shar-
+ing a service prefix, exactly as predicted — but agree-
+ment between the two partitions is only approximate (ARI
+≈0.85 at low thresholds). Table 1 is therefore a measure-
+ment over a released artifact, not a reproducible result,
+and discovery is the least-supported component of this pa-
+per. Regenerating the labelling from the shipped corpus,
+or releasing the serialization that produced it, is a prerequi-
+site for treating these numbers as evidence. We report them
+because the structure they describe is what the rest of the
+pipeline consumes, not because they settle anything.
+Reporting purity alone would flatter an over-segmenting
+partition, since purity rises monotonically as clusters
+shrink, so we report the full set of agreement measures (Ta-
+ble 1). Purity 0.930 with 42 of 50 clusters entirely label-
+pure says clusters rarely mix domains; ARI 0.235 says the
+partition does not agree with the nine-way labelling as a
+partition, because ARI penalizes splitting a reference class;
+NMI 0.668 says the clusters nonetheless carry most of the
+label information. A method recovering atomic domains
+and then subdividing them into template-level tasks pro-
+duces exactly this signature, and inspection confirms it: the
+only residual merges join composite domains sharing a ser-
+vice prefix, whose dialogues genuinely coincide over their
+first turns.
+We therefore make the weaker claim the numbers sup-
+port. Discovery is behaviorally consistent with the refer-
+ence labels and deliberately finer than them; it is not label-
+identical, and ARI 0.235 measures that intended difference
+rather than an error rate. Purity, ARI and NMI are com-
+puted over the 357 covered dialogues, not all 720.
+6.5
+Dependency accuracy against reference
+plans
+Because the converted plans carry symbolic variable refer-
+ences that would reveal the ground truth, both evaluations
+8
+
+
+===== page 9 =====
+here read a masked corpus: every code-level variable refer-
+ence is replaced by an opaque token (<REF_k>), numbered
+by first appearance and stable per variable within a conver-
+sation, so co-reference survives while producer identity is
+hidden. Concrete values, including cache keys, are intact.
+This places both evaluations in the value-opaque regime,
+with no access to outputs, original plans, or the ground-
+truth edge file. Applied to the shipped corpus, masking
+covers 14,925 variables across the 3,350 dialogues contain-
+ing any.
+Two measurements.
+The compiler’s engine is an LLM,
+so its output is one observation of a stochastic procedure
+and cannot be run over 3,350 dialogues at reasonable cost.
+Reporting only that would leave the central claim resting
+on an unpinned model and a hand-selected sample; report-
+ing only a mechanization would not measure the system we
+built. We report both, on the same corpus and ground truth.
+Run blind over five clusters chosen before scoring to
+cover four structural regimes, the compiler skill attains
+precision and recall of 248/250 = 0.992, Wilson inter-
+val [0.971,0.998], on 48 dialogues — 1.6% of the cor-
+pus’s edges. The two errors form a single substitution in
+two instances of one template: the inference attributed a
+cached value to an intervening sorting call where the anno-
+tation shows the cache received the unsorted output. This
+is exactly the configuration the suspected downgrade ex-
+ists for. Because one run of a non-deterministic procedure
+produced it, we do not treat the third decimal as meaning-
+ful. Three gaps are sharper than we previously stated. The
+released prompt selects its sample by a cluster identifier
+absent from the released labelling; it also selects a single
+cluster, whereas the protocol we describe — and ran —
+covered five, so the released prompt does not reconstruct
+the reported sample; and the 250 per-edge predictions are
+not released. This figure is therefore a reported obser-
+vation, not an auditable measurement, and we present it
+as such rather than as the paper’s primary evidence. The
+recomputable measurement of the same rule is Table 2.
+The mechanized rule, against three baselines.
+Testing
+what the rule does not infer requires every method to see
+identical data, so we mechanize the consumption rule — a
+deterministic, model-free program over the masked corpus
+— and score it with three reference points on all 3,350 con-
+versations and 15,775 edges (Table 2). The mechanization
+is deliberately cruder than the skill: for a consumer argu-
+ment bound to an opaque token it excludes every earlier call
+carrying the same token (a call consuming a value cannot
+have produced it) and attributes the token to the most recent
+survivor; with no schema knowledge it cannot perform the
+type-compatibility judgment the evidence discipline calls
+for. That gap is visible — 0.928/0.943 against the skill’s
+0.992 on its subset — and is why we report both.
+ADJACENCY and ALL-PAIRS test whether order suffices:
+Method
+Prec.
+Rec.
+F1
+ADJACENCY (consecutive pairs)
+0.584
+0.908
+0.711
+ALL-PAIRS (A<B)
+0.231
+0.998
+0.376
+RECURRENCE, all-pairs cand.
+0.253
+0.945
+0.399
+RECURRENCE, adjacent cand.
+0.617
+0.842
+0.712
+argument-level, most recent survivor
+0.928
+0.943
+0.936
+argument-level, unique-candidate only
+1.000
+0.071
+0.133
+Table 2:
+Dependency recovery on T1’s training split:
+15,775 deduplicated def–use edges over 3,350 conversa-
+tions, recurrence at θ=0.6. Wilson 95% precision inter-
+vals in row order: [.578,.590], [.228,.235], [.250,.257],
+[.610,.623], [.924,.932], [.997,1.000]. The rows do not
+see equivalent inputs: order-based rows read only tool or-
+der, while argument-level rows additionally read masked
+co-reference, which this corpus supplies for free.
+The
+skill’s 0.992 is deliberately not a row — different execu-
+tor, different sample.
+adjacency reaches 0.584 precision, so nearly half its edges
+are incidental ordering, and all-pairs collapses to 0.231.
+RECURRENCE tests whether repetition suffices, admitting
+an ordered pair recurring in at least a fraction θ of its do-
+main group’s traces, swept over [0.1,0.9] at best F1. Its
+candidate set matters more than θ, and we report both read-
+ings, because quoting only the worse one would understate
+the baseline: filtering all-pairs inherits the all-pairs preci-
+sion floor and reaches 0.399 F1, while filtering adjacent
+pairs reaches 0.617 precision and 0.712 F1. The second
+is the one to quote, and it exceeds raw adjacency’s preci-
+sion. Recurrence therefore genuinely improves on order; it
+simply does not reach consumption.
+We also correct the attribution.
+Calling this the op-
+erating principle of the workflow-memory family over-
+stated the case: none of AWM, WISE-Flow, WorkflowGen,
+SKILL-DISCO or NSI [25, 32, 26, 10, 17] induces struc-
+ture by thresholding ordered-pair frequency, several being
+LLM-driven abstraction, and WISE-Flow’s prerequisites
+and NSI’s variable bindings are themselves dependency-
+like.
+What we implemented is a frequency-thresholded
+directly-follows dependency measure of the Heuristics
+Miner kind [27]. The conceptual contrast with that fam-
+ily stands on its own terms — SKILL-DISCO, for instance,
+does not verify argument provenance — but it is a claim
+about mechanism, not a score those systems achieved.
+What this corpus cannot test.
+One property bounds ev-
+ery argument-level number above.
+The masked corpus
+contains 22,975 consumption relations — (consumer call,
+opaque token) pairs — which is not the 22,850 edge occur-
+rences of Section 5. The two counts differ by 125: 75 are
+multiplicities that the edge file collapses (one variable re-
+consumed by the same tool later in a dialogue), and 50 are
+relations the annotation does not license at variable gran-
+9
+
+
+===== page 10 =====
+Candidate-choice policy
+Prec.
+Rec.
+F1
+most recent survivor (as reported)
+0.928
+0.943
+0.936
+random survivor
+0.403
+0.440
+0.420
+second-most-recent survivor
+0.220
+0.214
+0.217
+earliest survivor
+0.146
+0.073
+0.097
+all survivors (no attribution)
+0.365
+1.000
+0.535
+Table 3: Ablating attribution while holding the exclusion
+filter fixed. Every row reads only ref-bearing arguments
+and drops candidates carrying the ref; rows differ only
+in which survivor receives the edge. The collapse under
+random choice shows the metric is not forgiving; the gap
+between rows shows recency, not exclusion, is doing the
+work.
+ularity. The completeness figure then depends on which
+granularity is asked for, and both are worth stating.
+At
+the tool-pair granularity our ground truth and every row
+of Table 2 use, all 22,975 relations correspond to a true
+def–use edge. At the stricter per-variable granularity —
+does the consumer consume that variable in the annotation
+— 22,925 of 22,975 do (99.8%); the 50 exceptions are two
+template families repeated across instantiations, and are an-
+notation gaps rather than inference errors. Either way a to-
+ken’s presence in an argument is an almost perfect depen-
+dency signal, and the task measured is producer attribution,
+not edge detection: there is little opportunity to emit a false
+positive except by mis-ranking candidates.
+Two caveats on how much even that establishes. Every
+relation has at least one candidate producer — the count of
+zero-candidate relations is exactly zero — so the absten-
+tion branch an alternative-origin exclusion is meant to trig-
+ger never fires on this corpus: a qualifier such as “with at
+least one candidate producer” would describe a filter that
+removes nothing. And the tool-pair test is weak on its own:
+a mean of 8.2 candidates survive per relation and a ran-
+domly chosen one satisfies it 36% of the time.
+That last figure invites the objection that the metric is
+simply forgiving, so we test it directly by ablating the attri-
+bution step while holding the exclusion fixed (Table 3). It
+is not forgiving: choosing at random among the same sur-
+vivors drops precision from 0.928 to 0.403, and choosing
+the earliest to 0.146. But the ablation also shows where
+the accuracy comes from, and it is not where the method’s
+rhetoric points. The exclusion filter is nearly vacuous here;
+the operative decision is recency, and the mechanized rule
+is best described as “most recent survivor” rather than as an
+exclusion test. The exclusion discipline the paper argues for
+is exercised by the skill, not by the mechanization, which is
+the price of making the central number model-free.
+Two further consequences follow. The last row’s preci-
+sion of 1.000 is close to analytically forced rather than em-
+pirically earned: the call defining a variable never carries
+that variable in its own arguments, so it always survives the
+carrier exclusion, and when one candidate survives it is the
+definer. We name that row for what it computes — unique-
+candidate — rather than “selective”, because it emits a hard
+edge only when exactly one candidate survives, which with
+a mean of 8.2 survivors is a degenerate criterion and ex-
+plains its recall of 0.071. It is a lower bound on absten-
+tion, not the method’s abstention behaviour, which rests on
+type compatibility and semantic exclusion the mechaniza-
+tion cannot perform. Second, measuring detection would
+need a construction that can produce false positives — de-
+coy tokens, or masking every identifier-shaped literal in-
+cluding user-supplied ones. We have not built that, and it is
+the missing construction in this evaluation.
+What the 0.928 does establish, then, is producer attri-
+bution under co-reference at high accuracy, on a corpus
+where detection is trivial and the exclusion test is close to
+vacuous. That is a necessary condition for the rule, not
+a demonstration of it — and it is measured on synthetic
+template-generated dialogues whose dialogues and refer-
+ence plans came from one generator, so incidental regular-
+ities are more systematic than in human or agent traces.
+6.6
+Token attribution on AppWorld
+AppWorld’s logs mask bearer tokens at source, so token
+dependencies — the dominant type in these traces — are
+invisible to value matching. Because the simulator is deter-
+ministic, replaying a trajectory recovers the real return val-
+ues the log omits; we replay each call, capture outputs, and
+substitute real values for masked placeholders as execution
+proceeds. On the resulting trace an edge is established by
+exact value matching.
+This reference is not independent of the rule.
+Earlier
+versions described the construction as “independent of any
+inference rule” and counted it as one of two independent
+ground truths.
+That is not defensible and we withdraw
+it. Replay must choose a value for each masked slot, and
+ours prefers a token produced by the consuming applica-
+tion’s own authentication call. The reference is then built
+by matching those injected values back to their producers,
+while the rule under test attributes each token to the most
+recent same-application login. Injector, reference, and rule
+share an assumption. All 563 edges are login-produced to-
+ken edges — the procedure recovered no non-token identi-
+fier edge in 168 trajectories — so this arm bounds session-
+token attribution and says nothing about the identifier flows
+the case studies foreground.
+This also invalidates an inference we drew from the app-
+blind baselines. Because injection prefers same-application
+tokens, any rule ignoring application identity is guaran-
+teed to disagree with the injection, so a lower score cannot
+discriminate between “application identity carries real de-
+pendency signal” and “it was built into the reference.” We
+withdraw the claim that the gap shows a property of the de-
+pendency structure rather than of the injection mechanism.
+What the numbers support is weaker: a self-consistency
+10
+
+
+===== page 11 =====
+check plus an ablation quantifying how much structure ap-
+plication identity carries. An intervention oracle — replay-
+ing each consumer with its token withheld or swapped, let-
+ting the simulator accept or reject — would settle it, and is
+the clearest next step.
+Protocol and results.
+We replay 168 trajectories over 56
+scenarios spanning seven applications.
+Replay executes
+44.2% of non-documentation calls successfully (5,571 of
+12,618; per-trajectory median 70.4%); the remainder fail
+for faithful reasons (an agent issuing a call before its au-
+thentication, reproduced exactly), contributing no edge.
+The rate matters: more than half of non-documentation
+calls contribute nothing, so the reference covers materi-
+ally less of the corpus than the per-trajectory median alone
+would suggest. Exact matching yields 563 token edges,
+of which the opaque rule recovers 546 with 4 false posi-
+tives and 17 false negatives: precision 0.993 [0.981,0.997],
+recall 0.970 [0.952,0.981] (Table 4).
+The false nega-
+tives concentrate on tokens consumed before any same-
+application login appears, where the rule has no producer
+and abstains — cases the replay independently flags as pre-
+authentication token use. The false positives are the mirror
+case.
+How much cross-corpus agreement this shows.
+An ear-
+lier version read 0.993 alongside T1’s 0.992 as a conver-
+gence and inferred that accuracy is a property of argument-
+level verification rather than of one corpus. That inference
+does not survive the comparison being made correctly: the
+figures were produced by different executors on different
+sample sizes. The like-for-like comparison is between the
+two mechanical measurements — T1 at 0.928 and App-
+World at 0.993 — and those do not converge; their Wilson
+intervals, [0.924,0.932] and [0.981,0.997], do not overlap.
+The difference is explicable: AppWorld’s edges are almost
+entirely session tokens, where the consuming application’s
+identity is a strong signal, whereas T1’s are dominated by
+cache round-trips in which several type-compatible produc-
+ers precede one consumer — precisely where the mecha-
+nization is weakest. What the corpora jointly establish is
+narrower than convergence: the rule transfers across two
+constructions sharing no machinery, at accuracies differ-
+ing with dependency type, and the harder type is where the
+skill’s judgment earns its cost.
+7
+Discussion and Limitations
+Economics, and what is not guaranteed.
+The eco-
+nomics rest on an asymmetry: a capable model may spend
+effort analyzing a cluster once, provided the workflow
+amortizes it over repeated executions. We measure call re-
+duction but not offline compilation cost, so we report no
+break-even point. No semantics-preservation property is
+Ground truth
+Rule
+Edges
+Prec.
+Rec.
+T1 plans (def–use)
+skill
+250
+0.992
+0.992
+T1 plans (def–use)
+mechanized
+15,775
+0.928
+0.943
+AppWorld replay (values)
+mechanized
+563
+0.993
+0.970
+Table 4: Dependency recovery under two ground-truth con-
+structions sharing no machinery with each other, with the
+executing rule named per row. Rows are not interchange-
+able and must not be averaged, and neither construction is
+independent of the data producing it: T1’s dialogues and
+plans come from one generator, and AppWorld’s reference
+shares an assumption with the rule it scores.
+Attribution rule
+Prec. [95% CI]
+Rec. [95% CI]
+first login, any app
+0.786 [.750,.818]
+0.771 [.734,.804]
+nearest login, any app
+0.856 [.825,.882]
+0.877 [.848,.902]
+all prior logins
+0.728 [.696,.759]
+1.000 [.993,1.000]
+same-app last login
+0.993 [.981,.997]
+0.970 [.952,.981]
+Table 5:
+Token-attribution rules against the value-
+observable reference (563 edges). This is an ablation quan-
+tifying how much of the reference’s structure application
+identity carries, not evidence of non-circularity: replay
+prefers same-application tokens, so app-blind rules must
+score lower. All prior logins attains perfect recall by con-
+struction, so only its precision is informative.
+established either: validation is schema and structural con-
+formance plus state tests on one intent, and differential re-
+play at scale is future work. A further exposure we do not
+address: removing schema-discovery calls and forbidding
+injected values’ discovery tools converts an API change
+from a self-healing event into a silent-wrong-behavior one.
+We have no workflow versioning, invalidation, or contract
+monitoring, and the value-level escape hatch covers stale
+values rather than changed schemas, so artifact lifetime un-
+der drift is unmeasured — leaving both sides of the amor-
+tization argument unconstrained. Aggressive canonicaliza-
+tion is the other cost: merging reads and writes of one re-
+source, or dropping identifier-shaped arguments, can erase
+the evidence a hard edge needs, so we recommend canoni-
+calizing conservatively.
+When not to compile, and who authorizes.
+Several sig-
+nals correctly keep intents out of the compiled set: insuf-
+ficient recurrence, no coherent argument structure, bind-
+ings that are all per-request content, and — demonstrated
+on AppWorld — an irreversible effect whose direction the
+traces leave under-determined. We do not report how often
+the compiler declines, which is the adoption-relevant rate.
+The authorization boundary also deserves sharper state-
+ment: on the Venmo intent the recipient selection resolves
+to LLM_OR_DYNAMIC, so no HUMAN node is due and a
+model decides the recipient of a money request at runtime;
+11
+
+
+===== page 12 =====
+“escalate” meanwhile denotes three different things here
+(fall back to the general agent, stop at compile time, emit no
+request). Deployments taking irreversible actions warrant
+approval gating beyond what we evaluate, and BPM’s an-
+swer of compensating transactions is unmodelled because
+these APIs admit no reversal.
+Transfer, and a negative result.
+We also applied the
+pipeline to single-turn Hermes-Function-Calling-v1 [15],
+whose per-example tool vocabularies and varying argument
+schemas stress canonicalization at argument-path level.
+It supplies clean demonstrations of the alternative-source
+condition: where one text is passed to three analysis tools,
+naive value matching would chain them into spurious de-
+pendencies, whereas the rule attributes the shared value to
+its true origin — the user’s request — and leaves the calls
+parallel. But this is the weakest evidence here and estab-
+lishes no generalization: exactly one recurring compilable
+family survives the single-turn filter, so no accuracy figure
+is reportable and none is claimed. What it establishes, by
+absence rather than measurement, is structural — inter-tool
+data flow concentrates in multi-turn traces and is largely
+absent from single-turn function calling, so such a corpus
+has little for a dependency compiler to find. Demonstrat-
+ing transfer needs a second multi-turn corpus with indepen-
+dent annotations, and ToolMind [29] is the right candidate:
+multi-turn, with a synthesis building a function graph from
+parameter correlations.
+What the mechanization does and does not stand in for.
+Making the central number model-free cost something we
+should state plainly. The mechanized rule implements the
+carrier exclusion — a call consuming a value cannot have
+produced it — but not the rest of the evidence discipline:
+it has no schema knowledge, so it cannot test type com-
+patibility, and it does not reason about user utterances or
+static context as alternative origins. Ablating the attribu-
+tion step while holding the exclusion fixed (Table 3) shows
+the consequence: on this corpus the exclusion leaves a
+mean of 8.2 candidates standing, and the accuracy is car-
+ried by choosing the most recent of them. So the 0.928 is
+evidence that argument-level co-reference plus recency re-
+covers T1’s dependencies, not evidence that admission-by-
+exclusion does. The exclusion discipline is exercised only
+by the skill, whose measurement is a single unaudited run.
+Closing that gap — a mechanization rich enough to per-
+form the exclusion test, on a corpus where detection is not
+trivial — is the most direct way to put the paper’s central
+claim on a recomputable footing.
+Variance, and what our own errors show.
+An LLM-
+driven compiler is not deterministic across runs and ver-
+sions.
+Three mechanisms bound the risk:
+the struc-
+tured specification between analysis and generation, val-
+idation with bounded repair, and evidence tuples making
+every constraint traceable. Variance in the analysis is the
+strongest argument for a learned compiler trained on the
+triples the system logs. Separately, two of our own claims
+were falsified during this work — branch necessity, and the
+first correction of it — both by execution rather than by
+re-reading traces. Where a compiled branch guards an ir-
+reversible effect, execution-checked sufficiency should be
+a compile-time obligation, and the harness performing the
+check is itself an inference instrument requiring validation.
+Reproducibility and scope.
+We separate tiers rather than
+claim blanket reproducibility.
+• Deterministic. Masking, the mechanized rule and its
+baselines and ablation, the replay reference with its
+scoring and coverage statistics, the discovery metrics,
+and the end-to-end execution with its leave-one-out
+and branch-sufficiency protocols are model-free re-
+leased commands that recompute their tables.
+• Procedure but not value, and not auditable. The blind
+protocol and the case studies ran on an unpinned LLM.
+The prompt and masked corpus are released, but the
+prompt’s sample cannot be identified in the released
+labelling and the 250 per-edge predictions are absent.
+• Not released. The T1 adapter producing the trace and
+edge files, so a reader cannot check how def–use was
+computed or how masking aligned to it — the step
+most worth auditing.
+• Known gap. The clustering that produced the refer-
+ence labelling ran on a different serialization and does
+not re-run to the same operating point (Section 6.4).
+• Regenerable, not redistributed. AppWorld traces, be-
+cause the benchmark ships a canary [19].
+On scope: the corpus-wide result is measured on syn-
+thetic template-generated dialogues, and the AppWorld
+measurement on traces whose dominant dependency is a
+session token. Out-of-sample execution evidence is one in-
+tent over three instances. All AppWorld traces come from
+one ReAct agent and all T1 dialogues from one generator,
+leaving an unexamined premise — that observational traces
+are evidence about task structure rather than one agent’s
+habits. No corpus demonstrates end-to-end compilation at
+production volume with exact accounting, which remains
+the ultimate test.
+8
+Related Work
+Process mining, including data- and object-aware.
+Process mining derives models from event logs, evalu-
+ated through fitness, precision, generalization and simplic-
+ity [23]; Sommers et al. [18] recast discovery as supervised
+graph translation over synthetic log–model pairs. The field
+is emphatically not confined to control flow, and we should
+be precise rather than draw a strawman.
+Decision min-
+ing recovers guards routing a case at a choice point [16];
+data-aware alignments and balanced multi-perspective con-
+12
+
+
+===== page 13 =====
+formance extend conformance to case attributes [7, 14];
+object-centric discovery correlates events through shared
+object identifiers carried as event attributes [24]; and data-
+flow anti-patterns already formalize reading an unavailable
+element and producing data never read [21], which is pre-
+cisely our DEAD_OUTPUT category and the “dead fetch”
+anomalies our blind analysis surfaced. The distinction we
+can defend is narrower than “control flow versus data”:
+those methods discover predicates over attributes, or cor-
+relate events by identifiers the log supplies as first-class
+fields, whereas we must infer which JSON argument value
+is a reference and to which producer it belongs, from the
+consumer side, when outputs are not recorded at all. Guards
+constrain which path a case takes; provenance constrains
+which orderings are admissible.
+Nor is “observed relation need not imply dependency”
+original to us. The sharpest prior statement is Bozorgi et
+al. [2], who argue that rules mined from event logs are cor-
+relational and adjust for confounding to recover causal ef-
+fect; van der Aalst’s text makes the corresponding point
+about directly-follows relations. We should not, however,
+claim the alpha-algorithm lineage as our precedent: clas-
+sical concurrency detection infers independence from ob-
+serving both orders across a log, which requires order
+variability, whereas we infer it from argument provenance
+within a single ordering. Our contribution is an evidence
+discipline for acting on the distinction under partial observ-
+ability — an exclusion test over alternative origins, and ab-
+stention when the test fails — not the distinction itself.
+Process mining and provenance over agent traces.
+The intersection this paper occupies is already populated.
+Fournier et al. [9] apply process and causal discovery
+directly to LLM-agent trajectories to expose behavioral
+variability, complemented by static analysis separating in-
+tended from unintended variation. GRADE [31] models
+an agent run as a graph with separate execution and de-
+pendency layers and — closest to us — grades each de-
+pendency edge by how it is known (observed, declared, in-
+ferred). AgentTrails [28] converts trajectories into prove-
+nance graphs of actions and artifacts and aligns recurring
+structure across executions via a joined quotient graph. We
+do not claim the graded-evidence taxonomy or the trace-
+to-provenance-graph construction as new.
+What we add
+to them is a sufficiency criterion rather than a provenance
+annotation: because our graph will be executed, an edge
+is admitted only after every alternative origin is excluded,
+and the compiler abstains when exclusion fails. GRADE
+and AgentTrails produce graphs for prediction and sense-
+making and both assume observable inputs and outputs; we
+operate under output opacity and emit an executable arti-
+fact.
+Workflow memories,
+reuse,
+and skill compilation.
+Agent Workflow Memory induces recurring workflows and
+retrieves them as procedural memory [25]; WISE-Flow
+aggregates interactions into prerequisite-augmented action
+blocks [32]; WorkflowGen routes requests among direct
+reuse, rewriting, and initialization by similarity [26]; Memp
+distills trajectories into step-level and script-like procedural
+memory with explicit build/retrieve/update strategies [8].
+In each, the retrieved artifact remains context for an LLM
+that still selects and instantiates actions at runtime. NSI
+lifts traces into logic-grounded programs, resolving ambi-
+guity by inventing branches or predicates rather than ab-
+staining [17]; Agentic Compilation confines the LLM to
+a one-shot phase producing a deterministic blueprint [6];
+SkillCraft studies composition of atomic tools into param-
+eterized skills [5]; and SKILL-DISCO distills control-flow
+subgraphs from successful traces in FSM-defined environ-
+ments [10].
+Closest on the systems side, PreAct [13] compiles a
+successful run of a computer-use task into a state ma-
+chine replayed with no per-step LLM call, verifying at
+each step that the environment matches expectation and
+handing back to the agent when it does not — the same
+guard-and-fall-back structure as our router, arrived at inde-
+pendently. It compiles a single trace of GUI actions with
+no argument-provenance analysis and no refusal to com-
+pile; our differentiators against it are cross-trace consolida-
+tion, argument-level def–use with exclusion, and declining
+under-determined irreversible effects.
+Two differences locate our work generally. Their unit
+of abstraction is control flow — which transitions recur
+— whereas ours is the evidence-audited argument binding:
+which runtime values resolve without model judgment, and
+which observed orders actual consumption supports. And
+they assume successful paths through a known transition
+system or a single synthesis pass, while we operate on noisy
+conversational logs under partial observability. NSI and
+WorkflowGen also work at binding granularity, but without
+a provenance-exclusion criterion. The methods are comple-
+mentary; distilling our intermediate decisions into a trained
+student model [11] is future work.
+Dependency DAGs from specifications, and by demon-
+stration.
+Three lines share our object but not our source
+of truth. LLMCompiler [12] has a planner emit a DAG
+of tool calls with explicit inter-task argument placeholders
+and executes it in parallel; the DAG is synthesized from a
+task description at plan time and never verified against ob-
+served behaviour, whereas we recover it from traces with
+per-edge evidence. RESTler [1] infers producer–consumer
+dependencies between API requests — B follows A be-
+cause B consumes a resource id A produced — from an
+OpenAPI specification plus live probing; our consumption
+rule is recognizably in that lineage, and what we add is the
+exclusion step (ruling out user text, injected context, de-
+faults, and every other prior call) and operation on logs
+alone, with no specification and no ability to probe. Fur-
+ther back, programming-by-demonstration systems gener-
+13
+
+
+===== page 14 =====
+alize a recorded trace into a parameterized program, infer-
+ring where to insert loops and which constants to turn into
+variables [4]; our pagination-is-a-loop rule is a direct de-
+scendant, differing in being multi-trace, unsupervised, and
+provenance-verified.
+9
+Conclusion
+We presented TraceCompiler, a skill-guided system for
+mining noisy LLM-agent traces and compiling recurring
+behavior into executable, mostly deterministic workflows.
+Its central principle is that observed execution order should
+not become workflow structure unless supported by data
+flow.
+The mechanized rule recovered dependencies at 0.928
+precision and 0.943 recall over 15,775 def–use-derived
+edges of T1’s training split, against 0.711 F1 for ad-
+jacency and 0.712 for a frequency-thresholded directly-
+follows measure on the same data — though, as Section 6.5
+shows by ablation, that accuracy rests on recency among
+surviving candidates rather than on the exclusion test the
+skill performs, so it bounds the rule’s mechanizable core
+and not the evidence discipline itself. The skill run blind
+reached 0.992 on a 250-edge subset, in a single unaudited
+run whose per-edge predictions we did not release, and the
+same rule 0.993 precision against a replay-built reference
+on AppWorld reported as a self-consistency check. The
+frozen skill compiled recurring intents into specifications
+— recovering a token dependency, a non-adjacent creden-
+tial dependency, and a cross-application recipient path on
+one intent, and correctly declining an under-determined ir-
+reversible side effect on another — and the compiled work-
+flow passed 15 of 21 state tests on withheld instances, the
+failing fold escalating rather than acting.
+The execution harness also falsified our claim that the
+branch was necessary rather than under-determined, and
+then, in its first version, produced a wrong account of
+why, because it dropped an argument the traces bind. To-
+gether these make a sharper point than either alone: ob-
+servational traces bound claims about necessity as tightly
+as claims about dependency, and the instrument used to
+test a compiled workflow is itself an inference procedure
+needing validation. The findings support a division of labor
+— agents should resolve genuinely novel or semantic deci-
+sions, while repeated evidence-supported behavior should
+be compiled into explicit programs. Future work will build
+the intervention oracle and decoy-negative construction this
+evaluation lacks, measure compile and decline rates at cor-
+pus scale, and distill the skill into a trained student model.
+Ethics statement
+This work analyzes three public corpora and introduces
+no human-subjects data.
+T1 [3] and Hermes-Function-
+Calling-v1 [15] are template- or model-generated; App-
+World [22] is a simulator with synthetic personal data, and
+all side-effecting executions reported here ran against that
+simulator, never a live service or real account. The com-
+piled workflows include an irreversible money-movement
+operation, and the compiler’s abstention and escalation on
+such operations is a deliberate safety property: Section 6.1
+reports a case where it declines to compile, and Section 6.3
+reports escalation in place of acting on an unresolved recip-
+ient. Deploying compiled workflows that take irreversible
+actions on real accounts warrants approval gating beyond
+what this paper evaluates. The authors declare no compet-
+ing interests and no external funding supported this work.
+References
+[1] Vaggelis Atlidakis, Patrice Godefroid, and Marina
+Polishchuk. RESTler: Stateful REST API fuzzing. In
+Proceedings of the 41st International Conference on
+Software Engineering (ICSE), pages 748–758, 2019.
+[2] Zahra Dasht Bozorgi, Irene Teinemaa, Marlon Du-
+mas, Marcello La Rosa, and Artem Polyvyanyy. Pro-
+cess mining meets causal machine learning: Discov-
+ering causal rules from event logs. In 2020 2nd In-
+ternational Conference on Process Mining (ICPM).
+IEEE, 2020. arXiv:2009.01561.
+[3] Amartya
+Chakraborty,
+Paresh
+Dashore,
+Nadia
+Bathaee,
+Anmol Jain,
+Anirban Das,
+Shi-Xiong
+Zhang, Sambit Sahu, Milind Naphade, and Genta In-
+dra Winata.
+T1:
+A tool-oriented conversational
+dataset for multi-turn agentic planning. In Advances
+in
+Neural
+Information
+Processing
+Systems
+39:
+Datasets and Benchmarks Track, 2025.
+[4] Sarah E. Chasins, Maria Mueller, and Rastislav
+Bodík. Rousillon: Scraping distributed hierarchical
+web data. In Proceedings of the 31st Annual ACM
+Symposium on User Interface Software and Technol-
+ogy (UIST), pages 963–975, 2018.
+[5] Shiqi Chen, Jingze Gai, Ruochen Zhou, Jinghan
+Zhang, Tongyao Zhu, Junlong Li, Kangrui Wang,
+Zihan Wang, Zhengyu Chen, Klara Kaleb, Ning
+Miao, Siyang Gao, Cong Lu, Manling Li, Junx-
+ian He, and Yee Whye Teh. SkillCraft: Can LLM
+agents learn to use tools skillfully?
+arXiv preprint
+arXiv:2603.00718, 2026.
+[6] Jagadeesh Chundru. Agentic compilation: Mitigating
+the LLM rerun crisis for minimized-inference-cost
+web automation. arXiv preprint arXiv:2604.09718,
+2026.
+[7] Massimiliano de Leoni and Wil M. P. van der Aalst.
+Data-aware process mining: Discovering decisions in
+14
+
+
+===== page 15 =====
+processes using alignments.
+In Proceedings of the
+28th Annual ACM Symposium on Applied Computing
+(SAC 2013), pages 1454–1461. ACM, 2013.
+[8] Runnan Fang, Yuan Liang, Xiaobin Wang, Jialong
+Wu, Shuofei Qiao, Pengjun Xie, Fei Huang, Hua-
+jun Chen, and Ningyu Zhang.
+Memp: Exploring
+agent procedural memory. In Findings of the Asso-
+ciation for Computational Linguistics (ACL), 2026.
+arXiv:2508.06433.
+[9] Fabiana Fournier, Lior Limonad, and Yuval David.
+Agentic AI process observability: Discovering be-
+havioral variability.
+In Proceedings of the 4th In-
+ternational Workshop on Process Management in
+the AI Era (PMAI), co-located with ECAI, vol-
+ume 4087 of CEUR Workshop Proceedings, 2025.
+arXiv:2505.20127.
+[10] Zhongxin Guo, Danrui Qi, Hanwen Gu, Peng Cheng,
+and Yongqiang Xiong. SKILL-DISCO: Distilling and
+compiling agent traces into reusable procedural skills.
+arXiv preprint arXiv:2606.26669, 2026.
+[11] Minki Kang, Jongwon Jeong, Seanie Lee, Jaewoong
+Cho, and Sung Ju Hwang. Distilling LLM agent into
+small models with retrieval and code tools.
+arXiv
+preprint arXiv:2505.17612, 2025.
+NeurIPS 2025
+Spotlight.
+[12] Sehoon Kim, Suhong Moon, Ryan Tabrizi, Nicholas
+Lee, Michael W. Mahoney, Kurt Keutzer, and Amir
+Gholami.
+An LLM compiler for parallel function
+calling.
+In Proceedings of the 41st International
+Conference on Machine Learning (ICML), 2024.
+arXiv:2312.04511.
+[13] Bojie Li.
+PreAct: Computer-using agents that get
+faster on repeated tasks, 2026.
+[14] Felix Mannhardt, Massimiliano de Leoni, Hajo A.
+Reijers, and Wil M. P. van der Aalst. Balanced multi-
+perspective checking of process conformance. Com-
+puting, 98(4):407–437, 2016.
+[15] Nous
+Research.
+Hermes-Function-Calling-
+v1.
+https://huggingface.co/datasets/
+NousResearch/hermes-function-calling-v1,
+2024.
+Single-turn
+configuration
+func_calling_singleturn; accessed 2026-07-29.
+[16] Anne Rozinat and Wil M. P. van der Aalst. Decision
+mining in ProM. In Business Process Management
+(BPM 2006), volume 4102 of Lecture Notes in Com-
+puter Science, pages 420–425. Springer, 2006.
+[17] Jie-Jing Shao, Haiyan Yin, Yueming Lyu, Xingrui Yu,
+Lan-Zhe Guo, Ivor Tsang, James Kwok, and Yu-Feng
+Li. Lifting traces to logic: Programmatic skill induc-
+tion with neuro-symbolic learning for long-horizon
+agentic tasks.
+arXiv preprint arXiv:2605.01293,
+2026. ICML 2026.
+[18] Dominique Sommers, Vlado Menkovski, and Dirk
+Fahland. Process discovery using graph neural net-
+works. In 2021 3rd International Conference on Pro-
+cess Mining (ICPM), pages 40–47. IEEE, 2021.
+[19] Stony Brook NLP.
+AppWorld:
+Official reposi-
+tory and release disclaimer. https://github.com/
+StonyBrookNLP/appworld, 2024. Accessed 2026-
+07-28.
+[20] Yifan Sui, Han Zhao, Rui Ma, Zhiyuan He, Hao
+Wang, Jianxun Li, Kaiqiang Xu, Kai Chen, and
+Yuqing Yang. Parallelizing tool execution and LLM
+generation for low-latency agent serving.
+arXiv
+preprint arXiv:2603.18897, 2026.
+[21] Nikola Trˇcka, Wil M. P. van der Aalst, and Natalia
+Sidorova. Data-flow anti-patterns: Discovering data-
+flow errors in workflows. In Advanced Information
+Systems Engineering (CAiSE), volume 5565 of Lec-
+ture Notes in Computer Science. Springer, 2009.
+[22] Harsh Trivedi, Tushar Khot, Mareike Hartmann,
+Ruskin Manku, Vinty Dong, Edward Li, Shashank
+Gupta, Ashish Sabharwal, and Niranjan Balasubra-
+manian. AppWorld: A controllable world of apps and
+people for benchmarking interactive coding agents. In
+Proceedings of the 62nd Annual Meeting of the As-
+sociation for Computational Linguistics (Volume 1:
+Long Papers), pages 16022–16076, Bangkok, Thai-
+land, August 2024. Association for Computational
+Linguistics.
+[23] Wil M. P. van der Aalst. Process Mining: Data Sci-
+ence in Action. Springer Berlin Heidelberg, 2 edition,
+2016.
+[24] Wil M. P. van der Aalst and Alessandro Berti. Dis-
+covering object-centric Petri nets. Fundamenta Infor-
+maticae, 175(1–4):1–40, 2020.
+[25] Zora Zhiruo Wang, Jiayuan Mao, Daniel Fried, and
+Graham Neubig. Agent workflow memory. In Pro-
+ceedings of the 42nd International Conference on
+Machine Learning, volume 267 of Proceedings of
+Machine Learning Research, pages 63897–63911.
+PMLR, 2025.
+[26] Ruocan Wei, Shufeng Wang, and Ziwei Shi. Work-
+flowGen: An adaptive workflow generation mecha-
+nism driven by trajectory experience. arXiv preprint
+arXiv:2604.19756, 2026.
+[27] A. J. M. M. Weijters, Wil M. P. van der Aalst, and
+A. K. Alves de Medeiros. Process mining with the
+15
+
+
+===== page 16 =====
+HeuristicsMiner algorithm. BETA Working Paper Se-
+ries WP 166, Eindhoven University of Technology,
+2006.
+[28] Eden Wu, Sonia Castelo, Yurong Liu, Cláudio T.
+Silva, and Juliana Freire.
+AgentTrails:
+Towards
+trust and reuse for agentic tasks.
+In Proceedings
+of the Workshop on Systems for Data-centric Agents
+with Human-in-the-loop (DASHSys), co-located with
+VLDB, 2026. arXiv:2607.18816.
+[29] Chen Yang,
+Ran Le,
+Yun Xing,
+Zhenwei An,
+Zongchao Chen, Wayne Xin Zhao, Yang Song, and
+Tao Zhang. ToolMind technical report: A large-scale,
+reasoning-enhanced tool-use dataset. arXiv preprint
+arXiv:2511.15718, 2025.
+[30] Naimeng Ye, Arnav Ahuja, Georgios Liargkovas, Yu-
+nan Lu, Kostis Kaffes, and Tianyi Peng. Speculative
+actions: A lossless framework for faster AI agents. In
+The Fourteenth International Conference on Learn-
+ing Representations (ICLR), 2026. Oral presentation;
+arXiv:2510.04371.
+[31] Yue Zhao. GRADE: Graph representation of LLM
+agent dependency and execution, 2026.
+[32] Yuqing Zhou, Zhuoer Wang, Jie Yuan, Hong Wang,
+Samson Koelle, Ziwei Zhu, and Wei Niu.
+WISE-
+Flow: Workflow-induced structured experience for
+self-evolving conversational service agents.
+arXiv
+preprint arXiv:2601.08158, 2026.
+A
+The Compiler Skill (Condensed)
+The skill is a versioned package: a specification document,
+four reference procedures, and five helper scripts.
+This
+appendix condenses its operative content and is keyed to
+the artifact’s own step numbering, so a reader can move
+between the two. Version 1.0.0 produced every result re-
+ported here; the released package is 1.1.0, whose changelog
+records exactly which previously-tacit rules were made ex-
+plicit afterwards and states that no decision rule changed.
+Input contract.
+The skill declares the trace schema it ex-
+pects: one row per event with conversation id, sequence,
+role, content, and a tool_calls column of {tool,
+input} objects. On deviation the instruction is to stop and
+report, never to adapt silently.
+Step 0 — Validate and de-identify.
+Check the schema,
+and strip identifiers that must not enter the analysis.
+Step 1 — Contamination pass.
+Detect conversations
+mixing unrelated intents (coarse embedding drift, then
+mandatory content reading); split at task boundaries; leave
+borderline cases unsplit. Idempotent.
+Step 2 — Cluster coherence.
+Identify the target cluster
+by content fingerprint — example requests, distinguishing
+tool, argument pattern, expected size — never by numeric
+id, which is unstable across re-clusterings. Hard abort on
+mismatch. Do not compile a cluster with fewer than three
+independent executions.
+Step 3 — Normalize and compare arguments.
+Map
+tool identifiers to a canonical app.action vocabulary, ex-
+tending to argument paths. Unknown tools map to an ex-
+plicit UNMAPPED marker rather than being merged into the
+nearest name.
+Step 4 — Event roles.
+Label each event across traces.
+Retry versus genuine variation is decided by argument
+comparison only, never by call counts. Unresolved events
+are kept, never silently dropped. A literal counter advanc-
+ing across otherwise-identical repeats is a pagination loop,
+not a set of calls and not a data edge — but an opaque cur-
+sor the client could not have computed is a data edge and
+must be verified as one.
+Step 4bis — Argument-level dependency verification.
+For each consumer argument, scan all earlier calls as can-
+didate producers. A hard edge requires all four of: trace-
+ability of the value to a producer output path; uniqueness,
+meaning no user-input span, constant, static context, de-
+fault, or other prior producer plausibly explains the same
+value; path compatibility of types; and a counterexample
+check. Record every accepted and rejected edge as a tu-
+ple ⟨consumer, argument path, observed value, proposed
+producer, producer output path, alternative origins checked,
+verdict, confidence⟩. A plausible alternative downgrades to
+SUSPECTED, which imposes no ordering constraint.
+Step 5 — Provenance.
+Assign every argument an ori-
+gin class. Classification is behavioral, never name-based.
+Session credentials need care: account credentials may be
+scope-stable, but a token a call returns is a session artifact
+and is a copy edge from the authenticating call, never a con-
+stant.
+Step 6 — Static-context injection.
+For each eligible
+value: resolve once at build time, embed into the parser
+node’s prompt annotated with source and usage, and forbid
+the discovery tool at runtime, escalating rather than silently
+rediscovering. Weak-evidence candidates are flagged, not
+embedded; an empty injection set is a valid outcome.
+Steps 7–9 — Graph, IR, validation.
+Build the small-
+est graph the traces support: only proven hard edges con-
+strain order, independent nodes stay parallelizable, retries
+collapse into policy, fan-out is explicit. Emit the Workflow
+IR, then validate it mechanically and structurally against
+the specification under a bounded repair loop.
+16
+
+
+===== page 17 =====
+Stop conditions.
+The skill abstains when a cluster cannot
+be segmented, when fewer than three traces support a struc-
+tural claim, when schemas are missing and values opaque,
+when multiple producers remain plausible, or when a static
+value cannot be scoped. One condition blocks output en-
+tirely rather than weakening it: when a node has an ir-
+reversible external effect whose identity the traces leave
+under-determined — most sharply when the candidates are
+opposites, such as adding versus removing — the compiler
+emits no executable graph. Deferring that choice to a run-
+time LLM node is explicitly not an acceptable resolution,
+since a runtime model has strictly less evidence than the
+analysis had.
+Vocabulary note.
+The skill’s taxonomies are finer than
+the paper’s prose. Its nine event-role labels refine the seven
+categories of Section 3.2, and its edge verdicts (HARD,
+TRANSFORM, SUSPECTED, REFUTED) do not map one-to-
+one onto the relation classes of Section 3.3; only HARD
+and SUSPECTED carry identical meaning in both. “Con-
+ditional hard” is represented in the artifact as a hard edge
+on a guarded node.
+17

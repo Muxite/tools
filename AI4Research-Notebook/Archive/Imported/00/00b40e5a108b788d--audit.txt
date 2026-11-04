@@ -1,0 +1,33 @@
+Independent producer and whitelist audit, 2026-10-02
+Frozen source: docs/product/prd-m1-full-2026-10-02.txt. User override: Dockerized modular monolith and local benchmark HTTP. Host deployment differences were excluded while those pages were concurrently revised.
+
+Producer derivation
+Only owning M1 stage pages supplied the eight fixtures. Requirement/Search/Screening contain capsule.json blocks and were copied from those blocks. Hypothesis/POC/Benchmark/Evaluation/Delivery use their own interface tables and prose. Missing kind/check/dependency/carrier facts were omitted instead of invented. derivation-notes.json documents omissions. No consumer or pipeline fixture supplied these facts.
+compile_brief: intake required, source_text required, intent_ir optional -> research_brief
+search_ideas: research_brief required, intake required -> idea_set
+select_opportunity: idea_set required, research_brief required -> opportunity_card
+form_hypothesis: opportunity_card required, research_brief required, intake required -> hypothesis_blueprint
+build_poc: hypothesis_blueprint required, research_brief required, intake required -> poc_bundle
+run_benchmark: poc_bundle required, hypothesis_blueprint required -> benchmark_payload
+evaluate_results: benchmark_payload required, hypothesis_blueprint required, research_brief required -> evaluation_verdict
+write_report: evaluation_verdict required, benchmark_payload required, research_brief required, idea_set required, opportunity_card required, hypothesis_blueprint required -> research_report
+Delivery's StageContext is described as supervisor-bound broker evidence rather than a named runner input. No seventh payload port was fabricated. runner.md later confirms an ordinary broker adjunct; this distinction must remain consistent with consumers.
+
+Source-confirmed findings and disposition
+1. PRD4.1.1/4.1.4: benchmark nonrepeatable_effect is absent from fields.md enum/policy mappings/runner permissions. Admission rejects the benchmark and mapping to irreversible prevents unattended production. FIXED: fields/policy/runner/benchmark now declare the separate empirical category, require exact policy/reservation/profile and prohibit automatic repetition; human-reviewed restart reserves a new attempt.
+2. PRD2.9/3.7.2/4.6.4: process-boundary.md requires the exact reserved dispatch but its closed request lacks reservation/attempt identity. Explicit restart could bind a different same-run/bundle attempt. FIXED: reservation_ref, dispatch_id, obs_id and positive attempt are required; service verifies all against committed reservation/Binding; profile+reservation separate setup/benchmark identity.
+3. PRD5.6.5: environment.md rejects Gate-off while source permits preregistered approved development/evaluation component ablation. FIXED: isolated component_ablation profile with preregistered study/approved actions, actual component states/deviations, no production admission/standing/release/acceptance, and required evidence/security controls. services-v1 feature/deviation enums updated; root owns further schema defs/export.
+4. PRD5.3.1: requested and effective seed must be recorded. Closed environment namespace has no seed key despite workstation promise to freeze it. FIXED: cc.execution.seed requested/effective/unavailable_reason, per-component/model seed audit, unsupported endpoint null/NOT_SUPPORTED. Root owns benchmark export seed schema.
+5. Frozen source contains no section5.7. FIXED: lifecycle and coverage point to5.3.1/5.6.5; coverage explicitly names4.4.1-4.4.10.
+6. PRD4.4.10 lines1722-1726 requires violation halt plus explicit human clearance, fixed threat model and documented residual risks. rsi-engine/fixture-oracle define stop/block and violation probes but no clearance API/record/latch tying authorized recovery to security evidence. records human_review is run-scoped and cannot represent offline session clearance. OPEN to RSI reviewer: define session-scoped security hold/clearance record/API; prevents a fresh session bypassing required human clearance. Include security-case mapping for prompt injection/resource/evidence/promotion and a residual-limitations ledger.
+7. PRD4.4.9/4.4.10 durable reconciliation: records.md rsi_session state enum omits closing/closed/no_candidate even though rsi-engine RsiSessionResult includes them. fixture-oracle ClosedRequest and final require closed_session_ref/accepted incumbent+lineage, but closed private record payload is not specified. OPEN to RSI reviewer: define exact private session/seal/result records and transitions; make final reservation distinct from loop ordinal/lifetime and retain accepted lineage/score/ref identity.
+8. PRD4.5.3 capture responsibility: permissions.md and observability.md require mandatory M1 captured broker/process effect comparison, but observation.md effects_observed is unchecked/librarian, stages.md treats it deferred and schemas.md says tooling is Not scheduled. FIXED: effects_observed required/checked; runner, tools, stages and schema index distinguish required runtime capture/comparison from deferred automated librarian drift.
+
+Conditional source mismatch, not raised without authorization context
+PRD4.1.2 specifies one provisional level and strict self-tests. Puppet exempt provider is an explicit design deviation in admission/library/policy. Parent must compare earlier user authorization before treating it as scope creep.
+
+Files modified by this delegated correction
+capsule/fields.md, schemas/policy.md, capsule/runner.md, m1/benchmark.md, capsule/process-boundary.md, system/lifecycle.md, system/experiments.md, system/environment.md, system/workstation.md, contracts/services-v1.schema.json (feature enum only), prd/coverage.md.
+No runtime implementation, runtime test, commit or deployment performed. Generated schema synchronization and connected canaries remain root-owned.
+
+Additional delegated edits: schemas/observation.md, capsule/stages.md, schemas/schemas.md, capsule/tools.md. All delegated text writes normalized to UTF-8 without BOM/LF. Architecture lint --check ran after normalization: former field-table/frontmatter failures cleared; 116 failures remain for stale generated exports/graph/schema map and concurrently revised deployment-first system diagram/table mismatch. Root owns regeneration and diagram completion; lint not reported green.

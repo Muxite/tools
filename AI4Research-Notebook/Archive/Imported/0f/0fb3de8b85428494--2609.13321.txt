@@ -1,0 +1,748 @@
+
+
+===== page 1 =====
+SkillSeam: Six Principles
+for Auditing Agent Skill Collections
+Kang Ruiyuan
+X32 Studio, Abu Dhabi, UAE
+kang@x32studio.com
+Abstract
+A folder of competent skills is not yet a reliable system. Skills rarely fail alone; they fail at the seams of a collection.
+As an agent’s skill library grows, procedures compete for attention, aliases double-load, boundaries blur, and poorly
+sized skills turn routing errors into task failures. We introduce SkillSeam, a method that audits the relationships
+through which individual skill files become a system. It maps each collection-level principle to a failure mechanism, its
+strongest observable, and a controlled perturbation test. From one sealed skill system, SkillSeam perturbs six design
+principles: persistence gradient, system coherence, regime gating, orthogonal coverage, flow, and granularity discipline.
+Crucially, each principle is evaluated through the channel its failure mechanism predicts rather than through accuracy
+alone. Flattening the persistence hierarchy increases loaded-skill tokens by 60%; a dangling anchor raises total tokens by
+64% and shifts accuracy by −3.1pp; with skill count and context size held fixed, replacing an unrelated control with
+a synonymous alias raises noncanonical routes from 0/32 to 15/32 and flips half of matched paraphrase pairs; in a
+candidate-ownership audit, overlapping lanes raise reported ownership conflicts from 0/16 to 14/16; bland triggers drive
+routing conflicts from 3/32 to 30/32 and inflate loaded-skill tokens 3.7×; and one granularity mis-mix produces the largest
+accuracy drop, −12.5pp. These outcomes turn six pieces of authoring advice into testable system properties without
+treating every probe as confirmation. We release the byte-differenced variants, task slices, rollups, and a one-screen
+design checklist so that other skill systems can measure the same failure channels.
+1
+Introduction
+Giving an agent another skill resembles hiring another specialist: it expands capability, but it does not create an organization.
+A roster needs explicit roles, information layers, and handoffs; a skill collection needs routing boundaries, ownership,
+traceability, and testable contracts. Individual skill files are now a standard way to give agents procedural knowledge [1].
+The harder problem begins after the first few files: two skills claim the same regime, a boundary is written where the
+router cannot observe it, a reference becomes unreachable, or one skill absorbs several jobs. Each skill may look competent
+alone while the collection fails at its seams.
+Figure 1: The organizational metaphor behind SkillSeam. The same capabilities appear on both sides; only their relationships change. Six
+principles turn conflicting roles and tangled information paths into layered knowledge, explicit gates, unique ownership, observable handoffs,
+and right-sized responsibilities.
+1
+arXiv:2609.13321v1  [cs.SE]  10 Sep 2026
+
+
+===== page 2 =====
+Figure 1 is a controlled organizational thought experiment. The people, skill cards, and underlying capability remain
+fixed; only their relationships change. On the left, duplicate roles, broken information paths, and implicit handoffs turn
+capable specialists into a tangled organization. SkillSeam applies six interventions: layer information, preserve traceability,
+gate new roles, assign one owner, expose handoffs, and right-size responsibilities. The result is not a smaller library. It is
+the same capability organized into a skill system with clear accountability.
+We introduce SkillSeam to ask a narrow question with broad practical consequences: what organizational relationships
+must remain decidable as a roster of skills becomes a skill system? We study six collection-level principles—persistence
+gradient, system coherence, regime gating, orthogonal coverage, flow, and granularity discipline—derived from the System-
+of-Skills practitioner guide [2], which also ships the method as an installable, agent-readable skill. Their common premise is
+that a skill collection is an architecture: it has layers, interfaces, routing predicates, and module boundaries. The principles
+should therefore be testable as system properties, not defended as writing style.
+Whether task-relevant procedures can help an agent is not our question; our contribution begins after a team has
+committed to a skill layer. We ask what breaks when that team organizes its skills badly, and we measure each break in
+the channel where it should first appear. Accuracy is appropriate for a mis-granulated capability; it is a weak instrument
+for a routing collision. Loaded-skill tokens reveal persistence and flow overhead; route flips reveal aliases; ownership audits
+reveal overlaps; reachability and task success reveal coherence and grain.
+We make three contributions through SkillSeam:
+1. A failure model for skill collections. Each of six principles is paired with a concrete mechanism and an observable:
+context burden, unreachable traces, semantic multi-reads, overlap multi-reads, routing conflicts, or task failure.
+2. A controlled perturbation method. We generate a byte-differenced L0–L6 ladder from one sealed collection,
+changing one organizational property per rung, and add diagnostic slices where a failure cannot appear on positive
+tasks.
+3. Measured mechanism-specific signatures. The experiments expose effects ranging from 60% more loaded-skill
+tokens to alias-driven route fragmentation in 15/32 tasks, overlap conflicts in 14/16 ownership audits, a 27/32 increase
+in routing conflicts, and a −12.5pp accuracy drop. Table 4 converts these outcomes into an executable audit.
+Figure 1 summarizes the argument: six principles protect six different failure channels. Underneath them is self-
+contained verification—a runnable test for every skill—whose specification semantics we adopt from SkillSpec [3]. It is the
+measurement substrate, not a seventh principle. The rest of the paper defines the contrasts, reports the signatures, and
+turns them into a design discipline that other agent systems can directly falsify.
+2
+Measurement Design
+SkillSeam is organized around one rule: measure each principle in the channel where its predicted failure should become
+visible. A single accuracy score cannot distinguish wasted context from double routing or an unreachable dependency.
+We therefore predefine four outcome families: task correctness, loaded-skill token burden, routing events (conflict and
+multi-read), and execution effort (turns, tool calls, and read calls).
+2.1
+Harness, suite, and scoring
+A fixed Python/Node harness holds model configuration, system prompt, temperature, injected seed, and task contract
+constant within every matched comparison. The cumulative ladder uses temperature 0.7; the targeted P3/P4 probes use
+GLM-5.3-Flash at temperature 0.2. Each session produces a typed JSONL record containing task correctness, selected and
+read skills, routing events, approximate token counts, tool calls, and an invalidity reason. Accuracy is reported over valid
+sessions; valid denominators and all timeout, refusal, and empty responses remain in the released rollups.
+The fixed 100-task suite spans communications, expenses, files, health, and scheduling. Tasks are partitioned into
+positive, hard-negative, ambiguous, out-of-domain, and paraphrase slices.
+Positive tasks test whether the expected
+skill completes a verifiable workspace effect. Hard negatives expose semantic aliases; ambiguous tasks expose overlap;
+out-of-domain tasks test abstention. This partition matters because an organizational defect is observable only on a task
+where its failure condition can occur.
+2.2
+Controlled principle perturbations
+The core experiment starts from one sealed, disciplined N16 collection (L0). A generator creates six cumulative snapshots,
+each adding one minimal organizational violation while preserving all untouched bytes. The adjacent contrast Lk−1 →Lk
+therefore estimates the change after introducing the next violation in the accumulated system; adjacent effects are not
+assumed independent or additive.
+L0–L6 use 32 matched tasks per layer. P3 and P4 require separate controlled diagnostics because their failures are
+structurally absent from a positive-only slice. P3 uses 32 tasks arranged as 16 same-intent canonical/synonym pairs over
+four expense intents. Both arms mount two skills and have the same character budget: the treatment replaces an unrelated
+control with a synonym alias while leaving the canonical skill byte-identical. P4 uses two skills with two sections each in
+both arms. The baseline assigns two target operations to disjoint owners; the treatment duplicates both claims. Sixteen
+balanced candidate audits require an explicit OWNERSHIP CONFLICT: yes|no decision. These probes are routing diagnostics,
+not adjacent accuracy effects. We restrict every comparison to sessions valid in both arms and retain a separate 32-task
+direct-execution P4 slice to distinguish diagnostic sensitivity from natural-task incidence.
+2
+
+
+===== page 3 =====
+Table 1: The controlled ladder. Each perturbation targets a distinct failure mechanism and is read through its most sensitive observable.
+Principle
+Perturbation
+Primary observable
+P1
+Persistence gradient
+Inline referenced detail into skill bodies
+loaded-skill tokens
+P2
+System coherence
+Dangle one trace anchor
+tokens, execution effort, accuracy
+P3
+Regime gating
+Replace an equal-length unrelated con-
+trol with a same-regime alias
+noncanonical route, paraphrase
+route flip
+P4
+Orthogonal coverage
+Make two equal-sized lanes claim the
+same operations
+candidate ownership conflict
+P5
+Flow
+Replace yes/no triggers with bland labels
+routing conflict, loaded-skill to-
+kens
+P6
+Granularity discipline
+Merge one thin skill and split one coarse
+skill
+task accuracy
+Figure 2: Mechanism-isolating P3/P4 probes. P3 replaces an equal-length unrelated control with a same-regime alias while holding the
+canonical skill fixed. P4 holds skill and section counts fixed while changing only the ownership matrix.
+2.3
+Identification and alternative explanations
+Figure 2 makes the identifying contrasts explicit. P3 could otherwise be dismissed as a collection-size or prompt-length
+effect: adding any second file may create another read candidate and consume more context. We therefore keep two files in
+both arms, preserve expense-core byte-for-byte, and pad the unrelated control to the exact character length of the alias.
+The 32 requests form 16 semantic pairs. Within each pair, arguments and desired operation are fixed; only canonical versus
+synonymous wording changes. A route flip is thus a change in which same-regime file becomes primary, not a change in
+task semantics or available coverage.
+P4 requires a different control. File count cannot isolate orthogonality because the defect is a many-to-many ownership
+relation. Both arms therefore contain the same two named lanes and two sections per lane. The disciplined arm assigns
+report export and currency conversion to separate owners, while the violated arm makes both files claim both operations.
+Candidate audits expose whether the router can name one owner after reading the available claims.
+We require a
+machine-readable final decision, OWNERSHIP CONFLICT: yes|no, and score only pairs with valid decisions in both arms.
+These probes intentionally optimize mechanism sensitivity. To prevent that choice from being mistaken for an ecological
+rate, SkillSeam keeps the earlier null target-pair probe and reports a separate direct-execution P4 slice. The diagnostic
+answers whether overlap makes ownership undecidable when inspected; the direct slice estimates how often an ordinary
+task causes that defect to surface without an audit. Their different magnitudes are part of the result, not interchangeable
+replications.
+2.4
+Supporting matrix
+A supporting mounting matrix contains 1,100 sessions across 11 conditions: managed and unmanaged layouts at N∈
+{4, 16, 64}, an N0 control, two N16 ablations, and a two-arm deepseek-v4-flash breadth check. It serves three secondary
+purposes: verifying that the skill layer is behaviorally consequential, checking whether skill count alone explains performance,
+and showing why generic success tasks can conceal P3/P4 routing failures.
+2.5
+Analysis
+For paired binary outcomes we report adjacent percentage-point changes and exact two-sided McNemar tests. The 32-task
+ladder is designed to identify failure signatures, not to turn small accuracy differences into significance claims; accordingly,
+the paper treats accuracy deltas as effect estimates. The P5 routing contrast is the exception in strength: 27 matched
+tasks switch from no conflict to conflict and none switch in the opposite direction (exact p = 1.49 × 10−8). Continuous
+execution measures are summarized on matched valid tasks. Token values are parser estimates, so we report relative token
+burden rather than dollar cost or latency. The analysis script in Appendix A recomputes every primary observable directly
+from the JSONL rollups and probe reports. Exact paired tests give p = 6.10 × 10−5 for P3 noncanonical routing and
+p = 1.22 × 10−4 for P4 reported ownership conflict.
+3
+
+
+===== page 4 =====
+3
+Evidence of Organizational Failure
+Table 2 is SkillSeam’s central result. The six perturbations do not produce six interchangeable accuracy deltas; they
+produce six mechanism-specific outcomes. This is the point of the measurement design: a test supports a principle only
+when breaking it creates the predicted failure in the designated observable channel.
+Table 2: Six principles, six failure mechanisms, and their strongest measured outcomes. Token counts are approximate parser estimates;
+P3/P4 use controlled routing diagnostics; other ladder comparisons are adjacent.
+Principle
+Failure mechanism
+Primary channel
+Observed signature
+P1
+Persistence gradient
+Context carried at the
+wrong layer
+loaded-skill tokens
+357 →570 per matched valid session
+(+59.5%); accuracy did not fall
+P2
+System coherence
+Broken trace creates search
+and recovery
+total tokens / accuracy
+13,052 →21,400 tokens (+64.0%); −3.1pp
+accuracy estimate
+P3
+Regime gating
+Synonymous aliases split
+one semantic route
+noncanonical route /
+paraphrase flip
+routes 0/32 →15/32 (p = 6.10×10−5);
+flips 0/16 →8/16
+P4
+Orthogonal coverage
+Overlapping lanes create
+duplicate ownership
+candidate ownership
+conflict
+0/16 →14/16 (p = 1.22×10−4); wrong
+first owner 0/16 →8/16
+P5
+Flow
+Non-observable triggers
+collapse routing
+conflict / loaded-skill
+tokens
+conflicts 3/32 →30/32; tokens
+552 →2,061 (3.7×)
+P6
+Granularity
+discipline
+Mis-sized modules fail task
+contracts
+accuracy
+0.906 →0.781 (−12.5pp), the largest
+adjacent accuracy change
+Figure 3: SkillSeam separates context burden (P1–P2), routing and ownership failures (P3–P5), and task correctness (P6). P3 holds skill
+count and character budget fixed; P4 is a candidate-ownership diagnostic, not a natural-task failure rate.
+3.1
+P1–P2: organization first appears as execution burden
+Flattening referenced detail into skill bodies (P1) does not hurt accuracy: L1 scores 0.969 versus 0.903 at L0. Yet every
+activation now carries more text. On the 31 tasks valid in both layers, mean loaded-skill tokens rise from 357 to 570
+(+59.5%; median paired increase 224 tokens). P1 is therefore an efficiency principle in these data, not an accuracy principle.
+Dangling one coherence anchor (P2) changes a different channel. Relative to L1, mean total tokens rise from 13,052 to
+21,400 (+64.0%), while accuracy moves from 0.969 to 0.938 (−3.1pp). The accuracy estimate is small at this sample size;
+the more informative signature is extra execution after the trace target becomes unreachable. Coherence protects an agent
+from searching around a broken dependency.
+3.2
+P3–P4: targeted routing probes expose partition failures
+On the original positive-task ladder, adding an alias (P3) and deleting a lane boundary (P4) each produce a 0pp adjacent
+accuracy change. This is informative rather than exculpatory: a positive task with one obvious gold skill cannot expose
+competition between two plausible skills.
+The P3 probe holds the collection at two skills and equalizes the character length of the second skill. The baseline
+pairs the canonical expense skill with an unrelated control; the treatment replaces only that control with a same-regime
+4
+
+
+===== page 5 =====
+synonym alias. Across 32 matched tasks, noncanonical routing rises from 0/32 to 15/32 (exact McNemar p = 6.10 × 10−5),
+and same-intent canonical/synonym wording flips the selected route in 0/16 versus 8/16 pairs. First-route entropy rises
+from 0 to 0.989 bits, while double-reads rise from 0/32 to 12/32. Regime gating therefore prevents routing fragmentation,
+not merely extra files.
+The P4 probe holds both arms at two skills with two sections per skill. The baseline assigns report export and currency
+conversion to disjoint owners; the treatment makes both skills claim both operations. On 16 balanced pre-execution
+ownership audits, reported duplicate ownership rises from 0/16 to 14/16 (exact McNemar p = 1.22 × 10−4), and the wrong
+skill is read first in 8/16 treatment sessions versus 0/16 controls. This is a mechanism diagnostic, not a natural-task
+accuracy estimate: on a separate direct-execution slice, canonical-owner violations move only 0/32 →3/32 (p = .25).
+Orthogonality makes ownership decidable before execution; ordinary success tasks often conceal that ambiguity.
+Table 3: Illustrative released traces (English prompt glosses). Rows show mechanism, not additional samples: aggregate estimates remain
+those in Table 2.
+Arm
+Matched input
+Observed read order
+Routing decision
+P3
+disciplined
+canonical: “record one personal ex-
+pense”
+expense-core
+canonical route
+P3
+disciplined
+synonym:
+“log one personal pur-
+chase”
+expense-core
+same route
+P3
+violated
+canonical: “record one personal ex-
+pense”
+expense-core
+canonical route
+P3
+violated
+synonym:
+“log one personal pur-
+chase”
+expense-alias →expense-core
+primary route flips to alias
+P4
+disciplined
+export an expense report
+report-lane →currency-lane
+OWNERSHIP CONFLICT: no
+P4
+violated
+same request
+currency-lane →report-lane
+OWNERSHIP CONFLICT: yes; wrong owner
+read first
+Table 3 shows why the aggregate channels differ. The P3 pair preserves semantics but changes the primary route only
+when the alias exists. The P4 audit may inspect both files even in the disciplined arm; the informative event is not the
+second read itself, but whether those reads resolve to one owner. Under overlap, the same request begins at the wrong lane
+and ends with an explicit conflict.
+3.3
+P5: trigger flow produces the clearest routing failure
+Replacing observable yes/no triggers with bland descriptions causes a routing collapse. Conflicts jump from 3/32 at L4 to
+30/32 at L5; 27 paired tasks switch into conflict and none switch out (exact McNemar p = 1.49 × 10−8). Mean loaded-skill
+tokens rise from 552 to 2,061, a 3.7× burden, while accuracy moves only −3.1pp. Accuracy alone would nearly miss the
+strongest mechanism in the ladder.
+A separate N16 arm provides a consistent warning: adding prose not-for labels to the unmanaged collection moves
+valid-only accuracy from 0.910 to 0.857 (−5.3pp). Those labels describe a boundary but do not make the triggering
+condition more observable. The result is reported as a corroborating estimate, not as a replacement for the paired conflict
+evidence.
+3.4
+P6: granularity reaches task correctness
+The final perturbation merges one too-thin skill into its parent and splits one coarse skill behind blurred boundaries.
+Accuracy falls from 0.906 at L5 to 0.781 at L6 (−12.5pp), the largest adjacent accuracy change in the ladder. Because
+L6 changes both sides of the granularity rule, the estimate belongs to the combined mis-sizing intervention, not to either
+merge or split alone.
+3.5
+Supporting checks
+The larger mounting matrix answers secondary questions. First, the N4, N16, and N64 sweeps show no monotone accuracy
+trend in either managed or unmanaged layouts: within this range, file count does not explain the organizational signatures
+above. Second, the N0 control gives the expected sanity check that task-relevant skills matter at all (0.400 without skills
+versus 0.89–0.92 with a mounted collection). Full supporting condition counts are reported in Appendix A.
+4
+The SkillSeam Design Guide
+The six SkillSeam principles treat skill authoring as organization design. Skills are specialist roles; triggers are job
+descriptions; routes are assignments; references are institutional memory; and tests are accountable outcomes. The objective
+is not a larger roster, but an organization whose failure channels remain observable. Figure 4 locates the principles in the
+system; Table 4 is the operational checklist.
+P1 — Build an information hierarchy. As an organization separates standing policy from team playbooks and archived
+detail, put facts needed every turn in the core prompt, procedures behind skill triggers, and rare detail in reference/. The
+test is not merely whether the task succeeds; measure how much skill text each successful session must carry. Flattening
+the hierarchy preserved accuracy here but increased loaded-skill tokens by 59.5%. A persistence audit should therefore flag
+rarely used detail that rides with every activation.
+P2 — Give every role a traceable purpose. A role with no place in the organization chart becomes an orphan.
+Likewise, every skill should implement a named system principle or capability. Treat a missing trace target like a broken
+dependency: fail the build, not the user session. When a trace is broken, inspect recovery effort (tokens, turns, and tool
+5
+
+
+===== page 6 =====
+Figure 4: Where SkillSeam acts in a skill system. P1–P2 govern persistence and traceability across layers; P3–P5 govern partitioning and
+routing among skills; P6 governs the grain of each skill.
+Table 4: The six-principle audit. Evidence status distinguishes direct paired evidence from diagnostic-slice observations.
+Principle
+Rule
+Audit signal
+Evidence in this paper
+P1
+Persistence gradient
+Layer information by frequency of
+use
+loaded-skill tokens
+direct paired token burden
+P2
+System coherence
+Preserve each role’s trace to system
+purpose
+recovery effort after a bro-
+ken trace
+direct adjacent estimate
+P3
+Regime gating
+Create a role only for a new regime
+route consistency under
+paraphrase
+strong controlled paired evi-
+dence
+P4
+Orthogonal coverage
+Assign one accountable owner per
+lane
+candidate ownership con-
+flict
+strong diagnostic paired evi-
+dence
+P5
+Flow
+Make entry conditions and handoffs
+observable
+routing conflict and load
+burden
+strong direct paired evidence
+P6
+Granularity discipline
+Right-size responsibilities
+task-contract failure
+direct adjacent estimate
+Substrate: self-contained verification [3]—every skill ships a runnable test.
+calls) alongside correctness. The dangling anchor in our ladder raised execution burden before it produced a large accuracy
+signal.
+P3 — Create roles for regimes, not titles. A new role is justified by a distinct responsibility, not a new title; a new
+skill is justified only by a new user–scenario regime. A second name for the same behavior creates an assignment choice
+without adding coverage. Test this principle with semantic hard negatives and count noncanonical routes, paraphrase
+route flips, and same-semantic multi-reads; generic success tasks can conceal the failure. If two skills repeatedly load for
+one intent, merge them or make their regimes observably different.
+P4 — Assign one accountable owner. For any routable system state, one skill should own the lane. As in a well-defined
+responsibility matrix, advice may be shared but accountability cannot be ambiguous. This is not the same as writing
+exclusions in prose: the boundary must be expressed in conditions the router can observe. Audit orthogonality on
+candidate-ownership tasks and count cases where the router reports two defensible owners or reads the wrong owner first.
+P3 prevents duplicate regimes; P4 prevents neighboring regimes from sharing the same boundary.
+P5 — Make assignments and handoffs observable. A usable job description tells colleagues when responsibility
+begins and ends. Likewise, a trigger should answer a question about observable user intent before it describes a method.
+Bland labels such as “helps with scheduling” force the model to infer the boundary at runtime. This principle has the
+clearest direct signal in our data: conflict count and loaded-skill burden both collapse when trigger faces are degraded.
+These routing metrics should be first-class evaluation outputs, not debugging notes.
+P6 — Right-size each role. An overloaded role hides incompatible jobs; a fragmented role cannot own an outcome. Split
+a skill when one file spans distinct regimes; fold a skill back when it has no independent trigger, contract, or test. Count is
+not the criterion—cohesion is. Granularity should be tested end-to-end because mis-sizing changes which instructions and
+checks travel together. In our ladder, the combined merge/split perturbation produces the largest adjacent accuracy loss.
+Verification substrate. Each rule becomes auditable only when a skill has an executable contract. We adopt SkillSpec’s
+view of skill correctness as specification reasoning [3]: a self-check validates the expected workspace effects independently
+6
+
+
+===== page 7 =====
+of the model’s final prose. Verification is the floor beneath the six principles, not a seventh design claim.
+5
+Discussion
+A skill collection is a routing architecture. SkillSeam changes the unit of analysis from the individual instruction file
+to the relationships among files. Once skills share an agent, quality depends on where knowledge lives, which capability each
+file implements, when each route becomes active, and what belongs together. These are architecture questions. Treating
+them as prose quality misses the system-level failures that appear only when otherwise reasonable skills interact.
+The metric must match the failure. The experiments explain why a single agent-accuracy score is inadequate. A
+persistence violation first appears as excess context; an alias or overlap first appears as route fragmentation or undecidable
+ownership; a vague trigger appears as conflict and load amplification; a granularity failure reaches the task contract.
+Positive-only benchmarks can therefore certify a collection that fails under ambiguity. SkillSeam offers a general evaluation
+pattern: derive the failure condition from the design rule, construct the task slice that activates it, and measure the closest
+observable before asking whether aggregate accuracy moves.
+Mechanism sensitivity and deployment incidence are different. A diagnostic task asks whether a failure can be
+activated under its defining condition. A direct-execution task asks how often that condition surfaces without assistance.
+P4 demonstrates the distinction: ownership conflict is reported in 14/16 audits, whereas only 3/32 ordinary executions
+violate the canonical owner. The smaller number does not refute the structural defect, and the larger number is not a
+claim that 87.5% of user tasks fail. Reporting both prevents two common errors: dismissing a latent architecture problem
+because aggregate accuracy is unchanged, and marketing a stress-test rate as production prevalence.
+Organization creates leading indicators. Several SkillSeam signals move before task correctness. P1 increases context
+burden without reducing accuracy; P2 adds recovery work before a large accuracy loss; P3 splits routes while preserving
+capability coverage; and P4 makes ownership ambiguous even when either file contains a usable procedure. These are
+useful release-gate metrics precisely because they precede visible failure. They expose systems that still pass today’s tasks
+but have become harder to route, maintain, and extend.
+Scale by audits, not accumulation. The N4–N64 sweep shows no monotone benefit from adding files in the measured
+range. The practical bottleneck is not how many skills an agent can mount, but whether the collection remains traceable,
+partitioned, and routable. A team can apply SkillSeam as a release gate: measure loaded skill burden, reject broken
+anchors, run alias and overlap suites, count routing conflicts, and execute each skill’s contract. This turns skill maintenance
+from subjective cleanup into a repeatable systems test.
+The six principles form a debugging order. The principles are not additive score components. They locate failures
+at progressively later points in an execution path: P1 places knowledge, P2 keeps it reachable, P3 decides whether a new
+route deserves to exist, P4 assigns that route an owner, P5 makes its trigger observable, and P6 packages the resulting
+procedure at a testable grain. This ordering gives practitioners a triage strategy. Fixing a downstream prompt cannot
+repair an unreachable trace, and tuning task logic cannot make duplicate owners disjoint. Start at the earliest violated
+relationship, then rerun the mechanism-specific probe.
+6
+Related Work
+Procedural knowledge and skill libraries. Agents increasingly externalize reusable behavior. ReAct couples reasoning
+and action [4]; Voyager stores executable skills [5]; Agent Workflow Memory and ExpeL distill trajectories into reusable
+procedures [6, 7]; and programmatic skill induction and skill networks add verification and library refactoring [8, 9].
+Memory systems similarly organize persistent experience [10, 11, 12]. This line asks what agents should retain and retrieve.
+SkillSeam instead holds the procedural layer fixed enough to study how relationships among skills create routing and
+execution failures.
+Context and tool routing. RAG and context-engineering research studies which information enters a model’s context
+and how position, length, and retrieval affect performance [13, 14, 15, 16].
+Tool and skill guidance recognizes the
+same operational pressure: context is finite, tools need functional boundaries, and detailed instructions should load on
+demand [17, 18, 19]. Those works motivate individual authoring choices. SkillSeam turns six such collection-level choices
+into perturbations with distinct observables: context burden, broken traces, multi-reads, routing conflicts, and task failure.
+Agent evaluation and specification. Reproducible evaluation frameworks emphasize fixed conditions and inspectable
+task contracts [20, 21]; agent benchmarks extend that discipline to repositories, browsers, tools, and computer use [22,
+23, 24, 25]. SkillSeam applies controlled evaluation to the skill collection itself: one organizational property becomes
+the treatment, and the task slice is chosen to expose its predicted failure. The six principle semantics come from the
+System-of-Skills guide [2]; the executable verification substrate adopts SkillSpec’s view of skill correctness as specification
+reasoning [3]. The contribution is not another skill format, but a way to measure whether a collection’s design rules survive
+contact with agent behavior.
+7
+Limitations
+The principle ladder uses one model, one seed, and one suite family; other systems may change the magnitudes. P4’s
+strongest result is an ownership-audit diagnostic, not a natural-task failure rate; the separate direct-execution slice is
+7
+
+
+===== page 8 =====
+smaller. Token fields are parser estimates, and cumulative ladder effects are adjacent signatures rather than independent
+constants. Denominators and exclusions appear in Appendix A.
+8
+Conclusion
+A roster becomes an organization when roles, information, ownership, and handoffs become explicit. A skill collection
+becomes a system by the same logic. SkillSeam makes those relationships measurable: each of six design principles is paired
+with a failure mechanism, a targeted perturbation, and the observable best suited to reveal it. Four perturbations expose
+clear context, recovery, routing, and accuracy signatures. Controlled follow-ups complete the map: a synonymous alias
+creates noncanonical routes in 15/32 tasks, while overlapping lanes produce reported ownership conflict in 14/16 audits.
+Together with a 27/32 conflict increase for trigger flow and a −12.5pp granularity estimate, the results show why no single
+accuracy score can price skill organization. The lesson is not to add fewer or more skills, but to organize the capability
+already present: layer its information, preserve its traces, gate new roles, assign one owner, expose handoffs, and right-size
+each responsibility. Better agents need skill collections whose seams can be inspected; SkillSeam supplies that audit.
+A
+Reproducibility and Supporting Results
+A.1
+Supporting mounting matrix
+Table 5 reports the conditions removed from the main reading path. They establish that skills are consequential and that
+file count alone does not explain the SkillSeam signatures; they are not estimates of the six principle effects.
+Table 5: Supporting conditions. Accuracy is valid-only; valid/session counts expose every exclusion.
+Model/leg
+Condition
+Sessions
+Valid
+Accuracy
+glm matrix
+managed N4 / N16 / N64
+300
+297
+.909 / .918 / .910
+glm matrix
+unmanaged N4 / N16 / N64
+300
+299
+.890 / .910 / .909
+glm control
+none N0
+100
+100
+.400
+glm ablation
+managed minus refsink
+100
+99
+.929
+glm ablation
+unmanaged plus not-for
+100
+98
+.857
+deepseek breadth
+managed / unmanaged N16
+200
+168
+.855 / .812
+A.2
+Analysis notes
+The main ladder contains 32 sessions per layer and one invalid L0 session. Continuous metrics use tasks valid in both
+adjacent layers. P1’s paired loaded-skill token comparison therefore uses 31 tasks (357.4 to 570.0 mean tokens; median
+paired increase 224). P5’s conflict comparison uses all 32 matched tasks: 27 switch into conflict and none switch out, giving
+a two-sided exact McNemar p = 1.49 × 10−8. Other adjacent accuracy contrasts are reported as effect estimates because
+their exact paired tests do not reject at the pre-registered corrected threshold.
+An initial 30-session-per-arm P3/P4 slice failed to activate either designated pair; we retain that null result in the
+released analysis rather than treating unrelated multi-reads as evidence. The redesigned GLM-5.3-Flash probes isolate the
+mechanisms. P3 has 32 valid matched tasks in two equal-sized, equal-character-budget collections; 15 tasks switch only
+into noncanonical routing (p = 6.10 × 10−5). P4 has 16 valid balanced candidate-audit pairs with equal skill and section
+counts; 14 switch only into reported duplicate ownership (p = 1.22 × 10−4). A separate 32-pair direct-execution P4 slice
+moves 0 →3 (p = .25), so the paper labels the stronger P4 result as a diagnostic rather than an ecological failure rate.
+A.3
+Probe robustness by intent
+Table 6 checks whether the headline effects are carried by one wording family. P3’s treatment produces noncanonical routes
+in every tested operation: recording, aggregation, budget checking, and budget setting. The magnitude varies from 2/8 to
+6/8, which is expected because descriptions and prompts differ in lexical proximity, but no intent has a zero treatment
+count. All corresponding baseline strata remain at zero.
+Table 6: Controlled-probe outcomes by intent. Counts use only sessions valid in both arms.
+Probe
+Intent
+Disciplined
+Violated
+Measured event
+P3
+record expense
+0/8
+4/8
+noncanonical route
+P3
+aggregate expenses
+0/8
+2/8
+noncanonical route
+P3
+check budget
+0/8
+3/8
+noncanonical route
+P3
+set budget
+0/8
+6/8
+noncanonical route
+P4
+currency conversion
+0/8
+7/8
+ownership conflict
+P4
+report export
+0/8
+7/8
+ownership conflict
+P4 is exactly balanced across its two target directions: both currency conversion and report export produce 7/8 reported
+conflicts under overlap and none under disjoint ownership. This symmetry matters because an order artifact would more
+naturally favor the skill listed or read first. Instead, treatment sessions read the wrong owner first in 8/16 cases while
+the explicit conflict decision rises in both directions. The result therefore reflects duplicated ownership rather than one
+anomalous skill name.
+8
+
+
+===== page 9 =====
+A.4
+Probe execution and integrity
+Each probe task runs in a fresh agent session with only the two condition-specific skills mounted. The generator enforces
+matched task IDs, a byte-identical canonical P3 skill, equal P3 second-file character counts, equal P4 skill counts, and
+equal P4 section counts. Offline tests check those invariants before any model request. Analysis intersects valid task IDs
+across arms, deduplicates skill reads by first occurrence, and computes exact two-sided McNemar tests from paired binary
+outcomes.
+The released records include system prompts, ordered skill reads, final decisions, token usage, and condition manifests.
+The OpenRouter model ID is z-ai/glm-5.3-flash; no API credential is stored in an artifact. Across smoke, completed,
+and retained diagnostic runs, the harness recorded $0.0742 in model cost. Cost is reported for reproducibility only and is
+not an outcome of the six-principle study.
+A.5
+Falsification checks
+SkillSeam treats each measured signature as support only after checking the most immediate competing explanation.
+Table 7 summarizes those checks. The purpose is not to claim that every possible confound has been removed; it is to keep
+the conclusion no broader than the contrast permits.
+Table 7: Claim-level falsification checks. Each row identifies the nearest alternative explanation and the design feature used to test it.
+Nearest alternative
+Check built into SkillSeam
+P1
+Harder tasks caused more context use
+Same-task valid pairs; only referenced detail is moved into the loaded
+body
+P2
+Token growth is ordinary sampling noise
+Same tasks and model settings; the sole new defect is one unreachable
+named anchor
+P3
+More files or more characters created the split
+Two skills in both arms; exact second-file character match; canonical
+skill byte-identical
+P4
+One skill name or listing order caused the con-
+flict
+Same named lanes in both arms; both report and currency directions
+yield 7/8 conflicts
+P5
+Accuracy alone captures the trigger defect
+Target routing conflicts move 27 pairs in one direction while accuracy
+changes only −3.1pp
+P6
+The result identifies merge and split separately
+Claim is explicitly restricted to the combined mis-sizing intervention
+The checks also determine the appropriate language of each conclusion. P1 and P2 support burden claims, not universal
+accuracy losses. P3 supports route fragmentation after a same-regime alias is introduced, not the proposition that every
+alias causes failure on every prompt. P4 supports undecidable ownership under an explicit audit, while its direct-execution
+rate remains separately visible. P5 supports a routing collapse because the designated event, not a generic token count,
+changes in 27 matched pairs. P6 supports the practical granularity rule as a combined intervention; separating over- and
+under-granulation would require another factorial experiment. This claim discipline lets the paper emphasize strong effects
+without turning a sensitive diagnostic into a broader statement than the data warrant.
+A.6
+Code, variants, and rollups
+Every main-text number is regenerated by 06-paper/analysis/compute_paper_stats.py; its tests are in 06-paper/ana
+lysis/test_compute_paper_stats.py. Source data are the JSONL rollups in 05-analysis/, including rollup-ladder-p
+3.json, rollup-ladder-p4.json, the three paid-matrix rollups, the breadth rollup, and p3-regime-probe-glm53f.json,
+p4-orthogonality-audit-glm53f.json, and p4-direct-probe-glm53f.json.
+The frozen scheduler, parser, and offline gate are 02-harness/run_matrix.py, 02-harness/parser.py, and
+02-harness/tests/run_all.py. Condition manifests are 02-harness/conditions.json, conditions-ladder.json, and
+conditions-ladder-p4.json. The controlled follow-up generator, task suites, collections, conditions, and analyzer are
+under 03-suites/principle-probes/. Byte-hashed L0–L6 variants and their generator live under 03-suites/l-skill-v
+ariants/; each snapshot includes a layer manifest and previous-layer diff. The fixed generator seed is 24301.
+A.7
+Companion agent skill
+The SkillSeam principles are also distributed as an agent-readable skill in the public System-of-Skills repository [2]:
+https://github.com/X32Studio/best-practice-for-skills-system. The repository includes English and Chinese
+guides, principle pointers, and an installable skill/ directory. The paper supplies the measurement evidence; the companion
+skill supplies the operational interface an agent can apply while creating or reviewing a collection.
+References
+[1] Anthropic. Agent skills: Best practices. https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills/best-pract
+ices, 2025. Accessed 2026-09 for principle-level comparison.
+[2] k-r33 (X32 Studio). System of skills: How to organize a set of agent skills into a coherent system. https://github.com/X32Stud
+io/best-practice-for-skills-system, 2026. Upstream practitioner guide and installable agent skill. This paper evaluates six
+collection-organization principles and treats self-contained verification as their substrate.
+[3] Yizhuo Zhang, Bo Kang, Yi Yang, Zhiyu Duan, Zhouteng Ye, and Shunkun Yang. SkillSpec: Intent-masked specification
+reasoning for agent skill correctness, 2026. Source of the self-contained-verification semantics (skill correctness as specification
+reasoning); cited with credit.
+[4] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan, and Yuan Cao. ReAct: Synergizing reasoning
+and acting in language models. arXiv preprint arXiv:2210.03629, 2023. ICLR 2023.
+9
+
+
+===== page 10 =====
+[5] Guanzhi Wang, Yuqi Xie, Yunfan Jiang, Ajay Mandlekar, Chaowei Xiao, Yuke Zhu, Linxi Fan, and Anima Anandkumar. Voyager:
+An open-ended embodied agent with large language models. arXiv preprint arXiv:2305.16291, 2023.
+[6] Zora Zhiruo Wang, Jiayuan Mao, Daniel Fried, and Graham Neubig. Agent workflow memory. arXiv preprint arXiv:2409.07429,
+2024.
+[7] Andrew Zhao, Daniel Huang, Quentin Xu, Matthieu Lin, Yong-Jin Liu, and Gao Huang. ExpeL: LLM agents are experiential
+learners. arXiv preprint arXiv:2308.10144, 2024. AAAI 2024.
+[8] Zora Zhiruo Wang, Apurva Gandhi, Graham Neubig, and Daniel Fried. Inducing programmatic skills for agentic tasks. arXiv
+preprint arXiv:2504.06821, 2025.
+[9] Haochen Shi, Xingdi Yuan, and Bang Liu. Evolving programmatic skill networks. arXiv preprint arXiv:2601.03509, 2026. Skill
+libraries whose structure is refactored under rollback validation; organization of the skill library as a first-class object.
+[10] Joon Sung Park, Joseph C. O’Brien, Carrie J. Cai, Meredith Ringel Morris, Percy Liang, and Michael S. Bernstein. Generative
+agents: Interactive simulacra of human behavior. arXiv preprint arXiv:2304.03442, 2023.
+[11] Charles Packer, Sarah Wooders, Kevin Lin, Vivian Fang, Shishir G. Patil, Tianjun Zhang, and Joseph E. Gonzalez. MemGPT:
+Towards LLMs as operating systems. arXiv preprint arXiv:2310.08560, 2023.
+[12] Zeyu Zhang, Xiaohe Bo, Chen Ma, Rui Li, Xu Chen, Quanyu Dai, Jieming Zhu, Zhenhua Dong, and Ji-Rong Wen. A survey on
+the memory mechanism of large language model based agents. arXiv preprint arXiv:2404.13501, 2024. (arXiv:2404.13501, not
+the look-alike 2304.13501 which is an unrelated networking paper).
+[13] Patrick Lewis, Ethan Perez, Aleksandra Piktus, Fabio Petroni, Vladimir Karpukhin, Naman Goyal, Heinrich K¨uttler, Mike Lewis,
+Wen-tau Yih, Tim Rockt¨aschel, Sebastian Riedel, and Douwe Kiela. Retrieval-augmented generation for knowledge-intensive
+NLP tasks. arXiv preprint arXiv:2005.11401, 2020. NeurIPS 2020.
+[14] Nelson F. Liu, Kevin Lin, John Hewitt, Ashwin Paranjape, Michele Bevilacqua, Fabio Petroni, and Percy Liang. Lost in the
+middle: How language models use long contexts. arXiv preprint arXiv:2307.03172, 2023. TACL 2023.
+[15] Yunfan Gao, Yun Xiong, Xinyu Gao, Kangxiang Jia, Jinliu Pan, Yuxi Bi, Yi Dai, Jiawei Sun, Meng Wang, and Haofen Wang.
+Retrieval-augmented generation for large language models: A survey. arXiv preprint arXiv:2312.10997, 2023.
+[16] Lingrui Mei, Jiayu Yao, Yuyao Ge, Yiwei Wang, Baolong Bi, Yujun Cai, Jiazhi Liu, Mingyu Li, Zhong-Zhi Li, Duzhen Zhang,
+Chenlin Zhou, Jiayi Mao, Tianze Xia, Jiafeng Guo, and Shenghua Liu. A survey of context engineering for large language models.
+arXiv preprint arXiv:2507.13334, 2025.
+[17] Anthropic Applied AI team (Rajasekaran, P.; Dixon, E.; Ryan, C.; Hadfield, J.). Effective context engineering for AI agents.
+https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents, 2025. Published 2025-09-29;
+page fetched and title matched 2026-09-10.
+[18] Anthropic (Aizawa, Ken) and colleagues. Writing effective tools for AI agents — with AI agents. https://www.anthropic.co
+m/engineering/writing-tools-for-agents, 2025. Published 2025-09-11; page fetched, title matched 2026-09-10; ”more tools
+don’t always lead to better outcomes” and namespacing/boundary guidance.
+[19] Anthropic. Best practices for Claude code. https://code.claude.com/docs/en/best-practices, 2025. Canonical URL (redirects
+from /engineering/claude-code-best-practices); page fetched, title matched 2026-09-10. Skills-as-CLAUDE.md-vs-SKILL.md
+placement guidance.
+[20] Percy Liang, Rishi Bommasani, Tony Lee, et al. Holistic evaluation of language models. arXiv preprint arXiv:2211.09110, 2022.
+Methodological template for condition-matrix, pre-registered LLM evaluation.
+[21] EleutherAI (Gao, Leo; Tow, Jonathan; et al.). Eleutherai/lm-evaluation-harness. Zenodo, DOI 10.5281/zenodo.10256836,
+https://zenodo.org/records/10256836, 2023. Framework for few-shot LM evaluation; record fetched and title matched
+2026-09-10.
+[22] Carlos E. Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, and Karthik Narasimhan. SWE-bench:
+Can language models resolve real-world GitHub issues? arXiv preprint arXiv:2310.06770, 2024. ICLR 2024.
+[23] Shuyan Zhou, Frank F. Xu, Hao Zhu, Xuhui Zhou, Robert Lo, Abishek Sridhar, Xianyi Cheng, Tianyue Ou, Yonatan Bisk,
+Daniel Fried, Uri Alon, and Graham Neubig. WebArena: A realistic web environment for building autonomous agents. arXiv
+preprint arXiv:2307.13854, 2023.
+[24] Shunyu Yao, Noah Shinn, Pedram Razavi, and Karthik Narasimhan. τ-bench: A benchmark for tool-agent-user interaction in
+real-world domains. arXiv preprint arXiv:2406.12045, 2024.
+[25] Tianbao Xie, Danyang Zhang, Jixuan Chen, Xiaochuan Li, Siheng Zhao, Ruisheng Cao, Toh Jing Hua, Zhoujun Cheng, Dongchan
+Shin, Fangyu Lei, et al. OSWorld: Benchmarking multimodal agents for open-ended tasks in real computer environments. arXiv
+preprint arXiv:2404.07972, 2024.
+10

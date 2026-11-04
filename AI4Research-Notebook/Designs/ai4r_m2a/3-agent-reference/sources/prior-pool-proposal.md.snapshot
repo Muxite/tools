@@ -1,0 +1,204 @@
+# AI4R M2 reactive capability pool proposal
+
+Internal design proposal, 2026-10-28. M1plus remains the M1 amendment. This proposal defines a larger M2 direction and does not amend the current implementation authorities.
+
+AI4R M2 should use JiuwenSwarm's native agent as its execution core, surrounded by discoverable Capability Capsules that bundle capabilities with their declarations, checks, and evidence. The agent chooses and revises its actions as research unfolds. AI4R contributes reliable capability selection, enforced verification, capability lifecycle management, and scientific traceability.
+
+The principal change is the unit of commitment: commit to the research objective and constraints, and bind each concrete action when it is dispatched. Future actions remain revisable. Exact experiments retain their protocols and version pins, even while the broader research agenda changes.
+
+## The pool model
+
+The agent is the swimmer. The pool is the available capability environment. Capsules are the floating units the swimmer can discover and use: tools, skills, MCP integrations, specialist agents, datasets, models, or packages containing several related operations. Admission, checks, and lifecycle controls maintain pool quality. The record of what the swimmer used and learned provides traceability.
+
+The agent can reason and explore without selecting a capsule. Capsule use adds explicit capabilities and scoped assurance. Reasoning alone does not become verified evidence merely because the surrounding agent has installed capsules.
+
+A capsule is a coherent package with selectable operations. For example, a profiling capsule can expose inspect, run, compare, and export operations with shared dependencies and checks. A data capsule can expose a pinned dataset and access operations, including provenance, permitted uses, modality, and schema checks. A skill capsule carries instructions plus enforceable tool bindings and output obligations. A specialist-agent capsule declares its delegated objective, accessible tools, effect limits, and result checks.
+
+Category names organize discovery; operation contracts determine compatibility and execution. A category should not become one opaque action that forces the entire research journey through its own internal pipeline.
+
+## What the evidence supports
+
+The [failure inventory](AI4R-M1-FLAWS-INTERNAL-20261028.md) records repeated M1 failures and a native JiuwenSwarm POC completion in 13 calls. The [original campaign corrections](../cc-value-discovery-2026-10-26/PROBLEMS_AND_MISTAKES.md) explain that the successful native trial was reused as a baseline; it is one trial. These results justify testing a different architecture, but do not isolate the effect of node graphs from harness faults, contracts, timeouts, and deployment problems.
+
+The [M1plus amendments](../../jiuwenswarm/docs/architecture/design-package-m1plus/1-amendments.md) retain an accepted Brief, one frozen run plan, and the staged research journey. M1plus improves the existing structure; M2 changes which component controls the journey.
+
+Three corrections should guide the M2 argument:
+
+- A chain whose independent mandatory steps each succeed with probability 0.95 has a one-attempt success probability of 0.95^n: about 66% at eight steps and 36% at twenty. This is an illustrative assumption, not an estimated AI4R failure rate. Seven heterogeneous attempts cannot establish a per-node rate.
+- Reactive agents also accumulate errors. Detection, bounded recovery, alternate routes, and durable progress can improve outcomes. Removing the graph alone does not remove compounding, and a graph can also implement recovery.
+- Bundling verification makes checks unavoidable on the protected invocation path. It does not make checks infallible or establish unrestricted scientific correctness. Small benchmark wins support specific mechanisms, not a universal guarantee.
+
+The architectural objection is therefore specific: a mandatory graph frozen before discovery is a poor default for broad research whose next useful action depends on new evidence. Short deterministic recipes and real causal dependencies remain useful.
+
+This is consistent with [Anthropic's account of its research system](https://www.anthropic.com/research/multi-agent-research-system), which describes open-ended research as dynamic and dependent on intermediate discoveries. The [openJiuwen team's harness paper](https://arxiv.org/abs/2608.27969) describes shared execution machinery, capability composition through Rails, and adaptation to runtime evidence. These sources support the design rationale; neither evaluates this proposed AI4R M2 system.
+
+## Responsibilities on JiuwenSwarm
+
+Source inspection used `AI4Research-Development/jiuwenswarm-agentic` on branch `m1plus/v2`, HEAD `2dd6ef196da1b6cc43ff9c50031ebe078115c4f9`. The inspected tracked tree was clean; unrelated untracked benchmark files were present. M1plus design pages were read from the separate `jiuwenswarm` checkout, where they are untracked draft inputs. Source identities are recorded in the accompanying JSON file.
+
+| Responsibility | Existing seam | Proposed M2 contribution |
+|---|---|---|
+| Agent reasoning, action selection, delegation | Native JiuwenSwarm/openJiuwen agent and team runtime; `agents/swarm/assembly.py` | Configure the research agent and its research state. Preserve native ownership of execution and delegation. |
+| Capability attachment | `agents/swarm/registry.py` registers provider elements; `agents/swarm/providers/tools.py` builds tool providers | Add a capsule provider exposing discovery and guarded invocation through the same assembly mechanism. |
+| Skill visibility and discovery | `providers/skills.py`, `skill_retrieval_toolkits.py`, `symphony/skill_retrieval/runtime.py` | Project capsule summaries and operation declarations into discovery; add authoritative structured eligibility filters. Current skill retrieval is not proof that the proposed capsule vector search already exists. |
+| MCP connectivity | `common/mcp_config.py` builds MCP server configurations; the adapter registers them | Reuse native MCP transport. An AI4R adapter maps eligible capsule operations to guarded calls. MCP connectivity alone does not supply verification. |
+| Capsule checks and receipts | `capsule_runtime/engine.py`, `loader.py`, `admission.py`, `semantic.py` | Evolve the portable runtime into the invocation boundary, with durable admission, scoped evidence, and structured recovery outcomes. |
+| Session and context lifecycle | `runtime/session_lifecycle.py`, `session_provisioner.py`, native observability | Extend persisted state with research agenda, evidence references, and invocation identities. Test restart behavior at the actual boundary. |
+| Optional bounded planning | `SymphonyService.plan(query, mode, candidate_skill_ids, ...)` | Offer planning as a tool for a local subproblem or recipe. Its returned plan advises future action; it does not freeze the whole research session. |
+| Deterministic sequences | Existing SwarmFlow and executable recipes | Keep selected sequences available as capsule operations when their steps are known and useful. |
+
+This places AI4R's contribution above native execution, with small adapters at discovery, dispatch, evidence, and lifecycle boundaries. It avoids introducing a second scheduler, team framework, MCP client, or generic agent loop.
+
+The portable capsule runtime is an integration starting point, not a completed M2 foundation. Its documentation identifies process-local admission, checks that are not applicable outside the pipeline, worker threads that cannot be terminated by its timeout, and semantic review that currently excludes the original inputs. M2 needs durable evidence bindings, effective process cancellation through existing execution facilities, and review contexts sufficient for each claimed check. Copying the runtime unchanged would preserve these gaps.
+
+## Proposed runtime structure
+
+```text
+User request or steering
+          |
+Optional intent clarification and compilation
+          |
+JiuwenSwarm research agent <---- durable agenda and evidence references
+          |
+Choose next action using current observations and available capabilities
+          |
+Discover eligible operations -> inspect declaration -> bind invocation
+          |
+AI4R capsule boundary: admission, inputs, authority, execution, checks
+          |
+Result or failure + verification status + receipt
+          |
+Record evidence and progress -> JiuwenSwarm research agent
+```
+
+A research session retains the objective, constraints, acceptance obligations, unresolved questions, working hypotheses, pending jobs, cumulative budget, and references to evidence. The agenda is mutable and versioned. It can contain tentative plans without making them dispatch authority.
+
+At an action boundary, the agent may reason, retrieve a capability, call an operation, inspect a running job, revise an experiment, ask for missing information, or deliver a result. Planning is distributed across these decisions. This need not mean an extra planner model call before every tool call: use the native decision loop and reserve explicit planning for useful boundaries.
+
+After each material observation, the agent reassesses future work. New findings, failed checks, changed goals, completed jobs, unavailable services, or newly admitted capabilities can change its next action. Unrelated work can continue when one branch is blocked.
+
+The resulting evidence forms a graph after execution: which artifacts and invocations support which observations and claims. That graph records actual causal dependencies. It does not prescribe the entire route before the agent starts.
+
+## Declaration driven discovery
+
+Retain declarations as machine-readable selection and evidence objects. They should describe purpose, operation signatures, accepted modalities, preconditions, effects, resources, service requirements, verification coverage, limitations, provenance, version, and relevant execution history.
+
+Discovery should proceed in this order:
+
+1. Filter by active admission, authorization, modality, input compatibility, available resources, effect limits, and service readiness. Unknown required properties make a candidate ineligible until resolved.
+2. Search the eligible candidates by semantic relevance, using concise summaries and declaration chunks. Reuse JiuwenSwarm retrieval interfaces where practical; evaluate embeddings or hybrid retrieval as an extension.
+3. Load detailed contracts for the shortlist. Return operation identities, compatibility reasons, coverage limits, and useful historical evidence.
+4. Revalidate eligibility and bind exact versions immediately before invocation. A search index is a cache, not authority.
+
+An operation accepting only text is excluded from direct video processing. A valid video-to-text operation may make a text capability useful later, with the conversion and any information loss recorded explicitly.
+
+Each indexed chunk retains its capsule, operation, version, and declaration hash. Filter the candidate set before ranking, or restrict the vector query to that eligible set; filtering a small global top-k afterward can hide suitable operations. A revoked or removed capsule becomes ineligible immediately even if index cleanup lags. A stale index can fall back to a filtered catalog listing.
+
+Historical performance can help rank candidates, but must retain task domain, version, sample size, and failure context. Similarity and past success do not establish admission or acceptance.
+
+## Verification bundled with the capability
+
+Each admitted capsule release binds its implementation, dependencies, declarations, check definitions, and qualification evidence. Each invocation additionally binds the actual request, accepted input artifacts, effect grant, budget, and applicable acceptance obligations.
+
+The protected call path performs these operations:
+
+| Boundary | Required behavior |
+|---|---|
+| Before execution | Recheck release and admission identity; validate inputs, preconditions, source pins, resource availability, and permitted effects. |
+| During execution | Use the native execution environment and effect controls; track resource use and durable job identities. An after-the-fact output check cannot undo disclosure or an external write. |
+| After execution | Validate output shape, deterministic invariants, provenance, and any assigned independent semantic review before accepting evidence. |
+| Return | Supply accepted outputs or a structured failure, verification coverage, and a durable receipt. Retain rejected outputs separately as diagnostic observations. |
+
+The package carries the checks, while protected runtime policy determines which checks must apply. A worker or RSI candidate cannot weaken its own acceptance obligations by editing its declaration. Qualification includes tests of check behavior and representative defective cases; author-written self-tests alone do not establish independent verification.
+
+Semantic review needs the accepted objective, relevant inputs, exact outputs, criteria, and necessary execution evidence. Producer explanations remain untrusted supporting material. Reusing the current output-only verifier context for source-dependent scientific judgments would be insufficient. Deterministic checking should be preferred where it answers the obligation; semantic review is bounded and records uncertainty rather than recursively invoking reviewers.
+
+Instruction-only skills receive an explicit coverage label. Installing a skill cannot enforce all actions the agent takes after reading it. Enforced claims require mediated tools and observable outputs. Likewise, an MCP service or delegated agent can only be checked to the extent its interface and evidence permit.
+
+The swimmer retains ordinary reasoning and policy-permitted exploration. Protected capabilities cannot be reached through alternate raw endpoints, shell access, or delegated credentials that defeat their controls. If an exploratory action is allowed outside a qualified capsule, record its lower assurance; accepted scientific claims still require their evidence obligations.
+
+## Recovery and completion
+
+A failed invocation should give the agent a cause and a useful next decision. Distinguish invalid input, unavailable capability, incompatible version, execution fault, failed verification, and uncertain execution outcome. Preserve whether effects occurred and whether retry is safe.
+
+- Malformed input can be repaired in a new recorded attempt.
+- A bad implementation can lead to another admitted operation or a capability revision request.
+- A scientific negative can be an accepted experimental result that changes the hypothesis.
+- An execution timeout with an unknown external outcome requires reconciliation before an effectful retry.
+- Missing authorization or uncertain containment blocks affected actions until resolved. A cosmetic repair must not convert the condition into permission.
+- Exhausted budgets or missing essential user information produce a resumable blocked or partial result with the unresolved obligation named.
+
+Recovery consumes cumulative budgets across attempts. Repeated identical failures and lack of evidence progress trigger reassessment, an alternate route, or a stop. A model cannot renew its own budget by creating a new child task.
+
+Long work returns a job handle with inspect, cancel, and result operations. JiuwenSwarm retains runtime scheduling ownership. AI4R records job state and reconciles interrupted invocations on restart; it does not rebuild an asynchronous execution engine.
+
+Completion is judged against the current authorized objective and its evidence obligations. Successful tool calls alone do not establish task completion. Final assembly checks claim-to-evidence coverage and records unresolved uncertainty. A correct negative result can complete a study; a safe halt remains a different outcome.
+
+## Capability change during long research
+
+New software can become useful during a long session. The pool therefore evolves through candidate creation, qualification, admission, availability, deprecation, and revocation. RSI and the capsule factory propose candidates; protected qualification decides whether future calls can use them.
+
+Newly admitted versions become discoverable for future actions. Running invocations retain their version pins. Stateful labs retain service/session bindings until explicit supported migration or replacement. Removing a capsule from future discovery does not delete evidence or immutable artifacts needed to reproduce completed work.
+
+Revocation blocks new calls immediately and marks affected evidence for reassessment. A critical revocation can cancel affected running work through the existing runtime; an ordinary update does not interrupt it. The activation record, index refresh, and decision to select a new version are separately traceable.
+
+Experiments still preregister a bounded protocol before measurement. Changing a metric, dataset, method, or treatment creates a new experimental revision. This permits scientific adaptation without silently changing the rules of an experiment after seeing its result.
+
+## Intent compilation and requirements
+
+Place intent compilation at the user boundary as a reusable intake capability. It translates broad requests into an editable research brief: desired outcome, constraints, available assets, open questions, and acceptance obligations. Clear requests can proceed with a minimal brief; expensive clarification is reserved for ambiguity that affects correctness, authority, or meaningful execution.
+
+The brief records what the user requested and which assumptions remain tentative. It should not manufacture scientific constraints from infrastructure policy. Requirements and evidence obligations persist independently of a particular action plan.
+
+The agent can invoke clarification or requirement refinement again when discoveries expose ambiguity. User steering creates a new objective revision; the agent cannot quietly relax an inconvenient success criterion. Prior evidence remains attached to the objective and experiment revisions under which it was produced.
+
+## Changes relative to M1 and M1plus
+
+| Current rule or mechanism | M2 proposal |
+|---|---|
+| PRD V10 sections 1.1, 3, and 4.8 define the governed baseline lifecycle and planning responsibilities | Author a distinct M2 amendment making native agent control the default for broad research. Preserve scientific outcomes and evidence obligations. |
+| M1 planning and freeze; M1plus A5 retains one bound run plan | Bind exact inputs, versions, checks, and effects at invocation dispatch. Retain mutable future work and immutable invocation records. |
+| M1plus preserves Search through Delivery as the research journey | Expose these functions as independently usable capabilities and optional recipes. Enforce actual prerequisites and task obligations. |
+| M1plus A3 proposes four hard-check families and one retry | Classify failures by violated obligation and permitted recovery. Invalid inputs and unauthorized effects must be blocked before execution. Retry limits depend on operation semantics within cumulative budgets. |
+| M1plus A1, A2, A7 propose category capsules, split declarations, and bundled verifiers | Carry this direction forward, adding operation discovery, runtime evidence binding, and independently protected check policy. |
+| M1plus A6 proposes a generalist with held-out tests | Use native generalist behavior for uncovered work with explicit assurance and task-specific checks. Hidden tests help testable outputs; they cannot certify arbitrary open-ended research. |
+| Portable runtime has process-local admission and incomplete portability for several stages | Retain its useful mechanics while decoupling evidence services from legacy stage order and qualifying durable, cancellable operation execution. |
+
+These are proposed product and architecture amendments for M2. They do not retroactively redefine M1 acceptance or establish that M1plus has already implemented them.
+
+## First implementation and evaluation
+
+Start with the existing JiuwenSwarm research agent, the portable capsule runtime, and three representative packages: one deterministic utility, one scientific experiment package, and one source-grounded intake or analysis package. Include a long job and a pinned data resource across those packages. Add a thin discovery adapter, per-invocation evidence binding, and structured recovery. Reuse native session and execution facilities.
+
+Compare native JiuwenSwarm, native plus a verification prompt, M1plus when runnable, and the proposed M2 integration using fixed tasks, the same models, tools, resources, and cumulative budgets. Include both answerable and unanswerable cases. Predefine scoring and failure categories before running the comparison.
+
+Measure correct task completion, unsupported claims, recovery success, false rejection, cost and time per correct completed task, operator interventions, and dependency coverage. Distinguish process completion, independently correct completion, valid scientific negatives, partial delivery, safe stops, and infrastructure failures. Increase task length and introduce controlled faults without assuming that all steps fail independently.
+
+| Scenario | Intended behavior | Primary owner |
+|---|---|---|
+| New evidence invalidates a working hypothesis | Preserve the observation, revise future work, and create a new experiment if necessary | Native agent with AI4R research state |
+| A capsule returns wrong results or malformed data | Reject acceptance, retain diagnostics, and provide a recoverable cause | Capsule runtime and agent |
+| No capsule matches an uncovered task | Allow permitted native exploration with explicit verification limits; seek new capability if needed | Native agent and discovery adapter |
+| A new package version is admitted mid-session | Offer it to future calls; preserve existing invocation and experiment pins | Capsule lifecycle and dispatch adapter |
+| Restart occurs after an external action but before its receipt | Reconcile the action by durable identity before retrying | Native job runtime and invocation evidence adapter |
+| A verifier is persuaded by misleading producer text | Separate source evidence from worker narrative; score the checker on blind defects | Qualification and verification policy |
+| An index still lists a revoked operation | Reject at dispatch from authoritative status and refresh discovery | Lifecycle and dispatch adapter |
+| The user changes the goal | Record a new objective revision and reassess relevant prior evidence | User intake and native agent |
+
+A bounded pilot establishes compatibility and usefulness for its tested cases. Broader capsule coverage and long-duration operation remain separate demonstrations.
+
+## Tradeoffs and remaining specification work
+
+The strength of this design is that native agent flexibility and AI4R verification reinforce each other at the point of use. Its principal cost is authoring and maintaining trustworthy declarations, adapters, and checks. Better models and new capabilities can be incorporated incrementally. The main threats are bypassable enforcement, weak semantic checkers, stale evidence bindings, and loops that consume budget without advancing the research.
+
+Detailed specification should settle the capsule schema revision, concrete native provider registration, authoritative admission storage, research-state persistence, job reconciliation interfaces, and the first package contracts. Set numerical pilot thresholds before seeing results. None of these requires replacing JiuwenSwarm's agent loop.
+
+## Source reading route
+
+- [M1 failure inventory](AI4R-M1-FLAWS-INTERNAL-20261028.md) and [original campaign corrections](../cc-value-discovery-2026-10-26/PROBLEMS_AND_MISTAKES.md).
+- [M1plus amendments](../../jiuwenswarm/docs/architecture/design-package-m1plus/1-amendments.md) and [M1plus planning](../../jiuwenswarm/docs/architecture/design-package-m1plus/planning-and-generalist.md).
+- [Current product receipt](../../AI4Research-Development/jiuwenswarm-agentic/docs/product/README.md) and [PRD V10](../../AI4Research-Development/jiuwenswarm-agentic/docs/product/received-prds/prd-m1-v10-2026-10-15.txt).
+- [Native provider assembly design](../../AI4Research-Development/jiuwenswarm-agentic/jiuwenswarm/agents/swarm/DESIGN.md), [tool providers](../../AI4Research-Development/jiuwenswarm-agentic/jiuwenswarm/agents/swarm/providers/tools.py), and [skill retrieval](../../AI4Research-Development/jiuwenswarm-agentic/jiuwenswarm/symphony/skill_retrieval/runtime.py).
+- [Portable capsule runtime and limitations](../../AI4Research-Development/jiuwenswarm-agentic/jiuwenswarm/capsule_runtime/README.md), [invocation implementation](../../AI4Research-Development/jiuwenswarm-agentic/jiuwenswarm/capsule_runtime/engine.py), and [semantic review context](../../AI4Research-Development/jiuwenswarm-agentic/jiuwenswarm/capsule_runtime/semantic.py).
+- [Existing M2 lab package proposal](../../AI4Research-Notebook/Designs/M2%20Lab%20Capsules%20and%20Factory%20Proposal.md), which already proposes selectable operations, mutable future work, immutable dispatch, and stateful lab bindings.
+- [Source identities](AI4R-M2-REACTIVE-CAPABILITY-POOL-SOURCES-20261028.json).

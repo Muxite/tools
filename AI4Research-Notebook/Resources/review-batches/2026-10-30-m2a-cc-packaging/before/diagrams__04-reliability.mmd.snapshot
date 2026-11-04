@@ -1,0 +1,15 @@
+flowchart TB
+ NEW[New or updated CC] --> AD[Admission: release and environment qualification]
+ AD --> POOL[Eligible capability pool]
+ POOL --> B[Bind required checks]
+ B --> I[Input and effect checks]
+ I --> RUN[Execute within enforced limits]
+ RUN --> O[Output and scientific evidence checks]
+ O -->|Pass| OK[Accept evidence]
+ O -->|Fail or inconclusive| REC[Bounded repair, new approach or human input]
+ REC --> B
+ I & RUN & O -. every-call receipt .-> F[Circulation: usage, issues and drift]
+ F --> RE[Reevaluate qualification]
+ RE -->|Still qualified| POOL
+ RE -->|Suspend or retire| OUT[Leave active pool; retain history]
+ OK --> AG[Agent revises research agenda]

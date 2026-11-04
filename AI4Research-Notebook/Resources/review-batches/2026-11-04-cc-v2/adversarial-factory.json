@@ -1,0 +1,102 @@
+{
+  "reviewer": "adversarial_factory",
+  "date": "2026-11-04",
+  "scope": "Factory/requests, scientific stateful methods, provenance/Lab boundaries, MAPIE and v1 migration; reviewed current files while integration owner was updating evidence.",
+  "evidence_file": "adversarial-factory-evidence.json",
+  "findings": [
+    {
+      "id": "FACTORY-01",
+      "severity": "P1",
+      "title": "Migration silently redirects an earlier operation when a later operation is named default",
+      "file": "CC Protocols/reference/ccv2.py",
+      "line": 586,
+      "attempt": "migrate_v1({cc:1,id:paper.ops,version:1.0.0,carrier:repo@sha256:<64 a>,operations:{fit:{does:Fit,run:/fit,gives:{x:integer}},default:{does:Predict,run:/predict,gives:{x:integer}}}})",
+      "observed": "status=translated, issues=[]; bindings.default.command becomes [/predict], and capabilities.fit has no using override. fit consequently resolves to /predict. Both original operations are valid v1 IDs and distinct executable paths.",
+      "impact": "A trusted migration can call a different scientific or production operation while retaining the earlier action description.",
+      "general_fix": "Allocate collision-free binding names independently of operation IDs and explicitly set every capability using value. Normalize and verify translated dispatch equivalence before reporting translated."
+    },
+    {
+      "id": "FACTORY-02",
+      "severity": "P2",
+      "title": "Prediction metadata falsely claims 90 percent confidence for a valid 50 percent model",
+      "file": "CC Protocols/reference/examples/mapie/method.py",
+      "line": 31,
+      "attempt": "Fit a trusted upstream MAPIE SplitConformalRegressor(confidence_level=0.5), serialize it, Host.put_artifact, then Host.call(release,predict_intervals,{model:ref,data:{x:five_points}}).",
+      "observed": "Call succeeded/complete and produced calibrated intervals from that 50 percent model with confidence_level:0.9. The model digest was correctly verified; byte integrity does not prove model compatibility.",
+      "impact": "A valid external or historical model artifact can yield scientifically incorrect confidence metadata without any diagnostic.",
+      "general_fix": "Validate model type and calibration state; derive the confidence level from the loaded model or reject incompatible configuration. Persist model metadata containing method/version/configuration/dependency producer lineage and validate it against the expected interface."
+    },
+    {
+      "id": "FACTORY-03",
+      "severity": "P2",
+      "title": "Evaluation silently broadcasts malformed bounds and accepts inverted intervals",
+      "file": "CC Protocols/reference/examples/mapie/method.py",
+      "line": 38,
+      "attempt": "Evaluate digest-verified JSON {lower:[0,0],upper:[[1],[10]]} with labels [5,5]; separately {lower:[10,20],upper:[0,1]} with labels [5,15].",
+      "observed": "First returns succeeded/complete with coverage=0.5, width=5.5,count=2 despite a 2x2 comparison. Second returns succeeded/complete with mean_width=-14.5. Only labels.shape==lower.shape is checked.",
+      "impact": "Malformed artifact data yields plausible numerical research outputs; a successful runtime receipt obscures the malformed evaluation subject.",
+      "general_fix": "Require nonempty finite 1D lower,upper,labels arrays of equal shape and enforce lower<=upper before computing per-sample metrics. Invalid scientific input should return a clear tool error; valid poor coverage should continue to execute successfully."
+    },
+    {
+      "id": "FACTORY-04",
+      "severity": "P2",
+      "title": "Sealing publishes a release with a missing bundle-relative entry script",
+      "file": "CC Protocols/reference/ccv2.py",
+      "line": 242,
+      "attempt": "Native binding command=[{python},{bundle}/absent.py] in a package containing cc.yaml only; Host.seal then Host.call(run,{}).",
+      "observed": "Seal returns a release digest. Call dispatches Python then fails PROCESS_FAILED because absent.py does not exist.",
+      "impact": "Factory can label a missing-source package sealed even when its explicit bundled entrypoint is unresolved; consumers learn this only after dispatch.",
+      "general_fix": "At minimum check explicit bundle-relative command material exists and is captured during seal. Preserve distinction between source-complete seal and separately qualified runtime/dependencies; do not imply sealing proves code semantics."
+    },
+    {
+      "id": "FACTORY-05",
+      "severity": "P2",
+      "title": "Migration reports translated before validating source or destination declarations",
+      "file": "CC Protocols/reference/ccv2.py",
+      "line": 560,
+      "attempt": "migrate_v1 with cc=1, valid action and ports but carrier=repo:latest, then normalize returned declaration.",
+      "observed": "Migration reports translated with issues=[], while normalize immediately rejects returned declaration as MUTABLE_BINDING.",
+      "impact": "Migration status is unreliable for unsupported/malformed source bindings and can be mistaken for a completed admissible translation.",
+      "general_fix": "Validate the v1 input and normalize the candidate before translated; turn any unsupported semantics or destination validation failures into explicit needs_review issues without a completed declaration."
+    }
+  ],
+  "verified_boundaries": [
+    {
+      "case": "Stateful model and input/output lineage",
+      "observed": "Current integrations/mapie-report.json has succeeded fit/predict/evaluate; model edge exactly equals fit model ref to predict provenance input; intervals edge exactly equals predict output to evaluate provenance input. Seeded synthetic train60/calibrate50/test50 yields coverage0.94,width1.7601173275650268,count50; all three receipts include 180 package version entries. This is a real MAPIE artifact pipeline, not paper reproduction."
+    },
+    {
+      "case": "Negative valid scientific results",
+      "attempt": "Evaluate normal intervals [0,1] against labels [5,5].",
+      "observed": "succeeded/complete with coverage0,width1,count2. Appropriate: execution completion remains separate from semantic improvement. No assessment was requested."
+    },
+    {
+      "case": "Fixed request requirements and methodological mismatch",
+      "attempt": "Resolve fixed does=Use paper method A, no substitutes with an open binding answered by Python -c print(42).",
+      "observed": "Resolver preserves fixed text and accepts a structurally valid binding; it cannot prove implementation semantics. This matches documented generic resolver limits. Scientific acceptance requires evidence/checker/review outside pointer filling."
+    },
+    {
+      "case": "ARM/GPU/weights eligibility",
+      "attempt": "Add binding.platform=linux/arm64 to a native declaration.",
+      "observed": "UNKNOWN_FIELD. Generic v2 runtime has no built-in architecture ABI/driver/model qualification schema; require declared unsupported semantics to be represented through a registered supported policy or treat qualification as external and pending. Docs correctly require qualified-host admission and actual loaded-generation evidence. No ARM/GPU or GB10 execution attempted or claimed."
+    },
+    {
+      "case": "Missing dependencies",
+      "observed": "MAPIE package contains cc.yaml and method.py only; package has no dependency lock reference. Current integration README and requirements-tested.lock provide pinned demonstrated environment separately, including sklearn1.5.2,numpy2.2.6 and exact MAPIE source revision. README honestly records reduced dependency environment/pip-check failure. Package-local reproduction instructions should point directly to these files; requirements.txt alone covers host not MAPIE."
+    },
+    {
+      "case": "Pickle trust is separate from checksums",
+      "observed": "Host validates bytes and can accept arbitrary caller-staged local artifact references; it does not authenticate model producer or prove pickle safety. method.py pickle.load executes trusted serialized material. Current 05 documentation explicitly warns to admit only trusted producers, so no missing-warning finding raised. The method comment claiming release-store digest should not be treated as producer admission."
+    },
+    {
+      "case": "Partial evidence and hardware claims",
+      "observed": "03 explicitly separates succeeded/partial, unknown effects and assessment. 04/11 require exact loaded binary/configuration/generation/window, pinned models/workload and independent frozen criteria. Current evidence does not establish full paper, deployed agent end-to-end, container execution or qualified-host Strata/Muse/GB10 reproduction."
+    }
+  ],
+  "limitations": [
+    "No maintained implementation or documentation changed.",
+    "Only small local scientific and migration probes executed.",
+    "Integration evidence was still being updated by its owner during review.",
+    "Probe artifacts are trusted locally generated data; no malicious pickle executed."
+  ]
+}

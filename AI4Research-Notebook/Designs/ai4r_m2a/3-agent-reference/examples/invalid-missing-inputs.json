@@ -1,0 +1,38 @@
+{
+  "schema_version": "2.0.0-m2a.2",
+  "id": "calculation.calculate",
+  "package_id": "cc.calculation",
+  "kind": "tool",
+  "description": "Calculate a finite numeric result with explicit units.",
+  "entrypoint": "example_worker:calculate",
+  "outputs": [
+    {
+      "name": "result",
+      "contract_id": "calculation.result.v1",
+      "media_types": [
+        "application/json"
+      ],
+      "semantic_constraints": [
+        "finite result",
+        "same requested units"
+      ]
+    }
+  ],
+  "effects": [
+    "artifact.write"
+  ],
+  "required_providers": [
+    "artifacts"
+  ],
+  "required_check_ids": [
+    "calculation.input.v1",
+    "calculation.output.v1"
+  ],
+  "limits": {
+    "max_attempts": 2,
+    "max_wall_seconds": 120,
+    "max_cost_units": 10,
+    "cost_unit": "declared_provider_credit",
+    "max_child_depth": 0
+  }
+}

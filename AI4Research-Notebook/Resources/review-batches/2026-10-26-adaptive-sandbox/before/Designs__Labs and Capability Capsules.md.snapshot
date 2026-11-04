@@ -1,0 +1,68 @@
+---
+id: labs-and-capability-capsules-overview
+status: current-direction-runtime-unverified
+source: Sources/Prompts/2026-10-23-robotics-lab-brief-direction.txt; Sources/Prompts/2026-10-25-multi-lab-workload-scope.txt; Sources/Prompts/2026-10-25-long-running-agentic-focus.txt; Resources/review-batches/2026-10-23-library-cleanup/reference-patterns.json
+last_reviewed: 2026-10-26
+next_action: Use this component overview before the detailed M2 proposals; demonstrate one connected research loop
+---
+# AI4Research Labs and Capability Capsules
+
+**Current M2 reading route:** [[Designs/Sandbox Lab Design]] and [the seven-view diagram set](Sandbox%20Lab%20Diagrams/README.md) own the current sandbox proposal. Workload profiling is the first validation case; robotics is a non-blocking integration. The proposal separates CC factory ownership from whole-system RSI, supports multi-operation packages and automatic compatible local adoption, and treats VM deployment as a profile. The earlier details below remain useful only where compatible; rolling planning still needs agreement with its owner.
+
+Preliminary direction for application developers; deployment details remain open.
+
+**Operating model:** very long-running agentic research, with persistent goals and knowledge across sessions, iterative experimentation, RSI, and high-quality verification throughout. Task records, checkpoints, recovery and evidence retention support continuity; individual work invocations remain scoped and budgeted. [[Sources/Prompts/2026-10-25-long-running-agentic-focus.txt]] makes this a central system requirement.
+
+**Multi-lab purpose:** AI4R supports the intended operation of many sandboxed, field-specific research labs, each like a small startup. A human steers the kinds of ideas to pursue; AI4R generates ideas and hypotheses, analyzes data, writes code, runs experiments, and retains results. The first lab focuses on workload profiling and proposed standard performance/workload units for predicting low-level usage and hardware requirements on other machines using historical data with minimal direct hardware access. Another lab attaches robotics simulation. These goals do not establish measured prediction accuracy or deployed multi-lab autonomy.
+
+Each lab's CCs and harness evolve through RSI. Selected capsules, research data, and findings return to improve master AI4R through qualification and adoption. [[Sources/Prompts/2026-10-25-multi-lab-workload-scope.txt]] supplies this scope clarification.
+
+A **lab** is a persistent research project. Its **sandbox** contains an independent fork of master AI4Research (AI4R), shared and domain-specific **capability capsules (CCs)**, and installed applications such as a robot simulator or workload profiler.
+
+CCs package and vendor functionality from skills, tools, MCPs, repositories, or new code, with declarations of purpose, interfaces, dependencies, permissions, and verification expectations. They connect that functionality to planning, execution, verification, RSI, and reusable workflows such as proof-of-concept generation. Underlying code authors only need to understand their own functionality and interface.
+
+## How the pieces fit
+
+Boxes show logical containment, not a required process or container layout. Dashed arrows show distribution and contribution.
+
+![Current lab context](Sandbox%20Lab%20Diagrams/01-lab-context.png)
+
+[Deployment, packages, adaptive work, storage, factory and domain views](Sandbox%20Lab%20Diagrams/README.md) expand this context.
+
+## Responsibilities and research loop
+
+| Owner | Responsibility |
+|---|---|
+| Lab infrastructure | Manage sandbox lifecycle, isolation, resources, and durable state. |
+| AI4R harness and planner | Sustain autonomous work across sessions through task records, checkpoints, and recovery. |
+| Application code | Own domain behavior: physics, controls, observations, or profiling. |
+| CCs | Supply reusable functionality and contracts for planning, verification, and improvement. |
+| Library and admission | Approve versions using evidence of quality, malicious-behavior checks, and declared behavior. Approval reflects tested scope. |
+| Verification | Verifier CCs assess outputs; system-owned controls decide acceptance. |
+| CC factory | Produce CC candidates, adapters, package manifests and evidence in response to lab or RSI requests. |
+| RSI owner | Own the overall improvement workflow and harness changes; consume the CC factory interface. Candidates cannot alter their own acceptance rules. |
+
+**Robotics loop:** plan an experiment → use CCs to configure and drive the simulator → collect and verify results → retain findings → plan further research or develop improvements. Both AI4R and the simulator belong to the lab sandbox. Time-sensitive control stays in application code.
+
+Selected improvements can return to master through separate qualification. Other labs and ongoing work do not update automatically.
+
+## Patterns to reuse
+
+Adapt these checked first-party references without committing to entire frameworks:
+
+| Reference | Apply here |
+|---|---|
+| Anthropic, *Effective harnesses for long-running agents*; Temporal | Progress records, startup checks, checkpoints, and recovery that reconciles interrupted operations before retrying. |
+| MCP; Paper2Agent | Existing tool interfaces and an inspect–adapt–test pipeline for producing candidate CCs. |
+| MLflow Model Registry | Versioned library entries, lineage, evaluation evidence, and explicit promotion. |
+| NVIDIA Isaac Lab | Modular scenes, actions, observations, and events within the robotics application. |
+| Darwin Gödel Machine | Parent–candidate–evaluation–archive cycles for code and harness improvement; a research precedent with limited reliability evidence. |
+
+Reuse suitable upstream code under its license. Start with one lab, one application, and a few manually packaged CCs; demonstrate an experiment, retained findings, restart/continuation, and one evaluated improvement.
+
+Checked against the lab and capability notes for design consistency. Whole-harness RSI is the broader target; current M1 scope is narrower. This brief does not establish runtime validation.
+
+
+## Source and design history
+
+[[Sources/Prompts/2026-10-23-robotics-lab-brief-direction.txt]] supplies the high-level user direction. [[Designs/Durable Project Labs]] owns durability; [[Designs/Lab Capsule and Factory Design Plan]] retains the detailed VM/container/factory proposal. Earlier topology proposals remain possible realizations beneath this logical overview, rather than mandatory deployment choices for an application author. The broader harness-RSI target exceeds current M1 scope. Reference review scope and official sources are recorded in [the reference receipt](../Resources/review-batches/2026-10-23-library-cleanup/reference-patterns.json).

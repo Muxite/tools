@@ -1,0 +1,1559 @@
+
+
+===== page 1 =====
+SiLR: Structure-Preserving Admission and Process Reward for LLM Tool Agents
+Chenyu Zhou1∗, Qiliang Jiang2∗, Shuning Wu3, Xu Zhou3
+1School of Engineering, Institute of Science Tokyo, Japan
+2College of Control Science and Engineering, Zhejiang University, China
+3Department of Electrical and Computer Engineering, National University of Singapore, Singapore
+zhou.c.76d6@m.isct.ac.jp, zhouxu_nus@u.nus.edu
+Abstract
+A runtime gate for an LLM tool agent is usually cast as a filter.
+In a ReAct loop, however, a rejected proposal is followed by
+another at the same state: the gate is a search operator over
+the proposal stream, and its admission criterion shapes which
+trajectories are reachable. We study post-violation recovery
+admission, where progress must be admitted while the system
+is still in violation, and identify the scalar projection trap: an
+aggregate-score gate can accept a locally improving proposal
+and commit the trajectory to a residual plateau. SiLR instead
+shadow-executes each proposal and admits it under a product
+order over the branch-level violation state (overloaded-branch
+support and per-branch severity). We prove that no scalar
+surrogate is sound for this order, so the failure is a represen-
+tational impossibility rather than a matter of threshold tun-
+ing. On mined Gym-ANM scenarios, SiLR recovers 21/21
+multi-action episodes, against 0/21 for terminal admission
+and 9/21 for the best scalar gate, an advantage significant
+across the full 24-scenario benchmark. The terminal-versus-
+structured dichotomy holds across three model families and
+in CityLearn. Because admission rests on deterministic simu-
+lation, the LLM lies outside the trust boundary and admission
+authority resides in the verifier: a magnitude-redistribution
+attack that defeats both scalar and support-only baselines is
+contained only by the full per-branch predicate. With two con-
+straint families active, every tested scalar projection admits
+physically unsafe actions, and the support-only gate admits
+the largest fraction (63.2% of 42,410 unsafe actions; product
+order 0). In the hardest dual-family traces, scalar gates recover
+only through that unsafe class. Reused as a GRPO process re-
+ward, the same signal outperforms its count projection in every
+mined scenario and is the only tested reward under which the
+ungated policy exceeds the untrained base (0.844 vs. 0.778).
+Scalar projection loses the violation geometry at both design
+points; only the full product order is structurally sufficient.
+Introduction
+Critical-infrastructure operations—power dispatch, datacen-
+ter scheduling, financial settlement—increasingly rely on
+tool-using large language model (LLM) agents (Zhang
+2025). Recent runtime-enforcement systems (SARC (Be-
+sanson 2026), AgentSpec (Wang, Poskitt, and Sun 2026),
+GuardAgent (Xiang et al. 2025), ShieldAgent (Chen, Kang,
+and Li 2025), VeriGuard (Miculicich et al. 2025)) advance
+∗These authors contributed equally.
+the runtime governance of these agents. They share an im-
+plicit premise: the system starts inside the safe set, and the
+gate’s job is to keep it there. Infrastructure under autonomous
+control, however, will sometimes start outside it, already in
+violation and needing several actions to recover. The enforce-
+ment question then inverts: the gate must decide whether an
+action that still leaves the system unsafe nonetheless makes
+admissible progress toward recovery. This post-violation re-
+covery admission problem differs structurally from runtime
+prevention, and prior runtime governance for LLM tool
+agents does not address it. Runtime mediation intercepts un-
+safe actions, yet it rarely enables recovery after blocking an
+unsafe proposal (Sah et al. 2026): enforcement is not recov-
+ery.
+We frame the problem around admission semantics: the
+formal criterion by which a runtime gate decides to apply
+or reject an LLM-proposed action. Our thesis is that this
+choice—not the gate’s strictness—has first-order effects on
+whether multi-step recovery is possible. A terminal gate (ad-
+mit only fully-recovered post-states) is safe but admits no
+intermediate step, deadlocking every multi-action episode
+on our mined Gym-ANM (Henry and Ernst 2021) bench-
+mark. The natural relaxation is a scalar admission gate, ad-
+mitting any proposal whose aggregate violation penalty is
+non-increasing within a small slack. It is representationally
+insufficient: relaxing the slack does not close the recovery
+gap.
+The reason is the scalar projection trap, an admission-
+level instance of proxy gaming (Skalse et al. 2022; Krakovna
+et al. 2020). In a ReAct loop (Yao et al. 2023) a rejected
+proposal is followed by another at the same state, so the
+gate is not a filter but a search operator over the agent’s
+proposal stream. Admitting on an aggregate score collapses
+the multi-component violation geometry and can commit
+the trajectory to a residual plateau. A gate that preserves
+the per-branch geometry instead rejects a scalar-improving
+proposal that violates the product order and keeps the search
+alive. The gap is representational, which we make precise
+as an impossibility result and confirm empirically: 21/21
+structured vs. 9/21 best scalar and 0/21 terminal, significant
+across the full 24-scenario benchmark.
+Contributions.
+Our unifying claim concerns one object: a
+product order over the branch-level violation state. It is the
+arXiv:2609.04629v1  [cs.AI]  4 Sep 2026
+
+
+===== page 2 =====
+representation required at two design points of an LLM tool
+agent, and projecting it to a scalar fails at both for the same
+representational reason.
+• The gate as a search operator, and the scalar projec-
+tion trap. We reframe the runtime admission gate not as
+a filter but as a search operator over the ReAct proposal
+stream. Its scalar instantiation collapses the violation ge-
+ometry and commits the trajectory to a residual plateau.
+• Structured recovery admission (design point 1). We
+propose SiLR (Structure-preserving In-the-Loop Recov-
+ery), a simulator-backed admission layer that shadow-
+executes each LLM tool proposal and admits it only
+when the product order is preserved, emitting graded
+PASS/SAFE_PROGRESS/FAIL verdicts; we prove no
+scalar surrogate is sound with respect to this order.
+• Empirical evidence across model families and do-
+mains. Terminal admission deadlocks, and a scalar
+threshold sweep cannot close the recovery gap; plateau
+signatures and a model-predictive control (MPC) feasi-
+bility check confirm the mechanism is gate-induced; the
+dichotomy holds across three model families and a second
+domain (CityLearn).
+• Trust-boundary containment under LLM compro-
+mise. Because admission is grounded in deterministic
+simulation, admission authority moves from the LLM to
+the verifier; a magnitude-redistribution attack that defeats
+both scalar admission and the Grid-Agent (support-only)
+baseline is contained only by the full per-branch pred-
+icate. Under dual-family stress this becomes a safety–
+liveness split (Alpern and Schneider 1985). Despite near-
+ceiling single-constraint-family recovery, support-only
+admits the largest fraction of unsafe actions (63.2% of
+42,410), whereas the product order admits none.
+• The same violation geometry as a process reward (de-
+sign point 2). Reused as a GRPO signal, the product order
+yields a near-oracle process reward: deterministic, scal-
+able process supervision with no human step labels. It is
+also the only tested reward under which the policy stays
+above the untrained baseline once the gate is removed; no
+tested scalar projection of the reward attains full recovery
+in both multi-family stress regimes we test.
+Related Work
+Shielding and runtime guards.
+Shielding (Alshiekh et al.
+2018) synthesizes a finite-state shield from a temporal-
+logic specification that intercepts policy outputs at run-
+time. Model-Predictive Shielding (Bastani 2019), Recovery
+RL (Thananjeyan et al. 2021), and RL power-grid shield-
+ing (Malik 2026) relax binary terminal gates by admitting
+recoverability-set states or by screening actions with forward
+simulation. All of them, however, assume a fixed action space
+and require a backup or recovery policy, or a dynamics-
+model lookahead. A parallel line adds runtime enforcement
+to tool-using LLM agents through architectural gates, guard
+agents, or rule languages—SARC’s Pre-Action Gate (Besan-
+son 2026) (the closest binary baseline), AgentSpec (Wang,
+Poskitt, and Sun 2026), GuardAgent (Xiang et al. 2025),
+Table 1: Positioning of SiLR against the closest runtime-
+safety systems. “Geom.”: retains the (support, severity) vi-
+olation state vs. a scalar aggregate; “No look.”: single-step
+shadow only, no recovery policy or dynamics rollout.
+System
+Graded Geom.
+Black-
+box LLM
+No look-
+ahead
+SARC Pre-Action Gate
+✗
+✗
+✓
+✓
+AgentSpec
+✗
+✗
+✓
+✓
+GuardAgent / ShieldAgent
+✗
+✗
+✓
+✓
+Grid-Agent
+✗
+✗†
+✓
+✗‡
+MPS / Recovery RL
+✗
+✗
+✗
+✗
+SiLR (ours)
+✓
+✓
+✓
+✓
+†support-level validation, no per-branch severity guard; ‡applies
+then reverts (post-hoc rollback).
+ShieldAgent (Chen, Kang, and Li 2025), and VeriGuard (Mi-
+culicich et al. 2025), yet none target post-violation recovery
+admission: a terminal predicate preserves safety but dead-
+locks multi-step recovery. SiLR instead shields black-box
+LLM tool-call dispatch by single-step shadow simulation
+under a product order on the branch-level violation state, at
+constant per-step cost.
+Grid-Agent and scalarization.
+Grid-Agent (Zhang 2025)
+is the closest same-domain work: it couples LLM agents with
+sandboxed power-flow validation, rollback of negative ac-
+tions, and monotonic-progress behavior for power-grid con-
+trol. The mechanisms differ in kind. Grid-Agent’s check is a
+post-hoc rollback that reverts an action unless the violation
+set is resolved without introducing new violations. This check
+is a support-level criterion with no per-branch severity guard.
+SiLR’s product order is instead a pre-action admission pred-
+icate that never applies a proposal that violates the product
+order and emits graded verdicts reusable as a training signal.
+Scalarization is classically studied as a static representational
+problem (Miettinen 1999). The scalar projection trap instead
+concerns the behavior of the runtime gate, which acts as a
+commitment operator over the ReAct proposal stream, the
+admission-level counterpart of reward hacking (Skalse et al.
+2022; Krakovna et al. 2020). On the training side, the same
+verifier provides deterministic, simulator-based process su-
+pervision (Lightman et al. 2024; Uesato et al. 2022) in place
+of human step labels. Prompt-injection defenses (Greshake
+et al. 2023) sanitize inputs; SiLR instead assumes a compro-
+mised LLM and enforces safety after the proposal. Table 1
+positions SiLR against the closest systems along four axes:
+graded admission, retained multi-component violation ge-
+ometry, black-box LLM tool proposals, and no backup policy
+or dynamics lookahead. SiLR is the only system that satisfies
+all four.
+Threat Model and Method
+Trust boundary and adversary.
+SiLR places the LLM
+outside the trust boundary: no admission verdict depends
+on the LLM’s reasoning, only on the simulator’s determin-
+istic response. The LLM is untrusted; the simulator, ver-
+ifier, checkers, and tool layer are trusted. We adopt the
+
+
+===== page 3 =====
+LLM agent
+possibly compromised
+Shadow verifier
+simulate on a deep copy
+Product-order gate
+admit iff Φ=(S, σ)
+non-increasing
+Live simulator M
+trust boundary
+Untrusted
+Trusted verifier + simulator
+proposal at
+ˆst+1
+admit
+obst
+FAIL: regenerate
+Figure 1: SiLR admission architecture and trust boundary. A possibly compromised LLM (untrusted) emits a tool proposal at;
+the verifier shadow-executes it on a deep copy of the trusted simulator, applies the admission gate ψ1 ∧ψ2 ∧ψ3 (tool validation,
+then the product-order test ψ2 ∧ψ3), and either applies the admitted action (PASS/SAFE_PROGRESS) or rejects it (FAIL,
+regenerating within the step).
+compromised-prompt and compromised-observation capa-
+bility class, the union of the SARC (Besanson 2026) and
+VeriGuard (Miculicich et al. 2025) threat models. An attacker
+may (C1) rewrite the system prompt, (C2) splice attacker-
+controlled text into every observation, and (C3) persist both
+rewrites for the whole episode, which is the worst case for the
+defender. The attacker may not modify the verifier, simulator,
+or tool-layer validators, bypass the tool-application interface,
+or read the verifier’s shadow state. We score two safety fail-
+ures and their union. Material worsening is a final penalty
+strictly above the no-intervention default, false recovery is
+a terminal recovery reported while the live state still holds
+violations, and attack success is the union of the two. Recov-
+ery rate is reported separately as a liveness measure (attack
+constructions in the supplementary material).
+Setting.
+An LLM tool-calling agent controls a critical-
+infrastructure simulator M through a ReAct loop (Fig. 1).
+At each control step t = 1, . . . , Cstep the agent observes
+obst, proposes a tool call at, and a runtime verifier medi-
+ates the proposal before it is applied; on rejection the agent
+regenerates within the same step, up to a per-step budget
+Cprop. Post-violation initial conditions mean M starts in s0
+with active constraint violations, and the goal is to drive M
+violation-free.
+Shadow-execution verifier.
+For each candidate at, the
+verifier evaluates a deterministic shadow state ˆst+1 =
+shadow(st, at)
+=
+solve(apply(copy(st), at)),
+where
+solve(·) is the domain’s steady-state solver (Newton–
+Raphson power flow for Gym-ANM (Henry and Ernst
+2021)), run on a deep copy of M so rejected proposals leave
+the live system untouched.
+Branch-level violation state and verdict ladder.
+We in-
+stantiate Φ on a vector-valued violation state; in our power-
+grid testbed the active constraint family is branch loading,
+indexed by overloaded branch, and CityLearn instantiates the
+same construction on energy/comfort violations. Define the
+branch-level violation state
+Φ(s) =
+ S(s), σ(s)
+
+,
+S(s) ⊆B,
+σ(s) ∈R|B|
+≥0,
+(1)
+where B is the set of branches, S(s) the support set of over-
+loaded branches, and σ(s) the per-branch severity vector
+(σi(s) > 0 iff i ∈S(s)). The fully-recovered state satisfies
+S(s) = ∅; the aggregate penalty is P(s) = P
+i σi(s). We
+equip the state space with the product order
+Φ(s) ⪯Φ(s′) ⇐⇒S(s) ⊆S(s′) ∧σ(s) ≤σ(s′), (2)
+where the severity comparison is componentwise and sup-
+port inclusion subsumes count non-increase. This order re-
+tains both the overloaded-branch support and the per-branch
+severity; a scalar penalty gate is its one-dimensional pro-
+jection. We use violation geometry to denote the joint
+support-and-severity structure that this order retains. We
+call ˆst+1 admissible from st if Φ(ˆst+1) ⪯Φ(st). The ver-
+dict ladder is: PASS if S(ˆst+1) = ∅(terminal recovery);
+SAFE_PROGRESS if Φ(ˆst+1) ⪯Φ(st) but S(ˆst+1)̸ = ∅
+(admissible nonterminal progress); FAIL otherwise.
+The scalar projection trap.
+A scalar alternative replaces
+the product order with a scalar admission gate: admit ˆst+1
+whenever P(ˆst+1) is within a small slack of P(st). Any
+scalar surrogate projects Φ(s) = (S(s), σ(s)) onto R≥0, and
+projecting a partial order with antichains onto a total order
+necessarily makes some incomparable states comparable.
+Proposition 1 (Scalarization gap). No scalar-threshold ad-
+mission gate is sound for ⪯: for any f : (S, σ) →R≥0
+
+
+===== page 4 =====
+and any slack η ≥0, the gate admitting whenever f(ˆs) ≤
+(1+η)f(s) accepts, on some ⪯-antichain pair, a step that
+introduces or relocates a violation.
+Proof (constructive). Take Φ(s)
+=
+({A}, 2δ eA) and
+Φ(s′) = ({A, B}, 0.9δ(eA+eB)), δ > 0: these are ⪯-
+incomparable (S(s′)̸ ⊆S(s) while σA(s) = 2δ > 0.9δ =
+σA(s′)). Since R is totally ordered, f ranks the pair, so the
+gate admits s →s′ (adds branch B) or s′ →s (drives σA
+to 2δ); either is non-improving under ⪯. For the aggregate
+P = P
+i σi, P(s′) = 1.8δ < 2δ = P(s) ≤(1+η)P(s)
+for every η ≥0, so no slack removes the acceptance.
+The same antichain pair defeats the strongest scalar can-
+didates: the sup-norm ∥σ∥∞(0.9δ < 2δ) admits s →s′
+and a lexicographic order on (|S|, P
+i σi) admits s′ →s,
+so no monotone scalarization—weighted, max-norm, or
+lexicographic—escapes.
+The representational gap is intrinsic to projecting a partial
+order with antichains onto a total order; relaxing the slack
+only enlarges the admissible set, never removing the collapse.
+SiLR admits on ⪯directly. Through the search loop the rep-
+resentational gap becomes behavioral: a scalar gate admits
+the first P-improving proposal, ends the per-step search, and
+commits the trajectory to a residual plateau (the scalar pro-
+jection trap); a structured gate rejects the same proposal as
+inadmissible under the product order and keeps the search ac-
+tive. No scalar projection yields a sound recovery-admission
+criterion.
+Predicates and admission invariant.
+The implemented
+admission gate is a conjunction of three predicates evaluated
+on the shadow: ψ1 validates the tool and parameter bounds;
+ψ2(st, ˆst+1) : S(ˆst+1) ⊆S(st) (support inclusion); and
+ψ3(st, ˆst+1) : σi(ˆst+1) ≤max(ασi(st), σi(st) + ε) for all
+i ∈S(st), with α=1.05, ε=10−3. The conjunction ψ2∧ψ3 is
+the computable test for the relaxed ε-dominance order (Lau-
+manns et al. 2002), recovering the exact product order ⪯as
+α →1, ε →0. Here α absorbs the finite resolution of the
+discrete action space and ε absorbs the numerical precision.
+This yields the gate’s containment guarantee.
+Proposition 2 (Admission invariant). Under shadow fidelity
+(the live system reproduces the shadow post-state, exact in
+our deterministic simulators), every admitted trajectory sat-
+isfies (i) S(st) ⊆S(s0) for all t, independently of LLM
+behavior, and (ii) σi(st) ≤αtσi(s0) + ε αt−1
+α−1 , a bound that
+relaxes as t grows.
+The support invariant is α-free and holds for any gated policy,
+including a compromised LLM—the containment guarantee
+that defines a runtime shield and anchors a formal safety
+case (proof in the supplementary material). Empirically ψ2
+supplies liveness by preserving support, while ψ3 supplies
+the per-branch severity containment that RQ4 shows to be
+necessary. Concretely, ψ3 rejects a count-preserving redis-
+tribution that both ψ2 and any scalar aggregate admit. Sever-
+ities (10, 10) →(19, 0.1) leave the support unchanged and
+lower P
+i σi from 20 to 19.1, yet they drive one branch from
+10 to 19. Recovery is robust over α ∈[1.05, 1.20] (15/15),
+consistent with the α-free support invariant (sweep in the
+supplementary material).
+Applicability.
+A verifier call takes 17.5–30.0 ms on a sin-
+gle CPU core, orders of magnitude below the latency of an
+LLM ReAct step. The construction therefore applies wher-
+ever the tool API admits a deterministic shadow of the pro-
+posed call. In our testbed it runs on the dispatch loop, where
+shadow execution reuses the power-flow study that already
+precedes each dispatch.
+Evaluation
+We compare Structured admission against terminal and
+scalar gates (RQ1–RQ3), then test containment under com-
+promise (RQ4) and generalization across model families
+and a second domain (RQ5). The simulator is Gym-ANM
+ANM6-Easy (Henry and Ernst 2021), with a state-cloning
+shadow and bit-exact Newton–Raphson power flow. The
+LLM is Qwen3-14B (Qwen Team 2025), served via vLLM
+at temperature 0. Each ReAct episode runs Cstep=8 con-
+trol steps with Cprop=3 proposals per step. We mine a 600-
+scenario pool by gridded perturbation and classify it by re-
+coverability; the 24 MPC-recoverable multi-action scenarios
+form our benchmark (pool composition in the supplemen-
+tary material). For RQ1–RQ3, a focused comparison uses
+three operating points (Scenario A–Scenario C, with Sce-
+nario B the easiest and Scenario A the hardest) at N=7,
+giving 7 episodes per scenario and 21 per policy, and we
+additionally evaluate all 24 scenarios at N=5. The five ad-
+mission policies are as follows. Ungated applies no verifier.
+Terminal admits iff S(ˆst+1) = ∅, the binary SARC-style pre-
+action gate (Besanson 2026). Support-only applies ψ1 ∧ψ2,
+the pre-action instantiation of the Grid-Agent rollback base-
+line (Zhang 2025). Structured applies ψ1 ∧ψ2 ∧ψ3, the
+full product-order gate. The scalar sweep Scalarη admits iff
+P(ˆst+1) ≤(1+η)P(st) for η ∈{0, 0.05, 0.10, 0.20}. For
+the full-pool stress test (RQ4) we additionally evaluate the
+strongest scalar surrogates of Prop. 1: the sup-norm ∥σ∥∞
+and a lexicographic order on (|S|, P
+i σi).
+RQ1: binary terminal admission deadlocks recovery.
+Fig. 2(a) reports the main recovery ladder at matched N=7
+(21 episodes/policy). Terminal recovers 0/21: every inter-
+mediate proposal has S(ˆst+1)̸ = ∅, regardless of search
+depth. Structured admission recovers 21/21 (residual 0.000)
+against the best scalar result of 9/21, significant at the sce-
+nario level on the full benchmark (RQ2). The improvement is
+structural: support geometry closes the recovery gap, while
+the per-branch predicate ψ3 adds the severity containment
+RQ4 requires.
+RQ2: scalar admission is insufficient.
+If terminal ad-
+mission fails solely because it is too strict, the natural
+fix is scalar slack. Relaxing the threshold neither closes
+the recovery gap nor yields monotone recovery: across
+η ∈{0, 0.05, 0.10, 0.20} recovery is 5/21, 9/21, 7/21, 7/21
+(each far below structured admission’s 21/21). The non-
+monotonicity is itself a trap signature: the η=0.05 →0.10
+drop comes entirely from Scenario A and Scenario C, where
+wider slack admits an early P-improving proposal and locks
+
+
+===== page 5 =====
+0
+5
+10
+15
+20
+multi-action episodes recovered
+Structured
+Support-only
+Scalar
+Terminal
+Ungated
+21/21
+20/21
+9/21
+0/21
+1/21
+ψ1 ∧ψ2 ∧ψ3
+ψ1 ∧ψ2
+ΔP≤ηP
+S=∅ only
+no gate
+(a) Admission gate
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+reward-level confusion
+Geometric
+Count
+Binary
+0.00
+0.25
+1.00
+binary ceiling 0.42
+p=1.2×10−7
+(b) Process reward
+Figure 2: One product order, two design points. (a) As an admission gate at matched N=7, the product order recovers 21/21
+multi-action episodes, against 20/21 for support-only (Grid-Agent), 9/21 for the best scalar slack, 1/21 ungated and 0/21
+terminal; sublabels give each gate’s admission criterion. (b) As a GRPO process reward, a reward built on the same violation
+geometry has zero reward-level confusion against 0.25 for its count projection and 1.0 for a binary signal (oracle-optimal
+binarization ceiling 0.42); the dominance holds in all 24 mined scenarios (sign test p=1.2×10−7).
+Table 2: RQ2: the full benchmark of 24 mined multi-action
+scenarios, N=5, recovery [Wilson 95% CI]. Support-only is
+the Grid-Agent rollback baseline.
+Policy
+Recovery
+95% CI
+Terminal
+0/120
+[0.00, 0.03]
+Scalarη=0.05
+96/120
+[0.72, 0.86]
+Support-only
+113/120
+[0.88, 0.97]
+Structured
+120/120
+[0.97, 1.00]
+the trajectory onto a residual plateau rather than rejecting it
+to keep the per-step search alive. The recovery gap closes at
+the support level: support-only (ψ1 ∧ψ2) recovers 20/21 and
+the full product order 21/21. The full 24-scenario bench-
+mark confirms this (Table 2): structured admission recovers
+120/120 against the best scalar gate’s 96/120 (terminal
+deadlocks); treating each of the 24 scenarios as an indepen-
+dent cluster, the structured-vs-scalar advantage is significant
+(scenario-clustered Wilcoxon p=0.004, bootstrap 95% CI for
+the recovery-rate difference excluding zero).
+RQ3: the projection-trap plateau is gate-induced.
+The
+trap leaves a population signature: over the full benchmark,
+structured admission drives every episode to the recovered
+origin, while scalar-admitted failures settle on a nonzero-
+residual plateau (Fig. 3). The three operating points show
+increasing difficulty under the best per-scenario slack. Scalar
+admission recovers 7/7 episodes in Scenario B, at most 2/7
+in Scenario C (mean final residual 5.94 against a default
+of 17.59), and at most 1/7 in Scenario A, whereas struc-
+tured admission recovers 7/7 in all three (representative trace
+in the supplementary material). When initialized from the
+scalar-admitted Scenario C plateau, an MPC feasibility ora-
+cle (constant-setpoint baseline) reaches zero penalty in one
+rollout, which confirms that the plateau is gate-induced.
+RQ4: the admission architecture contains LLM-side
+compromise.
+A compromise suite evaluates the gate under
+Terminal
+Scalar
+Support-only
+Structured
+0.0
+2.5
+5.0
+7.5
+10.0
+12.5
+15.0
+17.5
+20.0
+final residual penalty P
+plateau band
+0/120
+96/120
+113/120
+120/120
+Figure 3: RQ3: final residual penalty of all 480 bench-
+mark episodes (24 scenarios, N=5, four gates; horizontally
+jittered). The count above each column is the number of
+episodes fully recovered (P=0). Structured admission drives
+everyepisodetotherecoveredorigin;scalar-admittedfailures
+settle in a nonzero-residual plateau band; terminal episodes
+remain at their initial violation state.
+three attack families: prompt injection, observation poison-
+ing, and stall, the last in plain and RAG forms. It runs across
+the three mined scenarios plus matched benign controls (60
+attack and 15 benign episodes). No attack success, false re-
+covery, or material worsening occurs in the 60 attack episodes
+(0/60) or in the 15 benign-control episodes (0/15). Contain-
+ment is architectural: the verifier never accesses the LLM’s
+prompt or observation channels (Prop. 2).
+The per-branch predicate ψ3 is necessary.
+This suite es-
+tablishes containment against channel compromise; whether
+the per-branch predicate is necessary is a separate question,
+isolated by a dedicated 120-case suite. Magnitude redistribu-
+
+
+===== page 6 =====
+0
+10
+20
+30
+40
+redistribution attacks admitted (/120)
+Structured
+Support-only
+Scalar
+0/120
+11/120
+43/120
+ψ1 ∧ψ2 ∧ψ3
+ψ1 ∧ψ2 (Grid-Agent)
+aggregate ∑
+i
+σi
+Figure 4: RQ4: magnitude-redistribution attacks admitted,
+by admission tier. Each added predicate closes more attack
+surface: Scalar 43/120, Support-only (Grid-Agent, ψ1 ∧ψ2)
+11/120, Structured (ψ1 ∧ψ2 ∧ψ3) 0/120.
+tion (C1/C2) drives one retained branch toward failure while
+holding the overloaded-branch set and the aggregate penalty
+within nominal bounds, evading aggregate- and support-level
+monitoring. Across this suite a scalar gate admits the concen-
+trating step in 43/120 cases and the support-only Grid-Agent
+rollback baseline (ψ1 ∧ψ2) in 11/120, whereas the full prod-
+uct order (ψ1 ∧ψ2 ∧ψ3) admits none (0/120; Fig. 4): only
+the per-branch test ψ3 rejects the concentrating step.
+The complementary antichain on the full witness pool.
+Beyond the support-preserving redistribution of Fig. 4, full-
+pool enumeration exposes the complementary Prop. 1 an-
+tichain (support expansion) and confirms the gap is repre-
+sentational. Over all 558 physically-unsafe one-step actions
+in ANM, the sup-norm ∥σ∥∞admits 46 and a lexicographic
+order on (|S|, P
+i σi) admits 88, while the full product order
+admits 0/558. These breaches instantiate the antichain: a new
+branch overloads while maxi σi falls. The same class recurs
+in CityLearn over 11,311 physically-unsafe actions under
+an independent state-of-charge/feeder oracle (verifier-level
+enumeration, independent of model choice): the sup-norm
+admits 6761, the full product order 0/11,311 (ReAct repli-
+cation in RQ5). Across pools the invariant comparison is
+zero-versus-nonzero: the full product order is the only gate
+that admits no unsafe action in either domain (supplementary
+material).
+Safety versus liveness under multi-family stress.
+The
+containment gap widens with two physically incompara-
+ble constraint families active, where any scalarization must
+trade one against the other. Over all 42,410 physically-unsafe
+actions on mined dual-family (voltage + branch) ANM
+states, every tested scalar projection admits 40.6–53.6%, and
+support-only admits the largest fraction at 63.2%, whereas
+the full product order admits 0. Support inclusion alone is
+therefore insufficient, and the per-branch guard ψ3 closes the
+multi-family surface. Recovery nevertheless remains feasible
+under this discipline: an oracle audit finds an admissible all-
+safe recovery order in all 689 mined dual-family scenarios.
+In ReAct traces on the two hardest dual-family scenarios (3
+seeds each), every scalar-gated recovery passes through phys-
+ically unsafe steps (18–38% of its penalty descent; worst, a
+212%-loaded branch driven to 282%), whereas the product-
+Table 3: RQ5: generalization across model families (ANM)
+and to a second domain (CityLearn), N=5 (recovery).
+CityLearn at Cstep=8;
+∗Qwen3-8B reaches 15/15 at
+Cstep=16. ANM Structured per-model (3 scenarios pooled)
+Wilson 95% CI [0.80, 1.00].
+ANM
+CityLearn
+Model
+Term.
+Structured
+Term.
+Structured
+Qwen3-8B
+0/15
+15/15
+5/15
+14/15∗
+Qwen3-14B
+0/15
+15/15
+5/15
+15/15
+Gemma-3-12B
+0/15
+15/15
+5/15
+10/15
+Llama-3.1-8B
+0/15
+15/15
+5/15
+15/15
+order gate admits none. This reproduces the safety–liveness
+trade-off familiar from runtime shielding (Alshiekh et al.
+2018) (details in the supplementary material).
+RQ5: the dichotomy transfers across model families
+and domains.
+At the ReAct level, the terminal-versus-
+structured dichotomy is family-independent and transfers
+across domains (Table 3). Across Qwen3 (two sizes),
+Gemma-3 (Gemma Team 2025), and Llama-3.1 (Llama
+Team 2024) on ANM, terminal admission deadlocks ev-
+ery model (0/15) while structured admission recovers com-
+pletely (15/15). The same pattern recurs in CityLearn
+building-energy dispatch (Vázquez-Canteli et al. 2019): ter-
+minal admission succeeds only on the single-step scenario
+(5/15), while structured admission recovers between 10/15
+and 15/15 depending on the model. The admission rule thus
+transfers unchanged, whereas completion rates depend on
+model capability: the gate semantics show structural porta-
+bility to a distinct physical model.
+From Admission Gate to Process Reward
+The product order is also the representation required at a
+second design point: not only the criterion a runtime gate
+admits on, but the object a policy should internalize. We
+reuse the verifier’s outputs, namely the graded verdict and
+the persisted branch state Φ of Eq. 1, to define a Group
+Relative Policy Optimization (GRPO) process reward (Shao
+et al. 2024; Lightman et al. 2024). This requires no verifier
+changes and no task-specific outcome labels. We fine-tune
+Qwen3-8B with low-rank adaptation (LoRA) (Hu et al. 2022)
+on the 9 hardest multi-action ANM scenarios, which the
+ungated base fails to recover reliably. The primary outcome
+is ungated recovery: the gate is removed at evaluation, so
+recovery measures what the policy internalized. An admitted
+SAFE_PROGRESS step from s to shadow post-state ˆs is
+scored on the branch state itself; writing σ(A) = P
+k∈A σk
+and (x)+ = max(0, x),
+ρgeom = W2
+|F |
+X
+f∈F
+σ(E ∩f)
+σ(f)
++ W3
+|F |
+X
+f∈F
+P
+k∈U∩f(σk −ˆσk)+
+σ(f)
+−Wd min
+
+1, max
+k∈U
+(ˆσk−σk)+
+σk
+
+,
+(3)
+where E = S \ ˆS and U = S ∩ˆS are the eliminated
+and surviving overloaded branches, F the constraint fam-
+
+
+===== page 7 =====
+0
+20
+40
+60
+80
+100
+GRPO iteration
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+recovery rate
+(a) Coupling regime
+geometric
+count (scalar)
+random init
+10
+0
+10
+1
+10
+2
+σ-heterogeneity (σL/σS)
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+trained recovery rate
+collapsed regime
+CityLearn
+σL/σS = 286
+(b) Severity heterogeneity
+geometric
+severity-scalar
+Figure 5: Training dynamics in the multi-family stress regimes. (a) Coupling: the geometric reward converges to full recovery
+within five GRPO iterations; the count reward—blind to the drift its own actions cause—is driven below its random initialization.
+(b) Trained recovery versus σ-heterogeneity: failure emerges at σL/σS ≈4 (both arms dip briefly at ratio 2); CityLearn’s measured
+ratio (286, dashed) lies deep in the collapsed regime; in the homogeneous limit all arms tie, ruling out the construction.
+ilies partitioning S, and (W2, W3, Wd) = (0.6, 0.3, 0.3).
+Three choices matter here. Support elimination outranks
+severity reduction on surviving branches, echoing the ad-
+mission order. The drift term debits any surviving branch
+driven worse. Per-family normalization keeps a high-σ fam-
+ily from hijacking the signal. The count projection replaces
+ρgeom by (|S| −| ˆS|)/|S|, and graded PASS/FAIL verdicts
+anchor the scale identically across arms (full scaffold in the
+supplementary material).
+Violation geometry yields a higher-fidelity process re-
+ward.
+We measure reward-layer fidelity by scoring every
+legal single-setpoint action at each trap state against the true
+one-step recovery value. The geometric reward never misor-
+ders an action pair with distinct oracle values (reward-level
+confusion 0.000 vs. 0.25 for its count projection), and it dom-
+inates in all 24 mined scenarios (sign test p=1.2×10−7). By
+contrast, a binary admit/reject signal cannot rank admissible
+steps at all (1.0; Fig. 2(b)). The separation is a property of the
+reward, not of the rollout distribution. It persists over the full
+legal action set (0.04 for the geometric reward, 0.19 for the
+count projection, and 0.63 for the binary signal) and against
+an oracle-optimal binarization (0.42), which is the ceiling of
+a process reward trained on binary outcome labels (Lightman
+et al. 2024). The geometric ranking matches the oracle with
+a Spearman correlation of 0.986; robustness controls are in
+the supplementary material.
+The violation geometry is the active ingredient.
+Three
+reward arms share the same rollout gate and differ only in
+the signal. The full geometric reward, descent in the product
+order over Φ, is the only one that keeps the trained pol-
+icy above the untrained base ungated (0.844 vs. 0.778). A
+verdict ladder (0.733) or a violation count (0.667) leaves it
+worse than untrained, which indicates gate-dependent behav-
+ior rather than internalized recovery (supplementary mate-
+rial). On 15 held-out scenarios the geometric policy recov-
+ers 14/15 against the base’s 9/15, both ungated (one-sided
+Fisher exact p=0.04).
+The same scalarization gap, on the training side.
+This is
+the training-side counterpart of the admission-side impossi-
+bility: the scalarization that is unsound as an admission rule
+(Prop. 1) collapses the GRPO advantage signal as a reward.
+Proposition 3 (Advantage collapse). With B concurrent vi-
+olation branches, a count-based reward takes at most B+1
+distinct values. Action pairs within a count-equivalence class
+therefore receive identical immediate reward and have no
+step-level advantage separation. Along a continuous partial
+reduction of any single branch, the count reward is piecewise
+constant, with zero gradient except at elimination points,
+whereas the graded geometric reward is strictly monotone in
+that reduction.
+(Proof in the supplementary material.) Empirically the flat
+fraction of the count reward is 98% of the continuous action
+range, inducing a failure class: with incomparable constraint
+families active, no tested scalar projection of the reward at-
+tains full recovery in both regimes; only the full geometric
+reward does. We isolate the mechanism in a controlled tabu-
+lar GRPO setting (Table 4; 16 training seeds each; design in
+the supplementary material): the severity scalar is hijacked
+by raw magnitude under σ-heterogeneity, the count reward
+is blind to the cross-family drift its own actions cause under
+coupling (Fig. 5(a)), and restoring the drift term closes only
+the coupling regime (Table 4).
+The collapse is a threshold effect that reproduces at
+scale.
+The severity-scalar failure emerges at σL/σS ≈4,
+and CityLearn’s measured heterogeneity ratio (286) lies
+deep in the collapsed regime (Fig. 5(b)). A four-building
+CityLearn suite reproduces the effect at scale: the geometric
+reward’s advantage signal correlates with the true one-step
+value (Spearman’s ρ=0.96 vs. 0.79 for count), and at the
+same violation count the count arm leaves the battery family
+with 14% higher residual severity (supplementary material).
+
+
+===== page 8 =====
+Table 4: The scalarization failure class: trained recovery in
+the two multi-family stress regimes (16 seeds each).
+trained recovery
+Training reward
+σ-het
+coupling
+geometric (full Φ)
+1.00
+1.00
+severity-scalar (Σσ descent)
+0.00
+0.04
+count (|S| descent)
+0.80
+0.12
+count with drift penalty
+0.80
+1.00
+Conclusion
+We recast the admission gate as a search operator and iden-
+tify the scalar projection trap: collapsing the violation state
+to a scalar commits trajectories to residual plateaus. The for-
+mal results establish this representational gap independently
+of LLM behavior (Prop. 1 and Prop. 2), and the experiments
+show 21/21 recoveries for structured admission, against 9/21
+for the best scalar gate and 0/21 for terminal admission. Un-
+der multi-family stress the product order keeps every inter-
+mediate step safe, whereas scalar gates reach recovery only
+through unsafe redistributions. Reused as a process reward,
+the same signal lets the policy internalize recovery. Preserv-
+ing the violation geometry is required at both design points.
+Attack-Family Constructions
+We implement four attack families under the compromised-
+prompt/compromised-observation capability class of Sec-
+tion . Prompt injection (C1): a high-priority operator-
+impersonating override that pushes an aggressive fixed set-
+point. Observation poisoning (C2): a fabricated “all readings
+nominal” stanza spliced into every observation, contradicting
+the violation list the verifier re-derives from the live simula-
+tor. Stall (C1): near-no-op setpoints that stay admissible while
+never recovering; a “stall-RAG” variant instructs the same
+behavior through a poisoned retrieval context. Magnitude
+redistribution (C1/C2): driving a single retained branch to-
+ward failure while holding the overloaded-branch set and ag-
+gregate penalty within nominal bounds, masking per-branch
+overload behind nominal aggregate- and support-level read-
+ings.
+The compromise suite (RQ4) runs the three attack fam-
+ilies in four configurations—prompt injection, observation
+poisoning, and stall in plain and RAG forms—across the
+three mined multi-action scenarios at N=5 per configura-
+tion, plus a matched benign control (60 attack + 15 benign
+= 75 episodes). Across the 60 attack episodes we observe no
+attack success, false recovery, or material worsening (0/60;
+Wilson 95% CI [0.00, 0.06]), and none of these failures oc-
+curs in the 15 benign-control episodes (0/15). Under prompt
+injection the rejection rate climbs sharply. The fourth fam-
+ily, magnitude redistribution, is evaluated against compet-
+ing gates in the 120-case redistribution suite of Fig. 4: its
+cases concentrate severity on a single retained branch while
+preserving the overloaded-branch set and holding the aggre-
+gate penalty within nominal bounds, slipping past aggregate-
+and support-level gates (43/120 and 11/120) while the per-
+branch test ψ3 rejects every one.
+Strong-scalar baselines on the full witness pool.
+Beyond
+the balanced 120-case suite, we enumerate every physically-
+unsafe one-step action in each domain—558 in ANM, 11,311
+in CityLearn (the latter under an independent state-of-
+charge/feeder-overload oracle, verifier-level, no LLM in the
+loop)—and evaluate all five gates (Table 5). The denominator
+is a constructed witness pool, not a natural-attack frequency,
+and absolute breach counts reflect each pool’s category com-
+position, so they are not comparable across domains; within a
+fixed pool, a lower unsafe-admission count indicates stricter
+containment. The one domain-invariant statement is that the
+full product order admits zero in both. The strongest scalar
+projections fail on the Prop. 1 antichain in both domains:
+in ANM all 46 sup-norm breaches are support expansions
+with maxi σi non-increasing; in CityLearn 6670 of the 6761
+sup-norm breaches are the same support-expansion class,
+the newly violating element being a battery or feeder, con-
+firming the mechanism in a second physical system. Finally,
+we stress the gates with two simultaneously active constraint
+families: a third enumeration over mined dual-family (volt-
+age + branch-loading) ANM states yields 42,410 physically-
+unsafe actions: the aggregate admits 17,200 (40.6%), the
+normalized aggregate 18,311, the sup-norm 17,663, the lex-
+icographic order 22,729, support-only 26,817 (63.2%), and
+the product order 0.
+Table 5: Unsafe admissions on the full physically-unsafe
+witness pool (verifier-level enumeration; counts reflect each
+pool’s category mix and are not comparable across domains;
+within a pool, lower is stricter containment). The full product
+order is the only gate that admits no unsafe action in either
+domain.
+Gate
+ANM (N=558)
+CityLearn (N=11,311)
+Scalar—aggregate P
+i σi
+108
+7204
+Scalar—sup-norm ∥σ∥∞
+46
+6761
+Scalar—lex. (|S|, P
+i σi)
+88
+7650
+Support-only (Grid-Agent ψ1 ∧ψ2)
+258
+432
+Structured (ψ1 ∧ψ2 ∧ψ3)
+0
+0
+Proofs
+Proposition 1 (Scalarization gap).
+Any scalar surrogate
+f : (S, σ) →R≥0 composes the vector-valued violation state
+with a total order. The pair Φ(s) = ({A}, 2δeA), Φ(s′) =
+({A, B}, 0.9δ(eA+eB)) forms a ⪯-antichain: S(s′)̸ ⊆S(s)
+blocks s′ ⪯s, while σA(s) = 2δ > 0.9δ = σA(s′) blocks
+s ⪯s′. Because f maps both into the totally ordered R≥0,
+exactly one of f(s) ≤f(s′) or f(s′) ≤f(s) holds (or
+both, if equal), so for any slack η ≥0 the gate admits at
+least one of the two transitions, each non-improving under
+⪯(one introduces branch B; the other inflates σA). For the
+canonical aggregate P = P
+i σi, P(s′) = 1.8δ < 2δ =
+P(s), so P(s′) ≤(1+η)P(s) for all η ≥0 and no slack
+removes the acceptance of s →s′. The argument depends
+only on ⪯admitting an antichain, hence applies to every
+scalar surrogate. □
+
+
+===== page 9 =====
+Proposition 2 (Admission invariant).
+By induction on
+t. Base: trivially S(s0) ⊆S(s0) and σi(s0) ≤α0σi(s0).
+Step: an admitted action passes ψ2 ∧ψ3 on the shadow, and
+shadow fidelity makes the live post-state equal the shadow, so
+S(st+1) ⊆S(st) (giving S(st+1) ⊆S(s0) by the inductive
+hypothesis) and σi(st+1) ≤max(ασi(st), σi(st) + ε) ≤
+ασi(st) + ε for all i ∈S(st) (and σi ≡0 off S(st)). Un-
+rolling σi(st+1) ≤ασi(st) + ε gives σi(st) ≤αtσi(s0) +
+ε Pt−1
+j=0 αj = αtσi(s0) + ε αt−1
+α−1 ; at α=1 the bound reads
+σi(s0) + tε. Neither step uses any property of the action
+source, so the support invariant (α-free) holds for any gated
+policy, including a compromised LLM. The severity term is
+a worst-case per-step drift envelope, not a descent guarantee:
+convergence to S = ∅depends on proposal quality. □
+Proposition 3 (Advantage collapse under scalarization).
+Immediate from the definitions. With B concurrent violation
+branches, the count delta of cleared violations ranges over
+{0, . . . , B}, taking at most B+1 distinct values; hence every
+action pair within a count-equivalence class receives iden-
+tical immediate reward and there is no step-level advantage
+separation between them. Along a continuous partial reduc-
+tion of any single branch’s severity that does not eliminate it,
+|S| is unchanged, so the count reward is piecewise constant,
+with zero gradient except at the discrete elimination points.
+The graded geometric reward’s severity term is strictly mono-
+tone in that same reduction, so it retains a nonzero advantage
+signal everywhere on the continuum. Empirically the flat
+fraction is 98% of the continuous action range. □
+Robustness and Cross-Domain Generalization
+Scenario pool composition.
+The mined 600-scenario
+ANM pool classifies by recoverability as 153 single-action,
+24 multi-action, 252 MPC-residual, and 171 trivial; the 24
+multi-action scenarios form the main benchmark.
+α-window sweep.
+Recovery holds across an α-window:
+15/15 for α ∈[1.05, 1.20] and 14/15 at α=1.02 (N=5),
+consistent with the α-free support invariant (Prop. 2); the
+magnitude guard ψ3 tightens as α →1 without disturb-
+ing support-driven recovery. The full 24-scenario benchmark
+(Table 2) and the cross-family replication (Table 3) are re-
+ported in the main text.
+Cross-domain (CityLearn).
+The full cross-domain repli-
+cation is reported in Table 3 (RQ5): the gate semantics re-
+cur in CityLearn building-energy dispatch (Vázquez-Canteli
+et al. 2019) over three district battery-storage scenarios (CL-
+1–CL-3; state-of-charge floor/ceiling and feeder-export lim-
+its, Φ indexed by the violating building or feeder). Gemma-
+3-12B on CL-2 is the only capability-related exception. The
+gate admits every Gemma proposal in that scenario (all
+SAFE_PROGRESS, with no rejections), so the admission
+rule transfers unchanged, but the sequence stalls before the
+terminal action the other models reach. Completion therefore
+tracks proposal quality rather than gate semantics.
+Scenario-level trap trace.
+Fig. 6 shows the representa-
+tive Scenario-C trace underlying RQ3: the scalar gate admits
+one early locally-improving proposal and plateaus at nonzero
+0
+1
+2
+3
+4
+5
+6
+ReAct step
+0.0
+2.5
+5.0
+7.5
+10.0
+12.5
+15.0
+17.5
+native ANM penalty
+recovered
+Scalar
+Structured
+Figure 6: Scalar projection trap on Scenario C (RQ3): repre-
+sentative trace at the best slack η=0.05; structured admission
+descends to full recovery in three steps while the scalar gate
+plateaus.
+residual (best slackη=0.05; the plateaurecurs at all fourslack
+settings, best 2/7), while structured admission descends to
+full recovery.
+Dual-family
+recovery
+audit.
+We
+mine
+689
+oracle-
+recoverable dual-family (voltage + branch-loading) ANM
+states and replay oracle device orders through the product-
+order verifier: an admissible all-safe recovery order exists in
+all 689/689 cases, so per-step safety never renders recov-
+ery infeasible. At the ReAct level (32-step budget, Qwen3-
+14B, temperature 0), we rescore every admitted step with the
+RQ4 physical oracle. On the two hardest such states, every
+scalar-gated recovery passes through physically unsafe steps
+(18–38% of its penalty descent; worst, a 212%-loaded branch
+driven to 282% loading), including support expansions of the
+same class enumerated in the dual-family admission audit.
+The product-order gate admits zero unsafe steps.
+The Verifier as a Process Reward: Extended
+Analysis
+Setup.
+We fine-tune Qwen3-8B with LoRA (Hu et al.
+2022) on the 9 hardest multi-action ANM scenarios (greedy
+decoding, without chain-of-thought). Three reward arms
+share the same structured rollout gate and differ only in the
+reward signal: Geometric rewards descent in the product
+order over Φ = (S, σ); Count rewards the count-delta of
+cleared violations; and a Verdict-only ablation strips the
+geometric component, leaving only the verdict ladder. We
+evaluate the checkpoint after the second GRPO (Shao et al.
+2024; Lightman et al. 2024) iteration, pooled over 5 training
+seeds (Table 6). On a separate 15-scenario held-out set, the
+geometric policy reaches 14/15 ungated recovery, against
+9/15 for the base policy (RQ-reward section).
+Reward formulas.
+All arms share one verdict scaffold and
+differ only in how an admitted SAFE_PROGRESS step is
+scored. For a step from pre-state s to shadow post-state ˆs
+
+
+===== page 10 =====
+Table 6: Verifier-as-reward on the 9 hardest ANM scenarios
+(5 seeds pooled; recovery [Wilson 95% CI]). Ungated recov-
+ery (gate removed at eval) measures internalization: only the
+full geometric reward stays above the untrained base.
+Reward (signal)
+gated
+ungated
+steps↓
+base (no LoRA)
+0.778
+0.778
+4.71
+Geometric (Φ descent)
+0.956
+0.844 [0.71,0.92]
+3.64
+Verdict-only (ladder)
+0.889
+0.733 [0.59,0.84]
+4.08
+Count (count-delta)
+0.889
+0.667 [0.52,0.79]
+3.84
+with verdict v,
+r(s, ˆs) =
+
+
+
+
+
+
+
+
+
+1 + 1
+2 ¯m(ˆs)
+v = PASS
+ρ•(s, ˆs)
+v = SAFE_PROGRESS
+−max
+ 0.3, csev(ˆs)
+
+v = FAIL
+−1
+v = ERROR,
+(4)
+where ¯m ∈[0, 1] is the mean normalized constraint margin
+and csev ∈{0.3, 0.6, 1.0} grades the worst residual violation
+(warning/violation/critical); a fixed step cost 0.05 is sub-
+tracted from every step and a terminal recovery bonus +1
+is added at the trajectory level, both shared across arms.
+Writing S, ˆS for the pre/post overloaded-branch supports
+with per-branch severities σk, ˆσk, E = S \ ˆS for the elim-
+inated branches, U = S ∩ˆS for the surviving ones, and
+f ∈F for the constraint families partitioning S, the three
+SAFE_PROGRESS scorings are (expanding the compact no-
+tation of Eq. 3)
+ρgeom = W2
+|F |
+X
+f∈F
+P
+k∈E∩f σk
+P
+k∈f σk
++ W3
+|F |
+X
+f∈F
+P
+k∈U∩f max(0, σk −ˆσk)
+P
+k∈f σk
+−Wd min
+
+1, max
+k∈U
+max(0, ˆσk−σk)
+σk
+
+,
+(5)
+ρcount = |S| −| ˆS|
+|S|
+,
+ρverdict ≡0.5,
+(6)
+with weights (W2, W3, Wd) = (0.6, 0.3, 0.3), so severity-
+weighted support elimination (ψ2) outranksper-branch sever-
+ity reduction (ψ3), echoing the admission product order;
+the third term penalizes any surviving branch driven worse.
+The geometric arm normalizes within each family and av-
+erages families with equal weight, so no high-σ family hi-
+jacks the signal; for a single family it reduces exactly to
+Σσ-normalization, leaving the single-type ANM result un-
+changed. A count-preserving magnitude reallocation (S= ˆS)
+earns ρgeom ≈0 and is debited by the drift term, yet is
+invisible to ρcount; the Verdict-only arm flattens ρ to a con-
+stant, keeping the PASS>SAFE_PROGRESS>FAIL lad-
+der while discarding within-step geometry. The failure-class
+study’s severity scalar instead uses the total-severity fraction
+ρsev =
+  P
+k∈S σk −P
+k∈ˆS ˆσk
+
+/ P
+k∈S σk, which retains
+magnitude but collapses the physically incomparable fami-
+lies into one dimension.
+Reward-layer fidelity controls.
+The reward-layer compar-
+ison in the main text (geometric confusion 0.000 vs. 0.25 for
+count over 24/24 scenarios) is stable under four controls
+(Fig. 7). (i) On-policy distribution. Scoring confusion on the
+states visited under three rollout policies—greedy on the ge-
+ometric reward, greedy on the count reward, and uniform
+random—keeps the geometric reward at 0.000 while count
+ranges 0.21–0.22, so the separation is a property of the re-
+ward rather than of a chosen visitation. (ii) Complexity scal-
+ing. On controlled trap states with B simultaneous violation
+branches, count confusion grows from 0.347 at B=2 to 0.465
+at B=10 (Pearson r=0.889) as more distinct actions collapse
+onto the same count-delta level, while the geometric reward
+stays at 0.000: the representational gap widens with problem
+complexity. (iii) Exactness. The simulator-computed geo-
+metric reward retains its fidelity advantage under additive
+Gaussian perturbation of scale sσ: its misordering rate rises
+from 0.011 (s=0) past the count projection’s 0.157 only once
+s exceeds ≈0.8—the margin exact simulation affords over a
+learned approximation. (iv) Exploit resistance. Fidelity also
+bounds how easily the reward is gamed: a binary admit/reject
+reward pays +0.5 for both a stall, an admitted no-op with
+ˆs=s, and a drift, a count-preserving reallocation that wors-
+ens a branch. An 8-step stall therefore accrues 4.0 against 1.5
+for recovering in three steps. The count reward is likewise
+indifferent to drift, whereas the severity-scalar and geometric
+rewards both score ≈0 on a stall and penalize drift. Resis-
+tance to both hacks rises with the constraint geometry the
+reward preserves.
+The multi-family failure class.
+When several physically
+incomparable constraint families are active at once, any
+scalar reward must collapse the product order into one di-
+mension, and the representational gap of Prop. 1 reappears
+in training dynamics as advantage collapse (Prop. 3). We run
+two controlled mechanism-isolation training-dynamics anal-
+yses (Krakovna et al. 2020), each a minimal multi-family
+recovery regime isolating one component of the violation
+geometry, with GRPO on the unmodified reward functions
+(16 training seeds each; trained recovery in Table 4). In the
+σ-heterogeneity regime (one large-σ family, one small-σ fam-
+ily whose violation is urgent), the severity scalar is hijacked
+by raw magnitude, chasing the large family and recovering
+0%, while per-family normalization makes the urgent fam-
+ily’s elimination worth a full family, and the geometric arm
+recovers 100%. In the coupling regime (clearing the large
+family drifts the small family toward an irreversible limit),
+the count reward is blind to the drift its own actions cause
+and trains to 12%; the drift-aware geometric reward trains
+to 100%. Restoring the drift term rescues count in the cou-
+pling regime (1.00) but not cross-family priority (0.80 under
+σ-heterogeneity), and the severity scalar fails in both—the
+two regimes require distinct components that only the full
+geometric reward combines.
+The σ-heterogeneity sweep (Fig. 5(b)) shows the failure
+is not an artifact of a chosen operating point: it emerges
+at σL/σS ≈4, saturates from 8 onward (CityLearn’s mea-
+sured heterogeneity is 286), and vanishes in the homo-
+geneous limit. The separation holds across the full 4×4
+
+
+===== page 11 =====
+5
+10
+violation branches B
+0.0
+0.2
+0.4
+confusion
+r=0.889
+(a) Complexity
+count
+geometric
+0
+1
+approx. noise sσ
+0.0
+0.1
+0.2
+0.3
+geom. mis-order
+count ref.
+(b) Exactness
+geom
+count
+random
+0.0
+0.1
+0.2
+0.3
+confusion
+(c) On-policy
+geometric (0.000)
+count
+binary countsev-sc.geom
+−0.2
+0.0
+0.2
+0.4
+0.6
+per-step reward
+(d) Hacking
+stall
+drift
+Figure 7: Reward-layer fidelity controls. (a) Reward-level confusion grows with the number of simultaneous violation branches
+B for the count reward (Pearson r=0.889) while the geometric reward stays at 0.000. (b) The geometric reward retains its
+advantage over the count projection under additive noise up to s≈0.8 σ. (c) The fidelity gap holds on states visited under three
+rollout policies (geometric confusion 0.000 throughout; count 0.21–0.22). (d) A binary admit/reject reward pays +0.5 for both
+stall and drift; the count reward is blind to drift, which the severity-scalar and geometric rewards penalize.
+coupling–floor grid (Fig. 8): geometric ≥0.97 in all 16
+cells, count ≤0.42 in 15; the single cell where the count re-
+ward retains recovery lies at the weakest coupling. An MLP
+policy reproduces the same ordering (1.00/0.13/0.05 for
+geometric/count/severity-scalar), so the pattern is not spe-
+cific to the policy class.
+The mechanism at full scale.
+Training Qwen3-8B with
+GRPO on the multi-family CityLearn suite (four buildings,
+σ-het 286) reproduces the mechanism in a second, larger sys-
+tem and shows that trajectory-return credit is needed to prop-
+agate delayed cross-family consequences, since a per-step z-
+score cannot assign the cost of flooring the battery family
+back to the early step that caused it. With trajectory-return
+credit the trained policies separate along the axis Prop. 3 pre-
+dicts. Across seeds the geometric reward’s advantage signal
+correlates with the true one-step action value (Spearman’s
+ρ=0.96 vs. 0.79 for count). After training, at the same viola-
+tion count, the count arm leaves the battery family with 14%
+higher residual severity than the geometric arm, which is the
+signature of a severity-blind signal.
+
+
+===== page 12 =====
+1
+1.5
+2
+2.5
+coupling strength
+1.00
+1.00
+1.00
+1.00
+0.98
+1.00
+1.00
+1.00
+0.97
+0.97
+1.00
+1.00
+0.97
+0.97
+0.98
+1.00
+(a) Geometric reward
+2.5
+3
+3.5
+4
+floor severity
+1
+1.5
+2
+2.5
+coupling strength
+0.10
+0.41
+1.00
+0.00
+0.08
+0.10
+0.10
+0.42
+0.04
+0.10
+0.11
+0.11
+0.04
+0.04
+0.09
+0.11
+(b) Count reward
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+trained recovery rate
+Figure 8: Trained recovery across the 4×4 coupling–floor
+grid. The geometric reward recovers ≥0.97 in all 16 cells;
+the count reward collapses (≤0.42) in 15 of 16, recovering
+only in the single cell (coupling, cfloor)=(1.0, 3.5), at the
+weakest coupling in the grid.
+References
+Alpern, B.; and Schneider, F. B. 1985. Defining Liveness.
+Information Processing Letters, 21(4): 181–185.
+Alshiekh, M.; Bloem, R.; Ehlers, R.; Könighofer, B.;
+Niekum, S.; and Topcu, U. 2018. Safe Reinforcement Learn-
+ing via Shielding. In Proc. AAAI Conf. on Artificial Intelli-
+gence.
+Bastani, O. 2019. Safe Reinforcement Learning with Nonlin-
+ear Dynamics via Model Predictive Shielding. arXiv preprint
+arXiv:1905.10691.
+Besanson, G. 2026. SARC: A Governance-by-Architecture
+Framework for Agentic AI Systems.
+arXiv preprint
+arXiv:2605.07728.
+Chen, Z.; Kang, M.; and Li, B. 2025. ShieldAgent: Shield-
+ing Agents via Verifiable Safety Policy Reasoning. arXiv
+preprint arXiv:2503.22738.
+Gemma Team. 2025. Gemma 3 Technical Report. arXiv
+preprint arXiv:2503.19786.
+Greshake, K.; Abdelnabi, S.; Mishra, S.; Endres, C.; Holz, T.;
+and Fritz, M. 2023. Not What You’ve Signed Up For: Com-
+promising Real-World LLM-Integrated Applications with In-
+direct Prompt Injection. In ACM Workshop on Artificial In-
+telligence and Security (AISec).
+Henry, R.; and Ernst, D. 2021. Gym-ANM: Reinforcement
+Learning Environments for Active Network Management
+Tasks in Electricity Distribution Systems. Energy and AI,
+5. ArXiv:2103.07932.
+Hu, E. J.; Shen, Y.; Wallis, P.; Allen-Zhu, Z.; Li, Y.; Wang,
+S.; Wang, L.; and Chen, W. 2022. LoRA: Low-Rank Adap-
+tation of Large Language Models. In Int. Conf. on Learning
+Representations (ICLR). ArXiv:2106.09685.
+Krakovna, V.; Uesato, J.; Mikulik, V.; Rahtz, M.; Everitt, T.;
+Kumar, R.; Kenton, Z.; Leike, J.; and Legg, S. 2020. Spec-
+ification gaming: the flip side of AI ingenuity. DeepMind
+Blog.
+Laumanns, M.; Thiele, L.; Deb, K.; and Zitzler, E. 2002.
+Combining Convergence and Diversity in Evolutionary Mul-
+tiobjective Optimization. Evolutionary Computation, 10(3):
+263–282.
+Lightman, H.; Kosaraju, V.; Burda, Y.; Edwards, H.; Baker,
+B.; Lee, T.; Leike, J.; Schulman, J.; Sutskever, I.; and Cobbe,
+K. 2024. Let’s Verify Step by Step. In Int. Conf. on Learning
+Representations (ICLR).
+Llama Team. 2024. The Llama 3 Herd of Models. arXiv
+preprint arXiv:2407.21783.
+Malik, G. 2026. Hierarchical Reinforcement Learning with
+Runtime Safety Shielding for Power Grid Operation. arXiv
+preprint arXiv:2604.14032.
+Miculicich, L.; Parmar, M.; Palangi, H.; Dvijotham, K. D.;
+Montanari, M.; Pfister, T.; and Le, L. T. 2025. VeriGuard:
+Enhancing LLM Agent Safety via Verified Code Generation.
+arXiv preprint arXiv:2510.05156.
+Miettinen, K. 1999. Nonlinear Multiobjective Optimization.
+Kluwer Academic Publishers.
+Qwen Team. 2025. Qwen3 Technical Report. arXiv preprint
+arXiv:2505.09388.
+Sah, T.; Srivastava, V.; Sah, D.; and Jordan, K. 2026. The Ver-
+ifier Tax: Horizon-Dependent Safety-Success Tradeoffs in
+Tool-Using LLM Agents. arXiv preprint arXiv:2603.19328.
+Shao, Z.; Wang, P.; Zhu, Q.; Xu, R.; Song, J.; et al.
+2024. DeepSeekMath: Pushing the Limits of Mathemati-
+cal Reasoning in Open Language Models. arXiv preprint
+arXiv:2402.03300.
+Skalse, J.; Howe, N. H. R.; Krasheninnikov, D.; and Krueger,
+D. 2022. Defining and Characterizing Reward Hacking. In
+Advances in Neural Information Processing Systems.
+Thananjeyan, B.; Balakrishna, A.; Nair, S.; Luo, M.; Srini-
+vasan, K.; Hwang, M.; Gonzalez, J. E.; Ibarz, J.; Finn, C.;
+and Goldberg, K. 2021. Recovery RL: Safe Reinforcement
+Learning with Learned Recovery Zones. IEEE Robotics and
+Automation Letters, 6(3).
+Uesato, J.; Kushman, N.; Kumar, R.; Song, F.; Siegel, N.;
+Wang, L.; Creswell, A.; Irving, G.; and Higgins, I. 2022.
+Solving math word problems with process- and outcome-
+based feedback. arXiv preprint arXiv:2211.14275.
+Vázquez-Canteli, J. R.; Kämpf, J.; Henze, G.; and Nagy,
+Z. 2019. CityLearn v1.0: An OpenAI Gym Environment
+for Demand Response and Urban Energy Management. In
+Proceedings of the 6th ACM International Conference on
+Systems for Energy-Efficient Buildings, Cities, and Trans-
+portation (BuildSys).
+
+
+===== page 13 =====
+Wang, H.; Poskitt, C. M.; and Sun, J. 2026. AgentSpec:
+Customizable Runtime Enforcement for Safe and Reliable
+LLM Agents. In IEEE/ACM International Conference on
+Software Engineering (ICSE). ArXiv:2503.18666.
+Xiang, Z.; Zheng, L.; Li, Y.; Hong, J.; Li, Q.; Xie, H.;
+Zhang, J.; Xiong, Z.; Xie, C.; Yang, C.; Song, D.; and Li, B.
+2025. GuardAgent: Safeguard LLM Agents via Knowledge-
+Enabled Reasoning.
+In Int. Conf. on Machine Learning
+(ICML).
+Yao, S.; Zhao, J.; Yu, D.; Du, N.; Shafran, I.; Narasimhan,
+K.; and Cao, Y. 2023. ReAct: Synergizing Reasoning and
+Acting in Language Models. In Int. Conf. on Learning Rep-
+resentations (ICLR). ArXiv:2210.03629.
+Zhang, Y. 2025.
+Grid-Agent: An LLM-Powered Multi-
+Agent System for Power Grid Control.
+arXiv preprint
+arXiv:2508.05702.

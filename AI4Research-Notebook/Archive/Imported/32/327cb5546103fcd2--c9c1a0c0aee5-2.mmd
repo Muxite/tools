@@ -1,0 +1,26 @@
+flowchart TB
+    H[(Accepted hypothesis and protocol)]
+    subgraph Task[Task: construct and measure the intervention]
+        Build[POC builder CC] --> BV[Build verifier CC]
+        BV --> BG[Protected build gate]
+        BG --> Measure[Benchmark CC]
+        Measure --> MV[Measurement verifier CC]
+        MV --> MG[Protected measurement gate]
+    end
+    H --> Build
+    MG --> Eval[Scientific evaluation CC]
+    Eval --> EV[Scientific-output Evaluator Gate]
+    EV --> Report[Delivery CC]
+    Report --> DV[Delivery Evaluator Gate]
+    DV --> O[(Released report and evidence)]
+    subgraph Legend[Legend]
+        Key[Blue: CC work; purple: verification; amber: infrastructure; green: artifacts]
+    end
+    classDef work fill:#E8F0FE,stroke:#2563EB,color:#172554
+    classDef verify fill:#F3E8FF,stroke:#7E22CE,color:#3B0764
+    classDef control fill:#FEF3C7,stroke:#B45309,color:#451A03
+    classDef data fill:#DCFCE7,stroke:#15803D,color:#052E16
+    class Build,Measure,Eval,Report work
+    class BV,MV,EV,DV verify
+    class BG,MG control
+    class H,O data

@@ -1,0 +1,20 @@
+flowchart TB
+    U[User browser or CLI] <-->|http://127.0.0.1:5173| H[Host loopback publication]
+    B[Optional benchmarker container] -->|Same client contract| Web
+    subgraph Local[Single workstation Compose deployment]
+        subgraph W[Workflow application image and container]
+            direction LR
+            UI[Built web frontend assets]
+            Web[Web server and control API]
+            Runtime[Workflow runtime and local modules]
+            UI -->|Same-origin UI and API| Web
+            Web --> Runtime
+        end
+        B
+        S[(Private run state and artifacts)]
+        O[(Benchmark campaign outputs)]
+        H <-->|Host 5173 to container 5173| Web
+        Runtime --> S
+        B --> O
+    end
+    Runtime -->|Audited model access| M[Configured model endpoint]

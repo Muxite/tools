@@ -1,0 +1,9 @@
+ 4697  scheduler_path = tmp_path / "execution" / "scheduler_input.json"
+ 4698  tampered_scheduler = json.loads(scheduler_path.read_text(encoding="utf-8"))
+ 4699  tampered_scheduler["graph"]["nodes"][0]["priority"] = 999
+ 4700  scheduler_path.write_text(json.dumps(tampered_scheduler), encoding="utf-8")
+ 4701  scheduler_errors = planner.verify_frozen_execution_chain(
+ 4702      tmp_path / "semantic", tmp_path / "execution"
+ 4703  )
+ 4704  assert "scheduler_input.recomputed_mismatch" in scheduler_errors
+ 4705  assert "frozen.scheduler_input_ref.hash_mismatch" in scheduler_errors

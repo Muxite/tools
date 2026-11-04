@@ -1,0 +1,4716 @@
+{
+  "review": "Independent adversarial coding-agent review",
+  "date": "2026-11-04",
+  "reviewed_source_sha256": "cb8849d36a76832a43dd45da645cb7079635f1e1d8e2744bf1542c4b6b6bdb15",
+  "scope": [
+    "08-coding-capsule.md",
+    "01-declaration.md",
+    "03-calls-and-receipts.md",
+    "09-upstream-coding-integration.md",
+    "reference/ccv2.py",
+    "reference/test_ccv2.py",
+    "reference/integrations/upstream_native_demo.py"
+  ],
+  "trust_assumption": "Native/delegate execution is trusted-local. These probes test admission, attribution and evidence, not OS isolation. Native internal tools and helpers need no per-edit CC wrapping.",
+  "findings": [
+    {
+      "id": "CODING-01",
+      "severity": "P1",
+      "title": "Overlapping workspace roots bypass exclusive leases and misattribute edits",
+      "attempted_declaration": {
+        "bindings": {
+          "default": {
+            "kind": "jiuwenswarm",
+            "agent": "outer-or-inner"
+          }
+        },
+        "capabilities": {
+          "run": {
+            "does": "Adversarial coding fixture",
+            "takes": {
+              "workspace": "handle"
+            },
+            "gives": {
+              "evidence": "json"
+            },
+            "needs": [
+              "workspace"
+            ],
+            "changes": "outer=[workspace.read]; inner=[workspace.read,workspace.write]"
+          }
+        }
+      },
+      "attempted_calls": [
+        {
+          "key": "outer",
+          "inputs": {
+            "workspace": "parent"
+          },
+          "resource_path": "workspace",
+          "grants": [
+            "workspace.read"
+          ]
+        },
+        {
+          "key": "nested-path",
+          "inputs": {
+            "workspace": "nested"
+          },
+          "resource_path": "workspace/src",
+          "grants": [
+            "workspace.read",
+            "workspace.write"
+          ]
+        }
+      ],
+      "reproduction": "Start outer delegate and hold it with threading.Event. While it owns parent workspace lease, call inner on child path using same Host/store. Inner edits src/file.py and returns. Release outer. Compare against same-root control call.",
+      "outcome": "Same-root control blocks RESOURCE_BUSY. Child-root call succeeds and edits file; outer call then fails UNDECLARED_EFFECT due to unrelated child write. Exact string path lease does not implement nonoverlapping path assignment.",
+      "impact": "Concurrent writers can overwrite each other under overlapping roots; observers are assigned changes they did not make. No hostile native execution is required.",
+      "minimum_general_fix": "Reserve canonical filesystem scopes atomically and reject ancestor/descendant overlap against all active/unreconciled scopes before dispatch. Preserve concurrency for independent worktrees. Define scoped lease inheritance for intentional nested calls rather than allowing accidental overlaps.",
+      "evidence": {
+        "same_path": {
+          "cc": "2",
+          "call": "be96e30a-1143-4429-99b8-c3577ff53076",
+          "key": "same-path",
+          "release": "3d90ab70b78821c81b4d71f724b8a09b4bfca13817345c93ab40727e7f1b691a",
+          "capability": "run",
+          "attempt": 1,
+          "state": "blocked",
+          "completeness": "none",
+          "reason": "RESOURCE_BUSY",
+          "outputs": {},
+          "assessment": {
+            "verdict": "not_requested",
+            "checks": []
+          },
+          "provenance": {
+            "finished": 1793814534.656651,
+            "attempt_dir": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-coding-review-zvoq4vbz\\store\\attempts\\be96e30a-1143-4429-99b8-c3577ff53076"
+          },
+          "effects": {
+            "declared": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "granted": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "observed": [],
+            "assurance": "trusted_local"
+          },
+          "diagnostics": [
+            {
+              "code": "RESOURCE_BUSY",
+              "path": "",
+              "message": "Workspace has an active or unreconciled call"
+            }
+          ]
+        },
+        "child": {
+          "cc": "2",
+          "call": "f5e623b0-b5b7-40c5-aba2-5f34867abe95",
+          "key": "nested-path",
+          "release": "3d90ab70b78821c81b4d71f724b8a09b4bfca13817345c93ab40727e7f1b691a",
+          "capability": "run",
+          "attempt": 1,
+          "state": "succeeded",
+          "completeness": "complete",
+          "reason": "COMPLETED",
+          "outputs": {
+            "evidence": {}
+          },
+          "assessment": {
+            "verdict": "not_requested",
+            "checks": []
+          },
+          "provenance": {
+            "binding": {
+              "agent": "inner",
+              "kind": "jiuwenswarm"
+            },
+            "started": 1793814534.6681724,
+            "inputs": {
+              "workspace": "nested"
+            },
+            "source_release": "3d90ab70b78821c81b4d71f724b8a09b4bfca13817345c93ab40727e7f1b691a",
+            "python": {
+              "path": "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+              "sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a"
+            },
+            "workspace_before": {
+              "nested": {
+                "digest": "5b279607e73f35bd2c3b5171d4f74f4e730b0d0a90df6873c649daf9f27017a2",
+                "files": [
+                  {
+                    "path": "file.py",
+                    "sha256": "992a93455c71fedd36ac9bbc439952c041cf61445958472af479269b8d873513",
+                    "size": 5
+                  }
+                ]
+              }
+            },
+            "packages": [
+              [
+                "Authlib",
+                "1.8.0"
+              ],
+              [
+                "PyJWT",
+                "2.14.0"
+              ],
+              [
+                "PyYAML",
+                "6.0.3"
+              ],
+              [
+                "Pygments",
+                "2.21.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "aiofile",
+                "3.12.3"
+              ],
+              [
+                "annotated-types",
+                "0.8.0"
+              ],
+              [
+                "anyio",
+                "4.15.1"
+              ],
+              [
+                "attrs",
+                "26.1.0"
+              ],
+              [
+                "beartype",
+                "0.22.9"
+              ],
+              [
+                "cachetools",
+                "7.2.0"
+              ],
+              [
+                "caio",
+                "0.12.4"
+              ],
+              [
+                "certifi",
+                "2026.7.22"
+              ],
+              [
+                "cffi",
+                "2.1.1"
+              ],
+              [
+                "charset-normalizer",
+                "3.5.2"
+              ],
+              [
+                "click",
+                "8.5.0"
+              ],
+              [
+                "colorama",
+                "0.4.6"
+              ],
+              [
+                "contourpy",
+                "1.4.0"
+              ],
+              [
+                "cryptography",
+                "50.0.1"
+              ],
+              [
+                "cycler",
+                "0.12.1"
+              ],
+              [
+                "cyclopts",
+                "4.25.3"
+              ],
+              [
+                "dnspython",
+                "2.8.0"
+              ],
+              [
+                "docker",
+                "7.2.0"
+              ],
+              [
+                "docstring_parser",
+                "0.18.0"
+              ],
+              [
+                "email-validator",
+                "2.3.0"
+              ],
+              [
+                "et_xmlfile",
+                "2.0.0"
+              ],
+              [
+                "exceptiongroup",
+                "1.3.1"
+              ],
+              [
+                "fastmcp",
+                "4.0.5"
+              ],
+              [
+                "fastmcp-slim",
+                "4.0.5"
+              ],
+              [
+                "flatbuffers",
+                "25.12.19"
+              ],
+              [
+                "fonttools",
+                "4.65.0"
+              ],
+              [
+                "griffelib",
+                "2.3.0"
+              ],
+              [
+                "h11",
+                "0.16.0"
+              ],
+              [
+                "httpcore2",
+                "2.13.0"
+              ],
+              [
+                "httpx2",
+                "2.13.0"
+              ],
+              [
+                "idna",
+                "3.20"
+              ],
+              [
+                "iniconfig",
+                "2.3.0"
+              ],
+              [
+                "jaraco.classes",
+                "3.4.0"
+              ],
+              [
+                "jaraco.context",
+                "6.1.2"
+              ],
+              [
+                "jaraco.functools",
+                "4.6.0"
+              ],
+              [
+                "joserfc",
+                "1.7.5"
+              ],
+              [
+                "jsonref",
+                "1.1.0"
+              ],
+              [
+                "jsonschema",
+                "4.26.0"
+              ],
+              [
+                "jsonschema-path",
+                "0.5.0"
+              ],
+              [
+                "jsonschema-specifications",
+                "2025.9.1"
+              ],
+              [
+                "keyring",
+                "25.7.0"
+              ],
+              [
+                "kiwisolver",
+                "1.5.1"
+              ],
+              [
+                "lxml",
+                "6.1.3"
+              ],
+              [
+                "markdown-it-py",
+                "4.2.0"
+              ],
+              [
+                "matplotlib",
+                "3.11.2"
+              ],
+              [
+                "mcp",
+                "2.2.0"
+              ],
+              [
+                "mcp-types",
+                "2.2.0"
+              ],
+              [
+                "mdurl",
+                "0.1.2"
+              ],
+              [
+                "more-itertools",
+                "11.1.0"
+              ],
+              [
+                "networkx",
+                "3.6.1"
+              ],
+              [
+                "numpy",
+                "2.5.3"
+              ],
+              [
+                "onnxruntime",
+                "1.30.0"
+              ],
+              [
+                "openapi-pydantic",
+                "0.5.1"
+              ],
+              [
+                "openpyxl",
+                "3.1.5"
+              ],
+              [
+                "opentelemetry-api",
+                "1.44.0"
+              ],
+              [
+                "packaging",
+                "26.3"
+              ],
+              [
+                "pathable",
+                "0.6.0"
+              ],
+              [
+                "pillow",
+                "12.3.0"
+              ],
+              [
+                "pip",
+                "25.0.1"
+              ],
+              [
+                "platformdirs",
+                "4.11.9"
+              ],
+              [
+                "pluggy",
+                "1.6.0"
+              ],
+              [
+                "protobuf",
+                "7.36.2"
+              ],
+              [
+                "psutil",
+                "7.2.2"
+              ],
+              [
+                "py-key-value-aio",
+                "0.4.5"
+              ],
+              [
+                "pycparser",
+                "3.0"
+              ],
+              [
+                "pydantic",
+                "2.13.5"
+              ],
+              [
+                "pydantic-settings",
+                "2.15.0"
+              ],
+              [
+                "pydantic_core",
+                "2.46.5"
+              ],
+              [
+                "pymupdf",
+                "1.28.2"
+              ],
+              [
+                "pymupdf-layout",
+                "1.28.2"
+              ],
+              [
+                "pymupdf4llm",
+                "1.28.2"
+              ],
+              [
+                "pyparsing",
+                "3.3.3"
+              ],
+              [
+                "pypdf",
+                "6.18.1"
+              ],
+              [
+                "pyperclip",
+                "1.11.0"
+              ],
+              [
+                "pytest",
+                "9.1.1"
+              ],
+              [
+                "python-dateutil",
+                "2.9.0.post0"
+              ],
+              [
+                "python-docx",
+                "1.2.0"
+              ],
+              [
+                "python-dotenv",
+                "1.2.3"
+              ],
+              [
+                "python-multipart",
+                "0.0.32"
+              ],
+              [
+                "python-pptx",
+                "1.0.2"
+              ],
+              [
+                "pywin32",
+                "312"
+              ],
+              [
+                "pywin32-ctypes",
+                "0.2.3"
+              ],
+              [
+                "referencing",
+                "0.37.0"
+              ],
+              [
+                "requests",
+                "2.34.2"
+              ],
+              [
+                "rich",
+                "15.0.0"
+              ],
+              [
+                "rich-rst",
+                "2.1.0"
+              ],
+              [
+                "rpds-py",
+                "2026.6.3"
+              ],
+              [
+                "ruff",
+                "0.16.8"
+              ],
+              [
+                "six",
+                "1.17.0"
+              ],
+              [
+                "sse-starlette",
+                "3.4.11"
+              ],
+              [
+                "starlette",
+                "1.6.0"
+              ],
+              [
+                "svgpath2mpl",
+                "1.0.0"
+              ],
+              [
+                "tabulate",
+                "0.10.0"
+              ],
+              [
+                "truststore",
+                "0.10.4"
+              ],
+              [
+                "tundlekit",
+                "0.1.0"
+              ],
+              [
+                "typing-inspection",
+                "0.4.4"
+              ],
+              [
+                "typing_extensions",
+                "4.16.0"
+              ],
+              [
+                "uncalled-for",
+                "0.4.0"
+              ],
+              [
+                "urllib3",
+                "2.8.0"
+              ],
+              [
+                "uvicorn",
+                "0.53.0"
+              ],
+              [
+                "watchfiles",
+                "1.2.0"
+              ],
+              [
+                "websockets",
+                "17.1"
+              ],
+              [
+                "xlsxwriter",
+                "3.2.9"
+              ]
+            ],
+            "finished": 1793814534.8001227,
+            "attempt_dir": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-coding-review-zvoq4vbz\\store\\attempts\\f5e623b0-b5b7-40c5-aba2-5f34867abe95"
+          },
+          "effects": {
+            "declared": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "granted": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "observed": [
+              {
+                "resource": "nested",
+                "kind": "workspace.snapshot",
+                "before": "5b279607e73f35bd2c3b5171d4f74f4e730b0d0a90df6873c649daf9f27017a2",
+                "after": "4aeec8abe601124e0c4319d77f7229c42a18f33b7458f8823578bfd3817e4da2",
+                "changes": [
+                  {
+                    "path": "file.py",
+                    "before": {
+                      "path": "file.py",
+                      "sha256": "992a93455c71fedd36ac9bbc439952c041cf61445958472af479269b8d873513",
+                      "size": 5
+                    },
+                    "after": {
+                      "path": "file.py",
+                      "sha256": "5439616c4fd2b84f3dec663e703ca6b0b7a45e82b074cc17b92cf58542131626",
+                      "size": 19
+                    }
+                  }
+                ]
+              }
+            ],
+            "assurance": "native_host_policy"
+          },
+          "diagnostics": []
+        },
+        "outer": {
+          "cc": "2",
+          "call": "760b60c5-1cba-4742-ad04-42672844b30a",
+          "key": "outer",
+          "release": "c279ae49e4148703c35d5798a4bda1db0343c98f1686720fcf301f0b6372aff4",
+          "capability": "run",
+          "attempt": 1,
+          "state": "failed",
+          "completeness": "complete",
+          "reason": "UNDECLARED_EFFECT",
+          "outputs": {
+            "evidence": {}
+          },
+          "assessment": {
+            "verdict": "not_requested",
+            "checks": []
+          },
+          "provenance": {
+            "binding": {
+              "agent": "outer",
+              "kind": "jiuwenswarm"
+            },
+            "started": 1793814534.512325,
+            "inputs": {
+              "workspace": "parent"
+            },
+            "source_release": "c279ae49e4148703c35d5798a4bda1db0343c98f1686720fcf301f0b6372aff4",
+            "python": {
+              "path": "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+              "sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a"
+            },
+            "workspace_before": {
+              "parent": {
+                "digest": "8db747e23830a4dfcc1632eeeccdb8740e0cbe46bd3dfe24ff9efc1ebdfe1474",
+                "files": [
+                  {
+                    "path": "dirty.txt",
+                    "sha256": "505e7aad9aff62f92a94fcec29cf9f3500a9f818fb4c54b82e5bd26d8697d5fd",
+                    "size": 10
+                  },
+                  {
+                    "path": "scratch.bin",
+                    "sha256": "06eb7d6a69ee19e5fbdf749018d3d2abfa04bcbd1365db312eb86dc7169389b8",
+                    "size": 2
+                  },
+                  {
+                    "path": "src/file.py",
+                    "sha256": "992a93455c71fedd36ac9bbc439952c041cf61445958472af479269b8d873513",
+                    "size": 5
+                  }
+                ]
+              }
+            },
+            "packages": [
+              [
+                "Authlib",
+                "1.8.0"
+              ],
+              [
+                "PyJWT",
+                "2.14.0"
+              ],
+              [
+                "PyYAML",
+                "6.0.3"
+              ],
+              [
+                "Pygments",
+                "2.21.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "aiofile",
+                "3.12.3"
+              ],
+              [
+                "annotated-types",
+                "0.8.0"
+              ],
+              [
+                "anyio",
+                "4.15.1"
+              ],
+              [
+                "attrs",
+                "26.1.0"
+              ],
+              [
+                "beartype",
+                "0.22.9"
+              ],
+              [
+                "cachetools",
+                "7.2.0"
+              ],
+              [
+                "caio",
+                "0.12.4"
+              ],
+              [
+                "certifi",
+                "2026.7.22"
+              ],
+              [
+                "cffi",
+                "2.1.1"
+              ],
+              [
+                "charset-normalizer",
+                "3.5.2"
+              ],
+              [
+                "click",
+                "8.5.0"
+              ],
+              [
+                "colorama",
+                "0.4.6"
+              ],
+              [
+                "contourpy",
+                "1.4.0"
+              ],
+              [
+                "cryptography",
+                "50.0.1"
+              ],
+              [
+                "cycler",
+                "0.12.1"
+              ],
+              [
+                "cyclopts",
+                "4.25.3"
+              ],
+              [
+                "dnspython",
+                "2.8.0"
+              ],
+              [
+                "docker",
+                "7.2.0"
+              ],
+              [
+                "docstring_parser",
+                "0.18.0"
+              ],
+              [
+                "email-validator",
+                "2.3.0"
+              ],
+              [
+                "et_xmlfile",
+                "2.0.0"
+              ],
+              [
+                "exceptiongroup",
+                "1.3.1"
+              ],
+              [
+                "fastmcp",
+                "4.0.5"
+              ],
+              [
+                "fastmcp-slim",
+                "4.0.5"
+              ],
+              [
+                "flatbuffers",
+                "25.12.19"
+              ],
+              [
+                "fonttools",
+                "4.65.0"
+              ],
+              [
+                "griffelib",
+                "2.3.0"
+              ],
+              [
+                "h11",
+                "0.16.0"
+              ],
+              [
+                "httpcore2",
+                "2.13.0"
+              ],
+              [
+                "httpx2",
+                "2.13.0"
+              ],
+              [
+                "idna",
+                "3.20"
+              ],
+              [
+                "iniconfig",
+                "2.3.0"
+              ],
+              [
+                "jaraco.classes",
+                "3.4.0"
+              ],
+              [
+                "jaraco.context",
+                "6.1.2"
+              ],
+              [
+                "jaraco.functools",
+                "4.6.0"
+              ],
+              [
+                "joserfc",
+                "1.7.5"
+              ],
+              [
+                "jsonref",
+                "1.1.0"
+              ],
+              [
+                "jsonschema",
+                "4.26.0"
+              ],
+              [
+                "jsonschema-path",
+                "0.5.0"
+              ],
+              [
+                "jsonschema-specifications",
+                "2025.9.1"
+              ],
+              [
+                "keyring",
+                "25.7.0"
+              ],
+              [
+                "kiwisolver",
+                "1.5.1"
+              ],
+              [
+                "lxml",
+                "6.1.3"
+              ],
+              [
+                "markdown-it-py",
+                "4.2.0"
+              ],
+              [
+                "matplotlib",
+                "3.11.2"
+              ],
+              [
+                "mcp",
+                "2.2.0"
+              ],
+              [
+                "mcp-types",
+                "2.2.0"
+              ],
+              [
+                "mdurl",
+                "0.1.2"
+              ],
+              [
+                "more-itertools",
+                "11.1.0"
+              ],
+              [
+                "networkx",
+                "3.6.1"
+              ],
+              [
+                "numpy",
+                "2.5.3"
+              ],
+              [
+                "onnxruntime",
+                "1.30.0"
+              ],
+              [
+                "openapi-pydantic",
+                "0.5.1"
+              ],
+              [
+                "openpyxl",
+                "3.1.5"
+              ],
+              [
+                "opentelemetry-api",
+                "1.44.0"
+              ],
+              [
+                "packaging",
+                "26.3"
+              ],
+              [
+                "pathable",
+                "0.6.0"
+              ],
+              [
+                "pillow",
+                "12.3.0"
+              ],
+              [
+                "pip",
+                "25.0.1"
+              ],
+              [
+                "platformdirs",
+                "4.11.9"
+              ],
+              [
+                "pluggy",
+                "1.6.0"
+              ],
+              [
+                "protobuf",
+                "7.36.2"
+              ],
+              [
+                "psutil",
+                "7.2.2"
+              ],
+              [
+                "py-key-value-aio",
+                "0.4.5"
+              ],
+              [
+                "pycparser",
+                "3.0"
+              ],
+              [
+                "pydantic",
+                "2.13.5"
+              ],
+              [
+                "pydantic-settings",
+                "2.15.0"
+              ],
+              [
+                "pydantic_core",
+                "2.46.5"
+              ],
+              [
+                "pymupdf",
+                "1.28.2"
+              ],
+              [
+                "pymupdf-layout",
+                "1.28.2"
+              ],
+              [
+                "pymupdf4llm",
+                "1.28.2"
+              ],
+              [
+                "pyparsing",
+                "3.3.3"
+              ],
+              [
+                "pypdf",
+                "6.18.1"
+              ],
+              [
+                "pyperclip",
+                "1.11.0"
+              ],
+              [
+                "pytest",
+                "9.1.1"
+              ],
+              [
+                "python-dateutil",
+                "2.9.0.post0"
+              ],
+              [
+                "python-docx",
+                "1.2.0"
+              ],
+              [
+                "python-dotenv",
+                "1.2.3"
+              ],
+              [
+                "python-multipart",
+                "0.0.32"
+              ],
+              [
+                "python-pptx",
+                "1.0.2"
+              ],
+              [
+                "pywin32",
+                "312"
+              ],
+              [
+                "pywin32-ctypes",
+                "0.2.3"
+              ],
+              [
+                "referencing",
+                "0.37.0"
+              ],
+              [
+                "requests",
+                "2.34.2"
+              ],
+              [
+                "rich",
+                "15.0.0"
+              ],
+              [
+                "rich-rst",
+                "2.1.0"
+              ],
+              [
+                "rpds-py",
+                "2026.6.3"
+              ],
+              [
+                "ruff",
+                "0.16.8"
+              ],
+              [
+                "six",
+                "1.17.0"
+              ],
+              [
+                "sse-starlette",
+                "3.4.11"
+              ],
+              [
+                "starlette",
+                "1.6.0"
+              ],
+              [
+                "svgpath2mpl",
+                "1.0.0"
+              ],
+              [
+                "tabulate",
+                "0.10.0"
+              ],
+              [
+                "truststore",
+                "0.10.4"
+              ],
+              [
+                "tundlekit",
+                "0.1.0"
+              ],
+              [
+                "typing-inspection",
+                "0.4.4"
+              ],
+              [
+                "typing_extensions",
+                "4.16.0"
+              ],
+              [
+                "uncalled-for",
+                "0.4.0"
+              ],
+              [
+                "urllib3",
+                "2.8.0"
+              ],
+              [
+                "uvicorn",
+                "0.53.0"
+              ],
+              [
+                "watchfiles",
+                "1.2.0"
+              ],
+              [
+                "websockets",
+                "17.1"
+              ],
+              [
+                "xlsxwriter",
+                "3.2.9"
+              ]
+            ],
+            "finished": 1793814534.807617,
+            "attempt_dir": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-coding-review-zvoq4vbz\\store\\attempts\\760b60c5-1cba-4742-ad04-42672844b30a"
+          },
+          "effects": {
+            "declared": [
+              "workspace.read"
+            ],
+            "granted": [
+              "workspace.read"
+            ],
+            "observed": [
+              {
+                "resource": "parent",
+                "kind": "workspace.snapshot",
+                "before": "8db747e23830a4dfcc1632eeeccdb8740e0cbe46bd3dfe24ff9efc1ebdfe1474",
+                "after": "90548629d103cfdb1be582458f736cd3579c344040d5673c02a2df1d31272f88",
+                "changes": [
+                  {
+                    "path": "src/file.py",
+                    "before": {
+                      "path": "src/file.py",
+                      "sha256": "992a93455c71fedd36ac9bbc439952c041cf61445958472af479269b8d873513",
+                      "size": 5
+                    },
+                    "after": {
+                      "path": "src/file.py",
+                      "sha256": "5439616c4fd2b84f3dec663e703ca6b0b7a45e82b074cc17b92cf58542131626",
+                      "size": 19
+                    }
+                  }
+                ]
+              }
+            ],
+            "assurance": "native_host_policy"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "CODING-02",
+      "severity": "P2",
+      "title": "Generic snapshot is insufficient to identify coding source and dependency state",
+      "attempted_declaration": {
+        "changes": [
+          "workspace.read",
+          "workspace.write",
+          "process.exec",
+          "dependency.install"
+        ],
+        "needs": [
+          "workspace"
+        ],
+        "takes": {
+          "workspace": "handle"
+        }
+      },
+      "attempted_call": {
+        "key": "metadata",
+        "capability": "run",
+        "inputs": {
+          "workspace": "parent"
+        },
+        "grants": [
+          "workspace.read",
+          "workspace.write",
+          "process.exec",
+          "dependency.install"
+        ]
+      },
+      "reproduction": "Initialize Git repository. Save HEAD and Host snapshot. Registered callback creates an empty commit and writes .venv/installed-package.dist-info. Compare HEAD and snapshots after successful call.",
+      "outcome": "HEAD changes, dependency file is created, yet snapshot is identical and observed workspace changes is empty. Receipt contains file-byte snapshot but no Git starting commit/index/mode state.",
+      "impact": "The coding contract asks for starting commit plus dirty state, modes and required external objects. Host generic observations and the happy-path native fixture do not establish that evidence. This is an evidence completeness gap, not a native sandbox bypass; section 03 already admits workspace-diff limits.",
+      "minimum_general_fix": "Add coding-specific evidence capture/policy: Git HEAD/index/modes plus dirty/untracked/binary state, explicit dependency environment/lock identity and relevant external objects. Mark absent evidence explicitly and avoid implying generic snapshots fully identify the tested tree or environment. Keep ignored caches excluded from ordinary source scanning.",
+      "evidence": {
+        "receipt": {
+          "cc": "2",
+          "call": "df03bf16-187d-4d21-aff6-77febf3435b6",
+          "key": "metadata",
+          "release": "1bb68a1fd0cc555c8aa9f592fd8bcc1d286b94da383fbed4b4a879a51e670e45",
+          "capability": "run",
+          "attempt": 1,
+          "state": "succeeded",
+          "completeness": "complete",
+          "reason": "COMPLETED",
+          "outputs": {
+            "evidence": {}
+          },
+          "assessment": {
+            "verdict": "not_requested",
+            "checks": []
+          },
+          "provenance": {
+            "binding": {
+              "agent": "metadata",
+              "kind": "jiuwenswarm"
+            },
+            "started": 1793814535.1008246,
+            "inputs": {
+              "workspace": "parent"
+            },
+            "source_release": "1bb68a1fd0cc555c8aa9f592fd8bcc1d286b94da383fbed4b4a879a51e670e45",
+            "python": {
+              "path": "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+              "sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a"
+            },
+            "workspace_before": {
+              "parent": {
+                "digest": "90548629d103cfdb1be582458f736cd3579c344040d5673c02a2df1d31272f88",
+                "files": [
+                  {
+                    "path": "dirty.txt",
+                    "sha256": "505e7aad9aff62f92a94fcec29cf9f3500a9f818fb4c54b82e5bd26d8697d5fd",
+                    "size": 10
+                  },
+                  {
+                    "path": "scratch.bin",
+                    "sha256": "06eb7d6a69ee19e5fbdf749018d3d2abfa04bcbd1365db312eb86dc7169389b8",
+                    "size": 2
+                  },
+                  {
+                    "path": "src/file.py",
+                    "sha256": "5439616c4fd2b84f3dec663e703ca6b0b7a45e82b074cc17b92cf58542131626",
+                    "size": 19
+                  }
+                ]
+              }
+            },
+            "packages": [
+              [
+                "Authlib",
+                "1.8.0"
+              ],
+              [
+                "PyJWT",
+                "2.14.0"
+              ],
+              [
+                "PyYAML",
+                "6.0.3"
+              ],
+              [
+                "Pygments",
+                "2.21.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "aiofile",
+                "3.12.3"
+              ],
+              [
+                "annotated-types",
+                "0.8.0"
+              ],
+              [
+                "anyio",
+                "4.15.1"
+              ],
+              [
+                "attrs",
+                "26.1.0"
+              ],
+              [
+                "beartype",
+                "0.22.9"
+              ],
+              [
+                "cachetools",
+                "7.2.0"
+              ],
+              [
+                "caio",
+                "0.12.4"
+              ],
+              [
+                "certifi",
+                "2026.7.22"
+              ],
+              [
+                "cffi",
+                "2.1.1"
+              ],
+              [
+                "charset-normalizer",
+                "3.5.2"
+              ],
+              [
+                "click",
+                "8.5.0"
+              ],
+              [
+                "colorama",
+                "0.4.6"
+              ],
+              [
+                "contourpy",
+                "1.4.0"
+              ],
+              [
+                "cryptography",
+                "50.0.1"
+              ],
+              [
+                "cycler",
+                "0.12.1"
+              ],
+              [
+                "cyclopts",
+                "4.25.3"
+              ],
+              [
+                "dnspython",
+                "2.8.0"
+              ],
+              [
+                "docker",
+                "7.2.0"
+              ],
+              [
+                "docstring_parser",
+                "0.18.0"
+              ],
+              [
+                "email-validator",
+                "2.3.0"
+              ],
+              [
+                "et_xmlfile",
+                "2.0.0"
+              ],
+              [
+                "exceptiongroup",
+                "1.3.1"
+              ],
+              [
+                "fastmcp",
+                "4.0.5"
+              ],
+              [
+                "fastmcp-slim",
+                "4.0.5"
+              ],
+              [
+                "flatbuffers",
+                "25.12.19"
+              ],
+              [
+                "fonttools",
+                "4.65.0"
+              ],
+              [
+                "griffelib",
+                "2.3.0"
+              ],
+              [
+                "h11",
+                "0.16.0"
+              ],
+              [
+                "httpcore2",
+                "2.13.0"
+              ],
+              [
+                "httpx2",
+                "2.13.0"
+              ],
+              [
+                "idna",
+                "3.20"
+              ],
+              [
+                "iniconfig",
+                "2.3.0"
+              ],
+              [
+                "jaraco.classes",
+                "3.4.0"
+              ],
+              [
+                "jaraco.context",
+                "6.1.2"
+              ],
+              [
+                "jaraco.functools",
+                "4.6.0"
+              ],
+              [
+                "joserfc",
+                "1.7.5"
+              ],
+              [
+                "jsonref",
+                "1.1.0"
+              ],
+              [
+                "jsonschema",
+                "4.26.0"
+              ],
+              [
+                "jsonschema-path",
+                "0.5.0"
+              ],
+              [
+                "jsonschema-specifications",
+                "2025.9.1"
+              ],
+              [
+                "keyring",
+                "25.7.0"
+              ],
+              [
+                "kiwisolver",
+                "1.5.1"
+              ],
+              [
+                "lxml",
+                "6.1.3"
+              ],
+              [
+                "markdown-it-py",
+                "4.2.0"
+              ],
+              [
+                "matplotlib",
+                "3.11.2"
+              ],
+              [
+                "mcp",
+                "2.2.0"
+              ],
+              [
+                "mcp-types",
+                "2.2.0"
+              ],
+              [
+                "mdurl",
+                "0.1.2"
+              ],
+              [
+                "more-itertools",
+                "11.1.0"
+              ],
+              [
+                "networkx",
+                "3.6.1"
+              ],
+              [
+                "numpy",
+                "2.5.3"
+              ],
+              [
+                "onnxruntime",
+                "1.30.0"
+              ],
+              [
+                "openapi-pydantic",
+                "0.5.1"
+              ],
+              [
+                "openpyxl",
+                "3.1.5"
+              ],
+              [
+                "opentelemetry-api",
+                "1.44.0"
+              ],
+              [
+                "packaging",
+                "26.3"
+              ],
+              [
+                "pathable",
+                "0.6.0"
+              ],
+              [
+                "pillow",
+                "12.3.0"
+              ],
+              [
+                "pip",
+                "25.0.1"
+              ],
+              [
+                "platformdirs",
+                "4.11.9"
+              ],
+              [
+                "pluggy",
+                "1.6.0"
+              ],
+              [
+                "protobuf",
+                "7.36.2"
+              ],
+              [
+                "psutil",
+                "7.2.2"
+              ],
+              [
+                "py-key-value-aio",
+                "0.4.5"
+              ],
+              [
+                "pycparser",
+                "3.0"
+              ],
+              [
+                "pydantic",
+                "2.13.5"
+              ],
+              [
+                "pydantic-settings",
+                "2.15.0"
+              ],
+              [
+                "pydantic_core",
+                "2.46.5"
+              ],
+              [
+                "pymupdf",
+                "1.28.2"
+              ],
+              [
+                "pymupdf-layout",
+                "1.28.2"
+              ],
+              [
+                "pymupdf4llm",
+                "1.28.2"
+              ],
+              [
+                "pyparsing",
+                "3.3.3"
+              ],
+              [
+                "pypdf",
+                "6.18.1"
+              ],
+              [
+                "pyperclip",
+                "1.11.0"
+              ],
+              [
+                "pytest",
+                "9.1.1"
+              ],
+              [
+                "python-dateutil",
+                "2.9.0.post0"
+              ],
+              [
+                "python-docx",
+                "1.2.0"
+              ],
+              [
+                "python-dotenv",
+                "1.2.3"
+              ],
+              [
+                "python-multipart",
+                "0.0.32"
+              ],
+              [
+                "python-pptx",
+                "1.0.2"
+              ],
+              [
+                "pywin32",
+                "312"
+              ],
+              [
+                "pywin32-ctypes",
+                "0.2.3"
+              ],
+              [
+                "referencing",
+                "0.37.0"
+              ],
+              [
+                "requests",
+                "2.34.2"
+              ],
+              [
+                "rich",
+                "15.0.0"
+              ],
+              [
+                "rich-rst",
+                "2.1.0"
+              ],
+              [
+                "rpds-py",
+                "2026.6.3"
+              ],
+              [
+                "ruff",
+                "0.16.8"
+              ],
+              [
+                "six",
+                "1.17.0"
+              ],
+              [
+                "sse-starlette",
+                "3.4.11"
+              ],
+              [
+                "starlette",
+                "1.6.0"
+              ],
+              [
+                "svgpath2mpl",
+                "1.0.0"
+              ],
+              [
+                "tabulate",
+                "0.10.0"
+              ],
+              [
+                "truststore",
+                "0.10.4"
+              ],
+              [
+                "tundlekit",
+                "0.1.0"
+              ],
+              [
+                "typing-inspection",
+                "0.4.4"
+              ],
+              [
+                "typing_extensions",
+                "4.16.0"
+              ],
+              [
+                "uncalled-for",
+                "0.4.0"
+              ],
+              [
+                "urllib3",
+                "2.8.0"
+              ],
+              [
+                "uvicorn",
+                "0.53.0"
+              ],
+              [
+                "watchfiles",
+                "1.2.0"
+              ],
+              [
+                "websockets",
+                "17.1"
+              ],
+              [
+                "xlsxwriter",
+                "3.2.9"
+              ]
+            ],
+            "finished": 1793814535.3406668,
+            "attempt_dir": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-coding-review-zvoq4vbz\\store\\attempts\\df03bf16-187d-4d21-aff6-77febf3435b6"
+          },
+          "effects": {
+            "declared": [
+              "workspace.read",
+              "workspace.write",
+              "process.exec",
+              "dependency.install"
+            ],
+            "granted": [
+              "dependency.install",
+              "process.exec",
+              "workspace.read",
+              "workspace.write"
+            ],
+            "observed": [
+              {
+                "resource": "parent",
+                "kind": "workspace.snapshot",
+                "before": "90548629d103cfdb1be582458f736cd3579c344040d5673c02a2df1d31272f88",
+                "after": "90548629d103cfdb1be582458f736cd3579c344040d5673c02a2df1d31272f88",
+                "changes": []
+              }
+            ],
+            "assurance": "native_host_policy"
+          },
+          "diagnostics": []
+        },
+        "head_before": "2381068497480e50a929559ef2437fd05fc7d3ef",
+        "head_after": "9e4dcc37b232b7ac82e9c51925ea6abc9dcd7d32",
+        "snapshot_unchanged": true
+      }
+    }
+  ],
+  "passing_controls": [
+    {
+      "scenario": "Direct editing with preexisting dirty text and untracked binary",
+      "outcome": "Partial result and interruption reason retained; both unrelated files unchanged.",
+      "evidence": {
+        "receipt": {
+          "cc": "2",
+          "call": "7f0c2d53-247b-4c64-8048-ce1596fef4b7",
+          "key": "direct",
+          "release": "3d8c7cfbc61e5dc7da27c1f1c3528470bc62d666c9933011e8390cea5774c247",
+          "capability": "run",
+          "attempt": 1,
+          "state": "succeeded",
+          "completeness": "partial",
+          "reason": "PARTIAL_OUTPUT",
+          "outputs": {
+            "evidence": {
+              "tests_passed": false
+            }
+          },
+          "assessment": {
+            "verdict": "not_requested",
+            "checks": []
+          },
+          "provenance": {
+            "binding": {
+              "agent": "direct",
+              "kind": "jiuwenswarm"
+            },
+            "started": 1793814534.3304448,
+            "inputs": {
+              "workspace": "parent"
+            },
+            "source_release": "3d8c7cfbc61e5dc7da27c1f1c3528470bc62d666c9933011e8390cea5774c247",
+            "python": {
+              "path": "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+              "sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a"
+            },
+            "workspace_before": {
+              "parent": {
+                "digest": "109c5c58f520aa90a2318e8c1d866ea1e829df2f11372a08953d21e70d67715d",
+                "files": [
+                  {
+                    "path": "dirty.txt",
+                    "sha256": "505e7aad9aff62f92a94fcec29cf9f3500a9f818fb4c54b82e5bd26d8697d5fd",
+                    "size": 10
+                  },
+                  {
+                    "path": "scratch.bin",
+                    "sha256": "06eb7d6a69ee19e5fbdf749018d3d2abfa04bcbd1365db312eb86dc7169389b8",
+                    "size": 2
+                  },
+                  {
+                    "path": "src/file.py",
+                    "sha256": "ac1b5c0961a7269b6a053ee64276ed0e20a7f48aefb9f67519539d23aaf10149",
+                    "size": 7
+                  }
+                ]
+              }
+            },
+            "packages": [
+              [
+                "Authlib",
+                "1.8.0"
+              ],
+              [
+                "PyJWT",
+                "2.14.0"
+              ],
+              [
+                "PyYAML",
+                "6.0.3"
+              ],
+              [
+                "Pygments",
+                "2.21.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "aiofile",
+                "3.12.3"
+              ],
+              [
+                "annotated-types",
+                "0.8.0"
+              ],
+              [
+                "anyio",
+                "4.15.1"
+              ],
+              [
+                "attrs",
+                "26.1.0"
+              ],
+              [
+                "beartype",
+                "0.22.9"
+              ],
+              [
+                "cachetools",
+                "7.2.0"
+              ],
+              [
+                "caio",
+                "0.12.4"
+              ],
+              [
+                "certifi",
+                "2026.7.22"
+              ],
+              [
+                "cffi",
+                "2.1.1"
+              ],
+              [
+                "charset-normalizer",
+                "3.5.2"
+              ],
+              [
+                "click",
+                "8.5.0"
+              ],
+              [
+                "colorama",
+                "0.4.6"
+              ],
+              [
+                "contourpy",
+                "1.4.0"
+              ],
+              [
+                "cryptography",
+                "50.0.1"
+              ],
+              [
+                "cycler",
+                "0.12.1"
+              ],
+              [
+                "cyclopts",
+                "4.25.3"
+              ],
+              [
+                "dnspython",
+                "2.8.0"
+              ],
+              [
+                "docker",
+                "7.2.0"
+              ],
+              [
+                "docstring_parser",
+                "0.18.0"
+              ],
+              [
+                "email-validator",
+                "2.3.0"
+              ],
+              [
+                "et_xmlfile",
+                "2.0.0"
+              ],
+              [
+                "exceptiongroup",
+                "1.3.1"
+              ],
+              [
+                "fastmcp",
+                "4.0.5"
+              ],
+              [
+                "fastmcp-slim",
+                "4.0.5"
+              ],
+              [
+                "flatbuffers",
+                "25.12.19"
+              ],
+              [
+                "fonttools",
+                "4.65.0"
+              ],
+              [
+                "griffelib",
+                "2.3.0"
+              ],
+              [
+                "h11",
+                "0.16.0"
+              ],
+              [
+                "httpcore2",
+                "2.13.0"
+              ],
+              [
+                "httpx2",
+                "2.13.0"
+              ],
+              [
+                "idna",
+                "3.20"
+              ],
+              [
+                "iniconfig",
+                "2.3.0"
+              ],
+              [
+                "jaraco.classes",
+                "3.4.0"
+              ],
+              [
+                "jaraco.context",
+                "6.1.2"
+              ],
+              [
+                "jaraco.functools",
+                "4.6.0"
+              ],
+              [
+                "joserfc",
+                "1.7.5"
+              ],
+              [
+                "jsonref",
+                "1.1.0"
+              ],
+              [
+                "jsonschema",
+                "4.26.0"
+              ],
+              [
+                "jsonschema-path",
+                "0.5.0"
+              ],
+              [
+                "jsonschema-specifications",
+                "2025.9.1"
+              ],
+              [
+                "keyring",
+                "25.7.0"
+              ],
+              [
+                "kiwisolver",
+                "1.5.1"
+              ],
+              [
+                "lxml",
+                "6.1.3"
+              ],
+              [
+                "markdown-it-py",
+                "4.2.0"
+              ],
+              [
+                "matplotlib",
+                "3.11.2"
+              ],
+              [
+                "mcp",
+                "2.2.0"
+              ],
+              [
+                "mcp-types",
+                "2.2.0"
+              ],
+              [
+                "mdurl",
+                "0.1.2"
+              ],
+              [
+                "more-itertools",
+                "11.1.0"
+              ],
+              [
+                "networkx",
+                "3.6.1"
+              ],
+              [
+                "numpy",
+                "2.5.3"
+              ],
+              [
+                "onnxruntime",
+                "1.30.0"
+              ],
+              [
+                "openapi-pydantic",
+                "0.5.1"
+              ],
+              [
+                "openpyxl",
+                "3.1.5"
+              ],
+              [
+                "opentelemetry-api",
+                "1.44.0"
+              ],
+              [
+                "packaging",
+                "26.3"
+              ],
+              [
+                "pathable",
+                "0.6.0"
+              ],
+              [
+                "pillow",
+                "12.3.0"
+              ],
+              [
+                "pip",
+                "25.0.1"
+              ],
+              [
+                "platformdirs",
+                "4.11.9"
+              ],
+              [
+                "pluggy",
+                "1.6.0"
+              ],
+              [
+                "protobuf",
+                "7.36.2"
+              ],
+              [
+                "psutil",
+                "7.2.2"
+              ],
+              [
+                "py-key-value-aio",
+                "0.4.5"
+              ],
+              [
+                "pycparser",
+                "3.0"
+              ],
+              [
+                "pydantic",
+                "2.13.5"
+              ],
+              [
+                "pydantic-settings",
+                "2.15.0"
+              ],
+              [
+                "pydantic_core",
+                "2.46.5"
+              ],
+              [
+                "pymupdf",
+                "1.28.2"
+              ],
+              [
+                "pymupdf-layout",
+                "1.28.2"
+              ],
+              [
+                "pymupdf4llm",
+                "1.28.2"
+              ],
+              [
+                "pyparsing",
+                "3.3.3"
+              ],
+              [
+                "pypdf",
+                "6.18.1"
+              ],
+              [
+                "pyperclip",
+                "1.11.0"
+              ],
+              [
+                "pytest",
+                "9.1.1"
+              ],
+              [
+                "python-dateutil",
+                "2.9.0.post0"
+              ],
+              [
+                "python-docx",
+                "1.2.0"
+              ],
+              [
+                "python-dotenv",
+                "1.2.3"
+              ],
+              [
+                "python-multipart",
+                "0.0.32"
+              ],
+              [
+                "python-pptx",
+                "1.0.2"
+              ],
+              [
+                "pywin32",
+                "312"
+              ],
+              [
+                "pywin32-ctypes",
+                "0.2.3"
+              ],
+              [
+                "referencing",
+                "0.37.0"
+              ],
+              [
+                "requests",
+                "2.34.2"
+              ],
+              [
+                "rich",
+                "15.0.0"
+              ],
+              [
+                "rich-rst",
+                "2.1.0"
+              ],
+              [
+                "rpds-py",
+                "2026.6.3"
+              ],
+              [
+                "ruff",
+                "0.16.8"
+              ],
+              [
+                "six",
+                "1.17.0"
+              ],
+              [
+                "sse-starlette",
+                "3.4.11"
+              ],
+              [
+                "starlette",
+                "1.6.0"
+              ],
+              [
+                "svgpath2mpl",
+                "1.0.0"
+              ],
+              [
+                "tabulate",
+                "0.10.0"
+              ],
+              [
+                "truststore",
+                "0.10.4"
+              ],
+              [
+                "tundlekit",
+                "0.1.0"
+              ],
+              [
+                "typing-inspection",
+                "0.4.4"
+              ],
+              [
+                "typing_extensions",
+                "4.16.0"
+              ],
+              [
+                "uncalled-for",
+                "0.4.0"
+              ],
+              [
+                "urllib3",
+                "2.8.0"
+              ],
+              [
+                "uvicorn",
+                "0.53.0"
+              ],
+              [
+                "watchfiles",
+                "1.2.0"
+              ],
+              [
+                "websockets",
+                "17.1"
+              ],
+              [
+                "xlsxwriter",
+                "3.2.9"
+              ]
+            ],
+            "finished": 1793814534.4765253,
+            "attempt_dir": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-coding-review-zvoq4vbz\\store\\attempts\\7f0c2d53-247b-4c64-8048-ce1596fef4b7"
+          },
+          "effects": {
+            "declared": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "granted": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "observed": [
+              {
+                "resource": "parent",
+                "kind": "workspace.snapshot",
+                "before": "109c5c58f520aa90a2318e8c1d866ea1e829df2f11372a08953d21e70d67715d",
+                "after": "8db747e23830a4dfcc1632eeeccdb8740e0cbe46bd3dfe24ff9efc1ebdfe1474",
+                "changes": [
+                  {
+                    "path": "src/file.py",
+                    "before": {
+                      "path": "src/file.py",
+                      "sha256": "ac1b5c0961a7269b6a053ee64276ed0e20a7f48aefb9f67519539d23aaf10149",
+                      "size": 7
+                    },
+                    "after": {
+                      "path": "src/file.py",
+                      "sha256": "992a93455c71fedd36ac9bbc439952c041cf61445958472af479269b8d873513",
+                      "size": 5
+                    }
+                  }
+                ]
+              }
+            ],
+            "assurance": "native_host_policy"
+          },
+          "diagnostics": [
+            {
+              "code": "PARTIAL_OUTPUT",
+              "message": "Tests interrupted; edits retained"
+            }
+          ]
+        },
+        "dirty_preserved": true,
+        "untracked_binary_preserved": true
+      }
+    },
+    {
+      "scenario": "Nested native helper/delegate work inside one reusable task",
+      "outcome": "Internal helper edited file; outer CC task succeeded and snapshot observed it without per-edit wrapping.",
+      "evidence": {
+        "receipt": {
+          "cc": "2",
+          "call": "a4d18094-c8d6-4f66-9bb1-732734cf52ca",
+          "key": "delegated",
+          "release": "ee094ae206bde6afe87284f7f880a056db8a5087b03d4297511dccd702a67244",
+          "capability": "run",
+          "attempt": 1,
+          "state": "succeeded",
+          "completeness": "complete",
+          "reason": "COMPLETED",
+          "outputs": {
+            "evidence": {
+              "nested_helper": true
+            }
+          },
+          "assessment": {
+            "verdict": "not_requested",
+            "checks": []
+          },
+          "provenance": {
+            "binding": {
+              "agent": "delegated",
+              "kind": "jiuwenswarm"
+            },
+            "started": 1793814535.425146,
+            "inputs": {
+              "workspace": "parent"
+            },
+            "source_release": "ee094ae206bde6afe87284f7f880a056db8a5087b03d4297511dccd702a67244",
+            "python": {
+              "path": "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+              "sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a"
+            },
+            "workspace_before": {
+              "parent": {
+                "digest": "90548629d103cfdb1be582458f736cd3579c344040d5673c02a2df1d31272f88",
+                "files": [
+                  {
+                    "path": "dirty.txt",
+                    "sha256": "505e7aad9aff62f92a94fcec29cf9f3500a9f818fb4c54b82e5bd26d8697d5fd",
+                    "size": 10
+                  },
+                  {
+                    "path": "scratch.bin",
+                    "sha256": "06eb7d6a69ee19e5fbdf749018d3d2abfa04bcbd1365db312eb86dc7169389b8",
+                    "size": 2
+                  },
+                  {
+                    "path": "src/file.py",
+                    "sha256": "5439616c4fd2b84f3dec663e703ca6b0b7a45e82b074cc17b92cf58542131626",
+                    "size": 19
+                  }
+                ]
+              }
+            },
+            "packages": [
+              [
+                "Authlib",
+                "1.8.0"
+              ],
+              [
+                "PyJWT",
+                "2.14.0"
+              ],
+              [
+                "PyYAML",
+                "6.0.3"
+              ],
+              [
+                "Pygments",
+                "2.21.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "aiofile",
+                "3.12.3"
+              ],
+              [
+                "annotated-types",
+                "0.8.0"
+              ],
+              [
+                "anyio",
+                "4.15.1"
+              ],
+              [
+                "attrs",
+                "26.1.0"
+              ],
+              [
+                "beartype",
+                "0.22.9"
+              ],
+              [
+                "cachetools",
+                "7.2.0"
+              ],
+              [
+                "caio",
+                "0.12.4"
+              ],
+              [
+                "certifi",
+                "2026.7.22"
+              ],
+              [
+                "cffi",
+                "2.1.1"
+              ],
+              [
+                "charset-normalizer",
+                "3.5.2"
+              ],
+              [
+                "click",
+                "8.5.0"
+              ],
+              [
+                "colorama",
+                "0.4.6"
+              ],
+              [
+                "contourpy",
+                "1.4.0"
+              ],
+              [
+                "cryptography",
+                "50.0.1"
+              ],
+              [
+                "cycler",
+                "0.12.1"
+              ],
+              [
+                "cyclopts",
+                "4.25.3"
+              ],
+              [
+                "dnspython",
+                "2.8.0"
+              ],
+              [
+                "docker",
+                "7.2.0"
+              ],
+              [
+                "docstring_parser",
+                "0.18.0"
+              ],
+              [
+                "email-validator",
+                "2.3.0"
+              ],
+              [
+                "et_xmlfile",
+                "2.0.0"
+              ],
+              [
+                "exceptiongroup",
+                "1.3.1"
+              ],
+              [
+                "fastmcp",
+                "4.0.5"
+              ],
+              [
+                "fastmcp-slim",
+                "4.0.5"
+              ],
+              [
+                "flatbuffers",
+                "25.12.19"
+              ],
+              [
+                "fonttools",
+                "4.65.0"
+              ],
+              [
+                "griffelib",
+                "2.3.0"
+              ],
+              [
+                "h11",
+                "0.16.0"
+              ],
+              [
+                "httpcore2",
+                "2.13.0"
+              ],
+              [
+                "httpx2",
+                "2.13.0"
+              ],
+              [
+                "idna",
+                "3.20"
+              ],
+              [
+                "iniconfig",
+                "2.3.0"
+              ],
+              [
+                "jaraco.classes",
+                "3.4.0"
+              ],
+              [
+                "jaraco.context",
+                "6.1.2"
+              ],
+              [
+                "jaraco.functools",
+                "4.6.0"
+              ],
+              [
+                "joserfc",
+                "1.7.5"
+              ],
+              [
+                "jsonref",
+                "1.1.0"
+              ],
+              [
+                "jsonschema",
+                "4.26.0"
+              ],
+              [
+                "jsonschema-path",
+                "0.5.0"
+              ],
+              [
+                "jsonschema-specifications",
+                "2025.9.1"
+              ],
+              [
+                "keyring",
+                "25.7.0"
+              ],
+              [
+                "kiwisolver",
+                "1.5.1"
+              ],
+              [
+                "lxml",
+                "6.1.3"
+              ],
+              [
+                "markdown-it-py",
+                "4.2.0"
+              ],
+              [
+                "matplotlib",
+                "3.11.2"
+              ],
+              [
+                "mcp",
+                "2.2.0"
+              ],
+              [
+                "mcp-types",
+                "2.2.0"
+              ],
+              [
+                "mdurl",
+                "0.1.2"
+              ],
+              [
+                "more-itertools",
+                "11.1.0"
+              ],
+              [
+                "networkx",
+                "3.6.1"
+              ],
+              [
+                "numpy",
+                "2.5.3"
+              ],
+              [
+                "onnxruntime",
+                "1.30.0"
+              ],
+              [
+                "openapi-pydantic",
+                "0.5.1"
+              ],
+              [
+                "openpyxl",
+                "3.1.5"
+              ],
+              [
+                "opentelemetry-api",
+                "1.44.0"
+              ],
+              [
+                "packaging",
+                "26.3"
+              ],
+              [
+                "pathable",
+                "0.6.0"
+              ],
+              [
+                "pillow",
+                "12.3.0"
+              ],
+              [
+                "pip",
+                "25.0.1"
+              ],
+              [
+                "platformdirs",
+                "4.11.9"
+              ],
+              [
+                "pluggy",
+                "1.6.0"
+              ],
+              [
+                "protobuf",
+                "7.36.2"
+              ],
+              [
+                "psutil",
+                "7.2.2"
+              ],
+              [
+                "py-key-value-aio",
+                "0.4.5"
+              ],
+              [
+                "pycparser",
+                "3.0"
+              ],
+              [
+                "pydantic",
+                "2.13.5"
+              ],
+              [
+                "pydantic-settings",
+                "2.15.0"
+              ],
+              [
+                "pydantic_core",
+                "2.46.5"
+              ],
+              [
+                "pymupdf",
+                "1.28.2"
+              ],
+              [
+                "pymupdf-layout",
+                "1.28.2"
+              ],
+              [
+                "pymupdf4llm",
+                "1.28.2"
+              ],
+              [
+                "pyparsing",
+                "3.3.3"
+              ],
+              [
+                "pypdf",
+                "6.18.1"
+              ],
+              [
+                "pyperclip",
+                "1.11.0"
+              ],
+              [
+                "pytest",
+                "9.1.1"
+              ],
+              [
+                "python-dateutil",
+                "2.9.0.post0"
+              ],
+              [
+                "python-docx",
+                "1.2.0"
+              ],
+              [
+                "python-dotenv",
+                "1.2.3"
+              ],
+              [
+                "python-multipart",
+                "0.0.32"
+              ],
+              [
+                "python-pptx",
+                "1.0.2"
+              ],
+              [
+                "pywin32",
+                "312"
+              ],
+              [
+                "pywin32-ctypes",
+                "0.2.3"
+              ],
+              [
+                "referencing",
+                "0.37.0"
+              ],
+              [
+                "requests",
+                "2.34.2"
+              ],
+              [
+                "rich",
+                "15.0.0"
+              ],
+              [
+                "rich-rst",
+                "2.1.0"
+              ],
+              [
+                "rpds-py",
+                "2026.6.3"
+              ],
+              [
+                "ruff",
+                "0.16.8"
+              ],
+              [
+                "six",
+                "1.17.0"
+              ],
+              [
+                "sse-starlette",
+                "3.4.11"
+              ],
+              [
+                "starlette",
+                "1.6.0"
+              ],
+              [
+                "svgpath2mpl",
+                "1.0.0"
+              ],
+              [
+                "tabulate",
+                "0.10.0"
+              ],
+              [
+                "truststore",
+                "0.10.4"
+              ],
+              [
+                "tundlekit",
+                "0.1.0"
+              ],
+              [
+                "typing-inspection",
+                "0.4.4"
+              ],
+              [
+                "typing_extensions",
+                "4.16.0"
+              ],
+              [
+                "uncalled-for",
+                "0.4.0"
+              ],
+              [
+                "urllib3",
+                "2.8.0"
+              ],
+              [
+                "uvicorn",
+                "0.53.0"
+              ],
+              [
+                "watchfiles",
+                "1.2.0"
+              ],
+              [
+                "websockets",
+                "17.1"
+              ],
+              [
+                "xlsxwriter",
+                "3.2.9"
+              ]
+            ],
+            "finished": 1793814535.57076,
+            "attempt_dir": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-coding-review-zvoq4vbz\\store\\attempts\\a4d18094-c8d6-4f66-9bb1-732734cf52ca"
+          },
+          "effects": {
+            "declared": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "granted": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "observed": [
+              {
+                "resource": "parent",
+                "kind": "workspace.snapshot",
+                "before": "90548629d103cfdb1be582458f736cd3579c344040d5673c02a2df1d31272f88",
+                "after": "00b1914937b81b5b0e3d650ad395f296a0b1c364d652c1e6ca6274102e64a702",
+                "changes": [
+                  {
+                    "path": "nested.txt",
+                    "before": null,
+                    "after": {
+                      "path": "nested.txt",
+                      "sha256": "e8b1853de0cd59654ae7284d08094081feec4fa505e6e010ec8d7e7a83f3fc98",
+                      "size": 18
+                    }
+                  }
+                ]
+              }
+            ],
+            "assurance": "native_host_policy"
+          },
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "scenario": "Delegate returns after deadline with partial completed edit",
+      "outcome": "Unknown retained, same key returns same receipt, new-key execution blocked by unreconciled lease, edit preserved. No confirmed cancellation invented.",
+      "evidence": {
+        "receipt": {
+          "cc": "2",
+          "call": "34a6b393-6bbd-4fca-9fd8-371c8025dddc",
+          "key": "overdue",
+          "release": "107f4ef9dd9cddccaafc11dac936d0b5d80cb050652a4011e75ecb3d858c2d8b",
+          "capability": "run",
+          "attempt": 1,
+          "state": "unknown",
+          "completeness": "none",
+          "reason": "EXECUTION_UNKNOWN",
+          "outputs": {},
+          "assessment": {
+            "verdict": "not_requested",
+            "checks": []
+          },
+          "provenance": {
+            "binding": {
+              "agent": "overdue",
+              "kind": "jiuwenswarm"
+            },
+            "started": 1793814535.6073503,
+            "inputs": {
+              "workspace": "parent"
+            },
+            "source_release": "107f4ef9dd9cddccaafc11dac936d0b5d80cb050652a4011e75ecb3d858c2d8b",
+            "python": {
+              "path": "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+              "sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a"
+            },
+            "workspace_before": {
+              "parent": {
+                "digest": "00b1914937b81b5b0e3d650ad395f296a0b1c364d652c1e6ca6274102e64a702",
+                "files": [
+                  {
+                    "path": "dirty.txt",
+                    "sha256": "505e7aad9aff62f92a94fcec29cf9f3500a9f818fb4c54b82e5bd26d8697d5fd",
+                    "size": 10
+                  },
+                  {
+                    "path": "nested.txt",
+                    "sha256": "e8b1853de0cd59654ae7284d08094081feec4fa505e6e010ec8d7e7a83f3fc98",
+                    "size": 18
+                  },
+                  {
+                    "path": "scratch.bin",
+                    "sha256": "06eb7d6a69ee19e5fbdf749018d3d2abfa04bcbd1365db312eb86dc7169389b8",
+                    "size": 2
+                  },
+                  {
+                    "path": "src/file.py",
+                    "sha256": "5439616c4fd2b84f3dec663e703ca6b0b7a45e82b074cc17b92cf58542131626",
+                    "size": 19
+                  }
+                ]
+              }
+            },
+            "packages": [
+              [
+                "Authlib",
+                "1.8.0"
+              ],
+              [
+                "PyJWT",
+                "2.14.0"
+              ],
+              [
+                "PyYAML",
+                "6.0.3"
+              ],
+              [
+                "Pygments",
+                "2.21.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "ai4r-lab-manager",
+                "0.1.0"
+              ],
+              [
+                "aiofile",
+                "3.12.3"
+              ],
+              [
+                "annotated-types",
+                "0.8.0"
+              ],
+              [
+                "anyio",
+                "4.15.1"
+              ],
+              [
+                "attrs",
+                "26.1.0"
+              ],
+              [
+                "beartype",
+                "0.22.9"
+              ],
+              [
+                "cachetools",
+                "7.2.0"
+              ],
+              [
+                "caio",
+                "0.12.4"
+              ],
+              [
+                "certifi",
+                "2026.7.22"
+              ],
+              [
+                "cffi",
+                "2.1.1"
+              ],
+              [
+                "charset-normalizer",
+                "3.5.2"
+              ],
+              [
+                "click",
+                "8.5.0"
+              ],
+              [
+                "colorama",
+                "0.4.6"
+              ],
+              [
+                "contourpy",
+                "1.4.0"
+              ],
+              [
+                "cryptography",
+                "50.0.1"
+              ],
+              [
+                "cycler",
+                "0.12.1"
+              ],
+              [
+                "cyclopts",
+                "4.25.3"
+              ],
+              [
+                "dnspython",
+                "2.8.0"
+              ],
+              [
+                "docker",
+                "7.2.0"
+              ],
+              [
+                "docstring_parser",
+                "0.18.0"
+              ],
+              [
+                "email-validator",
+                "2.3.0"
+              ],
+              [
+                "et_xmlfile",
+                "2.0.0"
+              ],
+              [
+                "exceptiongroup",
+                "1.3.1"
+              ],
+              [
+                "fastmcp",
+                "4.0.5"
+              ],
+              [
+                "fastmcp-slim",
+                "4.0.5"
+              ],
+              [
+                "flatbuffers",
+                "25.12.19"
+              ],
+              [
+                "fonttools",
+                "4.65.0"
+              ],
+              [
+                "griffelib",
+                "2.3.0"
+              ],
+              [
+                "h11",
+                "0.16.0"
+              ],
+              [
+                "httpcore2",
+                "2.13.0"
+              ],
+              [
+                "httpx2",
+                "2.13.0"
+              ],
+              [
+                "idna",
+                "3.20"
+              ],
+              [
+                "iniconfig",
+                "2.3.0"
+              ],
+              [
+                "jaraco.classes",
+                "3.4.0"
+              ],
+              [
+                "jaraco.context",
+                "6.1.2"
+              ],
+              [
+                "jaraco.functools",
+                "4.6.0"
+              ],
+              [
+                "joserfc",
+                "1.7.5"
+              ],
+              [
+                "jsonref",
+                "1.1.0"
+              ],
+              [
+                "jsonschema",
+                "4.26.0"
+              ],
+              [
+                "jsonschema-path",
+                "0.5.0"
+              ],
+              [
+                "jsonschema-specifications",
+                "2025.9.1"
+              ],
+              [
+                "keyring",
+                "25.7.0"
+              ],
+              [
+                "kiwisolver",
+                "1.5.1"
+              ],
+              [
+                "lxml",
+                "6.1.3"
+              ],
+              [
+                "markdown-it-py",
+                "4.2.0"
+              ],
+              [
+                "matplotlib",
+                "3.11.2"
+              ],
+              [
+                "mcp",
+                "2.2.0"
+              ],
+              [
+                "mcp-types",
+                "2.2.0"
+              ],
+              [
+                "mdurl",
+                "0.1.2"
+              ],
+              [
+                "more-itertools",
+                "11.1.0"
+              ],
+              [
+                "networkx",
+                "3.6.1"
+              ],
+              [
+                "numpy",
+                "2.5.3"
+              ],
+              [
+                "onnxruntime",
+                "1.30.0"
+              ],
+              [
+                "openapi-pydantic",
+                "0.5.1"
+              ],
+              [
+                "openpyxl",
+                "3.1.5"
+              ],
+              [
+                "opentelemetry-api",
+                "1.44.0"
+              ],
+              [
+                "packaging",
+                "26.3"
+              ],
+              [
+                "pathable",
+                "0.6.0"
+              ],
+              [
+                "pillow",
+                "12.3.0"
+              ],
+              [
+                "pip",
+                "25.0.1"
+              ],
+              [
+                "platformdirs",
+                "4.11.9"
+              ],
+              [
+                "pluggy",
+                "1.6.0"
+              ],
+              [
+                "protobuf",
+                "7.36.2"
+              ],
+              [
+                "psutil",
+                "7.2.2"
+              ],
+              [
+                "py-key-value-aio",
+                "0.4.5"
+              ],
+              [
+                "pycparser",
+                "3.0"
+              ],
+              [
+                "pydantic",
+                "2.13.5"
+              ],
+              [
+                "pydantic-settings",
+                "2.15.0"
+              ],
+              [
+                "pydantic_core",
+                "2.46.5"
+              ],
+              [
+                "pymupdf",
+                "1.28.2"
+              ],
+              [
+                "pymupdf-layout",
+                "1.28.2"
+              ],
+              [
+                "pymupdf4llm",
+                "1.28.2"
+              ],
+              [
+                "pyparsing",
+                "3.3.3"
+              ],
+              [
+                "pypdf",
+                "6.18.1"
+              ],
+              [
+                "pyperclip",
+                "1.11.0"
+              ],
+              [
+                "pytest",
+                "9.1.1"
+              ],
+              [
+                "python-dateutil",
+                "2.9.0.post0"
+              ],
+              [
+                "python-docx",
+                "1.2.0"
+              ],
+              [
+                "python-dotenv",
+                "1.2.3"
+              ],
+              [
+                "python-multipart",
+                "0.0.32"
+              ],
+              [
+                "python-pptx",
+                "1.0.2"
+              ],
+              [
+                "pywin32",
+                "312"
+              ],
+              [
+                "pywin32-ctypes",
+                "0.2.3"
+              ],
+              [
+                "referencing",
+                "0.37.0"
+              ],
+              [
+                "requests",
+                "2.34.2"
+              ],
+              [
+                "rich",
+                "15.0.0"
+              ],
+              [
+                "rich-rst",
+                "2.1.0"
+              ],
+              [
+                "rpds-py",
+                "2026.6.3"
+              ],
+              [
+                "ruff",
+                "0.16.8"
+              ],
+              [
+                "six",
+                "1.17.0"
+              ],
+              [
+                "sse-starlette",
+                "3.4.11"
+              ],
+              [
+                "starlette",
+                "1.6.0"
+              ],
+              [
+                "svgpath2mpl",
+                "1.0.0"
+              ],
+              [
+                "tabulate",
+                "0.10.0"
+              ],
+              [
+                "truststore",
+                "0.10.4"
+              ],
+              [
+                "tundlekit",
+                "0.1.0"
+              ],
+              [
+                "typing-inspection",
+                "0.4.4"
+              ],
+              [
+                "typing_extensions",
+                "4.16.0"
+              ],
+              [
+                "uncalled-for",
+                "0.4.0"
+              ],
+              [
+                "urllib3",
+                "2.8.0"
+              ],
+              [
+                "uvicorn",
+                "0.53.0"
+              ],
+              [
+                "watchfiles",
+                "1.2.0"
+              ],
+              [
+                "websockets",
+                "17.1"
+              ],
+              [
+                "xlsxwriter",
+                "3.2.9"
+              ]
+            ],
+            "finished": 1793814535.8089848,
+            "attempt_dir": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-coding-review-zvoq4vbz\\store\\attempts\\34a6b393-6bbd-4fca-9fd8-371c8025dddc"
+          },
+          "effects": {
+            "declared": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "granted": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "observed": [
+              {
+                "resource": "parent",
+                "kind": "workspace.snapshot",
+                "before": "00b1914937b81b5b0e3d650ad395f296a0b1c364d652c1e6ca6274102e64a702",
+                "after": "fe03e5ef24be108565d3d5263feecfa2e965f3d0c2cc07b37608711bc81d8752",
+                "changes": [
+                  {
+                    "path": "partial.txt",
+                    "before": null,
+                    "after": {
+                      "path": "partial.txt",
+                      "sha256": "5c7615a6bb57e1202dca9ab6a2116bbb36ad494e693172894a2a88ecf7c4c7e5",
+                      "size": 27
+                    }
+                  }
+                ]
+              }
+            ],
+            "assurance": "trusted_local"
+          },
+          "diagnostics": [
+            {
+              "code": "EXECUTION_UNKNOWN",
+              "path": "",
+              "message": "Delegate exceeded deadline; reconcile native session"
+            }
+          ]
+        },
+        "same_key_same_receipt": true,
+        "new_key": {
+          "cc": "2",
+          "call": "7d55c101-6ad1-4532-b571-881380b89c75",
+          "key": "after-overdue",
+          "release": "107f4ef9dd9cddccaafc11dac936d0b5d80cb050652a4011e75ecb3d858c2d8b",
+          "capability": "run",
+          "attempt": 1,
+          "state": "blocked",
+          "completeness": "none",
+          "reason": "RESOURCE_BUSY",
+          "outputs": {},
+          "assessment": {
+            "verdict": "not_requested",
+            "checks": []
+          },
+          "provenance": {
+            "finished": 1793814535.8264236,
+            "attempt_dir": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-coding-review-zvoq4vbz\\store\\attempts\\7d55c101-6ad1-4532-b571-881380b89c75"
+          },
+          "effects": {
+            "declared": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "granted": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "observed": [],
+            "assurance": "trusted_local"
+          },
+          "diagnostics": [
+            {
+              "code": "RESOURCE_BUSY",
+              "path": "",
+              "message": "Workspace has an active or unreconciled call"
+            }
+          ]
+        },
+        "partial_edit_preserved": true
+      }
+    }
+  ],
+  "limits": [
+    "No source files or live worktrees edited; temporary fixtures only.",
+    "Integration script inspected but full upstream runtime not rerun by this reviewer. It uses real TaskTool/SysOperation with a deterministic one-child driver; it does not test multiple competing children, permission pause, remote stop or LLM coding quality.",
+    "No native isolation or no-effects claim inferred from absent snapshot changes."
+  ],
+  "temporary_evidence": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\ccv2-coding-review-zvoq4vbz\\evidence.json",
+  "verification_rounds": [
+    {
+      "date": "2026-11-04",
+      "source_sha256": "cf1ae1fde9d012623d5f033f4ab8fa14ae4bedfe1f04e8b6777b48772a85368f",
+      "status": "Original findings fixed; one new concurrent reconciliation defect remains",
+      "resolved_findings": [
+        "CODING-01",
+        "CODING-02"
+      ],
+      "checks": {
+        "overlap_blocked": true,
+        "parent_no_misattribution": true,
+        "git_change_observed": true,
+        "file_modes_recorded": true,
+        "host_inventory": true,
+        "observation_limits": [
+          "No OS-wide effect monitoring in trusted-local mode",
+          "Dependency directories/caches excluded from file snapshots; installed package versions recorded",
+          "Workspace Git HEAD/index and ordinary file modes recorded; no implied publication authorization"
+        ],
+        "reconcile_race": {
+          "operator_receipt": {
+            "cc": "2",
+            "call": "74290bc6-5f15-4456-a2d2-9b5318facccc",
+            "key": "reconcile-race",
+            "release": "98bea26f8c6ce78c0f3bef6c121219e1667784ac5ea5aa6850cb5c940d55130d",
+            "capability": "run",
+            "attempt": 1,
+            "state": "failed",
+            "completeness": "none",
+            "reason": "RECONCILED_STOP",
+            "outputs": {},
+            "assessment": {
+              "verdict": "not_requested",
+              "checks": []
+            },
+            "provenance": {},
+            "effects": {
+              "declared": [],
+              "granted": [
+                "workspace.read",
+                "workspace.write"
+              ],
+              "observed": [],
+              "assurance": "trusted_local",
+              "enforced": [
+                "selected_capability",
+                "grant_admission",
+                "artifact_integrity",
+                "workspace_lease"
+              ],
+              "observation_limits": [
+                "No OS-wide effect monitoring in trusted-local mode",
+                "Dependency directories/caches excluded from file snapshots; installed package versions recorded",
+                "Workspace Git HEAD/index and ordinary file modes recorded; no implied publication authorization"
+              ]
+            },
+            "diagnostics": [],
+            "reconciliations": [
+              {
+                "previous_state": "running",
+                "previous_reason": "STARTED",
+                "stopped": true,
+                "operator_note": "Execution owner completed all work and stopped. Awaiting delivery of buffered adapter response.",
+                "recorded": 1793814974.1422539
+              }
+            ]
+          },
+          "final_receipt": {
+            "cc": "2",
+            "call": "74290bc6-5f15-4456-a2d2-9b5318facccc",
+            "key": "reconcile-race",
+            "release": "98bea26f8c6ce78c0f3bef6c121219e1667784ac5ea5aa6850cb5c940d55130d",
+            "capability": "run",
+            "attempt": 1,
+            "state": "succeeded",
+            "completeness": "complete",
+            "reason": "COMPLETED",
+            "outputs": {
+              "evidence": {}
+            },
+            "assessment": {
+              "verdict": "not_requested",
+              "checks": []
+            },
+            "provenance": {
+              "binding": {
+                "agent": "reconcile-race",
+                "kind": "jiuwenswarm"
+              },
+              "started": 1793814973.9990985,
+              "inputs": {
+                "workspace": "parent"
+              },
+              "source_release": "98bea26f8c6ce78c0f3bef6c121219e1667784ac5ea5aa6850cb5c940d55130d",
+              "python": {
+                "path": "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+                "sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a"
+              },
+              "workspace_before": {
+                "parent": {
+                  "files": [
+                    {
+                      "path": "dirty.txt",
+                      "sha256": "505e7aad9aff62f92a94fcec29cf9f3500a9f818fb4c54b82e5bd26d8697d5fd",
+                      "size": 10,
+                      "mode": 438
+                    },
+                    {
+                      "path": "scratch.bin",
+                      "sha256": "06eb7d6a69ee19e5fbdf749018d3d2abfa04bcbd1365db312eb86dc7169389b8",
+                      "size": 2,
+                      "mode": 438
+                    },
+                    {
+                      "path": "src/file.py",
+                      "sha256": "992a93455c71fedd36ac9bbc439952c041cf61445958472af479269b8d873513",
+                      "size": 5,
+                      "mode": 438
+                    }
+                  ],
+                  "git": {
+                    "head": "081f96fe90c7cc8d8227e3f1ee67ba266dd567f5",
+                    "index_sha256": "5489312aa3ecdff15bdebfb523012f59ea7b1f528f0df1daea280270ae482834"
+                  },
+                  "digest": "af5b785932e50ac83832f5c87230f61b11cc280b2353ad5ed78d77ccc613754c"
+                }
+              },
+              "packages": [
+                [
+                  "Authlib",
+                  "1.8.0"
+                ],
+                [
+                  "PyJWT",
+                  "2.14.0"
+                ],
+                [
+                  "PyYAML",
+                  "6.0.3"
+                ],
+                [
+                  "Pygments",
+                  "2.21.0"
+                ],
+                [
+                  "ai4r-lab-manager",
+                  "0.1.0"
+                ],
+                [
+                  "ai4r-lab-manager",
+                  "0.1.0"
+                ],
+                [
+                  "aiofile",
+                  "3.12.3"
+                ],
+                [
+                  "annotated-types",
+                  "0.8.0"
+                ],
+                [
+                  "anyio",
+                  "4.15.1"
+                ],
+                [
+                  "attrs",
+                  "26.1.0"
+                ],
+                [
+                  "beartype",
+                  "0.22.9"
+                ],
+                [
+                  "cachetools",
+                  "7.2.0"
+                ],
+                [
+                  "caio",
+                  "0.12.4"
+                ],
+                [
+                  "certifi",
+                  "2026.7.22"
+                ],
+                [
+                  "cffi",
+                  "2.1.1"
+                ],
+                [
+                  "charset-normalizer",
+                  "3.5.2"
+                ],
+                [
+                  "click",
+                  "8.5.0"
+                ],
+                [
+                  "colorama",
+                  "0.4.6"
+                ],
+                [
+                  "contourpy",
+                  "1.4.0"
+                ],
+                [
+                  "cryptography",
+                  "50.0.1"
+                ],
+                [
+                  "cycler",
+                  "0.12.1"
+                ],
+                [
+                  "cyclopts",
+                  "4.25.3"
+                ],
+                [
+                  "dnspython",
+                  "2.8.0"
+                ],
+                [
+                  "docker",
+                  "7.2.0"
+                ],
+                [
+                  "docstring_parser",
+                  "0.18.0"
+                ],
+                [
+                  "email-validator",
+                  "2.3.0"
+                ],
+                [
+                  "et_xmlfile",
+                  "2.0.0"
+                ],
+                [
+                  "exceptiongroup",
+                  "1.3.1"
+                ],
+                [
+                  "fastmcp",
+                  "4.0.5"
+                ],
+                [
+                  "fastmcp-slim",
+                  "4.0.5"
+                ],
+                [
+                  "flatbuffers",
+                  "25.12.19"
+                ],
+                [
+                  "fonttools",
+                  "4.65.0"
+                ],
+                [
+                  "griffelib",
+                  "2.3.0"
+                ],
+                [
+                  "h11",
+                  "0.16.0"
+                ],
+                [
+                  "httpcore2",
+                  "2.13.0"
+                ],
+                [
+                  "httpx2",
+                  "2.13.0"
+                ],
+                [
+                  "idna",
+                  "3.20"
+                ],
+                [
+                  "iniconfig",
+                  "2.3.0"
+                ],
+                [
+                  "jaraco.classes",
+                  "3.4.0"
+                ],
+                [
+                  "jaraco.context",
+                  "6.1.2"
+                ],
+                [
+                  "jaraco.functools",
+                  "4.6.0"
+                ],
+                [
+                  "joserfc",
+                  "1.7.5"
+                ],
+                [
+                  "jsonref",
+                  "1.1.0"
+                ],
+                [
+                  "jsonschema",
+                  "4.26.0"
+                ],
+                [
+                  "jsonschema-path",
+                  "0.5.0"
+                ],
+                [
+                  "jsonschema-specifications",
+                  "2025.9.1"
+                ],
+                [
+                  "keyring",
+                  "25.7.0"
+                ],
+                [
+                  "kiwisolver",
+                  "1.5.1"
+                ],
+                [
+                  "lxml",
+                  "6.1.3"
+                ],
+                [
+                  "markdown-it-py",
+                  "4.2.0"
+                ],
+                [
+                  "matplotlib",
+                  "3.11.2"
+                ],
+                [
+                  "mcp",
+                  "2.2.0"
+                ],
+                [
+                  "mcp-types",
+                  "2.2.0"
+                ],
+                [
+                  "mdurl",
+                  "0.1.2"
+                ],
+                [
+                  "more-itertools",
+                  "11.1.0"
+                ],
+                [
+                  "networkx",
+                  "3.6.1"
+                ],
+                [
+                  "numpy",
+                  "2.5.3"
+                ],
+                [
+                  "onnxruntime",
+                  "1.30.0"
+                ],
+                [
+                  "openapi-pydantic",
+                  "0.5.1"
+                ],
+                [
+                  "openpyxl",
+                  "3.1.5"
+                ],
+                [
+                  "opentelemetry-api",
+                  "1.44.0"
+                ],
+                [
+                  "packaging",
+                  "26.3"
+                ],
+                [
+                  "pathable",
+                  "0.6.0"
+                ],
+                [
+                  "pillow",
+                  "12.3.0"
+                ],
+                [
+                  "pip",
+                  "25.0.1"
+                ],
+                [
+                  "platformdirs",
+                  "4.11.9"
+                ],
+                [
+                  "pluggy",
+                  "1.6.0"
+                ],
+                [
+                  "protobuf",
+                  "7.36.2"
+                ],
+                [
+                  "psutil",
+                  "7.2.2"
+                ],
+                [
+                  "py-key-value-aio",
+                  "0.4.5"
+                ],
+                [
+                  "pycparser",
+                  "3.0"
+                ],
+                [
+                  "pydantic",
+                  "2.13.5"
+                ],
+                [
+                  "pydantic-settings",
+                  "2.15.0"
+                ],
+                [
+                  "pydantic_core",
+                  "2.46.5"
+                ],
+                [
+                  "pymupdf",
+                  "1.28.2"
+                ],
+                [
+                  "pymupdf-layout",
+                  "1.28.2"
+                ],
+                [
+                  "pymupdf4llm",
+                  "1.28.2"
+                ],
+                [
+                  "pyparsing",
+                  "3.3.3"
+                ],
+                [
+                  "pypdf",
+                  "6.18.1"
+                ],
+                [
+                  "pyperclip",
+                  "1.11.0"
+                ],
+                [
+                  "pytest",
+                  "9.1.1"
+                ],
+                [
+                  "python-dateutil",
+                  "2.9.0.post0"
+                ],
+                [
+                  "python-docx",
+                  "1.2.0"
+                ],
+                [
+                  "python-dotenv",
+                  "1.2.3"
+                ],
+                [
+                  "python-multipart",
+                  "0.0.32"
+                ],
+                [
+                  "python-pptx",
+                  "1.0.2"
+                ],
+                [
+                  "pywin32",
+                  "312"
+                ],
+                [
+                  "pywin32-ctypes",
+                  "0.2.3"
+                ],
+                [
+                  "referencing",
+                  "0.37.0"
+                ],
+                [
+                  "requests",
+                  "2.34.2"
+                ],
+                [
+                  "rich",
+                  "15.0.0"
+                ],
+                [
+                  "rich-rst",
+                  "2.1.0"
+                ],
+                [
+                  "rpds-py",
+                  "2026.6.3"
+                ],
+                [
+                  "ruff",
+                  "0.16.8"
+                ],
+                [
+                  "six",
+                  "1.17.0"
+                ],
+                [
+                  "sse-starlette",
+                  "3.4.11"
+                ],
+                [
+                  "starlette",
+                  "1.6.0"
+                ],
+                [
+                  "svgpath2mpl",
+                  "1.0.0"
+                ],
+                [
+                  "tabulate",
+                  "0.10.0"
+                ],
+                [
+                  "truststore",
+                  "0.10.4"
+                ],
+                [
+                  "tundlekit",
+                  "0.1.0"
+                ],
+                [
+                  "typing-inspection",
+                  "0.4.4"
+                ],
+                [
+                  "typing_extensions",
+                  "4.16.0"
+                ],
+                [
+                  "uncalled-for",
+                  "0.4.0"
+                ],
+                [
+                  "urllib3",
+                  "2.8.0"
+                ],
+                [
+                  "uvicorn",
+                  "0.53.0"
+                ],
+                [
+                  "watchfiles",
+                  "1.2.0"
+                ],
+                [
+                  "websockets",
+                  "17.1"
+                ],
+                [
+                  "xlsxwriter",
+                  "3.2.9"
+                ]
+              ],
+              "finished": 1793814974.242644,
+              "attempt_dir": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-coding-review-3cu86ff5\\store\\attempts\\74290bc6-5f15-4456-a2d2-9b5318facccc"
+            },
+            "effects": {
+              "declared": [
+                "workspace.read",
+                "workspace.write"
+              ],
+              "granted": [
+                "workspace.read",
+                "workspace.write"
+              ],
+              "observed": [
+                {
+                  "resource": "parent",
+                  "kind": "workspace.snapshot",
+                  "before": "af5b785932e50ac83832f5c87230f61b11cc280b2353ad5ed78d77ccc613754c",
+                  "after": "ad1fc0015f2cd3dabf77c7c26aaa29fb86c18a84a1f90181ac157114d1db08e0",
+                  "changes": [
+                    {
+                      "path": "stopped-effect.txt",
+                      "before": null,
+                      "after": {
+                        "path": "stopped-effect.txt",
+                        "sha256": "05343e9845302eb730fa9d18ac7b28d5e509893daf1eb76ede8d6e82d47b2da9",
+                        "size": 8,
+                        "mode": 438
+                      }
+                    }
+                  ]
+                }
+              ],
+              "assurance": "native_host_policy",
+              "enforced": [
+                "selected_capability",
+                "grant_admission",
+                "artifact_integrity",
+                "workspace_lease"
+              ],
+              "observation_limits": [
+                "No OS-wide effect monitoring in trusted-local mode",
+                "Dependency directories/caches excluded from file snapshots; installed package versions recorded",
+                "Workspace Git HEAD/index and ordinary file modes recorded; no implied publication authorization"
+              ]
+            },
+            "diagnostics": []
+          },
+          "reconciliation_survives": false
+        }
+      },
+      "unit_tests": "python -m unittest test_ccv2 -q: 18 passed",
+      "new_finding": {
+        "id": "CODING-03",
+        "severity": "P1",
+        "title": "Late adapter response overwrites reconciled terminal receipt and discards history",
+        "attempted_call": {
+          "key": "reconcile-race",
+          "capability": "run",
+          "inputs": {
+            "workspace": "parent"
+          },
+          "grants": [
+            "workspace.read",
+            "workspace.write"
+          ]
+        },
+        "attempted_reconciliation": {
+          "key": "reconcile-race",
+          "stopped": true,
+          "note": "Execution owner completed all work and stopped. Awaiting delivery of buffered adapter response."
+        },
+        "reproduction": "Delegate completes its only filesystem edit, signals execution owner is stopped, then waits before delivering buffered result. Main thread reconciles running call with truthful stopped attestation. Reconciliation returns failed RECONCILED_STOP plus reconciliation history. Let delegate return buffered outcome=ok. Call finalizer writes its stale local receipt over the reconciled DB record.",
+        "outcome": "Durable status becomes succeeded; reconciliations field disappears. Reconciliation artifact remains on disk but canonical receipt contradicts it.",
+        "minimum_general_fix": "Finalize call state under atomic version/state check. A terminal reconciled record must remain canonical, and late results must append historical observations without dropping reconciliation or converting it to success. Coordinate lease release/finalization with the same state ownership protocol.",
+        "evidence": {
+          "operator_receipt": {
+            "cc": "2",
+            "call": "74290bc6-5f15-4456-a2d2-9b5318facccc",
+            "key": "reconcile-race",
+            "release": "98bea26f8c6ce78c0f3bef6c121219e1667784ac5ea5aa6850cb5c940d55130d",
+            "capability": "run",
+            "attempt": 1,
+            "state": "failed",
+            "completeness": "none",
+            "reason": "RECONCILED_STOP",
+            "outputs": {},
+            "assessment": {
+              "verdict": "not_requested",
+              "checks": []
+            },
+            "provenance": {},
+            "effects": {
+              "declared": [],
+              "granted": [
+                "workspace.read",
+                "workspace.write"
+              ],
+              "observed": [],
+              "assurance": "trusted_local",
+              "enforced": [
+                "selected_capability",
+                "grant_admission",
+                "artifact_integrity",
+                "workspace_lease"
+              ],
+              "observation_limits": [
+                "No OS-wide effect monitoring in trusted-local mode",
+                "Dependency directories/caches excluded from file snapshots; installed package versions recorded",
+                "Workspace Git HEAD/index and ordinary file modes recorded; no implied publication authorization"
+              ]
+            },
+            "diagnostics": [],
+            "reconciliations": [
+              {
+                "previous_state": "running",
+                "previous_reason": "STARTED",
+                "stopped": true,
+                "operator_note": "Execution owner completed all work and stopped. Awaiting delivery of buffered adapter response.",
+                "recorded": 1793814974.1422539
+              }
+            ]
+          },
+          "final_receipt": {
+            "cc": "2",
+            "call": "74290bc6-5f15-4456-a2d2-9b5318facccc",
+            "key": "reconcile-race",
+            "release": "98bea26f8c6ce78c0f3bef6c121219e1667784ac5ea5aa6850cb5c940d55130d",
+            "capability": "run",
+            "attempt": 1,
+            "state": "succeeded",
+            "completeness": "complete",
+            "reason": "COMPLETED",
+            "outputs": {
+              "evidence": {}
+            },
+            "assessment": {
+              "verdict": "not_requested",
+              "checks": []
+            },
+            "provenance": {
+              "binding": {
+                "agent": "reconcile-race",
+                "kind": "jiuwenswarm"
+              },
+              "started": 1793814973.9990985,
+              "inputs": {
+                "workspace": "parent"
+              },
+              "source_release": "98bea26f8c6ce78c0f3bef6c121219e1667784ac5ea5aa6850cb5c940d55130d",
+              "python": {
+                "path": "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+                "sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a"
+              },
+              "workspace_before": {
+                "parent": {
+                  "files": [
+                    {
+                      "path": "dirty.txt",
+                      "sha256": "505e7aad9aff62f92a94fcec29cf9f3500a9f818fb4c54b82e5bd26d8697d5fd",
+                      "size": 10,
+                      "mode": 438
+                    },
+                    {
+                      "path": "scratch.bin",
+                      "sha256": "06eb7d6a69ee19e5fbdf749018d3d2abfa04bcbd1365db312eb86dc7169389b8",
+                      "size": 2,
+                      "mode": 438
+                    },
+                    {
+                      "path": "src/file.py",
+                      "sha256": "992a93455c71fedd36ac9bbc439952c041cf61445958472af479269b8d873513",
+                      "size": 5,
+                      "mode": 438
+                    }
+                  ],
+                  "git": {
+                    "head": "081f96fe90c7cc8d8227e3f1ee67ba266dd567f5",
+                    "index_sha256": "5489312aa3ecdff15bdebfb523012f59ea7b1f528f0df1daea280270ae482834"
+                  },
+                  "digest": "af5b785932e50ac83832f5c87230f61b11cc280b2353ad5ed78d77ccc613754c"
+                }
+              },
+              "packages": [
+                [
+                  "Authlib",
+                  "1.8.0"
+                ],
+                [
+                  "PyJWT",
+                  "2.14.0"
+                ],
+                [
+                  "PyYAML",
+                  "6.0.3"
+                ],
+                [
+                  "Pygments",
+                  "2.21.0"
+                ],
+                [
+                  "ai4r-lab-manager",
+                  "0.1.0"
+                ],
+                [
+                  "ai4r-lab-manager",
+                  "0.1.0"
+                ],
+                [
+                  "aiofile",
+                  "3.12.3"
+                ],
+                [
+                  "annotated-types",
+                  "0.8.0"
+                ],
+                [
+                  "anyio",
+                  "4.15.1"
+                ],
+                [
+                  "attrs",
+                  "26.1.0"
+                ],
+                [
+                  "beartype",
+                  "0.22.9"
+                ],
+                [
+                  "cachetools",
+                  "7.2.0"
+                ],
+                [
+                  "caio",
+                  "0.12.4"
+                ],
+                [
+                  "certifi",
+                  "2026.7.22"
+                ],
+                [
+                  "cffi",
+                  "2.1.1"
+                ],
+                [
+                  "charset-normalizer",
+                  "3.5.2"
+                ],
+                [
+                  "click",
+                  "8.5.0"
+                ],
+                [
+                  "colorama",
+                  "0.4.6"
+                ],
+                [
+                  "contourpy",
+                  "1.4.0"
+                ],
+                [
+                  "cryptography",
+                  "50.0.1"
+                ],
+                [
+                  "cycler",
+                  "0.12.1"
+                ],
+                [
+                  "cyclopts",
+                  "4.25.3"
+                ],
+                [
+                  "dnspython",
+                  "2.8.0"
+                ],
+                [
+                  "docker",
+                  "7.2.0"
+                ],
+                [
+                  "docstring_parser",
+                  "0.18.0"
+                ],
+                [
+                  "email-validator",
+                  "2.3.0"
+                ],
+                [
+                  "et_xmlfile",
+                  "2.0.0"
+                ],
+                [
+                  "exceptiongroup",
+                  "1.3.1"
+                ],
+                [
+                  "fastmcp",
+                  "4.0.5"
+                ],
+                [
+                  "fastmcp-slim",
+                  "4.0.5"
+                ],
+                [
+                  "flatbuffers",
+                  "25.12.19"
+                ],
+                [
+                  "fonttools",
+                  "4.65.0"
+                ],
+                [
+                  "griffelib",
+                  "2.3.0"
+                ],
+                [
+                  "h11",
+                  "0.16.0"
+                ],
+                [
+                  "httpcore2",
+                  "2.13.0"
+                ],
+                [
+                  "httpx2",
+                  "2.13.0"
+                ],
+                [
+                  "idna",
+                  "3.20"
+                ],
+                [
+                  "iniconfig",
+                  "2.3.0"
+                ],
+                [
+                  "jaraco.classes",
+                  "3.4.0"
+                ],
+                [
+                  "jaraco.context",
+                  "6.1.2"
+                ],
+                [
+                  "jaraco.functools",
+                  "4.6.0"
+                ],
+                [
+                  "joserfc",
+                  "1.7.5"
+                ],
+                [
+                  "jsonref",
+                  "1.1.0"
+                ],
+                [
+                  "jsonschema",
+                  "4.26.0"
+                ],
+                [
+                  "jsonschema-path",
+                  "0.5.0"
+                ],
+                [
+                  "jsonschema-specifications",
+                  "2025.9.1"
+                ],
+                [
+                  "keyring",
+                  "25.7.0"
+                ],
+                [
+                  "kiwisolver",
+                  "1.5.1"
+                ],
+                [
+                  "lxml",
+                  "6.1.3"
+                ],
+                [
+                  "markdown-it-py",
+                  "4.2.0"
+                ],
+                [
+                  "matplotlib",
+                  "3.11.2"
+                ],
+                [
+                  "mcp",
+                  "2.2.0"
+                ],
+                [
+                  "mcp-types",
+                  "2.2.0"
+                ],
+                [
+                  "mdurl",
+                  "0.1.2"
+                ],
+                [
+                  "more-itertools",
+                  "11.1.0"
+                ],
+                [
+                  "networkx",
+                  "3.6.1"
+                ],
+                [
+                  "numpy",
+                  "2.5.3"
+                ],
+                [
+                  "onnxruntime",
+                  "1.30.0"
+                ],
+                [
+                  "openapi-pydantic",
+                  "0.5.1"
+                ],
+                [
+                  "openpyxl",
+                  "3.1.5"
+                ],
+                [
+                  "opentelemetry-api",
+                  "1.44.0"
+                ],
+                [
+                  "packaging",
+                  "26.3"
+                ],
+                [
+                  "pathable",
+                  "0.6.0"
+                ],
+                [
+                  "pillow",
+                  "12.3.0"
+                ],
+                [
+                  "pip",
+                  "25.0.1"
+                ],
+                [
+                  "platformdirs",
+                  "4.11.9"
+                ],
+                [
+                  "pluggy",
+                  "1.6.0"
+                ],
+                [
+                  "protobuf",
+                  "7.36.2"
+                ],
+                [
+                  "psutil",
+                  "7.2.2"
+                ],
+                [
+                  "py-key-value-aio",
+                  "0.4.5"
+                ],
+                [
+                  "pycparser",
+                  "3.0"
+                ],
+                [
+                  "pydantic",
+                  "2.13.5"
+                ],
+                [
+                  "pydantic-settings",
+                  "2.15.0"
+                ],
+                [
+                  "pydantic_core",
+                  "2.46.5"
+                ],
+                [
+                  "pymupdf",
+                  "1.28.2"
+                ],
+                [
+                  "pymupdf-layout",
+                  "1.28.2"
+                ],
+                [
+                  "pymupdf4llm",
+                  "1.28.2"
+                ],
+                [
+                  "pyparsing",
+                  "3.3.3"
+                ],
+                [
+                  "pypdf",
+                  "6.18.1"
+                ],
+                [
+                  "pyperclip",
+                  "1.11.0"
+                ],
+                [
+                  "pytest",
+                  "9.1.1"
+                ],
+                [
+                  "python-dateutil",
+                  "2.9.0.post0"
+                ],
+                [
+                  "python-docx",
+                  "1.2.0"
+                ],
+                [
+                  "python-dotenv",
+                  "1.2.3"
+                ],
+                [
+                  "python-multipart",
+                  "0.0.32"
+                ],
+                [
+                  "python-pptx",
+                  "1.0.2"
+                ],
+                [
+                  "pywin32",
+                  "312"
+                ],
+                [
+                  "pywin32-ctypes",
+                  "0.2.3"
+                ],
+                [
+                  "referencing",
+                  "0.37.0"
+                ],
+                [
+                  "requests",
+                  "2.34.2"
+                ],
+                [
+                  "rich",
+                  "15.0.0"
+                ],
+                [
+                  "rich-rst",
+                  "2.1.0"
+                ],
+                [
+                  "rpds-py",
+                  "2026.6.3"
+                ],
+                [
+                  "ruff",
+                  "0.16.8"
+                ],
+                [
+                  "six",
+                  "1.17.0"
+                ],
+                [
+                  "sse-starlette",
+                  "3.4.11"
+                ],
+                [
+                  "starlette",
+                  "1.6.0"
+                ],
+                [
+                  "svgpath2mpl",
+                  "1.0.0"
+                ],
+                [
+                  "tabulate",
+                  "0.10.0"
+                ],
+                [
+                  "truststore",
+                  "0.10.4"
+                ],
+                [
+                  "tundlekit",
+                  "0.1.0"
+                ],
+                [
+                  "typing-inspection",
+                  "0.4.4"
+                ],
+                [
+                  "typing_extensions",
+                  "4.16.0"
+                ],
+                [
+                  "uncalled-for",
+                  "0.4.0"
+                ],
+                [
+                  "urllib3",
+                  "2.8.0"
+                ],
+                [
+                  "uvicorn",
+                  "0.53.0"
+                ],
+                [
+                  "watchfiles",
+                  "1.2.0"
+                ],
+                [
+                  "websockets",
+                  "17.1"
+                ],
+                [
+                  "xlsxwriter",
+                  "3.2.9"
+                ]
+              ],
+              "finished": 1793814974.242644,
+              "attempt_dir": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-coding-review-3cu86ff5\\store\\attempts\\74290bc6-5f15-4456-a2d2-9b5318facccc"
+            },
+            "effects": {
+              "declared": [
+                "workspace.read",
+                "workspace.write"
+              ],
+              "granted": [
+                "workspace.read",
+                "workspace.write"
+              ],
+              "observed": [
+                {
+                  "resource": "parent",
+                  "kind": "workspace.snapshot",
+                  "before": "af5b785932e50ac83832f5c87230f61b11cc280b2353ad5ed78d77ccc613754c",
+                  "after": "ad1fc0015f2cd3dabf77c7c26aaa29fb86c18a84a1f90181ac157114d1db08e0",
+                  "changes": [
+                    {
+                      "path": "stopped-effect.txt",
+                      "before": null,
+                      "after": {
+                        "path": "stopped-effect.txt",
+                        "sha256": "05343e9845302eb730fa9d18ac7b28d5e509893daf1eb76ede8d6e82d47b2da9",
+                        "size": 8,
+                        "mode": 438
+                      }
+                    }
+                  ]
+                }
+              ],
+              "assurance": "native_host_policy",
+              "enforced": [
+                "selected_capability",
+                "grant_admission",
+                "artifact_integrity",
+                "workspace_lease"
+              ],
+              "observation_limits": [
+                "No OS-wide effect monitoring in trusted-local mode",
+                "Dependency directories/caches excluded from file snapshots; installed package versions recorded",
+                "Workspace Git HEAD/index and ordinary file modes recorded; no implied publication authorization"
+              ]
+            },
+            "diagnostics": []
+          },
+          "reconciliation_survives": false
+        }
+      }
+    },
+    {
+      "date": "2026-11-04",
+      "source_sha256": "5336b345fdf187c277935726004b75fd8292f4979730b1344fb5314a61ad4561",
+      "status": "All coding findings closed by independent rerun",
+      "resolved_findings": [
+        "CODING-01",
+        "CODING-02",
+        "CODING-03"
+      ],
+      "exact_buffered_result_race": {
+        "canonical_state": "failed",
+        "canonical_reason": "RECONCILED_STOP",
+        "returned_receipt_matches_durable": true,
+        "reconciliation_history_preserved": true,
+        "late_observation_sha256_verified": true,
+        "late_result_retained_separately": true,
+        "receipt": {
+          "cc": "2",
+          "call": "e95cf591-950a-41b7-8646-70054a4edc84",
+          "key": "reconcile-race",
+          "release": "98bea26f8c6ce78c0f3bef6c121219e1667784ac5ea5aa6850cb5c940d55130d",
+          "capability": "run",
+          "attempt": 1,
+          "state": "failed",
+          "completeness": "none",
+          "reason": "RECONCILED_STOP",
+          "outputs": {},
+          "assessment": {
+            "verdict": "not_requested",
+            "checks": []
+          },
+          "provenance": {},
+          "effects": {
+            "declared": [],
+            "granted": [
+              "workspace.read",
+              "workspace.write"
+            ],
+            "observed": [],
+            "assurance": "trusted_local",
+            "enforced": [
+              "selected_capability",
+              "grant_admission",
+              "artifact_integrity",
+              "workspace_lease"
+            ],
+            "observation_limits": [
+              "No OS-wide effect monitoring in trusted-local mode",
+              "Dependency directories/caches excluded from file snapshots; host-interpreter package versions recorded; child runtimes need their own evidence",
+              "Workspace Git HEAD/index and ordinary file modes recorded; no implied publication authorization"
+            ]
+          },
+          "diagnostics": [],
+          "reconciliations": [
+            {
+              "previous_state": "running",
+              "previous_reason": "STARTED",
+              "stopped": true,
+              "operator_note": "Execution owner completed all work and stopped. Awaiting delivery of buffered adapter response.",
+              "recorded": 1793815121.0572681
+            }
+          ],
+          "late_observations": [
+            {
+              "path": "C:\\Users\\m50066326\\AppData\\Local\\Temp\\ccv2-coding-review-acxsdhrn\\store\\attempts\\e95cf591-950a-41b7-8646-70054a4edc84\\late-result-95ccedf54dc04bd29f6e8b87b455f5b1.json",
+              "sha256": "c2ea66d54cc164f0d6b8552469f3bd13fdf903557b6fea564de93030e8cde49c",
+              "recorded": 1793815121.1581116
+            }
+          ]
+        }
+      },
+      "checks": {
+        "overlap_blocked": true,
+        "parent_no_misattribution": true,
+        "git_change_observed": true,
+        "file_modes_recorded": true,
+        "host_inventory": true,
+        "observation_limits": [
+          "No OS-wide effect monitoring in trusted-local mode",
+          "Dependency directories/caches excluded from file snapshots; host-interpreter package versions recorded; child runtimes need their own evidence",
+          "Workspace Git HEAD/index and ordinary file modes recorded; no implied publication authorization"
+        ]
+      },
+      "unit_tests": "python -m unittest test_ccv2 -q: 21 passed",
+      "remaining_high_priority_findings": []
+    }
+  ],
+  "final_status": "closed"
+}

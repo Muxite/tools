@@ -1,0 +1,18 @@
+---
+id: m1-cc-search-reference
+status: active
+source: AI4Research-Development/jiuwenswarm-m1/jiuwenswarm/research/capsules/search.py; research/checks/research.py; research/capsules/assets.py
+last_reviewed: 2026-10-21
+next_action: Freeze connector and retrieval policy versions before any Search comparison.
+---
+# Search
+
+`research.search` proposes bounded queries, retrieves through an approved captured connector, and synthesizes one to three grounded candidate ideas. The two model turns are distinct: query planning precedes retrieval; synthesis sees captured excerpts, not unrestricted browsing.
+
+**Ports and obligations.** Inputs: frozen `search_scope` and accepted Research Brief. Output: `candidate_set`, which records Brief/scope refs, exact queries, connector outcomes, captured citations, and ideas with source IDs, assumptions, and risks. Queries are unique and within the scope's count/length limits. No captured citations means `no_evidence`; only supplied captured citation IDs can be cited.
+
+**Effects and checks.** Two text model calls, no worker tools or direct network. Retrieval authority resides in the injected connector with frozen scope. Host checks validate query bounds, evidence refs/hashes/spans, coverage and identity; semantic criteria assess mechanisms, distinctness, assumptions and risks from declaration/output. Separate output-only verifier restriction applies. Citation grounding should be audited independently against captured excerpts.
+
+**Failure and scoring.** Missing connector, empty evidence, malformed query, fabricated citation, unsupported synthesis, duplicate/non-distinct mechanisms, or incompatible scope have distinct codes/checks. An honest `no_evidence`/not-proven outcome is an appropriate abstention only when fixtures make evidence unavailable; on answerable material it is an avoidable abstention. Measure correct grounded claims, false claims, citation precision/coverage, abstention and execution failure separately.
+
+**Evidence.** [[Designs/CC Reference/Source Map]] links the carrier, check wiring, and focused test files. These are code/test evidence only, not a live retrieval or quality result.

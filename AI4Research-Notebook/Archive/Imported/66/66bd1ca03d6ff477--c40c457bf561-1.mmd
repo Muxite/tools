@@ -1,0 +1,59 @@
+flowchart TB
+    Browser[Browser]
+    subgraph App[One application container]
+        Web[Web assets and control plane]
+        Planner[Delivery Phase 3 planner CC]
+        Binder[Protected contract and guard binder]
+        Scheduler[Scheduler]
+        Runner[CC runner and native harness]
+        Verify[Verifier CCs: assessments]
+        Gate[Protected gate host]
+        Library[(CC library)]
+        Bridge[Audited model bridge]
+        State[Run-state module]
+        POC[Restricted POC execution boundary]
+        Web -->|Fixed preparation and static template| Binder
+        Web -->|Bounded planning through runner| Planner
+        Planner --> Binder
+        Binder --> Det[Protected deterministic checks]
+        Det -->|valid| Verify
+        Det -->|invalid or unavailable| Gate
+        Verify -->|typed assessment; host validates| Gate
+        Gate -->|Validated and frozen plan| Scheduler
+        Scheduler --> Runner
+        Runner -->|Captured work result and evidence| Det
+        Gate -->|Committed release or halt| Scheduler
+        Runner --> Routing[Protected model routing]
+        Routing --> Bridge
+        Runner --> POC
+        Library -.-> Binder
+        Library -.-> Runner
+        Scheduler <--> State
+        Verify -->|Assessment captured by host| Files
+        Gate --> State
+        Web <--> State
+        Profile[Account and profile adapter]
+        Web <--> Profile
+    end
+    Browser <-->|Authenticated local endpoint| Web
+    Bridge <-->|Provider request| Model[Configured model endpoint]
+    Profile <--> Profiles[(Durable account and profile store)]
+    Profiles -.->|Optional approved persistence adapter| Cloud[Cloud account or profile service]
+    State <--> DB[(Mounted SQLite state)]
+    Runner --> Files[(Mounted artifacts and raw evidence)]
+    POC -->|Scoped workspace only| Workspace[(POC workspace)]
+    subgraph Legend[Legend]
+        Key[Blue: CC work; purple: verification; amber: infrastructure; green: data; gray: outside]
+    end
+    classDef work fill:#E8F0FE,stroke:#2563EB,color:#172554
+    classDef verify fill:#F3E8FF,stroke:#7E22CE,color:#3B0764
+    classDef control fill:#FEF3C7,stroke:#B45309,color:#451A03
+    classDef data fill:#DCFCE7,stroke:#15803D,color:#052E16
+    classDef outside fill:#F1F5F9,stroke:#475569,color:#0F172A
+    class Planner work
+    class Verify verify
+    class Web,Binder,Scheduler,Runner,Bridge,Routing,Det,State,POC,Gate control
+    class Library,DB,Files,Workspace data
+    class Browser,Model,Cloud outside
+    class Profile control
+    class Profiles data

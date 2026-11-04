@@ -1,0 +1,24 @@
+flowchart TB
+    P[Operator VM provisioner] --> V
+    R[Tested M2 release and image registry] --> V
+    subgraph V[Lab Linux VM]
+        direction TB
+        APP[Compose - AI4R app and local factory]
+        MODEL[Compose - scoped model bridge]
+        BROKER[Host broker - system service]
+        ENGINE[Local Docker Engine]
+        BUILDER[BuildKit builder and cache]
+        IMG[Engine local image store]
+        CC[Short-lived CC containers]
+        DISK[Project, jobs and sealed evidence]
+        APP -->|authorized job API over Unix socket| BROKER
+        BROKER --> ENGINE
+        ENGINE --> BUILDER
+        BUILDER -->|explicit load| IMG
+        ENGINE --> CC
+        IMG --> CC
+        CC -->|invocation-scoped IPC| MODEL
+        BROKER --> DISK
+        CC -->|staged input and output paths only| DISK
+    end
+    APP -.->|candidate source, image and evidence| Q[Central qualification]

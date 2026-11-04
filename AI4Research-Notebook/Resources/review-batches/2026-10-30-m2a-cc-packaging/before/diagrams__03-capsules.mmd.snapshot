@@ -1,0 +1,20 @@
+flowchart TB
+ subgraph CC[Capability capsule: calculation category]
+  M[Manifest: release, providers, effect ceiling]
+  A[Capability A: calculate]
+  B[Capability B: normalize table]
+  V[Bundled handles: input checks and output verifiers]
+  M --> A & B
+  V --- A & B
+ end
+ N[Current need and actual inputs] --> F[Hard compatibility filter]
+ F -->|Eligible| R[Rank by current relevance]
+ F -->|Input mismatch| E[Exclude or select an explicit adapter]
+ R --> T[Bind and check every invocation]
+ T --> A
+ A --> O[Sealed output and receipt]
+ P[Python / CLI / MCP / AI4R] --> T
+ classDef eligible fill:#d9efdf,stroke:#40815a,color:#123;
+ classDef excluded fill:#e8e4ed,stroke:#84748d,color:#123;
+ class R,T eligible;
+ class E excluded;

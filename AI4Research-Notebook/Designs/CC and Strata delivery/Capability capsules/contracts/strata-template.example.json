@@ -1,0 +1,339 @@
+{
+  "schema_version": "0.1.0-proposal",
+  "kind": "moe-experiment",
+  "purpose": "Compare native IQ3_S expert storage with a proposed shared basis for routed down projections on one Spark. All fixture: and fixture.invalid references and numeric gates are illustrative; the source commit, model revision and two shard pins come from upstream.",
+  "discovery_tags": [
+    "inference",
+    "gb10",
+    "moe-storage",
+    "paired-benchmark"
+  ],
+  "package": {
+    "schema_version": "2.0.0-m2a.2",
+    "id": "cc.strata.compare",
+    "category": "inference",
+    "version": "0.1.0",
+    "release_digest": "aaa4543f5b27e2450fb43eb2ab93a5ae44d7108c77fc9b3f9caf8663d651791b",
+    "members": [
+      "strata.transform",
+      "strata.measure"
+    ],
+    "required_providers": [
+      "artifacts"
+    ],
+    "effect_ceiling": [
+      "artifact.write"
+    ],
+    "shared_check_ids": [
+      "strata.identity"
+    ],
+    "qualification_scope": [
+      "Design fixture only. No image, transformation, checked release, GPU run or measured result exists for this example."
+    ],
+    "file_manifest": {
+      "uri": "fixture:files",
+      "sha256": "d90982d68845c2af4501ed6cd549c68dc834a71fda402423c6356c12c8697fba"
+    },
+    "license": "example-only",
+    "execution": {
+      "format": "oci",
+      "image": "fixture.invalid/ai4r/benchmark@sha256:43310b2cddc562ceec45a0a6e1d54ab33d3898eb5817f5e43235bc19355ddb07",
+      "platform": "linux/arm64",
+      "host_requirements": [
+        "qualified GB10 ARM64 CUDA host"
+      ],
+      "dependency_lock_ref": {
+        "uri": "fixture:deps",
+        "sha256": "ba768f507632734656aced6dcb6ac7c7ab53e953baf0d3d989c80b47782e5334"
+      },
+      "resource_ownership_ref": {
+        "uri": "fixture:ownership",
+        "sha256": "d0f71f3a84b1566a3a25fee51b0183bec356d18c9a86d4e0a6d473e723b67612"
+      }
+    },
+    "quality_policy_ref": {
+      "uri": "fixture:quality-policy",
+      "sha256": "f690a1340ca35aa50b71d8d102328369699016d566d36eac4a79bfb3b598ac2a"
+    },
+    "history_key": "cc.strata.compare",
+    "evolution_policy": {
+      "policy_ref": {
+        "uri": "fixture:evolution",
+        "sha256": "cf5401394b47edb569918b66fec17c6851f7e7180780f764495fbfebf9c0d2f3"
+      },
+      "allowed_targets": [
+        "factory.recipe"
+      ],
+      "objectives": [
+        "Reduce total stored model bytes while retaining measured quality and throughput"
+      ],
+      "protected_targets": [
+        "verifiers",
+        "heldout-fixtures",
+        "permissions",
+        "quality-thresholds"
+      ],
+      "promotion_requires_independent_admission": true
+    }
+  },
+  "capabilities": [
+    {
+      "schema_version": "2.0.0-m2a.2",
+      "id": "strata.transform",
+      "package_id": "cc.strata.compare",
+      "kind": "tool",
+      "description": "Compile a hypothetical shared-basis pack using the pinned input shards.",
+      "entrypoint": "strata.transform",
+      "inputs": [
+        {
+          "name": "input",
+          "contract_id": "strata.transform.input",
+          "media_types": [
+            "application/json"
+          ],
+          "semantic_constraints": [
+            "Preserve and verify artifact byte identity."
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "contract_id": "strata.release",
+          "media_types": [
+            "application/json"
+          ],
+          "semantic_constraints": [
+            "Preserve and verify artifact byte identity."
+          ]
+        }
+      ],
+      "effects": [
+        "artifact.write"
+      ],
+      "required_providers": [
+        "artifacts"
+      ],
+      "required_check_ids": [
+        "strata.identity",
+        "strata.evidence"
+      ],
+      "limits": {
+        "max_attempts": 2,
+        "max_wall_seconds": 120,
+        "max_cost_units": 10,
+        "cost_unit": "declared_provider_credit",
+        "max_child_depth": 0
+      }
+    },
+    {
+      "schema_version": "2.0.0-m2a.2",
+      "id": "strata.measure",
+      "package_id": "cc.strata.compare",
+      "kind": "tool",
+      "description": "Measure immutable baseline and candidate releases on reserved GB10 hardware.",
+      "entrypoint": "strata.measure",
+      "inputs": [
+        {
+          "name": "input",
+          "contract_id": "strata.comparison",
+          "media_types": [
+            "application/json"
+          ],
+          "semantic_constraints": [
+            "Preserve and verify artifact byte identity."
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "contract_id": "strata.evidence",
+          "media_types": [
+            "application/json"
+          ],
+          "semantic_constraints": [
+            "Preserve and verify artifact byte identity."
+          ]
+        }
+      ],
+      "effects": [
+        "artifact.write"
+      ],
+      "required_providers": [
+        "artifacts"
+      ],
+      "required_check_ids": [
+        "strata.identity",
+        "strata.evidence"
+      ],
+      "limits": {
+        "max_attempts": 2,
+        "max_wall_seconds": 120,
+        "max_cost_units": 10,
+        "cost_unit": "declared_provider_credit",
+        "max_child_depth": 0
+      }
+    }
+  ],
+  "images": [
+    {
+      "role": "benchmark",
+      "platform": "linux/arm64",
+      "image": "fixture.invalid/ai4r/benchmark@sha256:43310b2cddc562ceec45a0a6e1d54ab33d3898eb5817f5e43235bc19355ddb07"
+    },
+    {
+      "role": "build",
+      "platform": "linux/arm64",
+      "image": "fixture.invalid/ai4r/build@sha256:8555e70bf7238087ad6495ee3fac839102b656c0a0d0a73907b957d179c959ac"
+    },
+    {
+      "role": "baseline-engine",
+      "platform": "linux/arm64",
+      "image": "fixture.invalid/ai4r/baseline-engine@sha256:f320eefd9954df6ec16ffe28b29457d3eb66bfb769ef8c2a4776fed3ba50e996"
+    },
+    {
+      "role": "candidate-engine",
+      "platform": "linux/arm64",
+      "factory_output": {
+        "capability": "strata.transform",
+        "port": "output",
+        "artifact_role": "engine-image"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "capability": "strata.transform",
+      "image_role": "build"
+    },
+    {
+      "capability": "strata.measure",
+      "image_role": "benchmark"
+    }
+  ],
+  "experiment": {
+    "model": {
+      "repository": "https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF",
+      "revision": "ed59f92082b1e93c0e96d60a8b11aab089b52f09",
+      "pack": "IQ3_S",
+      "shards": [
+        {
+          "file": "IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf",
+          "bytes": 54817524224,
+          "sha256": "4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3"
+        },
+        {
+          "file": "IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf",
+          "bytes": 28800138432,
+          "sha256": "316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113"
+        }
+      ],
+      "native_index": {
+        "name": "native_experts.txt",
+        "producer": {
+          "uri": "https://raw.githubusercontent.com/Niko1221/Strata/c62d5e3a15b40ea51c96aae9e8d36928965f53ab/tools/iq_pack.py",
+          "sha256": "6588cba726b74b70ebbe17f8972afecda4cd1e3160f82c15ec15214a8bc55be6"
+        },
+        "digest_stage": "bind-from-generated-output-in-release-lock"
+      }
+    },
+    "source": {
+      "git": "https://github.com/Niko1221/Strata.git",
+      "commit": "c62d5e3a15b40ea51c96aae9e8d36928965f53ab"
+    },
+    "changes": [
+      {
+        "transform_capability": "strata.transform",
+        "contract": {
+          "uri": "shared-basis-parameters.schema.json",
+          "sha256": "54df0bc7b1c3a7dfa43bd6ea3ef488c87a9242fd0716b5862bf511843df5cae2"
+        },
+        "input_pack": "IQ3_S",
+        "target": {
+          "layers": "all-routed",
+          "experts": "all-routed",
+          "projections": [
+            "down"
+          ]
+        },
+        "parameters": {
+          "rank": 32,
+          "basis_dtype": "fp16",
+          "coefficient_dtype": "fp16",
+          "residual_encoding": "int4-per-tile",
+          "sharing": "same-layer-same-projection"
+        },
+        "preserve": [
+          "router weights and top-k",
+          "tokenizer",
+          "attention and KV precision",
+          "other expert projections"
+        ],
+        "output_artifact": "candidate-pack",
+        "reader_abi": "proposed-basis-reader-v1"
+      }
+    ],
+    "baseline_image_role": "baseline-engine",
+    "candidate_image_role": "candidate-engine",
+    "benchmark_capability": "strata.measure",
+    "benchmark_profile": {
+      "uri": "fixture:paired-4k-256tok-temperature0",
+      "sha256": "c1bab3a22693e585ba394bfafa8647b78fd771936c02bab0de949b326481ac16"
+    },
+    "quality_suite": {
+      "uri": "fixture:heldout-quality",
+      "sha256": "1c316bc69d3435e785ab859835eacf0eb9a9b2cebca8d6089d7ec785deca9abe"
+    },
+    "hardware_profile": {
+      "uri": "fixture:gb10-arm64-cuda",
+      "sha256": "029c1789c1a86dbe45f8d658f30f6aed5b7f1c945cfcf05c7729a947237c6a8a"
+    },
+    "limits": {
+      "cpu_cores": 16,
+      "memory_mib": 112640,
+      "scratch_gib": 300,
+      "gpus": 1,
+      "exclusive_host": true,
+      "wall_seconds": 7200
+    },
+    "gates": [
+      {
+        "metric": "pack-bytes",
+        "unit": "By",
+        "aggregation": "sum",
+        "comparison": "ratio-at-most",
+        "threshold": 0.85
+      },
+      {
+        "metric": "peak-used",
+        "unit": "By",
+        "aggregation": "max",
+        "comparison": "ratio-at-most",
+        "threshold": 1
+      },
+      {
+        "metric": "prefill",
+        "unit": "token/s",
+        "aggregation": "median",
+        "comparison": "ratio-at-least",
+        "threshold": 0.95
+      },
+      {
+        "metric": "decode",
+        "unit": "token/s",
+        "aggregation": "median",
+        "comparison": "ratio-at-least",
+        "threshold": 0.95
+      },
+      {
+        "metric": "quality",
+        "unit": "fraction",
+        "aggregation": "score",
+        "comparison": "difference-at-least",
+        "threshold": -0.005
+      }
+    ],
+    "on_missing_evidence": "inconclusive"
+  }
+}

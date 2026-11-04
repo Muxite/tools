@@ -1,0 +1,13 @@
+flowchart LR
+    source["Pinned source snapshot"] --> propose["propose"]
+    task["Task"] --> propose
+    propose --> patch["Patch artifact"]
+    source --> test["test in disposable workspace"]
+    patch --> test
+    suite["Protected test suite"] --> test
+    test --> report["Report and raw evidence"]
+    report --> evaluator["Independent policy evaluation"]
+    patch --> evaluator
+    evaluator -->|eligible patch| apply["apply with scoped grant"]
+    workspace["Leased workspace at expected base"] --> apply
+    apply --> result["New snapshot and receipt"]

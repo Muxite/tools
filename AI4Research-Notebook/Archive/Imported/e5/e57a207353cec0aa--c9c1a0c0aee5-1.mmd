@@ -1,0 +1,21 @@
+flowchart TB
+    Intake[Intake] --> Intent[Intent compiler CC]
+    Intent --> IV[Intent Evaluator Gate]
+    IV --> Req[Requirement compiler CC]
+    Req --> RV[Requirement Evaluator Gate]
+    RV -->|Delivery Phase 1 fixed template| Bind[Protected binder and guard assignment]
+    RV -->|Delivery Phase 3| Plan[Bounded planner CC]
+    Plan --> Bind
+    Bind --> PV[Plan Evaluator Gate]
+    PV --> Freeze[Freeze accepted graph]
+    Freeze --> Run[Execute research DAG]
+    Run --> Out[Expose verified delivery]
+    subgraph Legend[Legend]
+        Key[Blue: CC work; purple: verification; amber: infrastructure]
+    end
+    classDef work fill:#E8F0FE,stroke:#2563EB,color:#172554
+    classDef verify fill:#F3E8FF,stroke:#7E22CE,color:#3B0764
+    classDef control fill:#FEF3C7,stroke:#B45309,color:#451A03
+    class Intent,Req,Plan,Run work
+    class IV,RV,PV verify
+    class Intake,Bind,Freeze,Out control

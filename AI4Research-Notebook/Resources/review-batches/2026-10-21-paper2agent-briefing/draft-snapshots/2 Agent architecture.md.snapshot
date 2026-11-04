@@ -1,0 +1,42 @@
+---
+id: paper2agent-agent-architecture
+status: proposed
+source: ../../Resources/review-batches/2026-10-21-paper2agent-briefing/upstream-source-review.md; ../../Resources/review-batches/2026-10-21-paper2agent/paper2agent-source-review.md; ../AI4Research Capability Growth.md; ../Paper2Agent Capability Factory.md
+last_reviewed: 2026-10-21
+next_action: Reconcile coordinator proposal with PRD V10 and maintained M1 design before any implementation
+---
+# Agent architecture: durable goals, bounded episodes
+
+**Recommendation:** add a durable goal/session coordinator outside each workflow episode, with ephemeral bounded workers inside. Persist goal state and evidence between episodes; rehydrate the coordinator for each model turn. This needs no permanently running process or always-open model session. This is proposed architecture, not current M1 behavior or a Paper2Agent claim.
+
+![Three agent-use patterns and their tradeoffs](diagrams/03-agent-use.png)
+
+| Pattern | What it handles well | Main limitation |
+|---|---|---|
+| DAG only, ephemeral workers | A frozen, inspectable episode with explicit order and bounded work | No owner observes accepted results across episodes, retains a goal, or asks what should happen next |
+| One monolithic persistent agent | A continuous interaction with tools and remembered context | Long-lived context and authority become hard to inspect, bound, resume, or compare; it blurs planning, work, and acceptance |
+| Hybrid: durable goal/session plus bounded DAG episodes | Maintains the user's goal and verified progress while each work episode remains frozen and attributable | Requires an explicit session record and a host-controlled transition from one episode to the next |
+
+The coordinator observes accepted episode results, updates hypotheses and next steps, and requests clarification when a material choice remains unresolved. It may propose the next bounded plan. It owns no gate, referee, or scheduler; those remain trusted host services. The coordinator is an ordinary authenticated client, invoked by the host and discarded after its turn.
+
+Persist the accepted user goal, constraints, source receipts, accepted evidence references, completed episode IDs, and unresolved questions. Keep model-generated hypotheses and proposed actions visibly marked as untrusted. Rehydrate only the scoped session view needed for the next turn. Profile-scoped memory may help retrieve relevant prior work, but it is neither an authoritative source nor a channel to hidden fixtures, answer keys, or evaluation evidence. Every episode gets a fresh capability snapshot and current policy/resource inventory; missing capability factory support requires preparing and admitting a new candidate, not pretending it is live.
+
+**A CC is a reusable contract, not an agent.** An agent can call a CC, but CCs may also be surfaced as tools or combined into a composite carrier. Current M1's agent/tool carriers are concrete; a composite CC carrier remains future work. The same host-protected service should support three call modes: one bounded CC action, a short frozen DAG episode, and (when admitted) a composite closure. The agent selects from a scoped catalog that the host has already filtered. The host owns authorization, binding, dispatch, budgets, and release. A CC's reusable contract does not grant its caller authority.
+
+Bounded inner tool loops are reasonable where that CC's own contract defines their tools, effects, and limits. This does not authorize arbitrary nested CC dispatch. Hidden CC execution must broker, bind, and check every call against the selected profile and current grant; proposals cannot bypass the normal release path. This preserves reuse without turning the coordinator into an executor or a second policy system.
+
+The source evidence supports this separation. The exact OpenJiuwen agent-core pin reviewed for M1 provides `DeepAgentSpec`, `LeaderHarness.run_once`, `AgentBackend`/`run_workflow`, Symphony `CapabilityProvider`, stateful sessions (F37), and workflow journal persistence (F38). `run_once` bypasses the supervisor; the Deep Agent task-loop flag selects one ReAct round or a self-driving loop. F37 supports session context recovery, but its feature record says cross-process/restart checkpointer wiring remains; F38's workflow journal is a separate layer. These are useful native interfaces, not a complete durable user-goal coordinator. Symphony snapshots enumerate candidates but do not establish effect isolation or authority.
+
+M1 intentionally configures its Planner with no tools, MCPs, subagents, rails, or skills, disables task loop/planning, and constrains its bridge to one text call. Its DAG adapter fixes serial order, cap one, zero retries, and no journal resume. These are Planner/workflow restrictions, not a claim that all M1 agents lack tools: Builder already has a single synchronous invocation with an internal tool loop bounded by D43/D45's call and workspace/network policy. None of these settings are upstream limitations. The source review distinguishes modified Stellven checkouts from actual upstream JiuwenSwarm.
+
+| Current gap | Proposed resolution |
+|---|---|
+| One-shot Planner cannot carry a goal over episodes | Add a host-managed durable session record and a rehydratable coordinator turn |
+| Frozen workflow cannot decide what to do after a result | Let the coordinator propose the next bounded episode after accepted results |
+| Agents, tools, and reusable CC contracts are conflated | Catalog CC carriers by scoped contract; let the agent select, while host authorizes and dispatches |
+| No composite carrier in M1 | Keep composite closure as a future admitted carrier; begin with single CC and frozen DAG episode modes |
+| Coordinator could drift into gate or scheduler authority | Keep gate, referee, budget, binding, and release in the trusted host path |
+
+Test against an all-ephemeral baseline with the same model, CC catalog, grants, tools, and checks. Include repository/tool discovery, multi-episode work, and changed goals. Compare quality, clarification, cost/calls, repeated work, context drift, recovery, and unauthorized-call rejection. Keep this experiment separate from Paper2Agent's factory-value claim; evidence for one does not prove the other.
+
+Start as a host-invoked authenticated client, outside mandatory hot paths. Keep candidate creation and updates behind current authority, independent checking, and explicit release. This proposal does not alter M1.

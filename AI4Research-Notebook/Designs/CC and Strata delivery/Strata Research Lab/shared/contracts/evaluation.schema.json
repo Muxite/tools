@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai4r:design:0.3:evaluation",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "record_type": {
+      "const": "lab-evaluation"
+    },
+    "schema_version": {
+      "const": "0.3.0-proposal"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "brief": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+    },
+    "product": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+    },
+    "baseline_lock": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+    },
+    "candidate_lock": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+    },
+    "workload": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+    },
+    "target": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+    },
+    "evaluation_policy": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+    },
+    "on_missing_evidence": {
+      "const": "inconclusive"
+    }
+  },
+  "required": [
+    "record_type",
+    "schema_version",
+    "id",
+    "brief",
+    "product",
+    "baseline_lock",
+    "candidate_lock",
+    "workload",
+    "target",
+    "evaluation_policy",
+    "on_missing_evidence"
+  ]
+}

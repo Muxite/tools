@@ -1,0 +1,14 @@
+flowchart LR
+    G[/GitHub issue or PR/] --> R[Workflow routes and sends]
+    R -->|mapped| D[/Discord alert and GitHub link/]
+    R -->|unmapped or delivery failed| F[Visible triage finding]
+    D --> H{Contributor reviews action}
+    H --> N[/Decision and next action in GitHub/]
+    classDef record fill:#e8f1fe,stroke:#1d4f91,color:#123d70
+    classDef tool fill:#e0f5ef,stroke:#1b7f72,color:#12554a
+    classDef human fill:#fff4d8,stroke:#b58100,color:#694b00
+    classDef unresolved fill:#ffe9e9,stroke:#b63636,color:#7f2020
+    class G,D,N record
+    class R tool
+    class H human
+    class F unresolved

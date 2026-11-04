@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Proposed shared-basis transform parameters",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rank",
+    "basis_dtype",
+    "coefficient_dtype",
+    "residual_encoding",
+    "sharing"
+  ],
+  "properties": {
+    "rank": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 256
+    },
+    "basis_dtype": {
+      "enum": [
+        "fp16",
+        "fp32"
+      ]
+    },
+    "coefficient_dtype": {
+      "enum": [
+        "fp16",
+        "fp32"
+      ]
+    },
+    "residual_encoding": {
+      "enum": [
+        "int4-per-tile",
+        "int8-per-tile"
+      ]
+    },
+    "sharing": {
+      "const": "same-layer-same-projection"
+    }
+  }
+}

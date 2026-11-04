@@ -1,0 +1,1501 @@
+
+
+===== page 1 =====
+CiteAudit: You Cited It, But Did You Read It?
+A Benchmark for Verifying Scientific References in the LLM Era
+Kaiwen Shi1 Weixiang Sun1 Zheyuan Zhang1 Lichao Sun2 Nitesh V. Chawla1 Yanfang Ye1∗
+1University of Notre Dame
+2Lehigh University
+Abstract
+Scientific research is the fundamental driver of human societal
+progress, and proper citation is vital for attribution and research
+integrity. However, the rise of large language models (LLMs) has
+introduced a new integrity risk: fabricated references that appear
+plausible but correspond to no real publications. Recent analyses
+have uncovered such hallucinated citations even in submissions
+and accepted papers at major machine learning venues, underscor-
+ing growing vulnerabilities in peer-review workflows and raising
+concerns about the credibility of scholarly discourse. At the same
+time, rapidly expanding reference lists render manual verification
+infeasible, while existing automated tools remain fragile to the
+noise and formatting variability of real-world citation data and lack
+standardized, transparent evaluation.
+This paper addresses these challenges by introducing the first
+comprehensive benchmark and detection framework for halluci-
+nated citations in scientific writing. We design a multi-agent veri-
+fication pipeline that decomposes citation checking into citation
+metadata extraction, memory lookup, web-based evidence retrieval,
+scholar search, and final judgment. This pipeline assesses whether a
+cited reference corresponds to a valid scholarly record and whether
+its core bibliographic fields are consistent with authoritative evi-
+dence. We further construct a large-scale, human-validated dataset
+spanning diverse domains, citation formats, and hallucination types,
+with unified evaluation protocols for citation existence and meta-
+data consistency. Experiments with state-of-the-art LLMs and ex-
+isting citation verification tools reveal substantial citation-related
+errors and show that our framework achieves stronger overall veri-
+fication performance than commercial and open-source baselines.
+Our work provides systematic infrastructure for auditing citations
+at scale in the LLM era, helping researchers, reviewers, and pub-
+lishers strengthen the trustworthiness of scientific references. Our
+code is available here.
+1
+Introduction
+Scientific research constitutes the most critical engine of human
+progress, and the protection of authorship represents a fundamen-
+tal respect for scholarly contributions as well as a vital source of
+intellectual inspiration. When citations are missing, inaccurate,
+or fabricated, the resulting break in the evidence chain can ob-
+scure logical dependencies, weaken argumentation, and jeopardize
+academic integrity at the level of both individual papers and the
+broader literature [10, 22, 26]. However, the rapid adoption of large
+language models (LLMs) [28] and other generative systems [29] has
+introduced a qualitatively new risk: the automatic creation of bibli-
+ographic entries that have no counterpart in the scholarly record.
+∗Corresponding author: yye7@nd.edu
+Figure 1: Motivation overview of our citation hallucination
+benchmark: existing gaps in closed-source citation checking
+tools and the unified, reliable evaluation framework enabled
+by our benchmark.
+In contrast to conventional citation mistakes, such as incomplete
+metadata or minor typographical errors, hallucinated citations are
+entirely fabricated references that nevertheless resemble legitimate
+academic works. Recent investigations have documented such cases
+across prominent machine learning conferences, revealing halluci-
+nated references in multiple submissions [6]. Independent reports
+further indicate that similar problems have surfaced even in ac-
+cepted papers at leading forums such as NeurIPS and ACL [7, 21].
+These incidents compromise multiple layers of the research process:
+they impede reviewers’ ability to assess evidence, expose co-authors
+to inadvertent integrity violations, and weaken the reliability of the
+publication ecosystem as a whole, with downstream implications
+for reproducibility and the credibility of scientific discourse.
+The growing scale of scholarly publishing further complicates
+this problem: reference lists have expanded rapidly across disci-
+plines [12], making thorough manual verification unrealistic for
+arXiv:2602.23452v3  [cs.CL]  1 May 2026
+
+
+===== page 2 =====
+reviewers, editors, and co-authors. This has motivated the devel-
+opment of automated citation-auditing tools [1, 3, 5]. However,
+prior works generally demonstrate two major gaps: 1) Cita-
+tion verification inevitably relies on retrieving information from
+external sources, yet the inherent noise and formatting variability of
+real-world references exposes a core weakness of existing systems,
+which frequently misfire when citations deviate from clean, canon-
+ical forms. 2) Most of these systems are proprietary, where they
+neither released their mechanism nor, more importantly, a large-
+scale, standardized and reproducible benchmark for hallucinated
+citation detection.
+To bridge these two gaps, we introduce, to the best of our knowl-
+edge, the first comprehensive benchmark and detection framework
+for hallucinated citations in scientific manuscripts. Our contribu-
+tions lay the groundwork for scalable tools that can support review-
+ers, editors, and automated review systems in upholding scholarly
+rigor in the LLM era. Specifically, we present a multi-agent frame-
+work and accompanying benchmark for verifying the existence and
+metadata consistency of scientific references. To cope with the
+first challenge, our system decomposes citation verification into
+cooperative roles: an Extractor parses citation strings into struc-
+tured metadata, a Memory Agent reuses previously verified records,
+a Web Search Agent retrieves external evidence, a Scholar Agent
+queries authoritative scholarly sources, and a Judge Agent produces
+the final real-or-fake decision. This pipeline enables fine-grained
+assessment of whether a cited reference corresponds to a valid
+scholarly record and whether its title, authors, venue, year, and
+identifiers are consistent with external evidence. To address the
+second challenge, we construct a large-scale benchmark span-
+ning diverse domains, citation formats, and hallucination types,
+with human-validated labels for both generated and real-world
+citation errors. The generated portion is built through controlled
+perturbations of verified references, while the real-world portion is
+collected from scholarly manuscripts and manually verified by the
+author team. We introduce unified evaluation protocols and metrics
+that measure citation existence, metadata consistency, classification
+performance, runtime, and cost across models. Experiments over
+leading LLMs and citation-verification tools reveal substantial rates
+of citation errors, including fabricated titles, incorrect authorship,
+venue mismatches, and invalid identifiers. Our analysis shows that
+the proposed multi-agent verification framework achieves stronger
+overall detection performance than commercial and open-source
+baselines. This work provides systematic infrastructure to audit
+citations at scale in the LLM era, offering a practical tool for re-
+searchers, reviewers, and publishers to assess and improve the
+trustworthiness of scientific references. Our contributions can be
+summarized as follows:
+• Benchmark. We release the first large-scale, standardized bench-
+mark for hallucinated citation detection, covering diverse do-
+mains and citation types with human-validated labels and unified
+evaluation protocols.
+• Framework. We introduce a multi-agent verification pipeline
+that separates claim extraction, retrieval, matching, reasoning,
+and judgment, enabling robust citation checking under noisy and
+heterogeneous real-world formats.
+• Findings. Through extensive experiments on state-of-the-art
+LLMs, we uncover pervasive citation errors and show that our
+framework yields stronger accuracy and interpretability than
+existing baselines.
+2
+Related Works
+2.1
+Reference Hallucination Detection
+Reliably identifying AI-generated hallucinated content has become
+an increasing concern for both academia and industry [8, 15]. Among
+them, one of the most concerning risks lies in hallucinations in aca-
+demic writing, where LLMs generate non-existent references [10].
+Such errors undermine scholarly trust and threaten the integrity
+of scientific communication [8, 25]. To verify the authenticity of
+academic references, some works [1, 3, 5] have emerged to audit
+references by parsing citation strings and matching them against
+external bibliographic databases. Yet retrieval-based citation check-
+ing pipelines remain brittle to noise and variability inherent in
+real-world references, thus limiting their performance. To address
+this, more recent systems [2, 4] adopt fuzzy matching strategies that
+compare citation fields against retrieved records using token-level
+similarity rather than exact string matching, enabling detection of
+mutated or incomplete references. However, these approaches still
+fundamentally reduce verification to field-level similarity match-
+ing, thus often failing under subtle or incomplete reference per-
+turbations. More recent research begins to combine LLM-based
+reasoning models with retrieval for citation verification [16], but
+these early efforts rely on overly limited and homogeneous external
+database sources, which can lead to false positive errors in practice.
+Moreover, their applicability can be further challenged in realis-
+tic settings where references must be extracted and verified from
+complex multimodal scholarly documents.
+2.2
+Web Search Agent and Fact Checking
+LLM-based agents have recently demonstrated strong performance
+on complex, long-horizon tasks by moving beyond pure text gener-
+ation toward actionable decision-making pipelines that interleave
+reasoning with interactions in external environments [13, 14, 23,
+30, 32]. A key advantage of agentic systems over standalone foun-
+dation models is tool use—the ability to invoke external modules
+to acquire up-to-date evidence, execute operations, and reduce re-
+liance on parametric memory. A representative and widely adopted
+form of tool use is web search [17, 19, 27], which enables agents
+to ground answers in retrieved evidence and thereby mitigate hal-
+lucinations [31, 33]. Early works have further applied web search
+agents to fact-checking settings, demonstrating their effectiveness
+in evidence-based misinformation detection [24]. In the context
+of citation verification, these advances in web search agent ar-
+chitectures motivate moving beyond approaches that rely solely
+on limited bibliographic APIs: by harnessing broader web search
+agents, systems can access a more comprehensive and diverse set
+of sources, thereby mitigating the coverage limitations inherent in
+API-based citation checks and improving the robustness of citation
+hallucination detection.
+
+
+===== page 3 =====
+Table 1: Statistical overview of our citation hallucination
+benchmark, including both the generated benchmark and
+the real-world test set.
+Subset
+Real
+Fake
+Data Source
+Generated
+Test Set
+3,586
+2,500
+GPT, Gemini, Claude Sonnet,
+Qwen, Llama, etc
+Real-World
+Test Set
+2,889
+467
+Google Scholar, OpenReview,
+ArXiv, BioRxiv, etc
+Overall
+6,475
+2,967
+3
+Benchmark
+While a growing set of citation-verification systems has been devel-
+oped to detect hallucinated citations in academic writing, many of
+these systems remain closed-source and proprietary, rendering their
+verification mechanisms opaque and their empirical performance
+irreproducible [20]. This lack of transparency hinders systematic
+advancement: without an open, standardized benchmark, it’s infea-
+sible to fairly compare methods or establish consistent evaluation
+protocols, thereby constraining the field’s scientific advancement,
+highlighting the need for a controlled, comprehensive, and repro-
+ducible benchmark for citation verification.
+To address this gap, we introduced CiteAudit, a benchmark
+grounded in hallucinated citations reported on OpenReview. Specif-
+ically, we manually screen a large collection of papers, analyze
+the error patterns of citation hallucinations that naturally occur in
+real-world scholarly writing, and accordingly propose a structured
+taxonomy of fake citation types, with the detailed description in
+Appendix A. Building on this foundation, our benchmark integrates
+both ecologically observed citation errors from the academic lit-
+erature and controlled hallucinated references generated through
+principled perturbations. Benchmark statistics are shown in Table 1.
+3.1
+Real World Data Collection
+We begin benchmark construction by collecting real-world citation
+entries from authentic scholarly manuscripts. Specifically, inspired
+by recent hallucination incidents reported at ICLR and NeurIPS,
+we collect citation instances from academic papers and scholarly
+records indexed in OpenReview, Google Scholar, arXiv, bioRxiv,
+and other public preprint or bibliographic platforms. From these
+sources, we systematically sample a large set of papers to obtain
+representative citation entries. We then cross-check their title, au-
+thor list, venue, year, and other bibliographic metadata against
+authoritative scholarly records, and label each entry as verifiably
+correct only when all key fields consistently match; otherwise, we
+mark the reference as containing genuine errors or hallucinated
+components at the field level.
+This real-world citation benchmark provides a high-quality gold
+reference set that reflects naturally occurring citation mistakes,
+including incorrect author attributions, venue mismatches, and
+nonexistent references. However, this process also highlights a key
+limitation: manual citation verification is highly labor-intensive
+and difficult to scale the dataset to a sufficiently large size.
+3.2
+Human-Synthesized Data Generation
+To overcome this scalability gap, we introduce the second compo-
+nent of our benchmark construction: a systematic framework for
+generating large-scale, controlled hallucinated citations.
+Real Citation Collection. We first extract official BibTeX entries
+from publicly available open-access bibliographic repositories, span-
+ning a broad spectrum of research areas and publication venues.
+These verified references serve as ground-truth citation records.
+Next, we generate hallucinated citations through targeted edits,
+guided by a principled taxonomy of citation hallucination types as
+shown in Figure 2.
+Figure 2: Taxonomy of citation hallucination types.
+Title Errors Generation. Title hallucinations correspond to cases
+where the cited paper’s title is incorrect or fabricated, while the
+remaining bibliographic fields remain unchanged. This error type
+is especially challenging because citation checkers often rely on
+fuzzy title matching, and minor title variations may appear plau-
+sible to both humans and automated systems. In our benchmark,
+we generate title errors through three complementary strategies.
+First, we perform keyword substitution, where core technical terms
+in the original title are replaced with semantically related alter-
+natives, producing subtle but invalid variations. Second, we apply
+paraphrasing-based perturbations, where the title is rewritten into
+a fluent alternative expression that preserves topical coherence but
+does not correspond to any existing publication. Third, we intro-
+duce topic-conditioned fabrication, where a generative language
+model synthesizes a realistic-looking title within the same research
+area, ensuring that the hallucinated reference remains highly plau-
+sible despite being nonexistent. Together, these three strategies
+form an increasing spectrum of title hallucination severity, captur-
+ing hallucinations where generated citations appear semantically
+appropriate but fail existence verification.
+Author Error Generation. Author hallucinations occur when the
+author list of a citation is partially or fully incorrect. Unlike su-
+perficial formatting errors, such mistakes directly distort scholarly
+attribution, potentially crediting nonexistent researchers or misas-
+signing contributions, thereby undermining academic integrity and
+the reliability of citation-based verification. We construct author
+errors via four perturbation operations. First, we simulate author-
+ship perturbations through redundant author additions that insert
+nonexistent names into correct author lists and through author
+
+
+===== page 4 =====
+Table 2: Chi-square comparison of GPTZero fake-citation
+detection between generated and real-world datasets.
+Dataset
+Pred Fake
+Pred Real
+Total
+Generated Test Set Fake Citations
+1809
+691
+2500
+Real-World Test Set Fake Citations
+338
+129
+467
+𝜒2 = 5.6 × 10−5, 𝑝= 0.994 (𝑑𝑓= 1)
+deletions that remove valid authors, thereby producing incomplete
+attribution. Then, we apply name-level perturbations to the existing
+author list, introducing realistic identity inconsistencies through
+edits to author name strings, such as swapping given and family
+names, while preserving the overall author set structure. Finally,
+we construct fully synthetic author lists, where the entire set of
+authors is fabricated rather than derived from the original reference.
+These author perturbations enable systematic evaluation of citation
+checkers’ sensitivity to identity-level inconsistencies.
+Metadata Error Generation. Metadata hallucinations involve
+incorrect bibliographic fields beyond title and authors, such as
+venue names, publication years, or persistent identifiers. These
+errors reflect cases where a model recalls a paper approximately but
+misattributes its publication context. We generate metadata errors
+by perturbing key BibTeX fields. Venue errors are constructed by
+replacing the true conference or journal name with a related but
+incorrect outlet. Year errors are introduced by shifting publication
+dates to plausible but invalid alternatives. In addition, we generate
+DOI and identifier hallucinations, where DOI strings are fabricated
+or mismatched, simulating errors that cannot be detected through
+surface-level text similarity alone. Metadata errors therefore capture
+hallucination patterns where citations appear structurally complete
+but fail bibliographic consistency checks.
+Our generated benchmark exhibits error characteristics that are
+highly consistent with those observed in real-world citation halluci-
+nations. As shown in Table 2, we compare GPTZero’s fake-citation
+detection behavior on hallucinated citations between the gener-
+ated benchmark and the real-world set. A chi-square test shows
+no significant difference (𝜒2 = 5.6 × 10−5, 𝑝= 0.994), indicating
+highly consistent behavior across the two settings and supporting
+the fidelity of our generation framework in simulating real-world ci-
+tation hallucination patterns. Additional statistics and breakdowns
+of the generated dataset are provided in Appendix B.
+3.3
+Data Annotation
+To ensure benchmark reliability, both the real-world citation en-
+tries collected in the data collection stage and the hallucinated
+citations generated through perturbation are subjected to a rig-
+orous multi-step annotation and verification pipeline. We adopt
+a screening process that combines automated evidence retrieval
+with careful human validation. First, a web-search-based model is
+employed to retrieve corresponding online evidence for each cita-
+tion, linking the bibliographic fields to relevant publication pages
+or authoritative scholarly records. This retrieval step provides scal-
+able support for large volumes of citations by surfacing candidate
+sources for verification. Subsequently, the author team manually in-
+spects the retrieved evidence and conducts detailed cross-checking
+to confirm citation authenticity and resolve potential mismatches.
+Through this human-in-the-loop verification, we ensure that each
+benchmark entry is assigned an accurate and high-confidence label,
+indicating whether it corresponds to a real reference or a hallucinat-
+ed/erroneous citation. Through this combination of web-grounded
+retrieval and rigorous author-led validation, our benchmark offers
+a systematic and reliable resource for evaluating citation verifica-
+tion systems under both naturally occurring citation errors and
+diagnostically controlled hallucination scenarios. Detailed human
+annotation guidelines and verification procedures are provided in
+Appendix C.
+4
+Methodology
+In this section, we formalize the detection of hallucinated citations
+as a multi-stage evidence verification problem. We introduce a de-
+centralized multi-agent framework coordinated via a hierarchical
+Standardized Operating Procedure (SOP), designed to systemati-
+cally audit scholarly references for both existence and metadata
+integrity.
+4.1
+Problem Formulation
+Let D be a scientific document containing a set of citation strings
+R = {𝑟1,𝑟2, . . . ,𝑟𝑛}. For each citation 𝑟𝑖, our objective is to deter-
+mine a binary verdict 𝑣𝑖∈{𝐹𝑎𝑘𝑒, 𝑅𝑒𝑎𝑙}. We represent each citation
+as a structured metadata tuple 𝑀𝑖= {𝑚𝑇,𝑚𝐴,𝑚𝑈,𝑚𝑉,𝑚𝑌}, where
+fields denote title, authors, URL or identifier, publication venue, and
+publication year, respectively. We define the verification function
+F : 𝑀𝑖→{0, 1} based on a Metadata Consistency Criterion 𝑆𝑐:
+𝑆𝑐=
+Ö
+𝑘∈{𝑇,𝐴,𝑈,𝑉,𝑌}
+I Consistent(𝑚𝑘, ˆ𝑚𝑘)
+(1)
+where ˆ𝑚𝑘represents the metadata retrieved from authoritative
+databases, and I(·) is the indicator function that outputs 1 if and
+only if the extracted field 𝑚𝑘is consistent with the retrieved ev-
+idence under predefined matching rules, and 0 otherwise. These
+rules use strict title matching for academic publications, lenient au-
+thor matching under standard name normalization, and reasonable
+venue and year tolerance for preprint-to-publication variants. A
+citation is classified as 𝐹𝑎𝑘𝑒if no corresponding entry exists in the
+global scholarly graph G𝑠𝑐ℎ𝑜𝑙𝑎𝑟or if 𝑆𝑐= 0.
+4.2
+Collaborative Multi-Agent Pipeline
+Our framework instantiates five specialized agents, each governed
+by a restricted action space and a specific role in the verification
+pipeline.
+Extractor Agent (A𝑒𝑥𝑡): The verification pipeline is initiated by
+A𝑒𝑥𝑡, which acts as a vision-integrated structural parser. Instead of
+traditional linguistic analysis, this agent orchestrates high-precision
+OCR tools such as Nougat and PyMuPDF to ingest raw text and vi-
+sual coordinates from the PDF manuscript. The LLM then performs
+a schema-constrained transformation to map these unformatted
+strings into an immutable metadata set 𝑀𝑖= {𝑚𝑇,𝑚𝐴,𝑚𝑈,𝑚𝑉}.
+This ensures that the original citation as presented by the author
+is preserved with minimal semantic distortion, providing the raw
+substrate for downstream metadata consistency auditing.
+
+
+===== page 5 =====
+LLM Controller
+(SOP Executor)
+Extractor Agent
+Storage
+Citation Verification SOP
+S1: Parse citation metadata
+S2: Query the verified the memory.
+S3: Web-based retrieval and verification.
+S4: Scholar retrieval and verification.
+𝒜𝑒𝑥𝑡
+{
+"index": "[310]",
+"authors": "Y. Zhang, M. Li, 
+and X. Chen",
+"title": "Automated contract 
+clause generation using pre-trained 
+language models",
+"venue": "arXiv:2205.12345 
+[cs.CL]",
+"year": "2022",
+"url": 
+"https://arxiv.org/abs/2205.12345",
+"source_page": 232,
+} ………
+Search
+Memory 
+Pool
+𝒜𝑚𝑒𝑚
+Memory Agent
+Y
+No
+Web Agent
+𝒜𝑤𝑒𝑏
+Thread 
+Pool
+Allocated
+Search Tools
+Judge Agent
+𝒜𝑗𝑢𝑑
+Yes
+Scholar Agent
+𝒜𝑠𝑐ℎ
+No
+Halluci
+nation
+Figure 3: Overview of CiteAudit, a SOP-driven multi-agent citation verification framework.
+Dual-End Memory Agent (A𝑚𝑒𝑚): To minimize redundant com-
+putation, A𝑚𝑒𝑚executes a semantic lookup across a dual-end
+knowledge base K. We formalize the retrieval as a vector similarity
+function. Let 𝐸𝑛𝑐(·) be the embedding model, the agent computes
+the confidence score 𝑠𝑚𝑒𝑚:
+𝑠𝑚𝑒𝑚(𝑀𝑖) = max
+𝑘∈K
+
+𝐸𝑛𝑐(𝑀𝑖) · 𝐸𝑛𝑐(𝑘)
+||𝐸𝑛𝑐(𝑀𝑖)|| · ||𝐸𝑛𝑐(𝑘)||
+
+(2)
+If 𝑠𝑚𝑒𝑚> 𝜏where 𝜏= 0.92, the citation is immediately verified via
+the fast-path, bypassing external retrieval.
+Web Search Agent (A𝑤𝑒𝑏): In scenarios where internal memory
+lookup results in a cache miss, A𝑤𝑒𝑏is triggered to conduct ex-
+ternal validation. This agent interfaces with the Google Search
+API to identify relevant online evidence for the cited reference.
+Rather than relying solely on search snippets, A𝑤𝑒𝑏retrieves con-
+tent from the top search results and extracts candidate evidence
+from scholarly or bibliographic sources. By ingesting textual data
+from author homepages, institutional repositories, publisher pages,
+and preprint platforms, the agent ensures that the subsequent judg-
+ment is grounded in retrieved evidence rather than superficial link
+descriptions.
+Judge Agent (A𝑗𝑢𝑑): As the central decision engine, A𝑗𝑢𝑑eval-
+uates the alignment between the extracted metadata 𝑀𝑖and the
+retrieved evidence set E. We define the verification function F𝑗𝑢𝑑𝑔𝑒
+as:
+F𝑗𝑢𝑑𝑔𝑒(𝑀𝑖, E) =
+Ö
+𝑓∈{𝑇,𝐴,𝑈,𝑉}
+I Consistent(𝑀𝑓
+𝑖, E)
+(3)
+where I(·) is the indicator function. The agent acts as a gatekeeper:
+it returns 𝑅𝑒𝑎𝑙only when the retrieved evidence satisfies the pre-
+defined title, author, venue, and identifier consistency rules from
+A𝑤𝑒𝑏or A𝑠𝑐ℎ.
+Scholar Agent (A𝑠𝑐ℎ): Acting as the Veracity Benchmark, this agent
+is invoked for high-stakes validation when preliminary web evi-
+dence is insufficient. It executes targeted, low-frequency crawling of
+authoritative repositories such as Google Scholar, publisher pages,
+DOI records, and preprint repositories to retrieve the canonical
+record ˆ𝑀𝑖.
+4.3
+Collaborative Multi-Agent Pipeline and
+Planning Model
+In this section, we describe the system’s execution kernel, which
+is orchestrated by an LLM Controller acting as the central SOP
+Executor. The coordination logic follows a rigorous task-allocation
+model governed by a Planning Model, ensuring high throughput
+via the Multi-Thread.
+Planning Model: The orchestrator is the structural backbone of
+the framework. Given a PDF manuscript, the Planning Model de-
+composes the verification job into a sequential and parallelizable
+graph based on the predefined Citation Verification SOP (S1-S4). It
+manages the state transitions of each citation task, ensuring that
+resources are optimally allocated from the Thread Pool.
+Formalization of SOP Execution. The coordination logic de-
+scribed in Stages 1-4 can be formalized as a hierarchical cascade
+function Φ(𝑟𝑖). The Planning Model routes the verification task
+sequentially to optimize the trade-off between cost and accuracy:
+Φ(𝑟𝑖) =
+
+
+Verified
+if A𝑚𝑒𝑚(𝑟𝑖) > 𝜏
+(Stage 2)
+Verified
+if A𝑗𝑢𝑑(𝑟𝑖, A𝑤𝑒𝑏) = 1
+(Stage 3)
+A𝑗𝑢𝑑(𝑟𝑖, A𝑠𝑐ℎ)
+otherwise
+(Stage 4)
+(4)
+This formulation ensures that the computationally expensive
+Scholar Agent (A𝑠𝑐ℎ) is only invoked as a fallback for unresolved or
+ambiguous citations, adhering to the principle of minimal resource
+consumption.
+Stage 1: Citation Metadata Extraction (A𝑒𝑥𝑡): The process is
+initiated by A𝑒𝑥𝑡, which maps the visual and textual data from the
+PDF into a structured JSON schema. This transformation converts
+implicit citations into explicit, verifiable metadata 𝑚𝑇,𝑚𝐴,𝑚𝑈,𝑚𝑉,
+providing the raw data substrate for the entire pipeline.
+
+
+===== page 6 =====
+Table 3: Results on the generated test set. Runtime efficiency, API pricing, and verification performance of citation verification
+models. Prices are reported per one million tokens based on official or primary provider APIs when available. As GPTZero
+pricing is defined per word in subscription tiers, a coarse token-level estimate is used for comparison.
+Model
+Time
+Price ($/1M tok)
+Confusion Matrix
+Metrics
+/10 refs
+In
+Out
+TP
+FN
+FP
+TN
+Acc
+Prec
+Rec
+F1
+Mixtral-8x7B-Instruct
+2.3
+0.60
+0.60
+1675
+825
+940
+2646
+0.710
+0.641
+0.670
+0.655
+Llama-3.3-70B-Instruct
+4.9
+0.88
+0.88
+1088
+1412
+381
+3205
+0.705
+0.741
+0.435
+0.548
+Qwen3-Next-80B-A3B
+3.5
+0.15
+1.50
+1265
+1235
+1370
+2216
+0.572
+0.480
+0.506
+0.492
+Gemini-3-Pro
+36.6
+2.00
+12.00
+1879
+621
+511
+3075
+0.814
+0.786
+0.752
+0.769
+GPT-5.2
+47.1
+1.75
+14.00
+2284
+216
+0
+3586
+0.965
+1.000
+0.914
+0.955
+GPTZero
+26.3
+70.00
+0.00
+1809
+691
+623
+2963
+0.784
+0.744
+0.724
+0.734
+Claude-Sonnet-4.5
+11.3
+3.00
+15.00
+2475
+25
+3364
+222
+0.443
+0.424
+0.990
+0.594
+Our Model
+11.2
+0.50
+3.00
+2428
+72
+136
+3450
+0.966
+0.947
+0.971
+0.959
+Stage 2: Verified Memory Querying (A𝑚𝑒𝑚): To optimize latency,
+the controller routes the metadata to A𝑚𝑒𝑚. This agent performs a
+high-speed lookup in the Memory Pool. If the reference has been
+previously audited and marked as Verified (𝑌), the task concludes
+immediately. If not found (𝑁), the planning model allocates the task
+to the next tier of the thread pool.
+Stage 3: Web-based Content Retrieval & Consistency Audit:
+Uncached citations are processed by the Web Search Agent and the
+Judge Agent. The orchestrator allocates parallel threads to retrieve
+high-relevance evidence from the live web. The Judge then performs
+the predefined metadata consistency check. A successful match (𝑌)
+updates the Memory Pool for future reuse, while a mismatch or
+inconclusive result (𝑁) triggers an escalation to the final verification
+tier.
+Stage 4: Scholar Retrieval & Final Verification: Unresolved
+citations are handled by the Scholar Agent. It utilizes low-frequency,
+high-precision crawling to fetch canonical scholarly records. The
+Judge Agent then performs a second-pass rule-based metadata
+consistency check. If this definitive check fails (𝑁), the citation is
+flagged as Fake with an associated provenance report; otherwise, it
+is successfully marked as Verified and stored.
+5
+Experiments
+5.1
+Experimental Setup
+In this section, we detail the implementation of our multi-agent
+framework and the hardware/software configurations used for the
+citation verification task.
+Agent Implementation and Model Selection: Our framework
+combines multimodal citation extraction, external evidence re-
+trieval, memory-based reuse, and model-based judgment. The ex-
+traction component is implemented with Qwen3-VL-235B A22,
+while the planning and final judgment components are powered by
+Gemini 3 Flash. The specific roles are instantiated as follows:
+• Planning Model (Orchestrator): Implemented using Gemini
+3 Flash. It acts as the central executor of the SOP, managing
+task states and thread-pool allocation. It coordinates citation
+extraction, evidence retrieval, memory lookup, scholarly search,
+and final judgment.
+• Extractor Agent (A𝑒𝑥𝑡): Utilizing the multimodal capabilities of
+Qwen3-VL-235B A22 [9], this agent performs page-level OCR
+and structural parsing. It identifies citation strings and maps
+them into a predefined JSON metadata schema.
+• Memory Agent (A𝑚𝑒𝑚): Developed based on the Mem0 [11]
+framework. It maintains a persistent, evolving knowledge graph
+of previously audited citations, enabling long-term context re-
+tention and rapid fast-path verification.
+• Web Search Agent (A𝑤𝑒𝑏): Integrated with the Google Search
+API for real-time evidence retrieval. It issues metadata-based
+search queries and collects candidate evidence from web-accessible
+scholarly and bibliographic sources.
+• Judge Agent (A𝑗𝑢𝑑): Powered by Gemini 3 Flash, this agent ex-
+ecutes the Strict Consistency Criterion (𝑆𝑐). It compares extracted
+citation metadata against retrieved external evidence and acts as
+the final arbiter for both preliminary and escalated verification
+stages.
+• Scholar Agent (A𝑠𝑐ℎ): A specialized high-precision crawler [18]
+designed to interface with authoritative scholarly databases, such
+as Google Scholar, to fetch canonical ground-truth records ( ˆ𝑀𝑖).
+The detailed system prompts and standardized operating proce-
+dure (SOP) definitions for all agents are documented in Appendix D.
+Infrastructure and Hyperparameters: The extraction pipeline
+is executed on a high-performance compute cluster equipped with
+NVIDIA B200 GPUs, while the planning and judgment stages use
+Gemini 3 Flash through API inference. We employ a Multi-thread
+Pool (Size=4) to facilitate simultaneous citation auditing across
+multiple documents. For the visual-textual extraction and final
+judgment stages, decoding is configured with a temperature of 0.0
+to ensure deterministic and reproducible parsing and verification.
+The vector database for A𝑚𝑒𝑚utilizes cosine similarity with a
+threshold of 0.92 to identify high-affinity citation matches.
+Evaluation Metrics. To evaluate the performance of our cita-
+tion verification system, we report both classification-based and
+efficiency-oriented metrics.
+
+
+===== page 7 =====
+Table 4: Results on the real-world test set. The results show strong consistency with the generated test set, supporting the
+external validity of the generated benchmark.
+Model
+Time
+Price ($/1M tok)
+Confusion Matrix
+Metrics
+/10 refs
+In
+Out
+TP
+FN
+FP
+TN
+Acc
+Prec
+Rec
+F1
+Mixtral-8x7B-Instruct
+2.3
+0.60
+0.60
+95
+372
+757
+2132
+0.664
+0.112
+0.203
+0.144
+Llama-3.3-70B-Instruct
+4.8
+0.88
+0.88
+83
+384
+306
+2583
+0.794
+0.213
+0.178
+0.194
+Qwen3-Next-80B-A3B
+3.7
+0.15
+1.50
+234
+233
+1104
+1785
+0.602
+0.175
+0.501
+0.259
+Gemini-3-Pro
+38.1
+2.00
+12.00
+351
+116
+412
+2477
+0.843
+0.460
+0.752
+0.571
+GPT-5.2
+48.8
+1.75
+14.00
+366
+101
+1379
+1510
+0.559
+0.210
+0.784
+0.331
+GPTZero
+26.2
+70.00
+0.00
+338
+129
+1358
+1531
+0.557
+0.199
+0.724
+0.313
+Claude-Sonnet-4.5
+13.3
+3.00
+15.00
+349
+118
+756
+2133
+0.740
+0.316
+0.747
+0.444
+Our Model
+11.2
+0.50
+3.00
+444
+23
+149
+2740
+0.949
+0.749
+0.951
+0.838
+We define four types of prediction outcomes. True Positives
+refer to hallucinated citations that are correctly flagged as fake.
+False Negatives are hallucinated citations that are mistakenly
+predicted as real. False Positives denote real citations that are
+incorrectly flagged as fake, and True Negatives are real citations
+that are correctly identified as real.
+Based on these outcomes, we compute standard metrics. Accu-
+racy reflects the overall correctness of the predictions across all
+citations. Precision measures how often the citations flagged as
+hallucinations are actually hallucinated, indicating the system’s
+ability to avoid false alarms. Recall quantifies how many of the
+actual hallucinated citations are successfully identified, capturing
+detection completeness. The F1 score balances precision and recall,
+offering a single measure of effectiveness in hallucination detection.
+In addition to classification performance, we also assess system
+efficiency by measuring the average runtime required to verify
+a batch of 10 citations, along with the associated input/output
+costs. These metrics reflect the practical feasibility of large-scale
+deployment and help benchmark the trade-off between verification
+accuracy and computational cost.
+5.2
+Evaluation on Generated Benchmark
+We evaluate all citation verification models on our generated bench-
+mark, which consists of 3,586 real-world references and 2,500 hal-
+lucinated references produced through controlled perturbations
+spanning multiple error categories. In addition, we conduct evalua-
+tion on a real-world test set comprising 2,889 authentic references
+and 467 naturally occurring hallucinated citations collected from
+real scholarly sources.
+Table 3 presents the performance of different citation verification
+models on our generated benchmark. Most existing models exhibit
+a clear imbalance between detecting hallucinated citations and
+preserving real references. For example, GPT-5.2 achieves perfect
+precision and makes no false-positive errors on real citations, but it
+misses a larger number of hallucinated references than the highest-
+recall systems. Conversely, Claude-Sonnet-4.5 achieves the highest
+recall, but introduces a large number of false positives on genuine
+references. In contrast, our model achieves the best overall balance
+between hallucination detection and real-reference preservation. It
+obtains the highest accuracy and F1 score, while maintaining both
+high precision and high recall. This indicates that our approach
+avoids both overly permissive acceptance of fabricated references
+and overly aggressive rejection of genuine citations, leading to
+more reliable citation verification performance.
+Table 3 also reports runtime efficiency and API pricing across
+representative citation-verification models. Our framework does
+not achieve the lowest runtime or the lowest API price, but it of-
+fers a favorable trade-off between cost, latency, and verification
+quality. In particular, it achieves the strongest overall classification
+performance on the generated benchmark while using substantially
+cheaper inference than several proprietary high-end models. This
+suggests that the proposed agentic verification design can improve
+reliability without relying solely on the most expensive model calls.
+5.3
+Evaluation on Real World Benchmark
+We additionally assess citation verification performance on a real-
+world collection composed of authentic references and naturally
+occurring hallucinated citations drawn from scholarly manuscripts.
+Compared with the controlled benchmark setting, this evaluation
+reflects the ambiguity, noise, and incomplete metadata commonly
+encountered in practical academic writing scenarios.
+The results in Table 4 reveal that existing approaches remain
+limited in balancing hallucination filtering with preservation of
+legitimate references. Methods that aggressively flag suspicious
+entries tend to over-reject genuine citations, whereas more per-
+missive systems allow fabricated references to pass verification,
+indicating unresolved reliability challenges in real deployment con-
+ditions. In contrast, our framework achieves the strongest overall
+performance across all reported classification metrics. Specifically,
+it delivers the highest accuracy, precision, recall, and F1 score, with
+the F1 score exceeding that of the second-best system by 0.267
+absolute points. This margin indicates a substantial improvement
+in balanced verification capability. Our method detects hallucinated
+citations more reliably while maintaining faithful acceptance of
+genuine references, overcoming the reliability limitations observed
+in prior systems.
+Moreover, the consistency of relative model behavior between
+this real-world evaluation and the controlled benchmark suggests
+
+
+===== page 8 =====
+that the perturbation-based construction pipeline captures impor-
+tant characteristics of citation errors occurring in practice, further
+supporting the empirical validity and diagnostic value of our bench-
+mark design.
+5.4
+Additional Experiment Analysis
+During experimentation, the suboptimal performance of advanced
+proprietary models appeared counterintuitive, motivating diagnos-
+tic evaluations via web-based LLM interfaces with observable rea-
+soning behavior. We found that even when explicitly instructed to
+perform external retrieval, the systems do not reliably execute veri-
+fiable search procedures, and the provenance of implicitly retrieved
+evidence remains opaque. This black-box behavior makes retrieval
+neither enforceable nor transparently grounded, which is prob-
+lematic for citation verification requiring explicit evidence tracing.
+This observation further underscores the necessity of specialized,
+auditable citation-verification tools that ground decisions in trace-
+able external evidence, reinforcing the value of our benchmark
+and system as a principled alternative to reliance on closed-source
+general-purpose LLMs.
+5.5
+Case Study
+We present representative case studies to qualitatively demonstrate
+the effectiveness and robustness of our citation verification frame-
+work. As illustrated in Figure 4, the system is capable of accu-
+rately identifying whether a citation refers to a real scholarly work,
+while further diagnosing fine-grained inconsistency types when
+mismatches occur.
+In Case Study 1, although the queried citation corresponds to a
+real arXiv paper and is correctly recognized as non-hallucinated by
+multiple baseline systems, the cited title exhibits a subtle semantic
+deviation from the ground-truth record. Our framework success-
+fully detects this title mismatch, retrieves the correct reference
+from arXiv, and explicitly reports the discrepancy, demonstrating
+sensitivity to partial but meaningful citation errors beyond binary
+real/fake classification. Similarly, in Case Study 2, the input cita-
+tion again refers to an existing paper; however, the listed author
+name does not match the true authorship information. While ex-
+isting tools label the citation as valid due to its overall plausibility,
+our system precisely identifies the author mismatch and recovers
+the correct author metadata from the authoritative source.
+Across both examples, the framework not only distinguishes
+real citations from hallucinated ones, but also performs structured
+verification of individual metadata fields, including title and au-
+thor information. By retrieving the correct ground-truth source
+and reporting explicit mismatch categories, our approach enables
+reliable, interpretable, and practically useful citation authenticity
+verification, which is essential for real-world scholarly and clinical
+documentation workflows.
+6
+Conclusion
+As large language models become deeply integrated into scientific
+writing and peer-review workflows, hallucinated citations pose a
+growing threat to research integrity. These references can appear
+Figure 4: Case studies of citation verification
+plausible in title, authors, venue, or year while remaining nonex-
+istent or inconsistent with real scholarly records, making them
+difficult to detect through surface inspection alone.
+In this work, we introduce an open, standardized, and scalable
+benchmark for hallucinated citation detection, covering both con-
+trolled perturbations and naturally occurring real-world citation
+errors. We also propose a multi-agent framework that verifies cita-
+tions through a structured SOP-driven process, combining planning,
+extraction, retrieval, memory-based reuse, scholarly search, and
+final judgment.
+Our experiments show that existing commercial and open-source
+baselines often struggle to balance detecting hallucinated citations
+with preserving genuine references. In contrast, our framework
+achieves strong performance in both generated and real-world
+settings, demonstrating a more reliable balance across accuracy,
+precision, recall, and F1 score. Overall, our benchmark and sys-
+tem provide practical infrastructure for building more accountable
+citation verification tools in the LLM era.
+
+
+===== page 9 =====
+References
+[1] 2023. GPTZero: AI Text Detection Service. https://gptzero.me/.
+Accessed:
+2026-02.
+[2] 2024. CiteCheck: AI-powered Citation Verification. https://citecheck.ai/. Ac-
+cessed: 2026-02.
+[3] 2024. Citely: AI Citation Assistant. https://citely.ai/. Accessed: 2026-02.
+[4] 2024. RefCheck AI. https://github.com/HuaHenry/RefCheck_ai.
+Accessed:
+2026-02.
+[5] 2024. SwanRef: Reference Verification Platform. https://www.swanref.org/.
+Accessed: 2026-02.
+[6] 2025. GPTZero finds over 50 hallucinations in ICLR 2026 submissions. https:
+//gptzero.me/news/iclr-2026.
+[7] 2026. AI conference’s papers contaminated by AI hallucinations. https://www.
+theregister.com/2026/01/22/neurips_papers_contaiminated_ai_hallucinations/.
+[8] Dang Anh-Hoang, Vu Tran, and Le-Minh Nguyen. 2025. Survey and analysis of
+hallucinations in large language models: attribution to prompting strategies or
+model behavior. Frontiers in Artificial Intelligence 8 (2025), 1622292.
+[9] Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui Chen, Zesen Cheng,
+Lianghao Deng, Wei Ding, Chang Gao, Chunjiang Ge, Wenbin Ge, Zhifang Guo,
+Qidong Huang, Jie Huang, Fei Huang, Binyuan Hui, Shutong Jiang, Zhaohai Li,
+Mingsheng Li, Mei Li, Kaixin Li, Zicheng Lin, Junyang Lin, Xuejing Liu, Jiawei
+Liu, Chenglong Liu, Yang Liu, Dayiheng Liu, Shixuan Liu, Dunjie Lu, Ruilin
+Luo, Chenxu Lv, Rui Men, Lingchen Meng, Xuancheng Ren, Xingzhang Ren,
+Sibo Song, Yuchong Sun, Jun Tang, Jianhong Tu, Jianqiang Wan, Peng Wang,
+Pengfei Wang, Qiuyue Wang, Yuxuan Wang, Tianbao Xie, Yiheng Xu, Haiyang
+Xu, Jin Xu, Zhibo Yang, Mingkun Yang, Jianxin Yang, An Yang, Bowen Yu, Fei
+Zhang, Hang Zhang, Xi Zhang, Bo Zheng, Humen Zhong, Jingren Zhou, Fan
+Zhou, Jing Zhou, Yuanzhi Zhu, and Ke Zhu. 2025. Qwen3-VL Technical Report.
+arXiv:2511.21631 [cs.CV] https://arxiv.org/abs/2511.21631
+[10] Mikaël Chelli, Jules Descamps, Vincent Lavoué, Christophe Trojani, Michel
+Azar, Marcel Deckert, Jean-Luc Raynier, Gilles Clowez, Pascal Boileau, Caro-
+line Ruetsch-Chelli, et al. 2024. Hallucination rates and reference accuracy of
+ChatGPT and bard for systematic reviews: comparative analysis. Journal of
+medical Internet research 26, 1 (2024), e53164.
+[11] Prateek Chhikara, Dev Khant, Saket Aryan, Taranjeet Singh, and Deshraj Yadav.
+2025. Mem0: Building Production-Ready AI Agents with Scalable Long-Term
+Memory. arXiv preprint arXiv:2504.19413 (2025).
+[12] C. Dai. 2021. Literary runaway: Increasingly more references cited per research
+paper. PLoS ONE 16 (2021), e0255849.
+[13] Mohamed Amine Ferrag, Norbert Tihanyi, and Merouane Debbah. 2025. From
+llm reasoning to autonomous ai agents: A comprehensive review. arXiv preprint
+arXiv:2504.19678 (2025).
+[14] Mengkang Hu, Tianxing Chen, Qiguang Chen, Yao Mu, Wenqi Shao, and Ping
+Luo. 2025. Hiagent: Hierarchical working memory management for solving
+long-horizon agent tasks with large language model. In Proceedings of the 63rd
+Annual Meeting of the Association for Computational Linguistics (Volume 1: Long
+Papers). 32779–32798.
+[15] Lei Huang, Weijiang Yu, Weitao Ma, Weihong Zhong, Zhangyin Feng, Haotian
+Wang, Qianglong Chen, Weihua Peng, Xiaocheng Feng, Bing Qin, et al. 2025. A
+survey on hallucination in large language models: Principles, taxonomy, chal-
+lenges, and open questions. ACM Transactions on Information Systems 43, 2 (2025),
+1–55.
+[16] LJ Janse van Rensburg. 2025. AI-Powered Citation Auditing: A Zero-Assumption
+Protocol for Systematic Reference Verification in Academic Research. arXiv
+e-prints (2025), arXiv–2511.
+[17] Tianyi Ma, Yiyue Qian, Zheyuan Zhang, Zehong Wang, Xiaoye Qian, Feifan
+Bai, Yifan Ding, Xuwei Luo, Shinan Zhang, Keerthiram Murugesan, et al. 2025.
+AutoData: A Multi-Agent System for Open Web Data Collection. arXiv preprint
+arXiv:2505.15859 (2025).
+[18] Microsoft. [n. d.].
+Playwright for Python.
+https://github.com/microsoft/
+playwright-python. Accessed: 2026-02.
+[19] Reiichiro Nakano, Jacob Hilton, Suchir Balaji, Jeff Wu, Long Ouyang, Christina
+Kim, Christopher Hesse, Shantanu Jain, Vineet Kosaraju, William Saunders, et al.
+2021. Webgpt: Browser-assisted question-answering with human feedback. arXiv
+preprint arXiv:2112.09332 (2021).
+[20] Subhey Sadi Rahman, Md Adnanul Islam, Md Mahbub Alam, Musarrat Zeba,
+Md Abdur Rahman, Sadia Sultana Chowa, Mohaimenul Azam Khan Raiaan, and
+Sami Azam. 2026. Hallucination to truth: a review of fact-checking and factuality
+evaluation in large language models. Artificial Intelligence Review (2026).
+[21] Y. Sakai, H. Kamigaito, and T. Watanabe. 2026. HalluCitation Matters: Revealing
+the Impact of Hallucinated References with 300 Hallucinated Papers in ACL
+Conferences. https://arxiv.org/abs/2601.18724.
+[22] Maria Janina Sarol, Shufan Ming, Shruthan Radhakrishna, Jodi Schneider, and
+Halil Kilicoglu. 2024. Assessing citation integrity in biomedical publications:
+corpus annotation and NLP models. Bioinformatics 40, 7 (2024), btae420.
+[23] Kaiwen Shi, Zheyuan Zhang, Zhengqing Yuan, Keerthiram Murugesan, Vincent
+Galass, Chuxu Zhang, and Yanfang Ye. 2025. NG-Router: Graph-Supervised
+Multi-Agent Collaboration for Nutrition Question Answering. arXiv preprint
+arXiv:2510.09854 (2025).
+[24] Jacob-Junqi Tian, Hao Yu, Yury Orlovskiy, Tyler Vergho, Mauricio Rivera, Mayank
+Goel, Zachary Yang, Jean-Francois Godbout, Reihaneh Rabbany, and Kellin Pel-
+rine. 2024. Web retrieval agents for evidence-based misinformation detection.
+arXiv preprint arXiv:2409.00009 (2024).
+[25] SMTI Tonmoy, SM Zaman, Vinija Jain, Anku Rani, Vipula Rawte, Aman Chadha,
+and Amitava Das. 2024. A comprehensive survey of hallucination mitigation
+techniques in large language models. arXiv preprint arXiv:2401.01313 6 (2024).
+[26] Ludo Waltman. 2016. A review of the literature on citation impact indicators.
+Journal of informetrics 10, 2 (2016), 365–391.
+[27] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik R Narasimhan,
+and Yuan Cao. 2022. React: Synergizing reasoning and acting in language models.
+In The eleventh international conference on learning representations.
+[28] Yanfang Ye, Zheyuan Zhang, Tianyi Ma, Zehong Wang, Yiyang Li, Shifu Hou,
+Weixiang Sun, Kaiwen Shi, Yijun Ma, Wei Song, et al. 2025. Llms4all: A re-
+view of large language models across academic disciplines.
+arXiv preprint
+arXiv:2509.19580 (2025).
+[29] Zhengqing Yuan, Yixin Liu, Yihan Cao, Weixiang Sun, Haolong Jia, Ruoxi Chen,
+Zhaoxu Li, Bin Lin, Li Yuan, Lifang He, et al. 2024. Mora: Enabling generalist
+video generation via a multi-agent framework. arXiv preprint arXiv:2403.13248
+(2024).
+[30] Zheyuan Zhang, Lin Ge, Hongjiang Li, Weicheng Zhu, Chuxu Zhang, and Yanfang
+Ye. 2025. MAPRO: Recasting Multi-Agent Prompt Optimization as Maximum a
+Posteriori Inference. arXiv e-prints (2025), arXiv–2510.
+[31] Zheyuan Zhang, Yiyang Li, Nhi Ha Lan Le, Zehong Wang, Tianyi Ma, Vincent
+Galassi, Keerthiram Murugesan, Nuno Moniz, Werner Geyer, Nitesh V Chawla,
+et al. 2025.
+NGQA: a nutritional graph question answering benchmark for
+personalized health-aware nutritional reasoning. In Proceedings of the 63rd Annual
+Meeting of the Association for Computational Linguistics (Volume 1: Long Papers).
+5934–5966.
+[32] Zheyuan Zhang, Kaiwen Shi, Zhengqing Yuan, Zehong Wang, Tianyi Ma, Keerthi-
+ram Murugesan, Vincent Galassi, Chuxu Zhang, and Yanfang Ye. 2025. Agen-
+tRouter: A Knowledge-Graph-Guided LLM Router for Collaborative Multi-Agent
+Question Answering. arXiv preprint arXiv:2510.05445 (2025).
+[33] Zheyuan Zhang, Zehong Wang, Tianyi Ma, Varun Sameer Taneja, Sofia Nelson,
+Nhi Ha Lan Le, Keerthiram Murugesan, Mingxuan Ju, Nitesh V Chawla, Chuxu
+Zhang, et al. 2025. Mopi-hfrs: A multi-objective personalized health-aware food
+recommendation system with llm-enhanced interpretation. In Proceedings of
+the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining V. 1.
+2860–2871.
+
+
+===== page 10 =====
+A
+Citation Hallucination Taxonomy
+To support systematic and reproducible evaluation of citation ver-
+ification systems, we propose a structured taxonomy of citation
+hallucinations. The taxonomy categorizes hallucinations accord-
+ing to the type and severity of bibliographic inconsistencies. It is
+grounded in citation errors observed in real scholarly manuscripts
+and is designed to capture both subtle and severe hallucination
+patterns produced by large language models.
+A.1
+Definition of Citation Hallucination
+We define a citation hallucination as a bibliographic reference that
+appears plausible in form and content but does not correspond
+to a valid scholarly record. Formally, given a citation metadata
+tuple 𝑀= {𝑚𝑇,𝑚𝐴,𝑚𝑈,𝑚𝑉,𝑚𝑌} representing title, authors, URL
+or persistent identifier, venue, and publication year, a citation is
+considered hallucinated if no authoritative scholarly source can be
+found that satisfies all essential metadata fields.
+Citation hallucinations differ from minor formatting inconsis-
+tencies or incomplete references. They involve semantic or factual
+mismatches that break the evidence chain between a claim and its
+cited source, thereby weakening scholarly attribution and verifica-
+tion.
+A.2
+Title-Level Hallucinations
+Title-level hallucinations occur when the cited paper title is incor-
+rect or fabricated, while other metadata fields remain partially or
+fully plausible. This error type is especially difficult because minor
+lexical variations or fluent paraphrases may appear legitimate to
+both human readers and automated systems.
+We identify three representative subclasses:
+• Keyword Substitution: Core technical terms in the original title
+are replaced with semantically related but incorrect alternatives.
+• Paraphrased Fabrication: The title is fluently rephrased into a
+plausible variant that does not correspond to any existing publi-
+cation.
+• Topic-Conditioned Synthesis: A realistic-looking title is gen-
+erated within the same research area without grounding in any
+real work.
+A citation with any of these patterns is labeled as hallucinated if
+no exact or canonical title match can be verified in authoritative
+bibliographic databases.
+A.3
+Author-Level Hallucinations
+Author-level hallucinations involve incorrect or fabricated author-
+ship information. These errors directly distort scholarly attribution
+and can mislead citation-based evaluation and credit assignment.
+We categorize author hallucinations into four types:
+• Author Addition: Nonexistent or unrelated author names are
+inserted into an otherwise valid author list.
+• Author Deletion: One or more legitimate authors are omitted
+from the citation.
+• Name Perturbation: Author names are altered through spelling
+changes, reordered given and family names, or partial truncation.
+• Fully Fabricated Authorship: The entire author list does not
+correspond to any real publication.
+A citation is marked as hallucinated if the author list cannot
+be aligned with a verified scholarly record under standard name
+normalization rules.
+A.4
+Metadata-Level Hallucinations
+Metadata-level hallucinations refer to inconsistencies in biblio-
+graphic fields beyond title and authors, including venue, publication
+year, DOI, arXiv ID, and other persistent identifiers.
+We consider the following categories:
+• Venue Mismatch: The cited venue does not match the actual
+publication outlet of the work.
+• Year Mismatch: The publication year is incorrect beyond ac-
+ceptable variation between preprint and final versions.
+• Identifier Fabrication: DOI, arXiv ID, or other persistent iden-
+tifiers are invalid or assigned to a different work.
+These hallucinations are difficult to detect through surface-level
+similarity matching because the citation may appear structurally
+complete while still being bibliographically invalid.
+A.5
+Compound and Cross-Field Hallucinations
+In practice, citation hallucinations often involve multiple simulta-
+neous inconsistencies. We therefore include a compound category
+for citations that contain errors across two or more metadata fields,
+such as title and authors, or venue and identifier.
+These compound hallucinations represent the most severe form
+of citation fabrication and are always labeled as hallucinated in our
+benchmark.
+A.6
+Relation to Real-World Citation Errors
+Our taxonomy is informed by empirical analysis of citation errors
+observed in real conference and journal submissions. We emphasize
+that not all citation inaccuracies constitute hallucinations. Minor
+formatting variations, missing page numbers, and capitalization
+differences are not considered hallucinations as long as the core
+bibliographic identity remains verifiable.
+This distinction ensures that the benchmark targets genuinely
+harmful hallucinations rather than benign citation noise, supporting
+fair and realistic evaluation of citation verification systems.
+B
+Dataset Construction and Statistics
+This appendix details the construction process and statistical com-
+position of the generated citation hallucination dataset used in our
+benchmark. The dataset is designed to support controlled and fine-
+grained evaluation of citation verification systems under diverse
+hallucination scenarios.
+B.1
+Source of Real Citations
+We begin by collecting a pool of verified real citations from pub-
+licly available bibliographic repositories and open-access scholarly
+sources. Each citation is extracted in structured BibTeX format
+and verified to ensure correctness across essential metadata fields,
+including title, authors, venue, publication year, DOI, arXiv ID,
+and other persistent identifiers. These verified citations serve two
+
+
+===== page 11 =====
+purposes. First, they provide the real-reference portion of the gener-
+ated benchmark. Second, they serve as seed references from which
+hallucinated variants are systematically generated.
+B.2
+Hallucinated Citation Generation
+Building on the verified citation pool, we generate hallucinated ref-
+erences through controlled perturbations guided by the taxonomy
+described in Appendix A. Each hallucinated citation is derived from
+a real reference by modifying one or more metadata fields while
+preserving overall plausibility and valid citation structure.
+The generated test set contains three primary hallucination cat-
+egories:
+• Title Errors (1,000 instances): The original title is replaced with
+a semantically plausible but invalid variant, while the remain-
+ing metadata fields are preserved. These errors are constructed
+through keyword substitution, paraphrase-based rewriting, and
+topic-conditioned synthesis.
+• Author Errors (1,000 instances): The author list is perturbed
+through controlled operations, including author addition, author
+deletion, name-level perturbation, and full authorship fabrication,
+while the remaining metadata fields are preserved.
+• Metadata Errors (500 instances): Bibliographic fields beyond
+title and authors are modified, including venue mismatches, pub-
+lication year shifts, and fabricated or mismatched persistent iden-
+tifiers.
+Each hallucinated citation maintains valid BibTeX structure and
+formatting so that models cannot rely on trivial syntactic irregular-
+ities for detection.
+B.3
+Dataset Composition and Balance
+The final generated test set contains 2,500 hallucinated citations
+and 3,586 verified real citations, resulting in 6,086 citation instances
+in total. The hallucinated portion is distributed across title-level,
+author-level, and metadata-level errors as described above. The
+real-reference portion is sampled from the verified citation pool
+and retained without perturbation.
+Although the dataset is not class-balanced, it reflects a realistic
+evaluation setting in which genuine references are more frequent
+than fabricated ones. This composition also allows us to evalu-
+ate whether citation verification systems can detect hallucinated
+references without over-rejecting valid scholarly citations. The con-
+trolled distribution across hallucination types ensures that evalua-
+tion results are not dominated by a single error mode and supports
+targeted analysis of model robustness across different classes of
+citation hallucination.
+B.4
+Quality Control and Validation
+All generated hallucinated citations are subjected to retrieval-based
+checks followed by human validation. A hallucinated citation is
+retained in the benchmark only if no authoritative scholarly record
+can be found that matches the perturbed metadata under standard
+normalization rules. This process reduces the risk of labeling a valid
+but hard-to-index citation as hallucinated.
+Through this validation procedure, the generated dataset pre-
+serves realistic citation form while ensuring that each hallucinated
+instance contains a verifiable bibliographic inconsistency. As a
+result, the benchmark evaluates substantive citation verification
+ability rather than sensitivity to formatting artifacts or incomplete
+citation style conventions.
+C
+Human Annotation and Verification Protocol
+To ensure the reliability and correctness of benchmark labels, all
+citation annotations in both the generated and real-world datasets
+were conducted by the author team. No crowd-sourced annotators
+were used, and no labels were assigned solely by automated systems.
+C.1
+Annotation Scope
+Each citation instance is represented as a structured metadata tu-
+ple, including title, authors, venue, publication year, and persistent
+identifiers when available. Annotators determine whether the cita-
+tion corresponds to a valid scholarly record and whether its critical
+metadata fields are consistent with authoritative sources.
+C.2
+Verification Procedure
+For each citation, annotators perform a manual verification process
+consisting of the following steps:
+• Authoritative Search: The citation is queried against scholarly
+databases, publisher websites, Google Scholar, and institutional
+repositories.
+• Metadata Cross-Checking: Retrieved records are manually
+compared against the citation title, author list, venue, year, and
+identifiers.
+• Existence Validation: A citation is marked as Real only if a
+corresponding scholarly work can be confidently identified with
+matching core metadata.
+• Hallucination Confirmation: A citation is labeled as Halluci-
+nated if no matching scholarly record can be found or if critical
+metadata fields are demonstrably inconsistent.
+C.3
+Labeling Criteria
+We adopt a strict but realistic labeling standard. Minor formatting
+variations, capitalization differences, and missing optional fields
+such as page numbers are not considered hallucinations as long
+as the core bibliographic identity remains verifiable. Conversely,
+inconsistencies in essential fields, including nonexistent titles, incor-
+rect authorship, invalid venue attribution, or fabricated identifiers,
+result in a hallucinated label.
+C.4
+Conflict Resolution
+All citation instances are independently reviewed by at least two
+authors. In cases of disagreement or ambiguity, the citation is
+jointly re-examined by the author team until a consensus deci-
+sion is reached. Citations for which no consensus can be achieved
+after exhaustive verification are excluded from the benchmark to
+avoid label noise.
+C.5
+Quality Assurance
+To further ensure annotation integrity, a subset of citations is ran-
+domly re-checked after the initial labeling process. This auditing
+step helps prevent systematic bias and supports consistent applica-
+tion of the labeling criteria across the dataset.
+
+
+===== page 12 =====
+D
+Prompt Templates and SOP Details
+This appendix documents the core prompt templates used in our
+SOP-driven multi-agent citation verification framework. For re-
+producibility and transparency, we disclose the prompts for the
+Planning Agent and the Judge Agent, which jointly control task
+routing and final verification decisions.
+D.1
+Planning Agent Prompt
+The Planning Agent serves as the central SOP executor. Its respon-
+sibility is not to judge citation correctness directly, but to determine
+the next verification stage for each citation. It routes each citation
+through memory lookup, web verification, and scholar verification
+according to the predefined SOP.
+Planning Agent Prompt
+You are a citation verification orchestrator.
+Your task is to execute a strict Standardized Operating Pro-
+cedure for academic citation verification. You do not judge
+whether a citation is correct. You only decide which verifica-
+tion step should run next.
+Available stages:
+(1) Memory Lookup: Check whether the citation has already
+been verified.
+(2) Web Verification: Compare the citation against evidence
+retrieved from web search.
+(3) Scholar Verification: Use scholarly databases or authori-
+tative bibliographic sources for final verification.
+SOP rules:
+• Always attempt Memory Lookup first.
+• If Memory Lookup confirms the citation, stop.
+• If Memory Lookup fails or returns unknown, proceed to
+Web Verification.
+• If Web Verification confirms a valid match, stop.
+• If Web Verification fails or remains inconclusive, escalate
+to Scholar Verification.
+• Scholar Verification is the final decision stage.
+Constraints:
+• Follow the SOP strictly.
+• Do not skip stages.
+• Do not modify citation metadata.
+• Do not make the final correctness judgment yourself.
+Return only a JSON object in the following format:
+{
+"citation_id": "<id>",
+"next_action": "memory" | "web" | "scholar" | "stop",
+"reason": "<brief justification>"
+}
+The structured output enables deterministic execution and multi-
+threaded scheduling in the verification pipeline.
+D.2
+Judge Agent Prompt
+The Judge Agent performs citation-to-evidence matching. It re-
+ceives citation metadata and retrieved search results, then deter-
+mines whether at least one result supports the cited paper. Unlike
+the Planning Agent, the Judge Agent makes the final verification
+decision, but it must base the decision only on retrieved evidence.
+Judge Agent Prompt
+Decide whether the cited paper exists, given only the search
+results below.
+Citation:
+• Title: {title}
+• Authors: {authors}
+• Venue: {venue}
+• Year: {year}
+Search results:
+{documents}
+Use only the provided search results. Do not use outside knowl-
+edge.
+Title matching. First determine the source type.
+For academic publications, including peer-reviewed papers,
+preprints, conference papers, journal articles, technical re-
+ports, theses, and books, apply strict title matching. The ti-
+tle must match at the word level. Only case, punctuation,
+whitespace, and hyphenation differences may be ignored. Any
+added, removed, substituted, or reordered content word means
+the title does not match.
+For non-academic online resources, including blog posts, doc-
+umentation pages, dataset cards, model cards, GitHub pages,
+news articles, government documents, and standards pages,
+apply relaxed title matching. Accept the title when it appears
+as a heading, project name, dataset name, model name, feature
+name, or a faithful description of the cited resource. Reject
+it when the cited title has no meaningful presence on the
+resource.
+Author matching. Apply lenient author matching. Author
+order does not matter. Initials and full given names may match
+when surnames and initials are consistent. Truncated author
+lists and “et al.” are acceptable when the overlapping surnames
+agree. Transliteration variants, missing diacritics, and spacing
+or hyphenation differences in compound names are acceptable.
+Reject on authors only when there is no meaningful surname
+overlap, or when a non-trivial subset of cited authors is clearly
+replaced by different authors.
+Venue and year. If the title matches and the authors agree,
+allow reasonable venue and year variation. This includes arXiv
+versions and published versions of the same work, conference
+acronyms and full names, journal spelling or abbreviation
+variants, and year differences within two years for preprint-
+to-publication transitions.
+Evidence quality. Accept evidence from authoritative or
+bibliographic sources, including publisher pages, DOI pages,
+arXiv pages, ACL Anthology, PubMed, conference proceed-
+ings, Semantic Scholar, ResearchGate, and official institutional
+
+
+===== page 13 =====
+pages. Reject cases where the only evidence is an unrelated
+paper bibliography that repeats the citation text without an
+independent publication record.
+Decision rule. Set match=true only when at least one search
+result contains a title match under the rules above and the
+authors agree under the lenient author rules. Otherwise set
+match=false.
+Return only JSON, with no markdown or extra explanation:
+{
+"match": true | false,
+"matched_result": <result_number_or_null>,
+"note": "<short reason>"
+}
+D.3
+Role Separation and Determinism
+The Planning Agent and Judge Agent have strictly separated respon-
+sibilities. The Planning Agent performs task routing only and never
+evaluates citation correctness. The Judge Agent performs evidence-
+based matching under explicit rules and never controls pipeline
+execution. This separation makes the verification process auditable
+and reduces the risk that routing decisions, retrieval failures, and
+final judgments become conflated.

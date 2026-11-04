@@ -1,0 +1,127 @@
+---
+id: cc-protocol-03-calls-and-receipts
+status: proposed-runtime-unverified
+source: November 3 workshop and November 4 protocol revisions
+last_reviewed: 2026-11-04
+next_action: Qualify the binding and evidence policy before production use
+---
+# Calls, outputs and assessments
+
+For delegated long-running calls, a `running` receipt may correspond to an input/authentication interruption. The durable host job record owns the required action, authorized responder, deadline and resume token; these are not extra fields in the core receipt. Headless calls without a response path terminate `blocked`. Cancellation is confirmed only after execution-owner stop and effect reconciliation. See [upstream integration](09-upstream-coding-integration.md) for the proposed A2A mapping and current gateway gaps.
+
+## One call selects one capability
+
+A capability is one entry in `operations`. Every call selects one operation from one immutable CC release. Inputs, outputs, prerequisites, effects and guarantees belong to that operation. Package metadata identifies and distributes the operations together.
+
+Calling one operation does not run the others. A workflow may explicitly connect an output port to a compatible input port of a subsequent call. Each call gets its own authority, budget and receipt. A composite exposed as one operation must prebind child releases, calls, effects, budgets and aggregate checks. Merely sharing a capsule does not grant mutual authority.
+
+## Request
+
+| Field | Type | Meaning |
+|---|---|---|
+| `key` | Nonempty caller ID | Idempotency key scoped to the authenticated principal. |
+| `release` | 64 lowercase hex digits | Digest of the CC release manifest bytes. |
+| `op` | Local operation ID | One capability in the release. |
+| `inputs` | Port-name map | Exactly the selected operation's required ports. |
+
+A JSON port carries `{"value": â€¦}`. An artifact port carries `{"ref":{"uri":â€¦,"sha256":â€¦}}`. Resolve and verify media type, bytes, permissions and digest before staging. A Ref-shaped JSON value remains ordinary data unless its port is declared an artifact. Optional arguments belong inside an input object schema using JSON Schema `required` and defaults implemented by the tool. The host never invents an omitted required port.
+
+For a live process, workspace or service, accept a scoped host-issued handle as an input value. The bound call records the handle's resolved resource identity and generation. Check lease, expiry and generation at use. A string supplied by the caller cannot grant resource access.
+
+## Admission and dispatch
+
+1. Atomically reserve principal/key, a call ID and bounded execution resources.
+2. Bind inputs, effective policy, required checks, selected implementation and provider scopes before dispatch.
+3. Reject duplicate keys with different parsed request contents using `KEY_CONFLICT`. An identical retry returns the existing call or latest receipt.
+4. Dispatch only the selected operation. Require grants to be subsets of its declared effects and the principal's authority.
+5. Reconcile uncertain dispatch against the same job and attempt token before retrying. Never replay an external effect merely because its acknowledgment was lost.
+
+A request that fails parsing returns `{error,message}` and has no call. A bound admission failure produces a receipt. Caller identity and policy context come from authenticated host state.
+
+## Process execution binding
+
+The default `run` string selects an absolute executable in the bound image. Invoke directly, without a shell. Write one UTF-8 JSON object and EOF to stdin.
+
+```json
+{"call":"trim.7","attempt":1,"inputs":{"text":{"value":"   "}}}
+```
+
+The process writes one JSON document to stdout. Logs go to stderr. For artifacts, the host adds a verified read-only `path` beside the input `ref` under `/cc/in/<port>`. Use a fresh private `/cc/out` directory per attempt.
+
+| Outcome | Process document | Host interpretation |
+|---|---|---|
+| Complete | `{"outcome":"ok","outputs":{â€¦}}`, exit 0 | Require all output ports and validate their types. |
+| Partial | `{"outcome":"partial","outputs":{â€¦},"reason":"â€¦"}`, exit 0 | Validate each returned port. Preserve the known incomplete coverage and missing outputs. |
+| Error | `{"outcome":"error","code":"â€¦","message":"â€¦"}`, nonzero exit | Execution failed. Preserve diagnostics. |
+| Crash or invalid document | Missing result, bad JSON, extra fields, wrong port/type, or contradictory exit status | Execution failed with `PROCESS_FAILED` or `INVALID_OUTPUT`. |
+
+```json
+{"outcome":"ok","outputs":{"trimmed":{"value":""}}}
+```
+
+Output JSON uses `{value}`. An artifact output uses `{"path":"relative-file"}`. Reject traversal, absolute paths, links and special files. Seal files before hashing and publishing. These files and temporary private computation are part of the standard execution envelope. Persistent workspace writes, attachment to another process, external requests, deployment and publication require declared effects.
+
+MCP services and A2A agents use the explicit bindings in [Distribution and interoperability](06-distribution-and-interoperability.md). They follow the same call, resource and evidence semantics.
+
+## Receipt fields
+
+The host writes the receipt. Tools report results and observations.
+
+| Field | Required | Meaning |
+|---|---|---|
+| `call`, `attempt` | Yes | Bound call ID and positive attempt number. |
+| `state` | Yes | `running`, `succeeded`, `failed`, `blocked`, `cancelled`, or `unknown`. |
+| `completeness` | Yes | `none`, `partial`, or `complete`. Completeness describes the promised result, not the count of returned files. |
+| `reason` | Yes | Stable reason code from the table below. |
+| `outputs` | Yes | Port map of validated inline values or persisted artifact Refs. May be empty. |
+| `assessment` | Yes | Host-generated assessment object below. |
+| `job` | If asynchronous | Durable execution job ID, retained on final receipts. |
+
+Assessment is exactly `{verdict,checks}`. Verdict is `not_requested`, `pending`, `passed`, `failed`, or `inconclusive`. Each check row is exactly `{id,verdict,evidence}`, with verdict `PASS`, `FAIL`, `UNAVAILABLE`, or `INCONCLUSIVE` and an array of evidence Refs. The bound call pins checker implementation, policy, scope and authorizing authority. Every bound semantic check must appear in a final assessment. Empty checks mean `not_requested`, never `passed`.
+
+`core.input`, `core.output`, identity, effect enforcement and durable recording are baseline host checks. They are recorded in the ledger and determine whether execution may report success. Assessment carries additional operation guarantees and consumer-policy checks. A basic tool can succeed with `assessment.verdict = not_requested`; this makes no claim about semantic correctness.
+
+## Outcome rules
+
+| Trigger | State | Completeness | Reason | Assessment |
+|---|---|---|---|---|
+| Valid complete result, durable outputs, known effects | succeeded | complete | COMPLETED | As independently observed |
+| Valid partial result, durable outputs, known effects | succeeded | partial | PARTIAL_OUTPUT | May fail full-coverage checks |
+| Invalid input before start | blocked | none | INVALID_INPUT | Inconclusive if checks were bound |
+| Missing provider, incompatible host or denied scope | blocked | none | MISSING_PROVIDER, UNSUPPORTED_HOST, UNSUPPORTED_BINDING, DENIED, REVOKED | Inconclusive if checks were bound |
+| Failed pre-effect prerequisite or check | blocked | none | BASE_MISMATCH or CHECK_FAILED | Failed for an observed failing semantic check |
+| Invalid output or process error | failed | none or partial | INVALID_OUTPUT, PROCESS_FAILED, TOOL_ERROR | As observed, incomplete checks inconclusive |
+| Known unauthorized effect | failed | none or partial | UNDECLARED_EFFECT | Never eligible for acceptance |
+| Deadline or cancellation with confirmed stop | failed or cancelled | none or partial | DEADLINE or CANCELLED | As observed |
+| Execution or effects cannot be reconciled | unknown | none or partial | EXECUTION_UNKNOWN or EFFECT_UNKNOWN | Inconclusive |
+| Still running | running | none or partial | STARTED | Pending if checks were bound |
+
+A check definition fixes its stage. A failed pre-effect check blocks mutation. A failed post-execution semantic check does not rewrite a successful execution as a process failure. An accepted result under a consumer policy must meet that policy's completeness, checks, provenance and effect requirements. A partial trace may support a bounded diagnosis while failing a whole-window comparison. The consumer must record its use and limitations. Unknown execution or effects quarantine outputs until reconciliation.
+
+Assessment aggregation is deterministic. Any FAIL gives failed; otherwise any UNAVAILABLE or INCONCLUSIVE gives inconclusive; otherwise all required checks PASS gives passed. Running required checks give pending. Evidence for a skipped or missing check cannot be manufactured.
+
+## Lifecycle and identities
+
+Use one active attempt per call. Read status and cancel using the authenticated call ID. The host owns deadlines, cleanup and stopping jobs. A terminal result wins a late cancellation race. Append reconciliations and subsequent assessments without overwriting prior observations.
+
+An authorized retry requires confirmed cessation, known effects, replay safety and remaining limits. A completed logical call needs a new key for a new requested execution. A transport request ID, A2A task ID, host job ID, CC call ID and attempt number remain distinct.
+
+## M2a projection
+
+The new receipt replaces the earlier draft's combined `status` with `state`, `completeness` and `assessment`. Existing M2a records retain schema version `2.0.0-m2a.2`.
+
+| CC result | M2a status |
+|---|---|
+| Running | running |
+| Complete success and all M2a prebound checks PASS, known authorized effects | accepted |
+| Partial success, semantic failure, or failed execution | rejected |
+| Complete execution but unavailable required checker | blocked |
+| Admission blocked, cancelled, unknown | blocked, cancelled, unknown respectively |
+
+Partial outputs remain usable under their explicit CC evidence scope. M2a's rejected delivery verdict cannot express that distinction by itself. Store the original receipt and its assessment as a companion record and retain its Ref in the bridge ledger. Never interpret an M2a status as the scientific verdict.
+
+Map release â†’ `release_digest`, package ID â†’ `package_id`, package/op â†’ `capability_id`, key â†’ `idempotency_key`. Store the exact input map as one `input_refs` item even for zero inputs. Admission owns `project_id,mode,contract_ref,environment_digest,provider_bindings,admission_ref,policy_ref,authorized_effects,limits,budget_reservation_id,deadline`. Freeze check IDs before observing output, including generated `core.input` and `core.output`.
+
+Receipt projection retains bound-call Ref, attempt, checks and evidence, observed effects, usage, output descriptors, job and parent-call IDs. Inline values become content-addressed JSON artifacts. A check row's checker digest comes from the bound definition. Absent parent/job IDs become null.
+
+M2a requires observed effects to be a subset of authorized effects. A recorded breach cannot pass that constraint. Preserve its original CC incident receipt and refuse a conforming export with `INCOMPATIBLE_CONTRACT`. Never erase the observation.

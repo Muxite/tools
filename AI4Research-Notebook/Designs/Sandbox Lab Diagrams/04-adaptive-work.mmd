@@ -1,0 +1,32 @@
+flowchart TB
+    GOAL["Persistent research goal<br/>Human constraints and completion criteria"]
+    KNOW["Research knowledge<br/>Findings, hypotheses and open questions"]
+    STRATEGY["Revisable strategy<br/>Plan to the next uncertainty boundary"]
+    BIND["Protected binding and current authorization<br/>Next justified execution batch"]
+    EXEC["Execute pinned CC invocations<br/>Bounded jobs and durable records"]
+    CHECK["Assigned checks and qualified review<br/>Protected acceptance decision"]
+    OBS["Retain results and observations<br/>Failure and uncertainty stay visible"]
+    CHANGE{"Material change or<br/>investigation boundary?"}
+    FINISH["Complete, wait or stop<br/>Criteria, blocker and budget visible"]
+    GOAL --> STRATEGY
+    KNOW --> STRATEGY
+    STRATEGY --> BIND
+    BIND --> EXEC
+    EXEC --> CHECK
+    CHECK --> OBS
+    OBS --> KNOW
+    OBS --> CHANGE
+    CHANGE -->|"revise future work; keep valid results"| STRATEGY
+    CHANGE -->|"no; batch still justified"| BIND
+    CHANGE -->|"goal met, blocked or budget spent"| FINISH
+    GOAL -.->|"authoritative limits"| BIND
+    class GOAL,BIND,FINISH control
+    class STRATEGY,EXEC work
+    class CHECK qualify
+    class KNOW,OBS,CHANGE data
+
+    classDef work fill:#e8f1ff,stroke:#3568a8,color:#142d4e,stroke-width:1.5px
+    classDef control fill:#fff1d7,stroke:#a66d16,color:#513406,stroke-width:1.5px
+    classDef qualify fill:#eee8fa,stroke:#7854a0,color:#35204d,stroke-width:1.5px
+    classDef data fill:#e5f3eb,stroke:#3c8160,color:#163e2a,stroke-width:1.5px
+    classDef external fill:#f0f2f5,stroke:#65758a,color:#273547,stroke-width:1.5px

@@ -1,0 +1,12 @@
+flowchart TB
+    release["Verified CC release"] --> adapter["Host CC adapter"]
+    agent["Native coding agent"] -->|tool arguments| adapter
+    identity["Host identity and permissions"] --> adapter
+    adapter -->|bound invocation| native["Native tool or MCP provider"]
+    adapter -->|delegated task| remote["A2A agent"]
+    native --> workspace["Leased worktree or execution provider"]
+    workspace --> evidence["Artifacts and effect journal"]
+    remote --> evidence
+    evidence --> receipt["Durable CC receipt"]
+    receipt --> agent
+    receipt --> evaluator["Independent evaluation"]

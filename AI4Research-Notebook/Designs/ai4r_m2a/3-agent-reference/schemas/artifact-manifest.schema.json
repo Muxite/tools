@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai4r.local/schemas/m2a/artifact-manifest",
+  "title": "AI4R M2a artifact-manifest",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "2.0.0-m2a.2"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "contract_ref": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "delivery_status": {
+      "enum": [
+        "COMPLETE",
+        "PARTIAL",
+        "INFEASIBLE",
+        "CANCELLED"
+      ]
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+          },
+          "uri": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "media_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "audience": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "reproduction": {
+            "enum": [
+              "exact_replay",
+              "controlled_replication",
+              "evidence_inspection_only"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "uri",
+          "sha256",
+          "media_type",
+          "bytes",
+          "audience",
+          "reproduction"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "receipt_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "uri": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "uri",
+          "sha256"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "required_obligations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "satisfied_obligations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "unmet_obligations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "report_artifact_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "reproduce_artifact_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "project_id",
+    "contract_ref",
+    "delivery_status",
+    "outputs",
+    "receipt_refs",
+    "required_obligations",
+    "satisfied_obligations",
+    "unmet_obligations",
+    "report_artifact_id",
+    "reproduce_artifact_id",
+    "limitations"
+  ],
+  "additionalProperties": false
+}

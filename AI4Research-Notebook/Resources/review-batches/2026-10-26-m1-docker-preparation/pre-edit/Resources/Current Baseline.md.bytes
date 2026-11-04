@@ -1,0 +1,55 @@
+---
+id: resource-current-baseline
+status: source-reviewed
+source: Resources/verification/baseline-2026-10-21.json; Resources/Handoffs/m2-labs/source-map.json; Resources/review-batches/2026-10-23-library-cleanup/authority-source-receipt.json
+last_reviewed: 2026-10-23
+next_action: Recheck the target source and host before making deployment or model claims
+---
+# Current baseline and source delta
+
+## Latest reconciled source and evidence (October 23)
+
+| Identity | What was established | Limit |
+|---|---|---|
+| Previously observed remote `ai4r_M1`: `809351f8993661a9fdc6e4e635d48f3d262f991b` | Source object re-inspected locally; contains integrated Planner and optional capsule source | No fetch or live remote probe in this maintenance; not the current local checkout |
+| Local shared branch `ai4r_M1`: `60f65abe64eb8294f6de6b0413dfb032e2cf86b9` | Final merge checkpoint; ancestor of inspected `809351f8` | Local ref, not evidence of today's remote head |
+| Local checkout `AI4Research-Development/jiuwenswarm-m1-current`: `builder/bounded-build-test-20261023` at `db34c50d1398870f356e6cc65b35c58a61c9436b` | Native Builder source `2890421c`; source checks and release pins recorded in [[Activities/2026-10-23 Agentic Builder and Pi Benchmark]] | Separate candidate; authenticated build/benchmark blocked; no M1 merge |
+
+[[Activities/2026-10-23 Final M1 Merge]] records the inherited 225-pass Windows check run, four exclusions, Linux source-pin checks and a separate `audit_unavailable` failure. Those results belong to their recorded integration candidate; they were not rerun at `809351f8` or during notebook cleanup. [[Activities/2026-10-23 Builder Upgrade]] records separate candidate checks and limitations. Do not add these totals or transfer them between revisions.
+
+Source integration establishes neither image deployment nor a live authenticated research campaign, measured CC benefit, or M2 VM/carrier/factory acceptance. Current Docker/Spark/model readiness was not probed here. [[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] owns the existing bounded implementation proposal; current high-level intent can evolve without claiming that proposal is implemented.
+
+**Owner-pointer warning:** at inspected `809351f8`, `docs/product/README.md` still identifies October 13, while the maintained design-owner checkout identifies October 15 PRD V10. M1 task records are under `docs/code/Missions/archive/M1/`, not the older live path. [[Designs/Project Authority]] records the conflict and historical allocation. Read the actual target instructions/process before coding.
+
+Exact source hashes, local refs and inspection limits are in [the cleanup receipt](review-batches/2026-10-23-library-cleanup/authority-source-receipt.json).
+
+## Earlier October 23 source and host update checkpoint
+
+[[Activities/2026-10-23 Delivery and Verification Status]] records then-current source identities: pushed deployment implementation `6a70305`, separate local Planner `9d8f21b`. At that checkpoint the engine probe could not connect to Docker's Linux pipe; no fresh engine probe was performed for this cleanup. The available-engine observation below belongs to October 21 and is retained as history, not current readiness. Prior captured checkouts and receipts are preserved.
+
+
+The original development checkout is preserved at **98bd9d913f9ddae5f0d6a3ae256bff10f25ee743**. The branch captured at implementation start is **d3d7f565c6c05ccf764fe0780fde149b7dc89b95**, in [the separate review worktree](../../AI4Research-Development/jiuwenswarm-m1-review-d3d7f56). Both remain available; no checkout files were edited. The [receipt](verification/baseline-2026-10-21.json) records changed paths and selected source hashes. A shallow-fetch update message does not establish ancestry; this review compares the exact two trees.
+
+## Historical October 21 source delta
+
+The 35 changed paths concern web shell styling and inputs, reconnect/session handling, Codex device-login controls, deployment launch convenience, and M1-001/M1-006/native task records. The capsule bodies, check bundles, runner, and native adapter have no diff between these revisions. Earlier bounded CC source observations still apply to those unchanged files; they do not qualify the changed integration or a built image.
+
+The new `deploy/m1/start-local.sh` enables an explicit loopback-only reusable bootstrap option (`AI4R_REUSABLE_LOGIN=1`); default Compose behavior remains one-use unless enabled. Source refuses a reusable bootstrap for a non-loopback IP origin. Treat either actual URL as a credential. The supplied one-use instructions belong to the earlier configuration and should not be silently rewritten as a universal rule. Empty configuration supports inspection, not research readiness.
+
+Codex login now propagates the device user code and tracks cancellation state. These are source observations, not independently validated authentication or deployment claims. The captured task register is r45; it still reports integrated candidate NOT_BUILT and final system evidence NOT_RUN. Later child records may contain narrower build or deployed-checkpoint observations; retain their actual scope and candidate identity.
+
+## Authority and assurance
+
+[[Designs/Project Authority]] explains stale AGENTS and branch-local PRD/task pointers. At the October 21 capture `docs/code/Missions/M1/TASKS.md` was populated; by inspected `809351f8` it is archived. Do not allocate duplicate tasks from either old registration-pending text or historical task records. Preserve task/IF/AC identities and reconcile source baseline receipts.
+
+| Evidence level | Historical October 21 assessment |
+|---|---|
+| Designed | PRD and maintained design present; source-specific authority requires receipts |
+| Implemented | Actual capsule, native adapter, host checks, broker, science and web code present |
+| Runnable | Deployment paths exist; actual M1 build/account/resource qualification not performed here |
+| Verified | Notebook tests and separate lab receipts only; neither implies M1 acceptance |
+| Accepted | No new integrated M1 acceptance or CC accuracy gain established |
+
+## Historical host observation (October 21)
+
+On this continuation Docker Desktop responds with Linux server 29.8.0, x86_64, 16 CPUs and approximately 8 GB daemon memory. Ubuntu-24.04 resolves the Windows Docker CLI through WSL. This supersedes the earlier unavailable-daemon observation; it does not establish a native Ubuntu daemon or GB10 support. Real lab smoke checks belong in [[Designs/Lab Progression]]. A small lab container is not an M1 production runtime.

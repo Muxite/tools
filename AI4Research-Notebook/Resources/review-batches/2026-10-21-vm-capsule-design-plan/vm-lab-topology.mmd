@@ -1,0 +1,27 @@
+flowchart TB
+    BASE[Central tested AI4R releases]
+    REG[Shared image registry and candidate exchange]
+    QUAL[Central qualification and release]
+    subgraph A[Lab VM A - project P]
+        AI[AI4R A and local factory A]
+        BUILD[VM-local build broker]
+        RUN[VM-local runner and checks]
+        STORE[Local images and durable project state]
+        AI --> BUILD
+        AI --> RUN
+        BUILD --> STORE
+        STORE --> RUN
+    end
+    subgraph B[Lab VM B - project Q]
+        BI[AI4R B and local factory B]
+        BS[Own builder, runner, images and state]
+        BI --> BS
+    end
+    BASE --> AI
+    BASE --> BI
+    REG --> STORE
+    REG --> BS
+    AI -->|candidate source and evidence| QUAL
+    BI -->|candidate source and evidence| QUAL
+    QUAL --> BASE
+    QUAL --> REG

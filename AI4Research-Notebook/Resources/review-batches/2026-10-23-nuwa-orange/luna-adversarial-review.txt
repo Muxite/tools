@@ -1,0 +1,53 @@
+Luna adversarial review — Nuwa orange draft
+
+Scope reviewed: 11-slide PPTX and notes, orange slide renders, builder text, the pinned Nuwa source snapshots and the AI4R CC/factory references. Slides 10–11 are hidden backups. The critique targets the intended question: what AI4R can usefully learn from Nuwa, where it might apply, and how to test value without treating persona roleplay as the contribution.
+
+Overall assessment
+The revision now makes AI4R central, includes a plausible test, and labels its use as proposed. The strongest remaining risk is that the talk presents a positive answer before the evidence: the Karpathy example contains broadly sensible benchmark-review questions, not a demonstrated person-specific gain. The trial then tests a skill package against no skill, so it cannot tell whether any gain came from the extraction method, extra instructions, expert content, or persona framing. The proposed factory branch also blurs a workflow, an authoring capability, evidence resources, and the generated product CC, while “check and admit” compresses distinct qualification and governance steps.
+
+Must fix before presenting
+
+1. Slides 1 and 9 state the benefit too firmly. Slide 1 labels “a reusable perspective for generating and challenging ideas” as AI4Research value. Slide 9 calls the method Nuwa’s “strongest contribution” and says expert evidence “becomes reusable research reasoning.” The footer and notes qualify the proposal, but the large claims still read as conclusions. This review has no comparative result establishing either claim. Preserve the thesis while presenting it as a candidate contribution.
+
+   Suggested replacements:
+   - Slide 1 value line: “Potential AI4R use: turn sourced expert reasoning into a reusable review procedure.”
+   - Slide 9 title: “A method worth testing: turn sourced reasoning into an AI4R review procedure”
+   - Slide 9 lead: “Expert evidence could inform reusable research reasoning.”
+
+2. Slide 4 does not show what the Karpathy-derived lens adds. “Task coverage,” “failure modes,” and “evidence” are generic, credible review prompts any competent reviewer might produce. As written, the slide illustrates a plausible response but does not support the line in the notes that person-specific reasoning is the contribution. Either map one or two concrete, sourced rules from the pinned Karpathy skill to the particular questions, or label this openly as an untested illustration and defer the value claim to the experiment.
+
+   Suggested visible qualifier: “Illustrative derivation from the skill; added value over a generic reviewer is untested.” For a stronger example, show the same benchmark reviewed with a generic checklist and the extracted procedure, with the distinct, source-backed question highlighted. Do not invent a supposedly unique Karpathy insight that the skill does not support.
+
+3. Slide 8’s two-arm comparison conflates method and added context. Same model/evidence/budget is a good start, but “evidence only” versus “evidence + persona skill” measures the whole package. It does not identify whether gains come from any checklist, person-specific extracted rules, the persona label/voice, or simply longer instructions. Because the stated interest is the method AI4R might imitate, add a generic checklist control. A three-arm pilot is worth putting in the hidden backup; keep the main slide concise and say “compare on unseen tasks.”
+
+   Suggested backup design: “All arms receive the same expert-source excerpts and task evidence: (1) plain reviewer; (2) length-matched generic review checklist; (3) Nuwa-derived procedure. Hold model, runtime tools and budgets fixed. Freeze unseen tasks and scoring before generation; blind quality scoring. Record authoring cost separately.” This measures the incremental value of an expert-derived procedure over a generic checklist and the value of adding any procedure. Persona voice can be isolated in a later test if needed.
+
+4. Slide 7’s factory proposal needs explicit identity and status boundaries. The slide title calls this an “authoring CC,” but the diagram never labels a distinct authoring CC; “Extract reasoning / Nuwa-like authoring” could be read as a single composite factory capability. The footer says authoring CC, evidence resources and product CC are separate, but the picture does not show that distinction. Also “Check and admit” merges qualification with ordinary admission, although the AI4R source describes an independent qualification step followed by an existing admission path. The phrase “qualified review-method CC” sounds like an achieved state despite this being only a proposal.
+
+   Suggested replacements/diagram labels:
+   - Subtitle: “Proposed M2 reasoning-method branch; separate from repository-to-tool wrapping.”
+   - Label the stage explicitly “Authoring stage / CC candidate generator” only if that is the intended future unit; otherwise say “Nuwa-like authoring step” and do not call the whole workflow an authoring CC.
+   - Keep three identities visually distinct: “Evidence resources,” “Factory-stage authoring capability/workflow,” and “Candidate reviewer-method CC.”
+   - Replace “Check and admit” with “Independent qualification” → “Existing admission gate.”
+   - Product box: “Candidate review-method CC for AI4R tasks” (then arrow to the qualification/admission steps, or show it as the post-admission result only after both are explicit).
+
+   State that this is an M2 proposal and not an existing M1 capability. The design references explicitly place the factory in M2 and say M1 does not currently represent this workflow. Keep the distinction from Paper2Agent/tool wrapping in the slide body, not only the notes: the proposed output is a reasoning procedure/reviewer CC, while the existing factory’s bounded pilot wraps upstream operations into tools. Avoid implying the full Nuwa research workflow should become one composite CC; the factory design calls for a flat workflow first.
+
+5. Make the source-of-truth boundary visible in the main story. Slide 1 says “Nuwa researches the person and writes the skill,” and slide 3 says “Nuwa studies the person,” while the slide 3 source line says the host agent executes the workflow. The notes correctly explain that Nuwa is an instruction skill executed by a host agent. That distinction matters when deciding what AI4R should imitate: an instruction package, an agent-run research process, or a generated perspective artifact. Add one short visible label on slide 3: “Nuwa is the instruction skill; a host agent carries out the research and authoring.” Consider revising slide 2’s “captures how a person thinks” to “organizes public evidence into a person-specific approximation.”
+
+6. Shorten the two long headings for fit and force the decision framing. Slide 5’s title wraps across two lines and Slide 9’s does too; the latter uses much of the slide’s top area and compounds the unsupported “strongest” claim. Use the replacements in item 1; for slide 5, a shorter option is “Where could this method help AI4R?” The orange/cream layout is consistent and legible overall; slides 3, 5–9 have usable spacing, and slide 7’s architecture is easy to follow once its labels are corrected.
+
+Optional refinements
+
+- Slide 6’s row 4 and notes make a strong local finding: the saved empty-content probe passed all six functions. Keep the scope exact in any talk track: this is a probe of the pinned checker snapshot, not evidence that all Nuwa validation is ineffective. The slide already identifies the source snapshot and says it is “our” probe; the notes should also state that this is a local test of the quality checker, not a rerun of Nuwa’s reported fidelity results.
+- On slide 5, “Research output / independent checks” can be read as checks being part of the output. If the flow means the output is then assessed, label the final box “Critique or test plan” and put “independently checked” below/after it. This also makes the proposed AI4R role concrete.
+- The spoken run time is about 6:45 by the slide timings. Slides 1–4 spend roughly 2:45 on Nuwa description/example before the dedicated AI4R value slide. If the live talk is running long, compress slide 2 or combine the five skill layers with the workflow rather than shrinking the legible text.
+
+
+Re-review outcome (2026-10-23)
+
+No remaining blockers found in the requested spot-check of slides 1, 3–10 and their notes. The visible host-agent line on slide 3 resolves the Nuwa/tool boundary; slide 4 now marks its derivation illustrative and the gain untested; slides 5 and 9 state the AI4R use as a proposal; slide 7 now separates evidence resources, authoring-stage CCs and the candidate product CC, marks the M2 flat-workflow proposal, and routes the candidate through independent qualification before existing admission; slide 8 notes the generic checklist comparator; hidden slide 10 specifies the three arms and shared evidence/model/tools/budget, with authoring cost separate. The requested visuals are legible, with no fit issue that blocks presenting. The presentation now distinguishes the proposed reasoning-method branch from tool wrapping and does not claim measured task-quality improvement.
+
+Method-detail spot-check addendum (2026-10-23)
+
+No concrete blockers found in the bounded review of revised slides 3, 4 and 7, their visible tables/diagram and speaker notes. The examples on slide 3 are labeled as paraphrases of the pinned Karpathy skill; the notes explicitly distinguish those synthesized examples from independently verified personal statements. The mental-model retention filters (cross-domain recurrence, generation of new judgments, distinctiveness), case-backed if-then rules, and limits/tensions are consistent with the pinned extraction framework and skill example. The notes correctly say these qualitative selection filters do not prove scientific correctness. Slide 4's six research streams align with the pinned Phase 1 categories, and its labels about source confidence, first-hand material, contradictions and inference are consistent with Nuwa's research instructions. Slide 7 maps the three proposed entry routes to distinct authoring work, then shares candidate authorship, independent qualification and the existing admission gate; the visible and spoken text state the design is proposed and M2, and a person name plus trait triggers source research rather than immediate capsule generation. The renders are legible and the distinctions requested are clear.

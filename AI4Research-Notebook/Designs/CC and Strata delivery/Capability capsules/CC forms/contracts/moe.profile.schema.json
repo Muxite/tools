@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai4r:profile:moe:1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "shards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "uri": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "media_type": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "uri",
+              "sha256",
+              "media_type"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "native_index": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "media_type": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "uri",
+            "sha256",
+            "media_type"
+          ]
+        }
+      },
+      "required": [
+        "repository",
+        "revision",
+        "shards",
+        "native_index"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layers": {
+          "type": "string",
+          "minLength": 1
+        },
+        "experts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projections": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "gate",
+              "up",
+              "down"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "layers",
+        "experts",
+        "projections"
+      ]
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "outcome-directed",
+            "specified-transformation"
+          ]
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "suggested_approach": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "mode",
+        "goal",
+        "suggested_approach"
+      ]
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.-]*$"
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verification": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "statement",
+          "verification"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "reader_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sharing": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coefficient_dtype": {
+          "type": "string",
+          "minLength": 1
+        },
+        "residual_encoding": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "rank",
+        "sharing",
+        "coefficient_dtype",
+        "residual_encoding"
+      ]
+    }
+  },
+  "required": [
+    "model",
+    "target",
+    "intent",
+    "invariants",
+    "reader_policy"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "intent": {
+            "properties": {
+              "mode": {
+                "const": "specified-transformation"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "parameters"
+        ]
+      }
+    }
+  ]
+}

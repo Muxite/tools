@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant R as Runner
+    participant F as Artifact store
+    participant V as Protected gate
+    participant S as Durable run-state
+    participant H as Scheduler
+    R->>F: Capture immutable candidate and observations
+    F-->>R: Exact attributable references
+    R->>V: Node contract, participating calls and captured evidence
+    V->>V: Deterministic checks then scoped semantic assessment
+    alt All mandatory obligations satisfied and persistence available
+        V->>S: Commit decision and exact accepted references
+        S-->>H: Committed readiness
+        H->>R: Dispatch eligible successor
+    else Blocking check or persistence failure
+        V-->>S: Halt reason where safely persistable
+        V-->>H: Non-advancing outcome
+        H->>H: Node fails, dependents skipped - orphan files grant no readiness
+    end

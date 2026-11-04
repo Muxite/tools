@@ -1,0 +1,23 @@
+sequenceDiagram
+    participant C as User or headless client
+    participant H as Harness
+    participant V as Protected Evaluator Gate boundary
+    participant S as Run-state authority
+    H->>V: Exact candidate, evidence and protected profile
+    V->>V: Deterministic checks, then semantic assessment if allowed
+    V->>S: Commit decision and exact accepted reference or halt
+    S-->>V: Durable result
+    V-->>H: Recorded verdict and routing action
+    alt All mandatory obligations passed
+        H->>H: Release dependent work
+    else Blocking verdict
+        H->>H: Stop new dispatch and contain active work
+        H->>S: Correlated triage request and available evidence
+        alt Interactive web or CLI/TUI
+            H-->>C: Native attention or human_session triage
+            C->>H: Inspect, acknowledge or request fresh work
+            H->>S: Attributable reply, original run remains halted
+        else Headless evaluation
+            H-->>C: Non-zero terminal status, run identity and bundle reference
+        end
+    end

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai4r.local/schemas/m2a/package",
+  "title": "AI4R M2a package",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "2.0.0-m2a.1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "category": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "release_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "required_providers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "effect_ceiling": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "shared_check_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "qualification_scope": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "file_manifest": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "category",
+    "version",
+    "release_digest",
+    "members",
+    "required_providers",
+    "effect_ceiling",
+    "shared_check_ids",
+    "qualification_scope",
+    "file_manifest",
+    "license"
+  ],
+  "additionalProperties": false
+}

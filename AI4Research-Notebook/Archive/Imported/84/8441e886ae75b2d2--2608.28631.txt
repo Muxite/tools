@@ -1,0 +1,1257 @@
+
+
+===== page 1 =====
+CrossAudit: A Git-Native, Cross-Vendor Audit Loop
+for Agentic Science
+Zhaohe Dong
+University of Cambridge
+zd314@cam.ac.uk
+Yuhao Chen
+University of Wisconsin–Madison
+ychen2546@wisc.edu
+August 2026
+Abstract
+An AI scientist should not grade its own homework. Yet in the systems we examined, the agent
+that reviews the work usually comes from the same model family as the agent that produced it, or at
+least from the same vendor. Model evaluators are known to favour their own generations. Whether
+models trained alike also share blind spots is a conjecture, not a settled finding, but if they do, the
+reviewer inherits the author’s. The record of what was flagged and what was waved through often sits
+in platform logs that nobody outside can replay.
+We present CrossAudit, a protocol for supervising autonomous research pipelines. It rests on
+three commitments. Each increment of work is audited by an agent from a different vendor, against a
+rulebook a human wrote and versioned. Reports, verdicts, disputes and rulings are git commits, so
+the supervision history can be re-read and cited; raw model exchanges are not yet part of that record.
+Scripted checks run before any model does. Advisory judgement never gates the pipeline: a model
+blocks only by citing a rule, and no model may waive a deterministic failure. Blockers that survive a
+bounded number of revision rounds go to a person.
+We state the protocol as eight invariants. We describe a reference implementation built from
+GitHub Actions and a few hundred lines of Python, and report a live deployment of a closely related
+variant in a computational-chemistry pipeline. We also ran a seeded-defect trial (30 increments, 43
+seeded defects, one run per configuration). A cross-vendor audit of our own repository then voided
+its blinding. We adopt that audit’s findings and report the corrected results. The trial shows that
+two vendors read the same rulebook differently. It does not show that either is better. The strongest
+evidence here is the committed, uncontrolled record of cross-vendor audits of this paper itself.
+Keywords: agentic science; AI scientist; scalable oversight; cross-vendor auditing; LLM-as-a-judge; self-
+preference bias; research integrity; human-in-the-loop.
+1
+Introduction
+Two things motivated this paper. The first is the arrival of genuinely agentic research systems: pipelines in
+which large language model (LLM) agents propose hypotheses, write and execute code, run experiments,
+and draft manuscripts with limited human intervention. Sakana’s AI Scientist produced machine-generated
+papers end-to-end [1, 2] and the line of work has since been published in Nature [3]; DeepMind’s AI
+co-scientist organises hypothesis generation as a multi-agent tournament [4]; autonomous laboratories
+close the loop through to physical synthesis [10, 11]. Publishers and funders are already being urged to
+respond institutionally [14].
+The second is older and more familiar: science’s continuing struggle with reliability. In one large
+survey, most researchers had failed to reproduce a published result [13]. Agentic pipelines raise the
+stakes on both sides of this ledger. On one side, they can enforce a discipline that no human sustains:
+every increment logged, every parameter recorded. On the other, they can mass-produce plausible,
+well-formatted, wrong results faster than any human audit culture can absorb.
+1
+arXiv:2608.28631v1  [cs.AI]  5 Aug 2026
+
+
+===== page 2 =====
+The relevant question, then, is not whether machine-generated science should be supervised, but
+how that supervision should be organised and who should provide it. Current frontier systems typically
+place supervision within the same architecture, using reflection agents, automated reviewers, or ranking
+tournaments [1, 4]. This creates a structural weakness: the critic and the creator are usually instantiated
+from the same model family or, at best, from models developed within the same vendor’s training pipeline.
+LLM evaluators are known to favour their own generations, with self-recognition identified as a causal
+factor in this self-preference bias [5]; position and stylistic biases introduce further distortions [8]. Agents
+trained on similar data may also share systematic blind spots, so a reviewer with the same blind spots as
+the author may fail to detect the author’s characteristic errors. At the same time, the supervision record
+(what was flagged, what was revised, and what was allowed to pass) often remains confined to transient
+context windows or proprietary platform logs. As a result, the communities asked to trust the resulting
+science cannot independently inspect the process by which it was reviewed.
+Contributions.
+We make four contributions.
+1. We articulate the same-source supervision problem in agentic science: internal critique by same-
+vendor models is structurally exposed to correlated failure (§2).
+2. We specify CrossAudit, a supervision protocol defined by eight invariants (vendor heterogeneity,
+ledger completeness, citation validity, determinism-first, bounded revision, graded interruption,
+receipt binding, fail-closed admission) that together specify a re-inspectable, third-party-auditable
+(up to self-declared vendor identity, §5) supervision history (§3).
+3. We describe a reference implementation requiring no infrastructure beyond two git repositories, a
+CI service, and two model API keys, together with a live deployment of a closely related variant in
+the first author’s computational-chemistry pipeline, and we report what a second, product-oriented
+implementation of the same protocol taught us about the specification (§4).
+4. We give an explicit threat model, including the attacks the protocol does not withstand, and situate
+the design against plausible alternatives (§5–§6).
+CrossAudit is deliberately limited in what it claims to establish. It does not certify scientific truth. No
+textual audit can. Instead, it records a narrower and directly inspectable property: that each increment
+in a machine-generated research record was evaluated against a named, versioned set of rules by a
+configured auditor from a second vendor, and that the resulting parsed decision was preserved in the
+ledger. The auditor has no write access to the increment’s repository, although its vendor identity is
+currently self-declared (§5). The ledger is public wherever the operator chooses to publish it. At present
+it preserves parsed audit reports, while capture of the raw model requests and responses is planned for
+revision 2. We argue that this narrower guarantee is an appropriate first target for accountable machine
+science, much as continuous integration, not formal verification, became the principal quality-control
+mechanism in modern software development.
+2
+Related work and the same-source problem
+Agentic science systems.
+The AI Scientist [1, 2, 3] automates the ideation–experiment–writeup–review
+cycle, including an internal automated reviewer scored against human reviewer data. The AI co-scientist
+[4] structures generation–reflection–ranking–evolution agents into a self-improving tournament over
+hypotheses, with reported expert-validated outcomes in drug repurposing and antimicrobial resistance.
+Language agents for literature synthesis reach or exceed expert performance on retrieval-grounded tasks
+[12]. In the laboratory, Coscientist executed chemistry protocols from natural-language goals [10] and
+A-Lab ran autonomous materials synthesis campaigns [11]. Across all of these systems, quality control
+is architecturally internal. The reviewer agents, reflection stages, or tournament judges are chosen and
+hosted by the same operator, run inside the same platform, and are frequently instantiated from the
+2
+
+
+===== page 3 =====
+same model family as the generators they judge. None of them commits to vendor heterogeneity in the
+reviewing layer.
+The pattern persists through the 2025 generation of research agents: Curie hardens agentic experimen-
+tation with internal rigour modules [15], and Agent Laboratory attaches critic agents to its own pipeline
+[16]. Commercial platforms now advertise the transparency half of our proposal: Kosmos promises
+reports in which “every conclusion can be traced” to code or literature via its platform [17]. Traceability
+of that kind is audit by the generating operator on its own infrastructure. It is valuable, but it involves no
+second-party auditor and no off-platform, replayable ledger. This paper is about that distinction.
+Why internal critique is not enough.
+Panickssery et al. demonstrate that LLM evaluators recognise
+their own generations and rate them preferentially. Their fine-tuning experiments indicate that the capacity
+for self-recognition is what causes the inflation [5]. Zheng et al. catalogue further judge pathologies,
+including position, verbosity, and self-enhancement biases, even in strong models [8]. A recent large-scale
+evaluation sharpens why these matter for supervision rather than for benchmarking: in a twenty-one-judge
+cohort, two production-deployed judges combine high test-retest reliability with severe position bias, and
+raw agreement overstates judge quality substantially once corrected for chance [9]. A judge can therefore
+be thoroughly reproducible and still be wrong in a fixed direction, which is the one failure a supervision
+loop must not inherit. Two later studies qualify the self-preference finding rather than overturn it: much
+of the measured preference tracks genuine quality differences between generations [6], and identity-blind
+re-tests leave roughly half of previously significant cases standing [7]. The configuration CrossAudit
+forecloses is therefore a narrower target than the headline effect, and we treat foreclosing it as a structural
+precaution, not a quantified harm averted. These results concern single-model self-evaluation. We expect
+the mechanism to generalise. Models that share a training pipeline are likely to share stylistic priors
+and knowledge gaps, and this places a same-vendor critic at the wrong end of the bias distribution just
+when its judgement matters most. We call this the same-source supervision problem. The remedy of
+drawing judges from different model families has precedent. Verga et al. score generations with a panel
+of evaluators drawn from three model families, expressly to dilute intra-model bias [18], and the same
+intuition has begun to appear in developer tooling as cross-vendor code review.1 CrossAudit’s claim
+is not the heterogeneity idea itself but its packaging as a supervision protocol for research: versioned
+rules, a replayable ledger, deterministic precedence, and bounded escalation, run against a live pipeline.
+Cross-vendor pairing does not eliminate correlated error. Frontier models plausibly train on largely
+overlapping public corpora, so where the shared literature is wrong, both auditors can be confidently
+wrong together. What pairing does foreclose is the demonstrated configuration of the best-documented
+bias in this setting, self-preference, and it is intended to decorrelate vendor-idiosyncratic failure modes.
+What cross-vendor pairing cannot fix, a model-free layer must (§3, I4).
+Supervision as an artefact.
+Software engineering solved an analogous trust problem not by making
+programmers infallible but by making the quality mechanisms inspectable: version control, continuous
+integration, review trails. Reproducibility initiatives in science point in the same direction. The unit of
+trust is the auditable record, not the author’s competence [13]. Deterministic screening of the research
+record also has its own lineage. statcheck recomputes reported statistics across the psychology literature
+[19], and the Problematic Paper Screener runs mechanical detectors over millions of published papers
+[20]. Both are post-publication analogues of our deterministic check layer, which moves checks of
+that character upstream, before a claim ever leaves the repository. At the ledger end, blockchain-based
+research-integrity infrastructures pursue tamper-evidence with far heavier machinery.2 Our position is
+that git, which is ubiquitous, free, and already attached to CI, permissions, and issue tracking, is ledger
+enough for the supervision trail. CrossAudit transplants this inspectability stance to agentic science: the
+1E.g. MindStudio, “Cross-Vendor AI Agent Review: Why Claude Should Review Codex’s Code and Vice Versa” (June 2026),
+https://www.mindstudio.ai/blog/cross-vendor-ai-agent-review-claude-codex, as accessed 30 July 2026, a
+workflow recommendation, without versioned rules, ledger, deterministic precedence, or escalation semantics.
+2E.g. the bloxberg consortium, https://bloxberg.org.
+3
+
+
+===== page 4 =====
+Table 1: Supervision properties of the systems considered here (a set we chose, not a systematic survey), as
+published. • = held by design; ∼= partial or informal; – = absent. PoLL is an evaluation technique, not a
+supervision loop; statcheck and the Problematic Paper Screener are deterministic by construction but run post-
+publication, where CrossAudit moves checks of that character before a claim leaves the repository. CrossAudit
+appears twice so that a specification is never graded on an implementation’s behalf: the protocol row states what
+the specification requires, and the implementation row grades the public reference implementation, whose ledger
+preserves parsed records but not raw exchanges (§4) and whose auditor vendor identity is self-declared (§5).
+The ledger column is graded at I2’s parsed-record tier; full process replay is unachievable while model calls are
+stochastic, for the specification as much as for any implementation.
+Critic from a
+different vendor
+Versioned,
+decidable rules
+Replayable
+audit ledger
+Deterministic
+precedence
+Bounded loop,
+escalation
+The AI Scientist [1]
+–
+–
+∼
+–
+∼
+AI co-scientist [4]
+–
+–
+–
+–
+∼
+PoLL judge panels [18]
+•
+–
+–
+–
+–
+Cross-vendor review advice (§2)
+•
+–
+∼
+–
+–
+statcheck, PPS [19, 20]
+–
+∼
+∼
+•
+–
+CrossAudit protocol (this paper)
+•
+•
+•
+•
+•
+CrossAudit reference implementation
+∼
+•
+∼
+•
+•
+supervision history itself becomes a first-class, versioned, citable research artefact. Table 1 compresses
+the comparison.
+3
+The CrossAudit protocol
+3.1
+Objects and roles
+CrossAudit supervises a pipeline in which a Generator agent (vendor A) produces discrete experiment
+increments and commits them under a designated path of a Science Repository. Each increment is audited
+by an Auditor agent (vendor B̸ = A) against a versioned, human-authored rulebook, the Constitution,
+held with all audit reports in a separate Audit Repository. A Deterministic Check Layer (DCL),
+plain scripts with no learned component (schema validation, unit and dimension analysis, convergence
+assertions, provenance completeness), runs before any model reads anything. A Human Principal
+authors the Constitution and receives escalations, but sits outside the per-increment loop. Compute (in
+the reference deployment, jobs on cloud HPC) is decoupled from supervision: verdicts gate the next
+increment, never running jobs. Figure 2 traces one increment through the loop.
+The two-repository split is separation of powers made mechanical (Figure 1): the Auditor holds no
+write access to the Science Repository, the Generator none to the Audit Repository, so neither agent holds
+credentials to alter the other’s record. Guarding each record against its own author also requires branch
+protection.
+3.2
+Eight invariants
+An implementation conforms to the extent that it preserves the following; Table 2 grades, invariant by
+invariant, what the reference implementation enforces, targets, or leaves to deployment, and we reserve
+“invariant” for the protocol’s obligation, never for an implementation’s achievement. (I7 and I8 are
+revision-1 invariants, adopted from the cross-vendor audit of this repository described in §4.4.)
+I1 — Heterogeneity. The Auditor’s model family differs from the Generator’s. This prevents the auditor
+from ever judging its own generations, the configuration in which self-preference bias has been
+demonstrated [5]. Similarity-driven preference is reduced, not eliminated. It is likewise designed
+to decorrelate vendor-idiosyncratic failure modes, an effect this paper does not measure (§4).
+Heterogeneity is also one of three isolations the protocol stacks: parametric (different weights),
+contextual (no shared memory: the Auditor never sees the Generator’s prompts, reasoning, or
+4
+
+
+===== page 5 =====
+Generator
+vendor A
+Science Repository
+increments
+Audit Repository
+rulebook, reports, receipts
+Auditor
+vendor B̸ = A
+Human principal
+writes
+writes
+reads committed artefacts only
+reads reports
+writes the rulebook
+Solid arrows are write access, dashed are read. Neither agent can write where the other’s record lives.
+Figure 1: Separation of powers. The Generator cannot touch the rules or the reports that judge it, and the Auditor
+cannot touch the record it audits. The Auditor reads committed artefacts and never the Generator’s prompts or
+reasoning. Only the human principal writes the rulebook. Guarding each record against its own author also requires
+branch protection.
+Generator
+research AI, vendor A
+e.g. Claude-based.
+Plans and runs the
+experiment; writes one
+increment: data, meta-
+data, logs, provenance.
+Science Repository
+The increment lands as
+commit S: frozen,
+diffable, citable.
+Every later step
+points at exactly S.
+Script checks: no AI
+Plain code checks S
+first: schema? units?
+sources? convergence?
+A hard fail is final; no
+model can override it.
+Cloud compute keeps
+running: a verdict
+gates the next incre-
+ment, never live jobs.
+Human principal
+The only person in
+the loop: writes the
+rulebook, rules on esca-
+lations, reads advisories
+asynchronously. Never
+interrupted otherwise.
+The rulebook
+(Constitution)
+Human-authored,
+versioned. Every rule:
+stable ID + decidable
+criterion. Changes land
+only between cycles.
+Auditor
+reviewing AI,
+vendor B̸ = A
+e.g. GPT-based; shares
+no memory with A.
+Reads S rule by rule;
+every finding must cite
+a rule ID and evidence.
+BLOCKER findings gate;
+ADVISORY never do.
+Verdict
+Audit ledger
+report.md +
+receipt.json, append-
+only. The receipt
+pins commit S, file
+hashes, rulebook ver-
+sion, auditor identity.
+1
+2
+3
+4
+5
+6
+7
+pushes
+audit trigger,
+pinned to
+exactly S
+all scripts pass
+commits report + receipt
+verdict
+sent back
+PASS: receipt re-verified at the admission gate
+⇒S admitted; the next increment builds on it
+BLOCKED: revise or dispute
+(once per finding); round +1, at most 3
+ESCALATE: rounds spent, invalid
+audit, or either agent asks
+Every element on this page is a git commit or a GitHub issue: the parsed supervision record is re-inspectable by anyone the operator grants access to.
+Figure 2: One experiment increment through the loop, read clockwise from the top left. Numbers give the order,
+and the three coloured paths out of the verdict are the only ways a cycle can end. The report commit lands before
+its receipt: the receipt binds the report’s content hash, so it can never reference an uncommitted object, and the
+receipt is derived by the deterministic audit-side workflow, never authored by the model. Who may write where is
+Figure 1; the walk in full is §3.1 and §3.4.
+conversational state, only committed artefacts). The mechanism we intend to remove is the one
+by which shared context sways a judge. The nearest evidence, that assistants accommodate a
+user’s stated view [21], concerns human-prompted sycophancy, not agent-to-agent anchoring, so
+contextual isolation is a design precaution here and not a channel we have shown to be closed, and
+credential (no shared credentials; §3.1).
+5
+
+
+===== page 6 =====
+I2 — Ledger completeness. Every protocol artefact (increment, report, verdict, dispute, escalation, and
+every change to the Constitution) is a commit or an issue in one of the two repositories. The
+guarantee has three tiers and only the first is currently met. Parsed-record inspectability: the
+reports, verdicts and receipts as committed, which the reference implementation does provide.
+Raw-exchange preservation: the model requests and responses behind them, which it does not yet
+capture. Full process replay: re-executing the supervision from the record, which is not achievable
+at all while the model calls are stochastic. A deployment should say which tier it holds. Ours holds
+the first, and §4 records two further gaps: the deployed variant’s controller state lives outside both
+repositories, and its generator’s session state was never committed.
+I3 — Citation validity. An audit report must cite the rule IDs it applied and the commit hash of the
+Constitution version in force. A report that cites nothing, or an unverifiable version, is invalid, is
+treated as an Auditor failure, and escalates. It can never pass an increment. The precedence is part
+of the invariant: an invalid report escalates even where the deterministic layer has independently
+blocked, because an integrity failure must never be absorbed into an ordinary scientific verdict, and
+admission fails closed on it.
+I4 — Determinism first. The DCL runs before any LLM audit. A DCL hard failure yields BLOCKED
+regardless of any model’s opinion, and no model may waive a DCL verdict. Rationale: heteroge-
+neous models still train on largely overlapping public corpora and hence can share their errors. The
+supervision layer whose failure modes are least entangled with any model is one with no learned
+component at all.
+I5 — Bounded revision. At most max rounds Generator–Auditor exchanges per increment (default
+three). Exhaustion escalates. This is the oscillation guard: without it, two mutually-correcting
+agents can disagree indefinitely, each round locally plausible and the pair jointly divergent.
+I6 — Graded interruption. Findings carry exactly two severities. BLOCKER (objective defect: DCL
+failure, internal contradiction, missing provenance, method–declaration mismatch) gates the incre-
+ment. ADVISORY (judgement: parameter taste, style, scope) is recorded for asynchronous human
+reading and never gates. Humans are interrupted only by ESCALATE. Running compute is never
+interrupted at all.
+I7 — Receipt binding. Every verdict is a receipt bound to the audited commit SHA; to an artefact
+manifest (paths and content hashes) that the Audit Repository derives from that SHA itself, never
+from caller-supplied payload; to the Constitution, check-layer, and prompt versions applied; to the
+auditor’s declared identity; and to the ledger commit of the report. A verdict that binds less is not a
+receipt.
+I8 — Fail-closed admission. Protected actions (admitting the next increment, production submission,
+claim publication) proceed only on verification of a valid, current, matching receipt. Absent,
+stale, conflicting, unbound, or model-audit-less receipts deny by default and escalate: no audit, no
+admission.
+Two severities only. In our judgement every additional level invites severity-inflation negotiation
+between the agents. Where a finer distinction is needed it belongs in the rule’s acceptance criterion, not
+in the escalation lattice.
+Table 2 condenses the eight invariants into a reference card: the guarantee each one makes, the
+mechanism that enforces it, and how far the reference implementation carries that enforcement today.
+The statuses are the ones §4 accounts for. The distance that remains is enumerated in ROADMAP-R2.md.
+3.3
+The Constitution
+The Constitution is the protocol’s quality ceiling: the Auditor’s blocking power may not, by rule, exceed
+the rules it is given (miscitation is caught by the dispute channel, not prevented), and the Generator is free
+6
+
+
+===== page 7 =====
+Table 2: The eight invariants as a reference card. “Enforced” means the reference implementation refuses the
+violating action in code; statuses follow the audited account in §4, and the implementation as a whole targets I1–I8
+while implementing a subset.
+Guarantee
+Enforced by
+Implementation status
+I1
+The Auditor never judges
+its own model family’s out-
+put
+Vendor
+pairing
+asserted
+from
+crossaudit.yml at dispatch
+Enforced from configuration; ven-
+dor identity self-declared (§5)
+I2
+Supervision
+history
+re-
+playable
+from
+the
+two
+repositories alone
+Every artefact a commit or issue;
+append-only full-SHA cycle direc-
+tories
+Parsed reports preserved;
+raw
+model exchanges not yet captured
+I3
+A report citing no rules, or
+an unverifiable Constitution,
+can never pass
+Invalid replies escalate,
+alone
+or
+atop
+a
+DCL
+hard
+failure
+(verdict-precedence
+tests);
+ad-
+mission refuses receipts whose
+audit integrity
+is
+not
+OK
+(tested)
+Enforced
+I4
+No model may waive a
+scripted hard failure
+Verdict synthesis is code; a DCL
+hard failure dominates any model
+verdict
+Enforced
+I5
+Generator–Auditor oscilla-
+tion terminates
+Controller-managed rounds; ex-
+haustion escalates
+Enforced by the controller state ma-
+chine
+I6
+Humans
+are
+interrupted
+only by escalation
+Two-severity schema; ADVISORY
+never gates
+Enforced in schema and router
+I7
+A verdict binds commit,
+manifest, and versions, or
+it is not a receipt
+Receipt derived from the checked-
+out tree;
+verifier checks every
+bound field
+Receipts emitted and verified; raw-
+exchange capture short of I2’s full
+intent
+I8
+No audit, no admission
+Single-use, freshness-guarded ad-
+mission; DCL ONLY never admits
+Verifier and controller enforce;
+binding admission to branch pro-
+tection is a deployer toggle
+to exploit whatever the rules fail to say. CrossAudit therefore treats it as law rather than documentation.
+Every rule carries a stable identifier (CA-DATA-001), a severity, a path scope, a decidable acceptance
+criterion, and a rationale. Decidability is the load-bearing requirement: a criterion a competent reader can
+evaluate against named artefacts without further judgement. What cannot be phrased decidably is either
+demoted to ADVISORY or (better) mechanised and moved into the DCL. Meta-rules govern the audit itself:
+missing evidence is a finding, never an implicit pass (CA-META-001); a report without citations is invalid
+(CA-META-002, enforcing I3); the Auditor may not issue a BLOCKER without citing a BLOCKER-severity
+rule and so does not legislate taste (CA-META-003); and matters beyond the increment-plus-Constitution
+evidence base must escalate rather than be guessed (CA-META-004). Constitution changes are commits
+reviewed by the human principal. The loop can propose rules but never enact them. (The name deliberately
+echoes, but must not be confused with, Constitutional AI [22]: there, a constitution steers a model’s
+training-time self-critique. Here it is a runtime rulebook applied by a structurally independent auditor and
+versioned in the ledger.)
+3.4
+Rounds, disputes, termination
+Round k for an increment: the Auditor publishes report Rk with a verdict. On BLOCKED, the Generator
+either revises (a new commit, opening round k+1) or a dispute is lodged against specific findings by rule
+ID, with grounds supplied by the principal. A disputed finding returns to the Auditor once: it is withdrawn
+with a logged reason, or upheld. An upheld dispute at the round bound escalates. Disputes exist because
+the Auditor is fallible in both directions: a false-positive BLOCKER, silently obeyed, degrades the science
+as surely as a false negative. The one-shot rule prevents the dispute channel from becoming the oscillation
+it exists to control. Two asymmetries make the channel safe, and the product line (§4.3) enforces both in
+code, not by convention. The disputer states grounds and the Auditor rules, so nothing in a dispute can
+overturn a finding by itself. It buys a second reading, and the second reading is the Auditor’s. And the
+7
+
+
+===== page 8 =====
+OPENk
+BLOCKEDk
+PASSED
+ESCALATED
+report Rk: PASS
+report Rk:
+BLOCKER found
+revise: new commit, round k+1, while k < max rounds (default 3)
+dispute by rule ID, one shot: withdrawn or upheld
+k = max rounds,
+or dispute upheld
+at the bound
+admission via receipt (I7–I8)
+human principal
+Figure 3: Termination as a walk on four states. Every path from OPEN ends in PASSED (admission gated by receipt)
+or ESCALATED (a human decides); the only cycle in the graph is the revision loop, and the round bound cuts it after
+max rounds exchanges. The dispute edge re-enters the same loop instead of adding one: a finding may return to
+the Auditor once.
+Table 3: Four objects, and which claims attach to which. The paper moves between them, and a claim about one is
+not a claim about another. Only the trial in §4.4 was measured, and it measured the reference scorer.
+Object
+What it is
+What it is claimed to do
+What it is not
+Evidence here
+Protocol
+The eight invariants, §3.2
+Define a supervision config-
+uration
+An implementation
+Argument only
+Reference imple-
+mentation
+§4, workflows and Python
+Target all eight, enforce a
+subset (Table 2)
+A product
+Regression tests;
+the trial’s scorer
+Live deployment
+§4, one chemistry pipeline
+Show the loop runs unat-
+tended
+Conforming: it diverges on
+I2 and on two-level sever-
+ity, both named
+Observational
+ledger, no control
+Product line
+§4.3, a separate package
+Show what a second imple-
+mentation taught the speci-
+fication
+Evaluated anywhere in this
+paper
+None
+Generator may not dispute at all. Grounds come from the principal, because a generator arguing with its
+own audit is the anchoring channel I1’s contextual isolation exists to close. Contesting the rule rather than
+the finding is an amendment, which is dated and effective only between cycles. Termination is structural:
+each increment ends in PASS or in human hands after at most max rounds exchanges. Figure 3 draws
+the walk.
+4
+Reference implementation and deployment
+4.1
+Mechanics
+The reference implementation3 uses no infrastructure beyond GitHub itself and two model API endpoints.
+A push under experiments/ triggers a cross-repository dispatch carrying the commit SHA; the audit
+side derives the audited scope from the SHA itself and the round from its own report index; caller-supplied
+payload is treated as an untrusted hint. The Audit Repository’s workflow checks out the science repository
+pinned at the audited SHA, asserts I1 from configuration, runs the DCL, then invokes the Auditor via an
+OpenAI-compatible endpoint with the Constitution, the DCL output, and the increment content as fenced
+data. The report is committed to the ledger, the verdict is dispatched back, and the science repository
+routes it, proceed, revise, or open an escalation issue. The whole implementation is three workflow files
+and two Python programs (a check runner and an auditor runner) of a few hundred dependency-light lines.
+Configuration is a single crossaudit.yml declaring vendors, max rounds, and escalation policy.
+3https://github.com/dongzhaohe321418-lab/crossaudit (MIT licence).
+8
+
+
+===== page 9 =====
+Status against the invariants.
+Per-invariant enforcement and status are Table 2’s job (§3.2); what
+belongs here is how those statuses were earned, because the route is itself evidence for the protocol.
+Following two rounds of cross-vendor audit of this repository (§4.4; both reports and dispositions
+committed under audits/), scope became SHA-derived, rounds ledger-derived rather than generator-
+controlled, receipts full-field, and the reply validator strict; truncated, unreadable, or symlinked inputs
+now escalate rather than pass, and keyless runs yield DCL ONLY, which the router treats as non-admission.
+A third cross-vendor read (also committed) then found the sharper failure mode: the controller state
+machine and full receipt verifier existed but were not wired into the execution path, dry-run admission, a
+hard-coded report path that broke on disputed rounds, a constitution check that could never fire. Those
+wiring defects are fixed. What remains unimplemented is the deployer-side binding of the admission status
+to branch protection, and raw model-exchange capture in the audit runner. The public implementation
+should therefore be read as targeting I1–I8 and implementing selected checks. The remaining distance is
+enumerated in ROADMAP-R2.md.
+Three details with protocol weight.
+First, the auditor runner validates the model’s reply against a fixed
+schema (verdict, findings with severities and rule citations) and any malformed or citation-free reply is
+converted to ESCALATE (I3); a familiar failure of LLM judges (the confident empty report) is thereby
+converted from silent passage into an escalation. Where the DCL has also hard-failed, the recorded
+verdict now escalates as well: the synthesis places I3 above I4 deliberately, because an integrity failure
+must never be absorbed into an ordinary scientific verdict, and a regression test pins the combined case
+(controller/tests/test verdict precedence.py; a valid model PASS still cannot outrank a DCL
+failure, so I4 is untouched). The receipt carries the auditor failure in audit integrity, and admission
+refuses any receipt where it is not OK (also tested), so the gate holds even against an older deployed runner.
+Second, increment content is passed to the Auditor as fenced, size-bounded content with the system
+prompt instructing that embedded instructions be ignored, a best-effort defence whose residual risk §5
+states plainly. The reference Auditor has no tools. Third, verdict synthesis is code, not model output:
+DCL hard failures dominate any model verdict (I4).
+4.2
+A live deployment
+A closely related variant of CrossAudit runs live in the first author’s computational-chemistry pipeline
+(perovskite additive screening). The generation side is a Claude-based research agent that plans calcula-
+tions, launches them on Alibaba Cloud E-HPC and a GPU worker, and pushes every increment to a private
+science repository whose audit policy, an epistemic-status ledger separating established, bounded, and
+provisional claims, together with a standing retraction log, is itself a committed, versioned document. A
+controller opens each cycle against a fixed science commit. The audit request pins a SHA-256 manifest of
+every tracked file. A Codex-CLI auditor (OpenAI lineage, so I1 holds against the Claude-based generator)
+writes four artefacts into an append-only per-cycle directory in the audit repository: a human-readable
+report, a machine-readable result, run metadata, and a per-file hash manifest. All sit on one long-lived
+audit branch that later cycles may not rewrite. The controller enforces this by validating every audit
+commit before recording a cycle as final, which detects a rewrite rather than preventing one. Prevention
+would need branch protection. The controller’s own orchestration state deliberately lives outside both
+repositories, so tampering by either agent with the record of its own supervision is detectable against
+controller-held state.
+Three deliberate divergences from the reference design should be named plainly: the deployed auditor
+is a tool-bearing CLI agent rather than the reference’s toolless one, contained instead by that commit
+validation and the append-only cycle layout. The externalised controller state means the deployment’s
+history is fully replayable from the repositories plus that state, a weaker property than I2’s repositories-
+alone ideal; and findings carry a four-level severity ladder feeding scope-level gates, rather than the
+protocol’s two levels, a live experiment running against §3.2’s two-level argument, whose outcome the
+telemetry will eventually adjudicate.
+9
+
+
+===== page 10 =====
+Every committed scientific artefact and parsed supervision decision lives on GitHub; raw model
+exchanges, transient progress and controller orchestration state do not (I2). The system is designed so
+that any single component (generator, auditor, controller host, workstation) can fail without loss of the
+committed ledger state.
+Two refinements of the deployed system go beyond the reference implementation and are worth
+adopting upstream. First, findings are evidence-typed: each carries a policy citation (section and rule ID),
+a deterministic check identifier where applicable, and a copy-paste reproduce command, so a human can
+re-derive any deterministic finding in seconds. Second, blocking is scope-granular: a finding blocks
+named scopes, production-job submission, claim publication, rather than the pipeline wholesale, refining
+I6’s graded-interruption principle. Human authority enters through escalation, plus one deployment-
+specific addition: a standing principal-approval gate on production launches, recorded in the ledger.
+The loop is live in the plainest sense: its first cycle (opened and closed within six minutes) returned a
+BLOCK decision on deterministic grounds (manifest-hash disagreements and commit-provenance defects),
+freezing production submission and claim publication until resolved. Audits gate the record and future
+submissions, never running jobs: E-HPC work in flight is never interrupted. A redacted public mirror of
+the deployment’s finalised cycles is maintained in the reference repository (ledger-mirror/; scientific
+magnitudes masked, structure, rule citations and reproduce-command shapes verbatim). Including that
+first cycle, the ledger accumulated seven model-audited cycles across two days (Figure 4): decisions ran
+BLOCK five times, then PASS WITH CAVEATS, then PASS, while findings per cycle fell 7, 4, 3, 2, 1, 1, 0.
+Part of that fall is the audit boundary moving, because the early cycles audit accumulated backlog and
+the later ones fresh increments; and with no control condition, what would have been caught without the
+loop is not knowable from this series. Of fourteen distinct findings, twelve are behaviourally confirmed
+real: each revise leg is a science-repository commit naming the finding IDs it closes, and the following
+cycle verifies the closure; two remain unresolved at the data freeze. All twelve were detected and
+closed before the gated downstream action. Whether they would have been caught some other way, this
+deployment cannot say: it ran no control condition. One leg (the ledger’s numbering gap at cycle 3) ran
+as a deterministic-tier follow-up without a model audit and is reported as-is. The generator’s session state
+was never committed, so no in-context self-review arm can be reconstructed retrospectively; that absence
+is itself evidence for I2. The mined, structurally redacted cycle records are frozen in this repository
+(experiment/v3/real-ledger/).
+The loop has since kept running. By 3 August (second freeze: science 485106fa, audit abb10a47;
+the counting rules and regeneration script are committed with it) the ledger held 21 model-audited cycles
+carrying 39 finding occurrences under 23 distinct finding identifiers, 20 of the 23 behaviourally confirmed
+closed (a fix commit named the finding and a re-audit verified the closure, which is closure evidence, not
+independent ground truth) and 3 still open at the freeze. The first arc converged, then two more increments
+passed on their first audit. What followed matters more. Sustained development settled at roughly one
+to three findings per cycle, and stayed there. The loop reaches a working rate, not zero, and that is the
+regime a long-running deployment lives in. Median closure lag, counted per distinct finding from first
+raise to verified closure over the 20 closed (the 3 open are excluded, not imputed), was one cycle, with a
+mean of 2.10 and a maximum of 7; ten of the 23 identifiers recur across cycles, which is what a re-audit
+exists to catch. On the deployment’s own four-level ladder the 23 findings graded as three CRITICAL,
+thirteen HIGH, four MEDIUM, and three LOW. Twenty-five of the 39 occurrences cite a single rule, firing in
+16 of the 21 cycles, the kind of concentration that tells a principal where the next deterministic check
+should go. The scope-granular gate was working throughout: counting finding–scope incidences, which
+overlap because one finding can gate two scopes, 33 gated claim publication and 12 gated production
+submission, and at the snapshot a claim-publication action stood withheld pending a clean verdict beneath
+it. Audits took a median of six minutes (range 3.7–18.2); the interval from one audit finishing to the next
+beginning, which bundles the repair with any idle time, had a median of thirty-four minutes (quartiles 18
+and 70, the maximum an overnight gap). So the audit is not the wall-clock bottleneck. What those repairs
+cost in human attention, which is what §6’s economics is actually about, the ledger does not record.
+Four things temper all of this. We report the shape of that second stretch and claim nothing causal
+10
+
+
+===== page 11 =====
+30 Jul
+31 Jul
+81fd505e
+BLOCK
+7 findings
+1
+7
+bfece650
+BLOCK
+4 findings
+2
+4
+746564b6
+BLOCK
+3 findings
+4
+3
+b7de4784
+BLOCK
+2 findings
+5
+2
+4aed10a9
+BLOCK
+1 finding
+6
+1
+4ccb0cd6
+PASS w/ caveats
+1 finding
+7
+1
+af0dc587
+PASS
+0 findings
+8
+0
+findings
+per cycle
+fixes
+fixes
+fixes
+fixes
+fixes
+fixes
+cycle 3: Tier-0 follow-up, no model audit
+Each next science commit names the finding IDs it closes; the following cycle verifies the closure. 12 of 14 distinct findings confirmed closed; 2 unresolved at freeze.
+Figure 4: The live deployment’s first convergence arc (seven cycles; the 21-cycle figures in the text come from a
+second freeze, 2026-08-03), mined from its audit ledger at the first data freeze (science af0dc587, audit 88b92429;
+structurally redacted records in experiment/v3/real-ledger/). Top lane: the audited science commits, with
+the day boundary from the ledger’s timestamps dashed. Middle lane: the audit cycles, coloured by decision, with
+the deployment’s own numbering gap preserved (the dashed pointer marks leg 3, a deterministic-tier follow-up
+without a model audit). Bottom: findings per cycle on a shared baseline, falling 7, 4, 3, 2, 1, 1 to 0 as decisions
+move from BLOCK to PASS; the twelve behaviourally confirmed defects were closed before the downstream actions
+they gated.
+from it, because the two stretches are not a matched comparison: the first audited accumulated work, the
+second audits fresh increments, and we drew the boundary after seeing the series. The auditor model
+was not held fixed either, since four identifiers appear in the metadata, so the series mixes configurations
+and cannot support arm comparison. Findings carry the deployment’s own source label, 11 of the
+39 occurrences marked DETERMINISTIC against 28 marked JUDGMENT; that records what caught each
+defect, not what could have. The second question is the one our registered study asks, and it remains
+unanswered. Finally, the v3 study’s Part B labels stay frozen at the 31 July snapshot. These later cycles
+are observational telemetry from one deployment with no control condition, and the analysis behind them,
+limits stated at length, is committed at experiment/v3/real-ledger-b/.
+Costs for the reference design are modest. The DCL is free. A single fenced-increment audit call
+scales with the size of the increment, not of the computation behind it, a few hundred lines of results
+and metadata read per call, while the experiment it gates may represent hours of HPC time; we quote no
+currency figure, because per-cycle token telemetry is deferred and an unmeasured price is not a datum.
+(The deployed variant’s tool-bearing auditor reads more and costs more; per-cycle cost reporting is
+deferred with the rest of the telemetry.) Auditing costs roughly what it costs to read the documentation,
+not what the compute behind it cost. Two caveats: multi-round exchanges multiply audit calls, and
+escalations spend human time, which is the truly scarce resource here.
+The deployment’s role is existence proof, an observational feasibility case study with no control
+condition and no effectiveness claim, for the deployed variant: the loop has run unattended, at single-
+researcher scale, on commodity infrastructure, and has completed one full convergence arc from BLOCK
+to PASS. Its first catch was attributable to the deterministic layer; the thirteen findings that followed came
+through the tool-bearing auditor, and what fraction of them a script could have caught (the mechanisability
+of the confirmed set) is a registered endpoint of the follow-up study, adjudication pending, not a claim
+made here.
+4.3
+What a second implementation taught the specification
+A separate line of work rebuilt the loop as an installable package, carrying the engine’s invariant semantics
+over unchanged.4 It is measured nowhere here, and we describe none of its interface. What a second
+4https://github.com/dongzhaohe321418-lab/crossaudit_v3 (MIT licence), version 3.2.0, at which this paper’s
+evidence about the product line is frozen; later product versions are outside it. The research repository does not chase the
+product, and the protocol’s authoritative text remains this paper.
+11
+
+
+===== page 12 =====
+implementation buys is the ordinary benefit of writing a specification down twice: the underspecified
+parts of the first writing become visible. Three did, and all three are about the protocol, not the package.
+Admission is a tier, not a switch.
+I8 says protected actions proceed only on a verified receipt, and §3.2
+notes that binding the check to branch protection is a deployer action. That framing is too binary for
+the field. Deployments sit at different distances from the guarantee: the history may be the operator’s to
+rewrite, or beyond unilateral control, or privilege-separated between the agents, or genuinely gated so that
+a failed audit refuses the merge. The distance that matters most is the one between the last two, where a
+paired deployment publishes verdicts that refuse nothing. Calling that state paired invites the reading
+gated, and announcing a verdict while implying refusal is worse than saying nothing: it manufactures
+confidence the ledger cannot support. Naming it separately is the fix, and the evidence rule behind the
+naming matters as much: absent evidence never counts in favour, so persistence is established by taking
+the lock rather than by reading a configuration field, and branch rules are read from the platform rather
+than from the deployment plan that was meant to set them.
+Whatever decides what the auditor sees is inside the trusted base.
+A conversational front end needs
+something that decides whether an utterance changes the work, changes the rules, contests a finding,
+or asks a question. That component is a real addition to what must be trusted. One that could quietly
+decide what the auditor never sees would be a third agent, unaudited, holding the power the protocol
+exists to distribute. The resolution follows from I2 once the invariant is read as covering discretion as
+well as artefacts: the routing decision itself becomes a ledger entry, carrying the utterance, the choice,
+the confidence, and the action taken, so a misroute is visible and reversible instead of silent. The same
+reading forbids a subtler leak, since such a component must forward the principal’s words and never the
+Generator’s.
+Domain generality is a claim an implementation can undermine quietly.
+Nothing in I1–I8 mentions
+science, but the reference deterministic layer’s four checks assume experimental data, so the protocol’s
+generality and its reference implementation’s generality are not the same property. Separating them
+requires a domain-neutral default, domain packs as plugins, and one discipline that is easy to skip: where
+no pack exists for a field, the deterministic layer contributes almost nothing and the model audit carries
+the load alone. I4’s mechanical guarantee thins, and an implementation in that position should say so
+instead of letting a uniform interface imply uniform strength. The same reticence governs a supervision
+display. A figure the ledger cannot support belongs on screen as not measured, not as zero, because “no
+escalations” and “we never looked” are different claims and only one deserves a large font.
+4.4
+An exploratory seeded-defect trial, audited and corrected
+We attempted a pre-registered, sealed seeded-defect pilot. The attempt did not survive contact with our
+own protocol. A cross-vendor audit of this repository, in which a second-vendor agent reviewed the
+generating agent’s work, returned a BLOCK-grade report whose findings voided the “sealed” framing
+and several companion claims; the report and our dispositions are committed at audits/. We adopted its
+findings in full. What follows are the corrected, exploratory results, which proved more instructive than
+the experiment we had intended to run.
+Design and execution.
+A deterministic generator produced 30 synthetic increments in the reference
+format: 10 clean and 20 defective, carrying 43 seeded defects across ten registered classes, four of
+them mechanisable and six requiring reading. A SHA-256 digest of the defect key was committed at
+registration. Three arms then ran over identical inputs with the identical Constitution, though not under
+an identical harness, so vendor is confounded with harness and sampling throughout. The first was the
+deterministic check layer. The second ran fresh-context Claude subagents, one per increment, with no
+shared memory (session sampling, a deviation we disclose). The third ran gpt-5.1 at temperature 0
+12
+
+
+===== page 13 =====
+under the frozen runner in CI. The corpus’s author is the deterministic generator, so the arm labels below
+name the auditor configuration alone: no arm audits work that its own model family produced, and the
+own-generation setting in which self-preference is demonstrated [5] is not instantiated here.
+What the audit found.
+We checked each finding and accepted all of them. The key file was public
+from the registration commit onward. This was our mistake, a mis-pathed ignore rule, and the key is
+in any case derivable from the public seeded generator, so no blinding claim survives; what remains is
+procedural blinding of fresh-context auditors, which the ledger cannot verify. The headline Claude-arm
+score depended on a scoring-map expansion made after the outputs were committed. Under the frozen
+map the arm scores 38/43; under the adjudicated map, with corrections logged, it scores 43/43. The
+former is the reportable score and the latter is exploratory. The deterministic layer’s five L6 catches
+contradict the registered taxonomy: the class was misregistered as model-only when its flag component is
+mechanisable. The trial is component-level throughout. The corpus was read directly, with no dispatch
+pipeline and no DCL precedence, so it is not an end-to-end run of the reference implementation. Finally,
+the trial’s own outputs violate I3: the runner recorded no Constitution hash, a defect one of the auditors
+itself flagged (below).
+Arm
+Recall
+lenient / strict
+Chance floor
+lenient / strict
+BLOCKER
+findings
+on 10 clean
+Verdict accuracy
+(of 30)
+Deterministic layer
+17/43 a
+4.8 / 4.2
+0
+25
+Claude-family (subagents)
+38 / 38 b
+22.4 / 16.3
+0
+30
+GPT-family (gpt-5.1, frozen runner)
+41 / 37 c
+31.8 / 24.4
+26
+20
+All figures exploratory: blinding voided, key derivable from the public generator. a 12/12 of its registered scope + 5/5 cross-hits on
+misregistered L6. b 43/43 under post-hoc adjudicated scoring. c all ten clean increments blocked (10/10 false-block verdicts); many findings
+letter-valid on inspection; per-finding adjudication pending. Strict-tier scores assemble rule and location evidence across findings rather than
+binding one finding per defect, and so overstate defect-level localisation. Chance floors: 2000-shuffle permutation null, seed 20260731;
+experiment/results/NULLCHECK.json.
+The two arms read the rulebook differently.
+The GPT-family arm scored 41/43 at the lenient tier but
+37/43 at the strict tier. It emitted 113 findings to the Claude-family arm’s 63, and it returned BLOCKED
+on all thirty increments. That figure matters, because a stub auditor that blocks unconditionally would
+reproduce it exactly, including the 20/30 verdict accuracy. It is the reliability-without-validity failure in
+its purest form [9]: a perfectly consistent judge carrying no information about the increment in front of
+it. Raw recall cannot settle the comparison, because it rises with the number of findings an arm emits;
+this is the same reason raw agreement overstates judge quality in the benchmarking literature [9]. A
+permutation test (2000 shuffles of the increment-to-defect map, holding each arm’s outputs fixed so that
+volume and citation habits are preserved; seed 20260731, experiment/score nullcheck.py) puts the
+random floors at 4.8, 22.4, and 31.8 of 43 for the three arms. The floors calibrate each arm against its own
+citation volume; they do not test the gap between arms, and an earlier draft said the lenient comparison
+was “within noise” with no statistic behind the phrase. The direct test, computed post hoc for this revision
+(experiment/arm contrast.py), pairs the two model arms on the 43 defects, which nest inside 20
+defective increments; each reply is increment-level, so defects within an increment share one generation,
+and the primary inference therefore resamples and permutes increments rather than defects. At the lenient
+tier the arms disagree on seven defects (five caught only by the GPT-family configuration, two only by
+the Claude-family one); the recall difference is +3 of 43, cluster bootstrap 95% CI [−2,+8], cluster sign-
+flip permutation p = 0.46 (the defect-level McNemar agrees at p = 0.45 but overstates independence),
+so these data cannot distinguish the two configurations at that tier. At the strict tier the difference is
+−1 of 43 (cluster CI [−6,+4], p = 1.0; the table’s footnote on blob-level matching applies) and the
+chance-corrected order reverses: floor-corrected agreement, (observed−floor)/(43−floor), is 0.81 for
+the Claude-family arm against 0.68 for the GPT-family arm. Inspection of the clean-increment blockers
+still suggests that many are letter-valid readings of an ambiguous rule, but per-finding adjudication was
+13
+
+
+===== page 14 =====
+not logged, and the claim as originally framed was unfalsifiable: any disagreement would have counted
+as support. The rule at issue, CA-DATA-001, requires “each numeric entry” in the results file to carry a
+unit and a source; the corpus’s convergence blocks carry units but no sources. The Claude-family auditor,
+like the check scripts and like the corpus author, read the rule by its intent and raised nothing. The foreign
+auditor enforced its letter. What survives is narrower but real, and it is about two configurations rather
+than two vendors. On identical inputs, one Claude-family and one GPT-family configuration read the
+same rulebook differently, which is consistent with I1’s premise and does not establish it: a single model
+pair, run once, cannot separate a vendor effect from a prompt, temperature, or sampling effect. The trial
+nevertheless measures disagreement rather than discrimination, and a 10/10 false-block rate on clean
+increments means that in this configuration every increment escalates, so the O(escalations) economics
+of §6 hold only under a far better-calibrated auditor or a sharper Constitution. The practical outcome was
+a Constitution amendment: scope the rule decidably.
+What we can still claim.
+The limits should be stated plainly. This is a component-level, checklist-
+aligned trial (the prompt names the defect families the corpus injects) on template-generated data, with
+the Claude-family arm’s execution self-attested and n=43. Zero blockers on ten clean increments bounds
+that arm’s false-positive rate only below ≈26% (one-sided 95%), and its advisory burden on the clean
+increments was five findings across five of ten. None of this is confirmatory evidence about detection
+rates. Three things the trial does establish. The model layers read: they caught 26 to 29 defects beyond
+the scripts’ registered scope of twelve (21 to 24 beyond the seventeen the scripts caught in all). The
+two auditor configurations, drawn from different vendors, returned discordant readings of the same
+rulebook on identical inputs; with a deterministic corpus author, that is a fact about configurations, not
+about generator–auditor vendor pairings. And the repository’s own disciplines (append-only outputs,
+logged adjudication, a committed cross-vendor BLOCK with itemised dispositions) were applied to the
+evaluation itself.
+A note from the successor study’s preparation.
+The registered replacement for this trial has not
+run, but building its corpus produced one observation that bears on I4 directly, and we record it here
+rather than wait. A rule drafted for that study required the Auditor to apply any unit conversion and
+state its tolerance before alleging that two numbers disagree. It complied. On five clean increments
+it then quoted the correct conversion constant, read the correct inputs, and miscalculated the product
+by up to 1.8 × 10−3 eV while adjudicating a discrepancy of 8.8 × 10−5 eV, and the two increments it
+declared contradictory were the two where its own arithmetic was worst. A four-line script settles the
+same comparison correctly every time. One model, one vendor, five increments: this illustrates rather
+than establishes. What it illustrates is that the remedy for a model’s arithmetic is not a rule demanding
+the model show more of it. A comparison that is decidable belongs to the deterministic layer, which is
+what I4 says; the rule was rewritten to route such pairs there instead, and the measurement is committed
+at experiment/v3/SMOKE-FINDINGS.md.
+4.5
+What a reader can check
+Four artefacts are versioned, and they answer different questions. Every statement below refers to the
+state of the reference repository at release tag paper-v1.0.0, cut at the source revision of this exact
+PDF, which is committed beside its source with its SHA-256 recorded in paper/HASHES.txt; “exact”
+is a checkable claim about the committed artefact and its hash, not about byte-level rebuild determinism,
+which TeX does not promise. An earlier draft pinned a bare commit instead, and the external review
+of this paper caught the draft having moved past its own pin; the anchor is now the tag that ships with
+the paper, so the two move together or not at all. The reference repository is public at that tag. The
+product-line repositories (§4.3) remain private at the time of writing, so claims about them rest on the
+audit excerpts committed under audits/ and on the evidence grading of Table 3, and a reader who
+cannot reach a cited artefact should discount the corresponding claim accordingly.
+14
+
+
+===== page 15 =====
+The reference implementation carries the protocol as specified here, with the controller, the receipt
+verifier, and their regression tests. The evaluation directory carries the trial corpus, the frozen scorer, and
+the permutation null with its seed, so every number in §4.4 regenerates from a clean checkout. The audit
+directory carries the cross-vendor reports written against this repository, and our dispositions on each one.
+That includes the findings that voided our own claims. The live deployment’s supervision records are
+mined into the same repository in structurally redacted form: cycle identities, decisions, severities, rule
+citations, and finding lifecycles verbatim, scientific magnitudes masked.
+5
+Threat model and limitations
+Below is what CrossAudit withstands and what it does not.
+Self-preference and vendor-correlated error.
+These are addressed by I1. Corpus-correlated error is
+not: where the shared literature is wrong or outdated, both vendors can agree confidently and wrongly.
+The mitigation is I4 for everything mechanisable; for what is not, it is the human’s asynchronous reading
+of ADVISORY trails. This residual cannot be assumed reducible by adding more LLM auditors, because
+all of them plausibly train on largely overlapping public corpora.
+Prompt injection.
+An increment could embed text addressing the Auditor. The Auditor runs toolless
+against a fixed reply schema, with increment content fenced as data; and because DCL verdicts are
+non-overridable, injection cannot waive the layer where hard defects are caught. Injection that shapes the
+LLM-side report remains partially open, as it does for LLM-judge systems generally. This bullet describes
+the reference implementation; the deployed variant’s tool-bearing auditor forgoes the toolless defence, a
+divergence §4 names together with its containment limits.
+Auditor failure.
+Empty, malformed, or rule-free reports convert to escalation (I3), never to silent
+passage. The cost is human attention, which is the correct currency for an unreliable auditor.
+Oscillation and deadlock.
+These are bounded by I5; the failure mode degrades to a human decision
+with the parsed exchange on the ledger, which is the intended floor.
+Goodharting the Constitution.
+A capable Generator will satisfy the letter of decidable rules. Decid-
+ability makes this visible rather than solved: the human reviews rule–outcome drift on the ledger and
+legislates accordingly. The Constitution is a living document, and its growth out of escalations is the
+system learning. A related boundary matters wherever a deployment lets the principal shape how the
+Generator works, through style guides, domain conventions, or worked examples. Such material may
+change how the work is done; it must never change where the Generator may write or who judges it.
+Guidance that could address the Auditor would be an unversioned rule, and guidance claiming wider
+write access than the path guard allows is only a text with an opinion.
+Collusion.
+Collusion has no out-of-band channel in the reference design. Coordination must ride the
+committed artefacts, where it is preserved for inspection. Encoded coordination within artefacts, and any
+channels a tool-bearing auditor acquires, remain possible. The realistic soft risk is convergent style across
+many rounds, and it is met by the Constitution’s review cadence.
+The operator.
+CrossAudit supervises the agents, not the principal. Selective publication, pre-publication
+history rewriting, and audit re-rolling by the operator all sit outside the protocol’s guarantees. External
+anchoring (signed pushes, transparency logs) would extend tamper-evidence to the operator; until then,
+“third-party-auditable” should be read as internally consistent as published. Relatedly, the DCL scripts
+15
+
+
+===== page 16 =====
+and the Auditor’s system prompt must live under the same ledgered, human-reviewed change control as
+the Constitution, because a Generator-editable check layer would hollow out I4.
+Vendor identity is self-declared.
+The ledger proves that an exchange occurred; it does not prove
+the identity of the models behind OpenAI-compatible endpoints. I1 is asserted from configuration, not
+verified cryptographically. Attested inference or vendor-signed responses would close this gap; today
+it is an honest limit on what “third-party-auditable” can mean. (The reference example also shares one
+dispatch token across both workflows, so credential separation is likewise configuration, not proof.)
+Confidentiality.
+The protocol ships every increment, possibly unpublished and patentable material, to a
+second vendor’s API. Data governance of that call (agreements, retention, disclosure risk) sits outside the
+protocol and must be settled per deployment.
+Scope.
+CrossAudit audits the research record, not the world. It cannot detect a miscalibrated instrument,
+a wrong dataset honestly described, or fraud upstream of the repository. It is also currently specified for
+single-generator pipelines; multi-agent generation raises attribution questions we do not address here.
+6
+Discussion
+Continuous integration for scientific claims.
+The ambition is what CI achieved for software: not proof
+of correctness, but a cheap and inspectable floor under quality. Human judgement is then redeployed
+to where it discriminates (the rules, the escalations, and the science) and not spent uniformly on every
+increment. We believe the analogy holds in one further respect. CI spread without institutional permission;
+a single developer could adopt it unilaterally, and its artefacts, the badges and the logs, became social
+proof. One disanalogy must be owned: CI’s checks are deterministic, while CrossAudit’s distinctive layer
+is a stochastic judge. The DCL exists to keep the gate’s hard core deterministic. CrossAudit is designed
+for the same adoption path: one researcher, two repositories and an afternoon for the audit loop itself,
+plus the CI, credential and branch-protection configuration that enforced admission needs.
+Relation to platform-scale systems.
+CrossAudit is complementary to, not competitive with, systems
+such as the AI co-scientist [4] or the AI Scientist [3]. Those systems generate. CrossAudit supervises
+whatever generates. The strongest version of our proposal is addressed to platforms of that kind. Their
+internal critique stages appear architecturally straightforward to re-instantiate across vendor lines and
+to externalise onto public ledgers, although the organisational and confidentiality costs are not ours to
+estimate. The resulting audit trails would give publishers and funders, who are currently asked to trust
+process descriptions [14], something they can actually inspect.
+What the ledger buys science socially.
+A complete supervision history, public where the operator
+publishes it, changes the character of machine-generated results. A claim then arrives not as prose plus
+reputation but as prose accompanied by its audit record: which rules it was checked against, what was
+contested, and what a differently-trained model conceded or refused. Reviewers can spot-check the ledger
+instead of re-deriving trust from nothing.
+The ledger as a data asset.
+A CrossAudit deployment produces, as a by-product, something the field
+currently lacks: a corpus of supervised machine science. Each tuple of increment, findings, dispute, and
+resolution is a labelled example of scientific work judged by an independent party under explicit rules,
+and therefore candidate training signal for better generator and auditor agents alike, with the attendant risk
+that training against the ledger is training against the rulebook, the optimisation §5 names as Goodharting.
+Aggregated across deployments, failed audits would form a public error taxonomy of agentic research:
+16
+
+
+===== page 17 =====
+what machine-generated science actually gets wrong, per rule, per field, over time. Whoever runs the
+loop accumulates this asset, and a community that runs it openly accumulates it as a commons.
+Constitutions as community objects.
+Because the Constitution is a plain, forkable file with stable
+rule IDs, it can outgrow any single deployment. A research community can maintain a shared domain
+constitution in the way communities maintain style guides and lint rules. A journal could publish the
+constitution it expects machine-assisted submissions to have been audited under, and accept the ledger
+link alongside the manuscript, much as data-availability statements are accepted today. Funders could
+write “public supervision ledger” into their terms. For regulated settings, pharmaceutical and clinical
+computation among them, the ledger’s attributability and its contemporaneous, hash-manifested record
+resemble properties that audit regimes already demand of human work, though we claim compliance
+with no specific regime. A repository badge (increments audited, escalations raised, constitution version)
+would then do for machine science what CI badges did for software: it would compress an inspectable
+process into a glanceable, verifiable signal. None of this requires new technical infrastructure. It requires
+only that the artefact exist, which a conforming deployment produces.
+A ratchet for standards.
+The Constitution need not be static. Because rules are commits and receipts
+pin the version in force (I7), standards can tighten over time without ambiguity about which version
+governed which increment. The safe dynamics have three channels. First, shadow-mode promotion: a
+candidate stricter rule enters as ADVISORY, rehearses enforcement on every cycle without gating, and
+accumulates ledger evidence on hit rate, dispute rate, and would-be blocking cost; the human promotes
+it to BLOCKER only when the record supports it. Second, threshold ratchets: numeric criteria tighten
+stepwise as the generator’s competence grows, each step a commit with its rationale. Third, agent-
+proposed amendment: either agent may draft a rule change from what the ledger shows it. The loop can
+propose. Only the principal enacts. One rule matters most. Standards freeze within a cycle and move
+only between cycles, because an auditor that could raise the bar mid-round would face the generator with
+a moving target and dissolve the termination guarantee of I5.
+From copied glue to an installable protocol.
+The reference implementation ships as copy-in glue:
+a deployer vendors checks/ and controller/ into an audit repository and edits three workflow files.
+The product line described in §4.3 replaces that with an installable package whose command surface is
+the loop itself: scaffold a project, run the deterministic layer and the auditor against a pinned commit,
+verify a receipt, admit. The argument for packaging is more than convenience. Vendored copies drift, so
+two deployments can silently run different verifiers, and a receipt that pins the Constitution, the check
+sources, and the prompt, but not the machinery that verified and admitted on their basis, is bound one
+layer short of I7’s intent. A release-versioned verifier closes it: the receipt can record the package version
+and distribution hash alongside the hashes it already carries, and the enforcement code becomes a pinned,
+citable dependency, not an unversioned copy. This binding is specified but not yet emitted, and it is the
+next thing we would fix. Packaging also gives field adaptation a natural unit, since check packs ship as
+plugins and DCL coverage can circulate between groups in the way we argue Constitutions should. The
+cost is a new trust surface, the package supply chain, for which hash-pinned installs and signed releases
+are the standard mitigations.
+A console for the human principal.
+The ledger is git-native on purpose, and it stays so. Raw git is
+nevertheless a demanding reading surface for the one human the protocol keeps in the loop, and I6 makes
+that human’s asynchronous reading load-bearing. The product line therefore carries a supervision console
+over the ledger: cycle timelines, the advisory backlog by rule and hit rate, an escalation inbox assembling
+what an adjudication actually needs, and the telemetry a standards ratchet would read. One design rule
+carries protocol weight: the console writes nothing of its own. Every action it offers runs the same verbs
+the command line offers, so each materialises as a commit or an issue through the authenticated paths
+the agents already use, the ledger stays complete (I2), and the console remains derivable from it. A
+17
+
+
+===== page 18 =====
+supervision interface with a private database would accumulate the unversioned, unreplayable state the
+protocol exists to exclude. Three refusals follow from the same principle and are worth stating because
+a supervision display that breaks them is worse than none: it does not show a figure the ledger cannot
+support, it does not colour a step green before it happened, and it does not imply that it acted on its own.
+There is a boundary case that deserves its own honesty. Work in flight is not yet in the ledger, so progress
+reporting is a view, not a record: it lives in memory and dies with the process. The ledger holds every
+committed round but cannot know that a round was cut off, so an interrupted run must be marked as
+interrupted rather than left to read as finished.
+Management by exception, at research scale.
+As agent labour becomes cheap, the binding constraint
+of agentic science shifts from compute to human attention. CrossAudit’s economic content is a hypothe-
+sised reduction in gating cost from O(increments) to O(escalations), conditional on escalation volume
+staying low; no deployment here recorded the human attention spent, so the hypothesis is stated with its
+measurement plan, not as a result. Our own trial shows the failure mode plainly: the GPT-family arm’s
+10/10 false-block rate would make escalations O(increments). The economics hold only with a calibrated
+auditor and a decidably scoped Constitution, and they must be measured rather than assumed. This is the
+managerial precondition for one researcher credibly directing several agent pipelines at once. In principle
+it should extend beyond science to any agentic work product that arrives as discrete increments whose
+quality is partially rule-expressible, from code to quantitative analysis, a conjecture this paper does not
+test.
+7
+Conclusion
+CrossAudit reframes supervision of autonomous research from a platform feature into a public, versioned
+artefact produced by structurally independent reviewers. Its ingredients are plain: a second vendor, a
+rulebook with stable IDs, scripts that run before any model, a bounded loop, and git underneath. We
+chose them because a single researcher can adopt all of this without asking anyone’s permission. The
+protocol’s eight invariants are a deliberately small set. Together they buy structurally independent review,
+a re-inspectable history, and human authority at the boundary; everything else in this paper is reference
+detail, and the reference repositories are public. An AI scientist should not grade its own homework.
+With two repositories and two API keys, it no longer has to.
+Author contributions and the use of language models.
+This paper was written with heavy use of the
+class of tools it proposes to supervise, and the division deserves stating rather than implying. The protocol,
+the invariants, the study designs and every judgement about what the evidence supports are the authors’.
+A large language model drafted most of the paper’s prose from the authors’ outlines and notes, wrote the
+bulk of the reference implementation and the analysis scripts under the authors’ direction, and produced
+the figures. The authors verified each of the reported numbers against the committed artefacts, checked
+all twenty-two references against their source pages, and read and revised the text. Two limitations of
+that arrangement should be named. First, the same assistant that drafted the prose also ran an internal
+screen of the manuscript for machine-authored writing patterns; the screen is committed under audits/,
+and it is a same-source review of the kind §2 argues against. Second, that screen missed a bibliographic
+error the assistant had itself introduced days earlier, which an external reviewer then caught. We report
+both because a paper about supervising machine work has no standing to be vague about the machine
+work in itself.
+References
+[1] Chris Lu, Cong Lu, Robert Tjarko Lange, et al. The AI Scientist: Towards fully automated open-ended
+scientific discovery. arXiv:2408.06292, 2024.
+18
+
+
+===== page 19 =====
+[2] Y. Yamada, R. T. Lange, C. Lu, et al. The AI Scientist-v2: Workshop-level automated scientific discovery via
+agentic tree search. arXiv:2504.08066, 2025.
+[3] Chris Lu, Cong Lu, Robert Tjarko Lange, et al. Towards end-to-end automation of AI research. Nature,
+651:914–919, 2026.
+[4] J. Gottweis, W.-H. Weng, A. Daryin, T. Tu, et al. Accelerating scientific discovery with Co-Scientist. Nature,
+655:487–496, 2026. Preprint: arXiv:2502.18864 (2025), as “Towards an AI co-scientist”.
+[5] A. Panickssery, S. R. Bowman, and S. Feng. LLM evaluators recognize and favor their own generations. In
+Advances in Neural Information Processing Systems (NeurIPS), 2024. arXiv:2404.13076.
+[6] Wei-Lin Chen, Zhepei Wei, Xinyu Zhu, Shi Feng, and Yu Meng. Do LLM evaluators prefer themselves for a
+reason? arXiv:2504.03846, 2025.
+[7] Dani Roytburg, Matthew Bozoukov, Matthew Nguyen, Jou Barzdukas, Mackenzie Puig-Hall, and
+Narmeen Oozeer. Are LLM evaluators really narcissists? Sanity checking self-preference evaluations.
+arXiv:2601.22548, 2026.
+[8] L. Zheng, W.-L. Chiang, Y. Sheng, S. Zhuang, et al. Judging LLM-as-a-judge with MT-Bench and Chatbot
+Arena. In Advances in Neural Information Processing Systems (NeurIPS), 2023. arXiv:2306.05685.
+[9] J. D. Norman, M. U. Rivera, and D. A. Hughes. Reliability without validity: a systematic, large-scale
+evaluation of LLM-as-a-judge models across agreement, consistency, and bias. arXiv:2606.19544 (preprint),
+2026.
+[10] D. A. Boiko, R. MacKnight, B. Kline, and G. Gomes. Autonomous chemical research with large language
+models. Nature, 624:570–578, 2023.
+[11] N. J. Szymanski, B. Rendy, Y. Fei, R. E. Kumar, et al. An autonomous laboratory for the accelerated synthesis
+of inorganic materials. Nature, 624:86–91, 2023.
+[12] M. D. Skarlinski, S. Cox, J. M. Laurent, J. D. Braza, et al. Language agents achieve superhuman synthesis of
+scientific knowledge. arXiv:2409.13740, 2024.
+[13] M. Baker. 1,500 scientists lift the lid on reproducibility. Nature, 533:452–454, 2016.
+[14] Editorial. AI scientists are changing research — institutions, funders and publishers must respond. Nature,
+651:853–854, 2026.
+[15] P. T. J. Kon, J. Liu, Q. Ding, et al. Curie: Toward rigorous and automated scientific experimentation with AI
+agents. arXiv:2502.16069, 2025.
+[16] S. Schmidgall et al. Agent Laboratory: Using LLM agents as research assistants. arXiv:2501.04227, 2025.
+[17] Edison Scientific. Kosmos: An AI scientist for autonomous discovery. Announcement, November 2025.
+https://edisonscientific.com/news/announcing-kosmos.
+[18] P. Verga, S. Hofst¨atter, S. Althammer, Y. Su, et al. Replacing judges with juries: Evaluating LLM generations
+with a panel of diverse models. arXiv:2404.18796, 2024.
+[19] M. B. Nuijten, C. H. J. Hartgerink, M. A. L. M. van Assen, S. Epskamp, and J. M. Wicherts. The prevalence
+of statistical reporting errors in psychology (1985–2013). Behavior Research Methods, 48:1205–1226, 2016.
+[20] G. Cabanac, C. Labb´e, and A. Magazinov. The ‘Problematic Paper Screener’ automatically selects suspect
+publications for post-publication (re)assessment. arXiv:2210.04895, 2022.
+[21] M. Sharma, M. Tong, T. Korbak, et al.
+Towards understanding sycophancy in language models.
+arXiv:2310.13548, 2023.
+[22] Y. Bai, S. Kadavath, S. Kundu, et al. Constitutional AI: Harmlessness from AI feedback. arXiv:2212.08073,
+2022.
+19

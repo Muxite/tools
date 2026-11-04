@@ -1,0 +1,126 @@
+Capsule broken tools -> verified tools, present more positively.
+Routing tokens is straight forward. 
+
+Make it easier to understand and use better words, more plain.
+
+we gpotta includec
+
+
+First: does RSI work?
+
+Saurav ran it on 2 capsules, and it improved. The test was to produce newer versions of 2 capsules. Calculate and table normalize. Running a lot of tests to see if the RSI version improved over other versions. The first loop, RSI didn't improve it, sometimes it got worse. Same CC new version. On 1st RSI loop, we barely improved. But then it took the measurements, and made a round 2, and then it improved. RSI round 1, RSI round 2, so the first round already happened and thats the baseline. 
+
+Negative here means time is longer. Positive is less time.
+
+What are the tests that you asked the agents to do.
+
+Why is the function of the workload for utility calculate workloads called shape??? should be task?
+
+Role?
+
+Task name and task description. sums, mean, min, max etc.
+
+We used Codex to approximate a completions endpoint by having no tool call and its only able to answer once, so Codex.
+
+Theres a theory in RSI where the last run is not the best and actually it levels off in quality. Last run != the best one.
+
+10 runs is enough. The goal is to show RSI works in AI4Research for the capsules. Did you compare AI4R vs OpenJiuwen.
+
+Did you have the results of the 11 paired runs? Are they stable or is it a noisy thing. For each run do you make a new CC?
+
+Whats the difference between runs and rounds?
+
+No RSI for verifier here. 
+
+
+
+
+Even tho a capsule loads a different tool or a different skill, we still treat them as the same capsule. 
+
+For example, if a bicycle is a capsule, regardless of who is riding it is the same bicycle. Or if someone else buys a different bicycle. So they should have swappable pieces. They are like templates with different fields and can change. A car would be adifference CC.
+
+
+If we have a CC for calculations, we should load a different tool into the CC. We should have overarching CCs that have pieces inside them. 
+
+CC is a schema and template with fields and definition. If every tool is gonna be different capsules then theres too many capsules. A capsule is a category and abstraction of a category of capabilities. Calculation is a capsule, draw is a capsule. draw/triangle is a capsule. robotics sim can be a capsule. workload_profiling/ can be capsule. Theres many capabilities and hundreds of different workloads and different methodologies. But overall the tool and the workload type of the capsule is the same but the category. The name of a capability capsule should be the name of a category. CCs allow packaging cuz we gotta import them and move them together as a grouping. ppaer2agent. It will be a capsule. it will have capabilities. Summary may be a capsule. Intake may be a capsule. We gotta have definitions of capsules. Under this defintions, how amny capsules do we ahve
+
+
+Intent is about who whats this and how ish, wheras requirements makes the contract and ACs and such. and we put the verifiers in between to get the task graph. contract generation should be the capsule, intent compiler should be a capsule because they do different things. the intent compiler is the sales person, and the contract compiler is the project manager. the graph can be formed by the planner, another capability capsule. 
+
+
+
+we can say that a few of our CCs have advantages while some other CCs need work and could be made better. Our RSI is to improve CC and they should be related. OpenJiuwen, CC, RSI
+
+Right now we need to demonstrate our RSI works on the 11 CCs and RSI should make it clear how many that RSI can help right now. Make the big picture clear.
+
+only 2 CCs improved, probably should make it into 1 CC. 
+
+Need to make RSI scope bigger coverage. From the director POV we gotta show that we have made progress since theyve basically invested in this.
+
+Next its about model routing.
+
+
+
+
+ChatGPT vs our model router. We use fewer tokens on the same 24 tasks. 
+
+
+Youve gotta make it clear so that we can show that we ask same question and receive same quality and then we can say we saved this many tokens. 
+
+So what are the questions we asked and what can we say. They answer correctly for all of them, we answer most, but get 87.5%. This looks like a tradeoff situation. It doesn't look that convient. The other way we can do it is make a test case so that we all use AI4R but 1 case is without model routing, the other case is with model routing. 
+
+
+Test case design is important. People will have a lot of questions about this test case design. 
+
+
+We used routing to Qwen to save tokens. But the verifier and the router itself uses tokens so thats a tradeoff for AI4R. 
+
+
+Whats each case and task we did.
+
+Our team will need to merge all our changes and make sure AI4R merged works completely and that all these files are positioned correctly so that other people and view our test report. 
+
+For c01-inference, only if the probability is larger than 0.5 then its correct. Its a numerical problem and its interesting that we could save so many tokens.
+
+
+So why did this thing happen that we should dive into. 
+
+the router switched to local qwen and it saved a lot of tokens. 
+
+
+We used fewer tokens but we were wrong. It was wrong all 3 times.
+
+
+test case desuugn is quite important.
+
+People will ask many questions and criticisms.
+
+Xiaoyang: what if i improve the candidate pool so i can choose better models and the algorithm is valuable.
+1. improve the selection strategy to improve accuracy
+2. add some useful models.
+
+
+Part A was shown. Project Quality was reviewed:
+
+real development: no spec kit
+we discovered we can tell codex to make a luna agent and use luna as a review agent to hold the main team of agents to be accountable and keep focusing on their deliverable. luna doesn't need to be expensive or smart, as it its not needed to reason, its there to make sol reason and not break.
+
+We can also use astra as the top orchestration agent and use gpt6.1sol workers
+
+or we can use claude code as the top worker and use codex agents and give them well bound tight tasks.
+Codex has made very big flaws that have wasted time.
+
+How is the quality of M1 so far?
+
+How many outstanding issues are still there. We just finished benchmarking so we did not have the time to od a general system test report and a list of outstanding issues. 
+
+We should keep shorter and smaller coding sessions instead of huge coding one shots. Frontier labs target certain benchmarks and always try to improve on that.
+
+Saurav will deliver the report by EOD 2026/10/28
+
+
+CC is not only the template of CC but it carries all its verifiers and other pieces along side it. AI4R could have loads of tasks and it will have a lot of capabilities and the labs will be given a lot of capabilities to be able to do its job. 
+
+Xiaoyang will do the CC Factory.
+
+

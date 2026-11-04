@@ -1,0 +1,21 @@
+flowchart TB
+ subgraph CC[Portable containerized capability capsule]
+  M[Declared inputs, outputs, effects and pinned dependencies]
+  A[Capability A: tool or skill]
+  B[Capability B: MCP or bounded subagent]
+  V[Guards, gates and dedicated verifiers]
+  I[Image pinned by digest and dependency lock]
+  M --> A & B
+  V --- A & B
+  I --- M
+ end
+ N[Sandboxed agent: current need and inputs] --> F[Filter compatibility, permissions and scoped trust]
+ F --> R[Rank eligible capabilities by relevance]
+ R --> T[Bind and check invocation]
+ T --> A
+ A --> O[Checked artifacts and attributable receipts]
+ O --> H[Historical performance by release and workload]
+ H --> Q[Independent quality policy and reevaluation]
+ Q --> F
+ X[External tool, skill, MCP or subagent caller] --> T
+ H -. evidence for permitted optimization .-> E[RSI candidate: independent admission required]

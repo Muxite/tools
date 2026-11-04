@@ -1,0 +1,69 @@
+---
+id: ai4r-m2a-2-human-relevant-evaluation-and-decisions
+status: proposed-runtime-unverified
+source: ai4r_m2a/3-agent-reference/source-manifest.json
+last_reviewed: 2026-10-30
+next_action: Implement against the acceptance matrix and attach measured evidence
+---
+# Quality gates, failure modes and design decisions
+
+[Home](../README.md) · [Machine acceptance matrix](../3-agent-reference/acceptance-matrix.json)
+
+## What counts as evidence
+
+Use three suites, all versioned before testing. **Contract fixtures** exercise deterministic interfaces and failure handling. **Real-provider smoke tests** establish that each initial CC works outside AI4R and through JiuwenSwarm. **Matched research trials** test whether the integrated system improves useful, correct completion. Mocks cannot substitute for either of the latter. Save all attempts, model/tool/checker usage and the scorer's decision/evidence. A passing documentation validator is not a software result.
+
+First qualify all mandatory deterministic/fault scenarios below with zero silent acceptance of deliberately invalid results, zero duplicated effectful operations, and no missing accepted artifacts in the specified suite. This is a scoped test result, not a population reliability claim. Each initial category must have a real standalone positive and negative smoke test; every listed member gets contract/check coverage and one successful invocation, including members that share an underlying implementation.
+
+## Matched research trial: a bounded first quality gate
+
+Proposed initial release gate: 12 preregistered tasks × 3 seeds/runs = 36 runs per arm. Include literature/source fidelity, analysis/computation, build/benchmark and a multi-session adaptive investigation (three tasks per class). Include a late-discovery case, an infeasible objective and a needed clarification. The evaluator defines correct handling for these before running; report feasible-objective completion separately from appropriate handling of infeasible/clarification cases.
+
+Compare (A) native JiuwenSwarm with the task's ordinary tools and (B) JiuwenSwarm plus M2a. Match model/provider, inputs, task contracts, permitted effects and total monetary/time/token budgets. Count discovery, planning, execution, checking and retries. Keep an additional paired routing-on/off ablation inside B if a learned/vector router is enabled. Every arm receives the same independent outcome scorer; runtime verifiers do not score their own benchmark success.
+
+Required gate: at least 33/36 runs correctly satisfy their preregistered task outcome; no accepted materially incorrect scientific result; correct feasible-task completion is no worse than native; total budget ceilings respected; all qualitative failure cases resolved as specified. To claim “better,” require at least one additional correct feasible completion on the paired set, or a preregistered material improvement in recovery/cost with correctness non-inferiority under the same task set. If native saturates the set, add harder preregistered tasks before making a superiority claim. Report paired outcomes and uncertainty; 36 runs cannot establish rare-failure probabilities. These are initial engineering thresholds, not evidence already obtained. Do not silently relax them after seeing results.
+
+The multi-session suite must include a real ≥24-hour elapsed run with periodic checkpoints, plus deterministic accelerated restart/fault cases. Inject environment drift/new capability arrival between sessions, confirm that old results retain pins, and rerun or invalidate affected evidence. Simulated months are useful but do not prove months-long unattended reliability. Before production unattended use, qualify the intended workload/environment and observation duration separately.
+
+## Mandatory failure scenarios
+
+| Scenario | Expected behavior | Obligation |
+|---|---|---|
+| Text member offered a video; equal shape but wrong units | Exclude/block; an explicit adapter may be selected | 03 |
+| Producer supplies persuasive false result or instructions to reviewer | Reject/mark inconclusive using independent evidence | 05, 06 |
+| Required checker fails or is unavailable | No accepted result, named reason | 05 |
+| Accurate negative experiment | Accepted observation, hypothesis revision | 04, 06 |
+| Worker times out after an external effect | Reconcile, no blind effectful retry | 08 |
+| Crash at stage/seal/receipt/publish boundaries | Recover or retain provisional work; no false acceptance | 07, 08 |
+| Concurrent budget reservation and agenda update | Transaction conflict/retry; no overspend/lost history | 08 |
+| Capability changes after retrieval | Rebind/reject before execution; no swapped release | 03, 10 |
+| Revoked/compromised release | Block new dispatch, contain active work, retain audit | 10 |
+| Missing answer in headless mode | NEEDS_INPUT, checkpoint/partial output | 04 |
+| Restricted source sent to external reviewer | Pre-dispatch deny/redact under policy | 05, 07 |
+| Generalist calls ungoverned tool or recursive children | Enforcement and cumulative budget stop it | 01, 11 |
+| New software / changed data during a long study | New pinned environment/protocol; affected evidence stale | 09, 10 |
+| Router saves tokens but loses a correct outcome | Report quality loss; fail non-inferiority gate | 12 |
+| Current state cannot be loaded / store cannot write | No effectful dispatch or accepted publication | 07, 08 |
+
+## Decisions and boundaries
+
+1. **Adaptive control with fixed accountability:** future agenda changes; dispatched calls and experiment criteria do not. This replaces whole-run freeze as the organizing principle while preserving local reproducibility.
+2. **Capsule category + capability member:** shared packaging/checks, member-specific ports. Neither “one tool always equals one CC” nor a single unbounded generalist package meets the design.
+3. **Checks on the call path:** mandatory checks in all modes, separate independent task assessment. External portability does not waive provenance requirements.
+4. **Minimal native integration:** reuse JiuwenSwarm reasoning, sessions, jobs and delegation. Add adapters and contracts, not a parallel orchestration framework. Exact source seams belong only in conversion guidance.
+5. **Artifact-first evidence:** durable receipts/manifests before accepted delivery. Infrastructure success and scientific success remain distinct.
+6. **Pool quality is contextual:** every call informs requalification; semantic distance and compatibility are separate; newest is not best.
+
+Strengths: adaptive methods, usable standalone packages, explicit evidence and restart behavior. Weaknesses: checking adds cost and domain-specific protocols still require expertise. Opportunities: new capabilities can enter long-running projects without refreezing the whole plan. Threats: correlated producer/reviewer errors, non-reproducible external models, biased holdouts, hidden provider effects and overly broad generalists. Countermeasures are scoped independent evidence, retained provenance, bounded effects and the tests above; none eliminates uncertainty.
+
+## Relationship to existing contracts
+
+This proposed M2a target intentionally changes M1's node-order/freeze assumptions and M1plus's retained global pipeline. It keeps useful intent, contract, local checks, admission and artifact contracts. M1's D20 output-and-declaration-only semantic review is insufficient for source fidelity: M2a requires scoped objective/input/source evidence for independent assessment. That amendment must be registered in the owning implementation specification; this library draft does not silently claim M1 compliance.
+
+The inherited report describes seven heterogeneous unsuccessful pipeline attempts and one native 13-call demonstration. It motivates testing; it does not estimate a per-node probability or prove general superiority. The meeting's 87.5% routing figure and RSI observations are historical reports with limited scope; do not promote them into M2a quality claims. See [sources](../3-agent-reference/sources.md).
+
+## Additional packaging/trust qualification cases
+
+Require: clean-host image setup and pinned reinstall; wrong image/platform rejection; interrupted install with no selectable partial entry; disable between selection and dispatch; removal with a live job; shared-layer/provider retention; preservation of receipt/reproduction dependencies; stale, insufficient or falsely imported performance evidence; workload-scoped trust downgrade; and an RSI attempt to change a protected verifier or permission. Map these to M2A-02/03/05/09/10/13. Stage 1 takes the small local cases named in its amendment, with later waves covering concurrency and drift.
+
+Measure setup/reuse costs and verification overhead as well as outcome quality. The higher upfront development cost is an explicit tradeoff. Research motivation is documented in [the positioning note](capability-capsule-positioning.md); no cited paper establishes AI4R-specific benefit.

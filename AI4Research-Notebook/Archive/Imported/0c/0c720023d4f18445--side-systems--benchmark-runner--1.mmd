@@ -1,0 +1,17 @@
+flowchart TB
+    Op[Operator, authorized agent or CI] --> L[Host launcher]
+    L -->|before every test and repeat| HC[Host inventory collector]
+    HC --> RS[(Result store)]
+    L -->|start finite job| R[Platform benchmark runner in the sidecar container]
+    subgraph Net[Private Docker network, evaluation profile]
+        R -->|ordinary authenticated client and evaluation-profile entry points| App[App container]
+    end
+    CS[(Case store: visible part)] -->|read only| R
+    R --> RS
+    App -->|exported run bundle through client boundary| R
+    L -->|after runner exits| Ref[Referee scorer]
+    LS[(Label store: referee only)] --> Ref
+    RS --> Ref
+    Ref --> RS
+    RS --> RG[Report generator]
+    RG --> Rep[(benchmark_report files)]

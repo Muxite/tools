@@ -1,0 +1,8 @@
+flowchart LR
+  W[Work CC] --> E[Captured result and observations]
+  E --> T1[Tier 1: admitted checks and host primitives]
+  T1 -->|pass| T2[Tier 2: semantic assessor CC]
+  T1 -->|fail or unavailable| H[Protected gate interprets checks and assessment; commits decision]
+  T2 -->|Assessment verdict| H
+  H -->|advancing| N[Release accepted artifact]
+  H -->|otherwise| S[Stop dispatch]

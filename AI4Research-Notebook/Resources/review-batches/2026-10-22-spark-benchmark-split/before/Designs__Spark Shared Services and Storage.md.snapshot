@@ -1,0 +1,187 @@
+---
+id: m2-spark-shared-services-storage
+status: proposed-m2
+source: Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt; Resources/review-batches/2026-10-21-spark-storage-design/source-receipt.json
+last_reviewed: 2026-10-21
+next_action: Inventory the actual Spark and implement capacity admission before enabling unattended downloads or factory iteration
+---
+# M2 Spark: shared inference and bounded sandbox storage
+
+The development target is the user's **GB10 DGX Spark with 128 GB unified memory and a 2 TB SSD**. Treat 2 TB as the supplied machine constraint, not an inferred vendor SKU. Measure usable filesystem bytes and existing usage on arrival. A nominal 2 TB is about 1.82 TiB before formatting; all policies below use measured bytes rather than mixing GB/GiB.
+
+**Architecture choice:** labs retain independent AI4R, factories, catalogs and local Docker engines. Large common resources belong to host-managed services: one model store, a shared GPU inference gateway, prepared repository/data storage, an OCI registry, and a capacity controller. Independent development does not require duplicate model weights or a model server per VM.
+
+This page owns the resource policy for [[Designs/Lab Capsule and Factory Design Plan]], [[Designs/VM Lab Infrastructure Design]], [[Designs/Container Capability Capsule Design]] and [[Designs/Per Lab Capability Factory Design]]. It refines their earlier generic-host assumptions. Proposed limits are starting controls, not measured capacity or executed cleanup.
+
+## Hardware changes the deployment
+
+Spark is Arm-based with unified CPU/GPU memory. Plan `linux/arm64` host services, guest images and CC images, and qualify repository dependencies accordingly. NVIDIA currently states that GPU passthrough for virtualization environments is unsupported. Put inference on the Spark host instead of assigning its GPU to lab VMs. CPU-guest KVM/provider support still needs an actual host probe; this document does not establish that a particular Spark kernel boots our lab VMs. [Hardware](https://docs.nvidia.com/dgx/dgx-spark/hardware.html), [passthrough support](https://docs.nvidia.com/dgx/dgx-spark/support.html).
+
+Keep vendor GPU drivers/host services intact during initial bring-up. First qualify one ARM64 CPU guest, storage quotas and the guest-to-host inference path. If the supported host configuration cannot run the intended CPU guests, record a provider decision: separate CPU VM host or an explicitly different container-only isolation profile. Do not silently call a container a VM. Central storage/inference and the carrier protocol can be developed independently of this decision.
+
+```mermaid
+flowchart TB
+    subgraph HOST[GB10 Spark - 128 GB unified memory and 2 TB SSD]
+        CAP[Host capacity controller - reservations, quotas and retention]
+        MODELS[One immutable model store]
+        INF[Host inference gateway and GPU workers]
+        SRC[Prepared repo and data store]
+        REG[OCI registry - selected base and candidate images]
+        EVID[Durable evidence and retention index]
+        MODELS -->|read-only weight mounts| INF
+        subgraph A[CPU lab VM A]
+            AI_A[AI4R and factory A]
+            RELAY_A[Scoped model relay]
+            ENG_A[Own broker, Engine and bounded build cache]
+            AI_A --> ENG_A
+            AI_A --> RELAY_A
+        end
+        subgraph B[CPU lab VM B]
+            AI_B[AI4R and factory B]
+            RELAY_B[Scoped model relay]
+            ENG_B[Own broker, Engine and bounded build cache]
+            AI_B --> ENG_B
+            AI_B --> RELAY_B
+        end
+        RELAY_A -->|authenticated requests| INF
+        RELAY_B -->|authenticated requests| INF
+        SRC -->|pinned resources on demand| AI_A
+        SRC -->|pinned resources on demand| AI_B
+        REG -->|pull only needed images| ENG_A
+        REG -->|pull only needed images| ENG_B
+        AI_A -.->|sealed export| EVID
+        AI_B -.->|sealed export| EVID
+        CAP -.-> INF
+        CAP -.-> ENG_A
+        CAP -.-> ENG_B
+        CAP -.-> SRC
+        CAP -.-> REG
+    end
+```
+
+Host services are outside evolving lab code. The capacity controller may initially be an operator service and transactional ledger; it does not need a distributed scheduler. Labs ask for capacity and resource handles, not raw host filesystem or Docker access.
+
+## What is shared and what is duplicated
+
+| Asset | Placement | Duplication rule |
+|---|---|---|
+| Model weights/tokenizers/configs | Canonical host store, immutable revision/format/quantization identities | Download once per actual artifact; VMs normally receive no weights |
+| Loaded model state and KV caches | Host inference worker | One worker per needed model/runtime profile initially; KV/session state remains per request, not shared between labs |
+| Prepared repo/data versions | Host immutable source store | One retained upstream version; bounded writable checkouts or slices per lab |
+| OCI blobs | Host registry | Content-addressed distribution; useful layer sharing within the registry |
+| Runnable images and BuildKit caches | Each VM's own engine/builder | Real local copies exist and count against that VM; registry is not cross-daemon deduplication |
+| Mutable AI4R/catalog/project state | Each VM | Independent and quota-bound |
+| Accepted results and lineage | Host evidence store with per-lab access | Verified export plus short local grace; avoid permanent local/export/archive triplicates |
+
+Never share `/var/lib/docker` or containerd metadata between daemons. A common registry does not make unpacked VM layers disappear. Image-store backend also matters: modern containerd stores can retain compressed and unpacked forms. Measure the chosen backend rather than adding displayed image sizes as physical usage. [Image storage](https://docs.docker.com/engine/storage/containerd/), [layer sharing](https://docs.docker.com/engine/storage/drivers/).
+
+## Starting disk budget
+
+Let **U** be measured allocatable filesystem capacity for this machine after excluded boot/recovery partitions. Count current OS/vendor files in the OS row. The percentages below partition U; approximate GB assume U were a full 2,000 GB, so actual byte ceilings scale down. These are policy ceilings, not claims that all are currently free.
+
+| Pool | Share of U | Approximate GB at 2 TB | Included |
+|---|---:|---:|---|
+| Host OS and stable infrastructure | 5% | 100 | Vendor OS, host service images, logs and tooling; if this is insufficient, rebalance other pools explicitly |
+| Canonical models and conversion staging | 25% | 500 | Weights, tokenizer, quantized variants, download/conversion intermediates and runtime caches |
+| Prepared repositories and datasets | 12.5% | 250 | Git/LFS data, immutable snapshots, dataset archives/extraction and package source cache |
+| Central OCI registry | 5% | 100 | Compressed base/CC blobs, manifests and retained candidate exports |
+| VM disks and all lab-local state | 25% | 500 | Guest OS, local images/containerd, BuildKit, checkouts, workspaces, logs and VM snapshots |
+| Durable results/evidence | 7.5% | 150 | Accepted outputs, raw measurements, selected failures and compact manifests |
+| Unallocated physical safety headroom | 20% | 400 | Reserved for controlled completion/recovery, not routine downloads or a new lab |
+| **Total** | **100%** | **2,000** | No dataset/image category is counted twice |
+
+Start with two active CPU labs, each with a maximum 200 GB virtual disk in this illustrative budget. The remaining 100 GB in the VM pool covers the shared guest base, permitted snapshots and staging; it is not a third lab allocation. Per-lab starting sub-budgets: 25 GB OS/source/config, 75 GB engine images/container layers, 30 GB BuildKit cache, 50 GB working data/output, 20 GB local headroom. Sub-budgets are ledger targets unless backed by actual separate filesystems/quotas; total virtual-disk size is not a per-directory quota.
+
+Stopped labs still consume their allocated bytes and retained reservations. Many projects can have archived source/catalog/evidence manifests without retaining a full VM disk for each. Verify restore and external/local artifact availability before disposing of an old VM; starting a new lab is not a reason to erase an unexported project. The 2 TB SSD is a bounded working set, not an unlimited model/repository/VM archive. Sustained growth requires selection/eviction or verified external SSD/NAS/object storage.
+
+Use a shared read-only guest base plus independent copy-on-write disks only if the chosen backend is qualified for it. All overlays/snapshots are in the VM pool; backing bases cannot be replaced or deleted while dependent disks exist. Sparse disks are not reservations. Guest deletion does not prove host-space reclamation: qualify discard/TRIM through the filesystem, virtual device and image backend, or require an offline compact/recreate procedure. [QEMU disk formats](https://www.qemu.org/docs/master/system/qemu-block-drivers.html).
+
+## Capacity admission comes before downloads and builds
+
+The host controller atomically records reservations before provisioning a VM, acquiring a repository/model, extracting data, converting weights, building/pulling/exporting an image, or dispatching an output-heavy run. A broker grants an operation only when both its pool and the physical host can cover **peak additional** disk/memory needs.
+
+For disk: `physical_used + outstanding_unconsumed_reservations + new_peak <= 0.80 * U`. Existing written bytes are not reserved a second time. Count download staging, expanded/quantized artifacts, build intermediates, loaded/unpacked layers and export overlap; registry size alone is insufficient. Unknown-size acquisition gets a bounded streaming limit or remains blocked, rather than an unbounded allocation. The guest broker tracks guest free bytes too; a globally spacious host cannot rescue a full guest filesystem.
+
+Reservations are hierarchical: a job inside an already reserved VM disk spends that VM's remaining envelope rather than reserving the same bytes again globally. Host model downloads, registry publications and external exports have their own physical allocations. Guest snapshots/backing-file overhead require additional allowance. Reconcile actual allocation and remaining commitments after completion/cancellation before releasing capacity.
+
+The controller needs telemetry plus enforceable guest disk/host filesystem limits and broker cancellation. A reservation ledger alone cannot stop an arbitrary process filling the disk. Initial operation concurrency is one heavyweight build/download/conversion at a time machine-wide; change it only after measuring peak usage. Unconsumed reservations have leases; reclaim only after reconciling the actual operation, not merely a missed heartbeat.
+
+Pressure states use actual underlying filesystem free space, separately for each filesystem:
+
+- At **70% used**, warn and reclaim eligible caches/stale candidates; preserve referenced artifacts.
+- At **80% used**, reject new storage-growth operations and new VM creation. Already reserved work may complete within its enforced allowance; do not consume the safety reserve to make a new experiment fit.
+- At **90% used**, refuse new ordinary job dispatch, prioritize evidence/database completion and recovery, and stop nonessential growth safely. Never erase unique results or kill an active experiment solely to make the dashboard green.
+
+Pool pressure can block a request even below global thresholds. A full protected pool requires explicit rebudgeting or verified external archival; cleanup cannot assume there is always something safe to delete. Persistent background model downloads and factory repair loops use this same admission path during development.
+
+## Central model acquisition and inference
+
+Only the model acquisition service downloads models. A lab requests `{model, immutable_revision, format, quantization, tokenizer, runtime_profile}`. If present and compatible, return a handle. Otherwise validate access/licensing, estimate peak space, reserve, download once into staging, verify files and publish atomically. Concurrent identical requests join one download. Unverified partials are not selectable and have bounded resume retention.
+
+Use one controlled Hugging Face cache root when that client is used; model workers mount its complete immutable snapshot/blob layout read-only. Do not dereference symlinks into a second full export or let every runtime choose a fresh default cache. Pin the cache client and use its compatible cache-management APIs; sharing capabilities vary with version/backend. Other formats such as GGUF or TensorRT artifacts are separately identified, budgeted outputs, not magically deduplicated alternatives. [Hub caching](https://huggingface.co/docs/huggingface_hub/guides/manage-cache).
+
+Do not download full-precision weights merely to quantize them locally if an authorized, validated compatible quantized artifact suffices. A conversion may temporarily need source plus output plus scratch; reserve that peak first. Do not hide weights, repositories or datasets in CC or AI4R image layers.
+
+Each VM's local model relay keeps the capsule-facing invocation-scoped IPC contract. It forwards authenticated requests to a host gateway on a VM-reachable private management interface, not host loopback and not an exposed public endpoint. Per-lab credentials, model allowlists, token/context/concurrency limits and cancellation prevent one lab from consuming the entire shared service. Requests never grant raw model-store or GPU/device access to guests.
+
+Record exact model revision/quantization/tokenizer/runtime, generation settings, route and concurrency/measurement mode in invocation evidence. Pin a model lease while a run/evaluation needs it; admission must not evict its only artifact mid-run. Conversations and KV state stay request-scoped. Multiple roles may share a loaded model without sharing conversation history; role-specific model requirements may still require separate workers.
+
+Store many models on disk if useful, but initially allow one large loaded model profile and queue/swap others at explicit boundaries. Start unified-memory planning at 12.5% host services, 25% total VM allocation, 50% active inference including weights/KV/runtime workspace, and 12.5% safety headroom. Approximate 16/32/64/16 GB are planning envelopes, not independent VRAM/RAM pools or proof of model fit. GPU/runtime allocation and prefill/context peaks require actual measurements and controller admission; do not assume a container memory limit perfectly accounts for every GPU/unified-memory allocation.
+
+For scientific timing, request an exclusive inference/accelerator measurement window and record competing activity. Ordinary research can use fair shared inference. GPU-dependent generated benchmark code is a separate host accelerator-job profile with broker-controlled image/input/device grants and capacity reservation; it is not GPU passthrough. Its weaker shared-host isolation and runtime evidence need explicit qualification before enabling arbitrary generated GPU workloads. Initial implementation exposes approved inference only.
+
+## Images and developer iteration without accumulation
+
+Keep stable ARM64 runtime/dependency base images, then small CC implementation layers. Put lockfiles/dependency steps before frequently edited code; use narrow contexts and multi-stage builds. A change to one CC should not rebuild the entire app plus every capsule. Live source mounts are useful in a marked developer profile; build immutable candidates for checkpoints/qualification, not every text edit. [Build cache optimization](https://docs.docker.com/build/cache/optimize/).
+
+CPU lab images should not inherit a large GPU inference stack merely because the host uses one. Hypothetically, an unchanged 8 GB base plus thirty 80 MB code layers is about 10.4 GB in one engine before cache/metadata, rather than thirty separate 8.08 GB copies. If each build changes a large dependency layer, that saving disappears; another VM also has its own physical image allocation. Measure actual shared/unique bytes on the chosen backend.
+
+Set BuildKit GC on **each actual builder**, not only the host/default daemon. Starting target: 30 GB maximum cache per lab, small reserved hot cache and guest free-space target. GC settings depend on pinned BuildKit/driver version and are soft collection behavior, not hard storage quotas. Enforce the guest/host envelope independently and pause builds before overshoot. [Build GC](https://docs.docker.com/build/cache/garbage-collection/).
+
+Do not retain a local archive, loaded image, registry export and complete build cache forever for every iteration. Keep one canonical retained image location plus qualified replicas needed by active work. A factory candidate may be local-only until it merits exchange; publish one selected candidate rather than every failed attempt. Images only appear immutable at the logical level: actual disk includes layers, cache and writable containers, so measure unique/reclaimable usage rather than summing `docker images` sizes.
+
+Initial retention targets, always subordinate to references and byte ceilings:
+
+| Object | Retain / reclaim policy |
+|---|---|
+| AI4R and factory app releases | Current lab release and one rollback image; any additional version leased by active/retained runs |
+| CC candidates | At most three unleased recent candidates per CC and 48-hour failure-image grace; active/accepted versions follow explicit retained-run policy |
+| Failed build context/image | Keep compact source delta, recipe, logs and failure evidence; heavy layers expire after diagnosis unless pinned |
+| Containers | Collect/seal logs and exit evidence, then remove owned stopped containers; bound writable workspace/log bytes |
+| Build caches | Reclaimable first, within builder budget; no correctness dependency on cache persistence |
+| Models and source snapshots | Evict only unleased reconstructible artifacts under pool policy; keep used revisions locally or in a verified retained external location |
+| VM checkpoints | At most one temporary rollback checkpoint per lab, with an expiry and byte budget; not a history of every iteration |
+| Raw results | Preserve essential measurement/correctness evidence; oversized intermediate data needs a declared retention/archive decision |
+
+Counts/ages alone never authorize deletion of an active/required object. If leased artifacts exceed a cap, stop admitting more work rather than silently evicting evidence.
+
+## Reference-aware reclamation, not blind prune
+
+Maintain a host retention index linking runs, releases, models, repo snapshots, datasets, image identities, archive locations and VM backing disks. Take a lease before dispatch/load/export; publish new references before dropping old ones. GC marks reachable objects, proposes eligible removals, rechecks under the publication/dispatch lock, removes only those objects through their owning store APIs and records observed bytes freed. A lost VM heartbeat is not enough to drop its references.
+
+Docker cannot see a reference held only in an AI4R catalog: an image unused by a current container may still be required for replay. Do not schedule broad `docker system prune -a --volumes`. Prune controlled build caches, delete specific unleased images/containers, and never delete lab data volumes as generic garbage. [Docker pruning semantics](https://docs.docker.com/engine/manage-resources/pruning/).
+
+Registry manifest deletion and blob reclamation are separate. Use the selected registry's supported GC process and exclude/quiesce writers as required; do not remove blobs while candidates/releases are being published. [Registry GC](https://distribution.github.io/distribution/about/garbage-collection/).
+
+Hashes/recipes alone do not promise future replay if upstream weights, packages or repos disappear. Classify each retained run as locally replayable, externally archived with verified artifact availability, or provenance-only. Releasing its last image/model bytes changes that classification explicitly. Same-SSD registry/evidence copies improve organization, not disaster recovery; durable backups require a different device or storage service.
+
+## Repositories, generalist gaps and iteration
+
+One acquisition service fetches authorized repository revisions/LFS resources and exposes immutable prepared snapshots. Labs receive only the revisions/files needed for a task. Use partial/shallow/sparse acquisition where compatible with required history, submodules, LFS and licenses; record omissions. A Git mirror alone does not include every LFS object or submodule. Avoid writable cross-VM shared Git object databases/alternates without a retention protocol; a removed source object must not break a lab. [Git clone options](https://git-scm.com/docs/git-clone).
+
+Generalist gap detection submits a separate factory attempt with a shared resource handle and a bounded build/test budget. Each repair preserves its source delta, failed evidence and lineage but does not keep an entire repo/VM/image archive for every attempt. Limit attempt count, elapsed time, new bytes, downloads and concurrent jobs at the parent journey as well as individual jobs. A good candidate enters normal independent qualification/admission; it does not make an already-frozen research plan mutate itself.
+
+Observe host filesystem used/free/inodes, allocated VM backing-file bytes and snapshot chains, every engine's image/container/volume usage, every builder's cache, registry blobs, model/cache/staging bytes and evidence growth. Guest and host measurements are two views of the same physical bytes; never add guest Docker totals to host VM-file allocation as if they were separate storage. Engine and Buildx reporting help attribution; host allocated filesystem usage is the capacity authority. [Engine usage](https://docs.docker.com/reference/cli/docker/system/df/), [builder usage](https://docs.docker.com/reference/cli/docker/buildx/du/).
+
+Use rotated Docker logs plus capped application/build logs from day one. Critical gate/evidence records must be persisted separately from disposable log rotation; if those cannot be written, the job cannot be accepted. [Docker logging](https://docs.docker.com/engine/logging/configure/).
+
+## Development and acceptance order
+
+1. Read-only inventory on the real Spark: capacity/usage, filesystem, architecture, host versions, KVM/provider capability and actual model memory peaks. Preserve the existing working installation; no host changes are implied by this design.
+2. Implement the host resource inventory, transactional reservations, per-pool enforcement and model downloader before unattended multi-lab builds/downloads.
+3. Run one approved host model worker with one canonical model copy; connect two CPU lab relays and verify isolation, accounting and pinned responses.
+4. Bound one factory/builder; execute repeated small CC edits and failed repairs. Track unique bytes, peak reservations and reclaimed bytes until steady state is demonstrated.
+5. Add the second active lab, shared sources/registry and reference-aware GC; test pressure, concurrency, failed transfers and snapshot reclamation without sacrificing protected objects.
+6. Only then widen model inventory, lab count, factory automation or host GPU benchmark execution.
+
+Required scenarios: two labs request one missing model concurrently; conversion cannot fit; model lease blocks eviction; cache cleanup cannot delete an admitted replay image; old guest files are deleted but host sparse disk does not shrink; disk pressure blocks a new generalist repair; protected artifacts alone exceed budget; controller crashes between reservation and publish; a failed export leaves source/evidence intact. Record BLOCKED/FAIL honestly. No Spark, GPU, VM or storage soak result is claimed here.

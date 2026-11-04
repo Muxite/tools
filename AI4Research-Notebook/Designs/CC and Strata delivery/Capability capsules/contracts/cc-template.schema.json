@@ -1,0 +1,502 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai4r:cc-template:0.1",
+  "title": "Proposed CC template profile over M2a release and capability declarations",
+  "description": "Design profile. Run authorization, resolved products, lease epochs, snapshots, measurements and attestations have separate identities. Fixture refs must never be admitted to a real lab.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "purpose",
+    "discovery_tags",
+    "package",
+    "capabilities",
+    "images",
+    "bindings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0-proposal"
+    },
+    "kind": {
+      "enum": [
+        "capability-bundle",
+        "moe-experiment"
+      ]
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "discovery_tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9.-]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "package": {
+      "$ref": "https://ai4r.local/schemas/m2a/package"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "$ref": "https://ai4r.local/schemas/m2a/capability"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/image"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/op"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "experiment": {
+      "$ref": "#/$defs/experiment"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "moe-experiment"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "experiment"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "experiment"
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "blob": {
+      "type": "object",
+      "required": [
+        "uri",
+        "sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "required": [
+        "role",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        },
+        "image": {
+          "type": "string",
+          "pattern": "^[^\\s@]+@sha256:[a-f0-9]{64}$"
+        },
+        "platform": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+/[a-z0-9_]+(?:/[a-z0-9_]+)?$"
+        },
+        "factory_output": {
+          "description": "Resolve to an OCI digest in the independently qualified Software Factory release lock before requesting a lab lease.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "capability": {
+              "type": "string",
+              "minLength": 1
+            },
+            "port": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_role": {
+              "const": "engine-image"
+            }
+          },
+          "required": [
+            "capability",
+            "port",
+            "artifact_role"
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "image"
+          ]
+        },
+        {
+          "required": [
+            "factory_output"
+          ]
+        }
+      ]
+    },
+    "op": {
+      "type": "object",
+      "required": [
+        "capability",
+        "image_role"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        },
+        "image_role": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "required": [
+        "repository",
+        "revision",
+        "pack",
+        "shards",
+        "native_index"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "pack": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "file",
+              "bytes",
+              "sha256"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "native_index": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "producer",
+            "digest_stage"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "producer": {
+              "$ref": "#/$defs/blob"
+            },
+            "digest_stage": {
+              "const": "bind-from-generated-output-in-release-lock"
+            }
+          }
+        }
+      }
+    },
+    "change": {
+      "type": "object",
+      "required": [
+        "transform_capability",
+        "contract",
+        "input_pack",
+        "target",
+        "parameters",
+        "preserve",
+        "output_artifact",
+        "reader_abi"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "transform_capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        },
+        "contract": {
+          "$ref": "#/$defs/blob"
+        },
+        "input_pack": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "object",
+          "required": [
+            "layers",
+            "experts",
+            "projections"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "layers": {
+              "enum": [
+                "all-routed"
+              ]
+            },
+            "experts": {
+              "enum": [
+                "all-routed"
+              ]
+            },
+            "projections": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "gate",
+                  "up",
+                  "down"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Checked against the transform capability's pinned input contract before acceptance."
+        },
+        "preserve": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "output_artifact": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        },
+        "reader_abi": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "required": [
+        "metric",
+        "unit",
+        "aggregation",
+        "comparison",
+        "threshold"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aggregation": {
+          "enum": [
+            "sum",
+            "median",
+            "max",
+            "score"
+          ]
+        },
+        "comparison": {
+          "enum": [
+            "ratio-at-most",
+            "ratio-at-least",
+            "difference-at-least"
+          ]
+        },
+        "threshold": {
+          "type": "number"
+        }
+      }
+    },
+    "experiment": {
+      "type": "object",
+      "required": [
+        "model",
+        "source",
+        "changes",
+        "baseline_image_role",
+        "candidate_image_role",
+        "benchmark_capability",
+        "benchmark_profile",
+        "quality_suite",
+        "hardware_profile",
+        "limits",
+        "gates",
+        "on_missing_evidence"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "$ref": "#/$defs/model"
+        },
+        "source": {
+          "type": "object",
+          "required": [
+            "git",
+            "commit"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "git": {
+              "type": "string",
+              "minLength": 1
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            }
+          }
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/change"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "baseline_image_role": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        },
+        "candidate_image_role": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        },
+        "benchmark_capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        },
+        "benchmark_profile": {
+          "$ref": "#/$defs/blob"
+        },
+        "quality_suite": {
+          "$ref": "#/$defs/blob"
+        },
+        "hardware_profile": {
+          "$ref": "#/$defs/blob"
+        },
+        "limits": {
+          "type": "object",
+          "required": [
+            "cpu_cores",
+            "memory_mib",
+            "scratch_gib",
+            "gpus",
+            "exclusive_host",
+            "wall_seconds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "cpu_cores": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "memory_mib": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "scratch_gib": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "gpus": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "exclusive_host": {
+              "type": "boolean"
+            },
+            "wall_seconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "gates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/measurement"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "on_missing_evidence": {
+          "const": "inconclusive"
+        }
+      }
+    }
+  }
+}

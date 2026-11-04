@@ -1,0 +1,892 @@
+---
+id: cc-protocol-05-examples-and-conformance
+status: proposed-runtime-unverified
+source: November 3 single-CC workshop, M2a contracts and reviewed Muse addendum
+last_reviewed: 2026-11-04
+next_action: Replay against a qualified carrier before deployment
+---
+# Worked examples and conformance
+
+- Each independent exchange starts with a fresh fixture namespace.
+- The first two profiler exchanges are one job observed at two times.
+- The remaining profiler exchanges are separate attempts.
+- Repeated digits denote synthetic subjects, including illustrative release digests.
+- The JSON block is an ordered list of exchanges; each has a caller request and the expected receipt.
+- A published agent view consists of the operation description, expanded port types, rule meanings and the common status meanings from the [wire protocol](03-calls-and-receipts.md).
+- A production catalog must resolve pinned types and show their constraints before selection.
+
+## CPU · trimming
+
+Choose run for ASCII space trimming. Supply text. The returned trimmed string may be empty. Wrong type rejects before executing; a crash rejects without a string.
+
+```yaml
+cc: '1'
+id: text.trim
+version: 1.0.0
+carrier: fixture.invalid/text@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+does: Remove leading and trailing ASCII spaces. An all-space input returns an empty string.
+run: /tools/trim
+takes:
+  text: string
+gives:
+  trimmed: string
+```
+
+```json
+[
+  {
+    "request": {
+      "key": "test-run",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "run",
+      "inputs": {
+        "text": {
+          "value": "  "
+        }
+      }
+    },
+    "receipt": {
+      "call": "call.1",
+      "attempt": 1,
+      "reason": "COMPLETED",
+      "outputs": {
+        "trimmed": {
+          "value": ""
+        }
+      },
+      "state": "succeeded",
+      "completeness": "complete",
+      "assessment": {
+        "verdict": "not_requested",
+        "checks": []
+      }
+    }
+  },
+  {
+    "request": {
+      "key": "test-run",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "run",
+      "inputs": {
+        "text": {
+          "value": 3
+        }
+      }
+    },
+    "receipt": {
+      "call": "call.1",
+      "attempt": 1,
+      "reason": "INVALID_INPUT",
+      "outputs": {},
+      "state": "blocked",
+      "completeness": "none",
+      "assessment": {
+        "verdict": "not_requested",
+        "checks": []
+      }
+    }
+  }
+]
+```
+
+## Lab profiler · bounded attachment
+
+Choose run for CPU stack samples, on a host-issued process handle resolved to a lease, PID and start identity. Set seconds within 1–10. Reserve the target and authorize attachment before launch. A complete trace covers the window. A shortened trace is partial evidence usable only within its observed coverage. A missing sensor blocks admission and produces no trace. A lost detach acknowledgment yields unknown effects.
+
+```yaml
+cc: '1'
+id: lab.sampler
+version: 1.0.0
+carrier: fixture.invalid/instrument@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+does: "Sample CPU stacks of one leased Linux process for 1\xE2\u20AC\u201C10 seconds. Attaching can perturb\
+  \ its timing. A short or interrupted capture is partial evidence."
+run: /tools/sample
+takes:
+  target: string
+  seconds:
+    type: integer
+    minimum: 1
+    maximum: 10
+gives:
+  trace:
+    artifact: application/x-ndjson
+rules:
+  inspect:
+    kind: need
+    meaning: Resolve a process handle to the leased Linux PID and start identity and grant scoped inspection.
+    definition:
+      uri: fixture:process.inspect
+      sha256: f59fc7fe46cbaee500b2f9e1d43b46457a3fe780ca451e70bd5b183ffc718805
+  attach:
+    kind: effect
+    meaning: Attach sampler to the bound process and detach on stop. May perturb timing.
+    definition:
+      uri: fixture:process.attach
+      sha256: 099d93ef02be9915f099a1e1cbdbb1253308ed564af6f0171d91ec7379441099
+  coverage:
+    kind: check
+    meaning: Trace covers the requested duration and records sampling gaps.
+    definition:
+      uri: fixture:sample.coverage
+      sha256: 02c3ffd8d2f56e188b733d820c1d3aba11184302c2cc04d354a1c79a022b56f6
+needs:
+- inspect
+changes:
+- attach
+guarantees:
+- coverage
+```
+
+```json
+[
+  {
+    "request": {
+      "key": "test-run",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "run",
+      "inputs": {
+        "target": {
+          "value": "engine-session-42"
+        },
+        "seconds": {
+          "value": 5
+        }
+      }
+    },
+    "receipt": {
+      "call": "call.1",
+      "attempt": 1,
+      "reason": "STARTED",
+      "outputs": {},
+      "job": "job.1",
+      "state": "running",
+      "completeness": "none",
+      "assessment": {
+        "verdict": "pending",
+        "checks": []
+      }
+    }
+  },
+  {
+    "request": {
+      "key": "test-run",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "run",
+      "inputs": {
+        "target": {
+          "value": "engine-session-42"
+        },
+        "seconds": {
+          "value": 5
+        }
+      }
+    },
+    "receipt": {
+      "call": "call.1",
+      "attempt": 1,
+      "reason": "PARTIAL_OUTPUT",
+      "outputs": {
+        "trace": {
+          "ref": {
+            "uri": "fixture:three-seconds",
+            "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          }
+        }
+      },
+      "job": "job.1",
+      "state": "succeeded",
+      "completeness": "partial",
+      "assessment": {
+        "verdict": "failed",
+        "checks": [
+          {
+            "id": "coverage",
+            "verdict": "FAIL",
+            "evidence": [
+              {
+                "uri": "fixture:check-coverage",
+                "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "key": "sampler-checked",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "run",
+      "inputs": {
+        "target": {
+          "value": "engine-session-42"
+        },
+        "seconds": {
+          "value": 5
+        }
+      }
+    },
+    "receipt": {
+      "call": "call.1",
+      "attempt": 1,
+      "reason": "COMPLETED",
+      "outputs": {
+        "trace": {
+          "ref": {
+            "uri": "fixture:full-trace",
+            "sha256": "0472f66e04930e7e0ffc7e9deab8b25d8fb4311e48df1a3897142ed324399015"
+          }
+        }
+      },
+      "job": "job.1",
+      "state": "succeeded",
+      "completeness": "complete",
+      "assessment": {
+        "verdict": "passed",
+        "checks": [
+          {
+            "id": "coverage",
+            "verdict": "PASS",
+            "evidence": [
+              {
+                "uri": "fixture:check-coverage",
+                "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "key": "sampler-missing_provider",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "run",
+      "inputs": {
+        "target": {
+          "value": "engine-session-42"
+        },
+        "seconds": {
+          "value": 5
+        }
+      }
+    },
+    "receipt": {
+      "call": "call.1",
+      "attempt": 1,
+      "reason": "MISSING_PROVIDER",
+      "outputs": {},
+      "state": "blocked",
+      "completeness": "none",
+      "assessment": {
+        "verdict": "inconclusive",
+        "checks": [
+          {
+            "id": "coverage",
+            "verdict": "UNAVAILABLE",
+            "evidence": []
+          }
+        ]
+      }
+    }
+  }
+]
+```
+
+## Legacy bundle · inspect or measure
+
+- Inspect a native v3 pack with the read-only index provider and receive inventory after shard-bound checks.
+- Measure instead sends the workload to the reserved loopback Strata endpoint and writes per-request observations to attempt storage.
+- The source validators for these ports are only fixture locators.
+- Native payload equivalence is unproven; publication is blocked until their pinned bytes and provider/effect definitions are supplied.
+- The JSON below illustrates this bound failure, not a successful translation.
+
+```yaml
+cc: '1'
+id: strata.lab-tools
+version: 1.0.1
+carrier: fixture.invalid/benchmark@sha256:9b083a97196866f7233e6e2948a46f4dc7fecb102dff2170d4e55a6ea8e8e30e
+defs:
+  workload:
+    schema_ref:
+      uri: fixture:workload-schema
+      sha256: fe89e8f2a9770f7663c47b44b6ac32249804222ed45249b0fc1a4e2bdc5748e1
+  pack:
+    schema_ref:
+      uri: fixture:pack-input
+      sha256: 20df460932e0c4175e1d93bb043878fcdbed1618f05ea10277337806dc60a585
+  observations:
+    schema_ref:
+      uri: fixture:observations-schema
+      sha256: 710f025cbad41787fee9889cef2392b492cc282bbd99f10a8501de9face2c53d
+  inventory:
+    schema_ref:
+      uri: fixture:inventory-output
+      sha256: 659b0510e05be111c60ebb2eb494c6ef8e818aee1c303d70b379a1aad302f0b8
+rules:
+  strata-api:
+    kind: need
+    meaning: Loopback endpoint with agreed inference/status API on a reserved GB10 host. gb10. at least
+      1024 MiB
+    definition:
+      uri: fixture:strata-api
+      sha256: 9e72726d0aa51888a6b0ecb0b294f15d52ae1c951b78473a8197652bfd52abad
+  native-index:
+    kind: need
+    meaning: Read-only pinned Strata native pack and its declared shard layout. strata-native-index-v3.
+      at least 128 MiB
+    definition:
+      uri: fixture:native-index
+      sha256: b65dbf9aa5431ed454864d3ed42c4dd8dc8f95496e71e3efa83eeaa4fa562e93
+  attempt.artifacts:
+    kind: effect
+    meaning: write raw per-request measurements
+    definition:
+      uri: fixture:attempt.artifacts
+      sha256: 9f418b2b74543166ac4811bb868c3714e2c9108a49b77f6547ac100e201187f5
+  output-schema:
+    kind: check
+    meaning: Check the raw per-request measurement schema.
+    definition:
+      uri: fixture:check-output-schema
+      sha256: 1aa37b007787b293e80dfd79e6397a33dc2611ed8dc6e733d0c8065e6f94ef8a
+  index-bounds:
+    kind: check
+    meaning: Check offsets and byte ranges against declared pack shards.
+    definition:
+      uri: fixture:native-index-bounds
+      sha256: a58930157cfb8d6ded0b0061a07b163ce3851466264f63b7640c6925797da4bb
+operations:
+  measure:
+    does: Collect per-request data with the pinned tools/dgx_bench.py wrapper
+    run: /opt/cc/measure
+    takes:
+      workload: $workload
+    gives:
+      observations: $observations
+    needs:
+    - strata-api
+    changes:
+    - attempt.artifacts
+    guarantees:
+    - output-schema
+  inspect:
+    does: Inspect v3 native_experts.txt offsets and shard bounds for an upstream pack
+    run: /opt/cc/inspect
+    takes:
+      pack: $pack
+    gives:
+      inventory: $inventory
+    needs:
+    - native-index
+    changes: []
+    guarantees:
+    - index-bounds
+```
+
+```json
+[
+  {
+    "request": {
+      "key": "test-inspect",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "inspect",
+      "inputs": {
+        "pack": {
+          "value": {
+            "pack_id": "tiny"
+          }
+        }
+      }
+    },
+    "receipt": {
+      "call": "call.1",
+      "attempt": 1,
+      "reason": "MISSING_PROVIDER",
+      "outputs": {},
+      "state": "blocked",
+      "completeness": "none",
+      "assessment": {
+        "verdict": "inconclusive",
+        "checks": [
+          {
+            "id": "index-bounds",
+            "verdict": "UNAVAILABLE",
+            "evidence": []
+          }
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "key": "test-measure",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "measure",
+      "inputs": {
+        "workload": {
+          "value": {
+            "requests": 1
+          }
+        }
+      }
+    },
+    "receipt": {
+      "call": "call.1",
+      "attempt": 1,
+      "reason": "MISSING_PROVIDER",
+      "outputs": {},
+      "state": "blocked",
+      "completeness": "none",
+      "assessment": {
+        "verdict": "inconclusive",
+        "checks": [
+          {
+            "id": "output-schema",
+            "verdict": "UNAVAILABLE",
+            "evidence": []
+          }
+        ]
+      }
+    }
+  }
+]
+```
+
+## Factory build · Strata header reader
+
+The Factory builds the recipe once for the specified ABI. The caller supplies pack bytes to run and receives a format string. A damaged header yields TOOL_ERROR. A mutable base image or missing executable prevents release, before any caller can run it.
+
+```yaml
+cc: '1'
+id: strata.header
+version: 1.0.0
+carrier:
+  format: build-recipe
+  source:
+    repository: fixture:strata
+    commit: '1111111111111111111111111111111111111111'
+    tree: '2222222222222222222222222222222222222222'
+  recipe:
+    uri: fixture:reader-recipe
+    sha256: a890b675cbe4ec768b37d50c36ff9eba9ee589b4b0d00dbfcc77d99c28abc6d8
+  environment_lock:
+    uri: fixture:arm64-lock
+    sha256: 37d4b3f98b2da977b9d9c8f980a5d817f7f82404c57f46d177340838a1ff6f68
+  target: linux/arm64
+  build_context:
+    uri: fixture:source-archive
+    sha256: fe0b8b9a3222f27b20efc8b42971b00a3d55e224c3a64a2da2cef113299a418d
+  base_image:
+    format: oci-image
+    image: fixture.invalid/instrument@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    platform: linux/arm64
+does: Read the pack header and return the declared format; malformed headers fail.
+run: /tools/header
+takes:
+  pack:
+    artifact: application/octet-stream
+gives:
+  format: string
+```
+
+```json
+[
+  {
+    "request": {
+      "key": "test-run",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "run",
+      "inputs": {
+        "pack": {
+          "ref": {
+            "uri": "fixture:pack",
+            "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          }
+        }
+      }
+    },
+    "receipt": {
+      "call": "call.1",
+      "attempt": 1,
+      "reason": "COMPLETED",
+      "outputs": {
+        "format": {
+          "value": "v3"
+        }
+      },
+      "state": "succeeded",
+      "completeness": "complete",
+      "assessment": {
+        "verdict": "not_requested",
+        "checks": []
+      }
+    }
+  }
+]
+```
+
+## Strata/Muse · frozen measured subject
+
+- Bind the frozen subject manifest described in [Provenance](04-provenance.md).
+- The GB10 and endpoint checks precede traffic.
+- Read samples only after joining host and engine observations to the attempt.
+- In this synthetic case the candidate uses more peak memory than its baseline.
+- A checked capture therefore supports a negative evaluation.
+- Missing required streams yield CHECK_UNAVAILABLE or PARTIAL_OUTPUT, depending on whether the checker or observation is missing.
+
+```yaml
+cc: '1'
+id: muse.measure
+version: 1.0.0
+carrier: fixture.invalid/instrument@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+does: Measure one frozen text-inference attempt. Return raw per-request timings and host samples for independent
+  evaluation.
+run: /tools/measure
+takes:
+  subject:
+    artifact: application/vnd.ai4r.attempt+json
+gives:
+  samples:
+    artifact: application/x-ndjson
+rules:
+  spark:
+    kind: need
+    meaning: Exclusive qualified GB10 lease and an endpoint attested to the input manifest.
+    definition:
+      uri: fixture:spark.lease
+      sha256: 14a8c3b2fb6ed9d749c352d948cf2c71038cba7fbc04f8712eea462c2aee31f4
+  traffic:
+    kind: effect
+    meaning: Issue inference requests to the leased endpoint within the admitted workload.
+    definition:
+      uri: fixture:endpoint.invoke
+      sha256: 4afd7e4e4802eb97986c32a74bff8c12a550c1c8680f2ff1f943ee49e17f8f2b
+  identity:
+    kind: check
+    meaning: Verify candidate restart identity, workload and required measurement streams.
+    definition:
+      uri: fixture:attempt.identity
+      sha256: 8ef361bda3758478942e9b06e7b510e9c30945cc40264f0bb2df88747926a835
+needs:
+- spark
+changes:
+- traffic
+guarantees:
+- identity
+```
+
+```json
+[
+  {
+    "request": {
+      "key": "test-run",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "run",
+      "inputs": {
+        "subject": {
+          "ref": {
+            "uri": "fixture:frozen-muse-attempt",
+            "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          }
+        }
+      }
+    },
+    "receipt": {
+      "call": "call.1",
+      "attempt": 1,
+      "reason": "COMPLETED",
+      "outputs": {
+        "samples": {
+          "ref": {
+            "uri": "fixture:request-and-host-samples",
+            "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+          }
+        }
+      },
+      "job": "job.1",
+      "state": "succeeded",
+      "completeness": "complete",
+      "assessment": {
+        "verdict": "passed",
+        "checks": [
+          {
+            "id": "identity",
+            "verdict": "PASS",
+            "evidence": [
+              {
+                "uri": "fixture:check-identity",
+                "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+]
+```
+
+## Non-Strata · arithmetic
+
+Choose run for integer addition. Supply a and b, read sum. Decimal inputs fail validation. No providers or effects are declared. This narrow arithmetic fixture exercises M2a call binding; the older calculation capsule has additional obligations listed below.
+
+```yaml
+cc: '1'
+id: math.sum
+version: 1.0.0
+carrier: fixture.invalid/instrument@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+does: Add two finite integers and return their sum.
+run: /tools/add
+takes:
+  a: integer
+  b: integer
+gives:
+  sum: integer
+```
+
+```json
+[
+  {
+    "request": {
+      "key": "test-run",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "run",
+      "inputs": {
+        "a": {
+          "value": 2
+        },
+        "b": {
+          "value": 3
+        }
+      }
+    },
+    "receipt": {
+      "call": "call.1",
+      "attempt": 1,
+      "reason": "COMPLETED",
+      "outputs": {
+        "sum": {
+          "value": 5
+        }
+      },
+      "state": "succeeded",
+      "completeness": "complete",
+      "assessment": {
+        "verdict": "not_requested",
+        "checks": []
+      }
+    }
+  }
+]
+```
+
+## Shared packet · report preview and external delivery
+
+An agent can preview a research packet locally or deliver it to an authorized destination. Both operations accept the same packet. Only delivery can make a remote change. If the transport loses the acknowledgment, the runner retains the destination and idempotency key for reconciliation and forbids blind replay.
+
+```yaml
+cc: '1'
+id: research.report
+version: 1.0.0
+carrier: fixture.invalid/report@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+defs:
+  packet:
+    type: object
+    required:
+    - text
+    properties:
+      text:
+        type: string
+    additionalProperties: false
+rules:
+  outbox:
+    kind: need
+    meaning: Authenticated delivery provider with a destination-scoped grant.
+    definition:
+      uri: fixture:outbox
+      sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  send:
+    kind: effect
+    meaning: Send the bound packet to the admitted destination once.
+    definition:
+      uri: fixture:send
+      sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+operations:
+  preview:
+    does: Render packet text as Markdown for local review.
+    run: /tools/preview
+    takes:
+      packet: $packet
+    gives:
+      markdown: string
+  deliver:
+    does: Submit packet text to the named destination and return its acknowledgment.
+    run: /tools/deliver
+    takes:
+      packet: $packet
+      destination: string
+    gives:
+      ack: string
+    needs:
+    - outbox
+    changes:
+    - send
+```
+
+```json
+[
+  {
+    "request": {
+      "key": "preview-1",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "preview",
+      "inputs": {
+        "packet": {
+          "value": {
+            "text": "Finding"
+          }
+        }
+      }
+    },
+    "receipt": {
+      "call": "preview.1",
+      "attempt": 1,
+      "reason": "COMPLETED",
+      "outputs": {
+        "markdown": {
+          "value": "Finding"
+        }
+      },
+      "state": "succeeded",
+      "completeness": "complete",
+      "assessment": {
+        "verdict": "not_requested",
+        "checks": []
+      }
+    }
+  },
+  {
+    "request": {
+      "key": "deliver-1",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "deliver",
+      "inputs": {
+        "packet": {
+          "value": {
+            "text": "Finding"
+          }
+        },
+        "destination": {
+          "value": "review.inbox"
+        }
+      }
+    },
+    "receipt": {
+      "call": "deliver.1",
+      "attempt": 1,
+      "reason": "EFFECT_UNKNOWN",
+      "outputs": {},
+      "state": "unknown",
+      "completeness": "none",
+      "assessment": {
+        "verdict": "not_requested",
+        "checks": []
+      }
+    }
+  }
+]
+```
+
+## Twenty M2a inventory members
+
+| Family and existing operations | Caller-visible behavior to preserve |
+|---|---|
+| Calculation · calculate, normalize_table | Validate typed columns, rounding and empty-table rules. Retain source and transformed packet. |
+| Reporting · markdown_report, packet_report, summary_to_packet, deliver, deliver_paper | Local transforms and external delivery select separate effects. Uncertain publication requires outbox reconciliation. |
+| Intent · compile_intent; contract · compile_requirements | Emit typed plans/requirements or missing-input evidence. An operation producing requirements cannot authorize them. |
+| Literature · search, screen, rank, summarize_paper | Search binds a scoped provider. Preserve query/source pins and screening/ranking criteria. An empty result is valid. |
+| Hypothesis · propose_hypothesis | A hypothesis with source references is a proposed claim, subject to later evaluation. Pin model/provider context; replay may only permit evidence inspection. |
+| Build · build | Produces candidate source, recipe or image. Separate artifact integrity and independent qualification. |
+| Evaluation · benchmark, evaluate | Separate observations from assessment. Freeze obligations, checkers and held-out evidence access before execution. |
+| Planner · plan, plan_paper; generalist · run_on_jiuwenswarm | Return plans as data. Dynamic execution must bind child calls, scoped providers, effects and budgets before dispatch. Unbounded legacy behavior blocks migration. |
+
+## Coverage of the source inventory
+
+| Source family | Generation 1 representation and preservation test |
+|---|---|
+| M1 calculation, typed table normalization and Markdown reporting | Pure computation or typed transforms use JSON or artifact ports. Preserve table column/type obligations and report/reproduction artifacts. The math.sum example is smaller than the M2a calculation release. Dropping its report, reproduce, artifact.write grant or check IDs is an incompatible migration. |
+| M1 generalist, discovery, screening and requirements | Prompts and rubrics are pinned implementation materials. Model/search access is scoped through needs and external calls through changes. Preserve source citations and headless missing-input behavior. If the generalist can dynamically invoke unconstrained tools, leave it unqualified until the adapter can enforce a ceiling. |
+| M1 scientific evaluation, verifier, π benchmark | These operations return assessments or measurements. Preserve frozen checker/fixture identities, independence, access to held-out data and distinct outcome versus scientific verdict. A producer cannot assign itself acceptance authority. |
+| M2a tool, skill, MCP, agent, workflow, data | Native interfaces can use an explicit process, MCP or A2A binding. A workflow spawning children needs authorized bounded child calls, parent linkage and prebound budgets. A data package can expose a read-only lookup/export; a passive dataset remains an input artifact. An MCP adapter must retain remote failure and uncertain external-effect semantics. |
+| Workshop 0.1 and 0.2, current 0.3 | Preserve original declaration and pinned materials. Earlier change request, patch/bundle/commit/image delivery and evaluation become companion records. A desired reader with unresolved ABI remains a draft. The two-operation diagnostic example retains the source port/check references, entrypoints and per-operation scope. Its synthetic predicates cannot qualify it. |
+| Muse persistent Lab | Operate, inspect and adjust have distinct grants. A scoped adjust operation changes a private workspace and returns a patch/snapshot reference. Any subsequent scored run requires a frozen subject and confirmed restart. Restore or fork creates a fresh lease and attempt. |
+
+## Rejecting and recovery fixtures
+
+Apply each mutation independently to the named positive example. Reject at the first indicated boundary; never silently drop the offending field.
+
+| Mutation | Expected behavior |
+|---|---|
+| Repeat `id` in CPU YAML, or repeat an operation name in a bundle | Parser rejects duplicate key before a YAML library can overwrite it. |
+| Supply both flat `run` and `operations`; type one port as both an artifact and an inline value | Reject conflicting declaration forms or ambiguous transport type. |
+| Replace inspector input with `$absent`, or use its check ID as an effect | Reject unresolved or wrong-kind definition. |
+| Add an unknown required profile | Reject at compile/admission. |
+| Replace image digest with a tag; change recipe tree or supply a different ABI | Reject resolution/build with the corresponding compiler diagnostic. A well-formed pin still requires actual matching bytes. |
+| Ask the diagnostic inspector for the benchmark write grant | Deny before launch. If an undeclared write is observed, record it and reject the receipt. |
+| Ask for eleven profiler seconds; substitute a recycled PID; lose attach acknowledgment | Reject input, deny target admission, or return unknown effects respectively. Never automatically attach twice. |
+| Replay an identical key; change its inputs; interrupt output persistence | Return existing job/receipt, return KEY_CONFLICT, or withhold acceptance until durable output is reconciled. |
+| Declare an output as JSON string and return a number; remove a required semantic checker result | Fail execution for invalid output or make the assessment inconclusive for missing checks. A partial trace never satisfies a complete-coverage check. |
+
+## Ownership review
+
+Package ID/version identify the release family. Carrier and entrypoint identify the executable. Description identifies the action, and output ports identify what callers can consume. Other author fields occur only when an example needs them. The compiler generates discovery summaries. The runner supplies immutable bindings, input-map references and uniform output checks. Duplicated identifiers required by M2a are generated from their owners.
+
+## Source basis
+
+- November 3 single-CC workshop 0.3 declaration, common carrier schema and qualified/draft examples; M2a 2.0.0-m2a.2 schema families and fixture corpus; M1 capsule extension release manifests and stage-role examples; reviewed 25-slide *Software Factory and Lab – Muse Spark addendum* (slides 2–6 for declaration/build, 16–17 for adjustment lineage, 18–25 for evidence and measurement).
+- Source-reviewed Strata revision `c62d5e3a15b40ea51c96aae9e8d36928965f53ab`.
+- These examples specify proposed behavior.
+
+
+## Historical verification · November 3 draft
+
+Before the November 4 receipt revision, the focused notebook replay (Resources/tools/check_cc_protocol_examples.py) parsed seven authored declarations, expanded both CPU forms to the published JSON, validated thirteen synthetic M2a call/receipt projections, exercised rejection cases and checked the legacy diagnostic operation bindings. Three CPU process exchanges ran locally, including a valid empty string.
+
+- The existing workshop validator passed its linked records and nineteen rejecting cases.
+- The older forms validator passed seven valid and eighteen rejecting cases.
+- M2a passed its native eighteen fixtures across eight schemas.
+- Eight M1 table-normalization fixture bodies ran directly against the original worker and checker, including malformed inputs and tampered output.
+- The repository-wide pytest bootstrap requires additional dependencies.
+- These results cover local contracts and fixture behavior.
+- OCI builds, real profiler attachment, independent qualification and a GB10/Muse run remain unverified.
+
+| Pinned source | SHA-256 of inspected file |
+|---|---|
+| Workshop CC 0.3 declaration schema | `bb0aa836c2f9f382e35ac7ba2b2e7ca29947847d3e73580de430a296427a1781` |
+| Workshop qualified diagnostic fixture | `ed30d0a467c2c691528b5f341bdc7bb1a42bb0d922f2c3c303d85526c58a9ffc` |
+| M2a bound call schema | `b7e0f41574db27b233f04d4c3737cfb9ec22a6b5aad4eccfaba7aee1320084bf` |
+| M2a receipt schema | `4ba80d8c7356d53f02d4cd4e74c120d136028c819f1e371cd2036d60f3df9591` |
+| M2a inventory of 20 members | `1e0b0e20062b05cfc6eb706e476f88b8960db2a1be96080ecd43358577689d05` |
+| Reviewed Muse addendum, including workshop | `24239b7b5a5e099db353fc5af4cf258ac69e3d77e2913330bb3c4b81eee387d5` |
+
+## November 4 revisions
+
+Execution state, output completeness and semantic assessment now have distinct fields. Profiler calls use a host-issued target handle. The coding example is in [Coding capsule](08-coding-capsule.md). Registry/import and native protocol bindings are in [Distribution and interoperability](06-distribution-and-interoperability.md). Quality policy and RSI are in [Quality and improvement](07-quality-and-improvement.md).
+
+## Verification record · November 4 revision
+
+| Check | Observed result |
+|---|---|
+| Authored declarations and normalized CPU forms | Eight declarations parse; compact and named CPU forms match the published normalized record. |
+| Calls and receipts | Sixteen fixture exchanges validate operation ports and the new receipt invariants; their M2a projections pass existing schema and semantic checks. |
+| Optional semantic assurance | Empty guarantees retain not_requested. A fabricated passed verdict without checks is rejected. |
+| Partial trace | Execution can succeed with partial completeness and failed coverage. Legacy M2a projection remains rejected and preserves output references. |
+| Coding scope | Propose grants model egress, test grants no external changes, apply grants workspace writes. A successful test process with failed tests has no independent passing assessment. |
+| Native binding declaration | MCP/A2A binding shapes accept the declared provider and reject a provider absent from needs. |
+| Process smoke | Local CPU subprocess handles nonempty/empty strings and process failure. |
+| Links | Internal document links resolve. External standards references are separate bibliography. |
+
+These checks validate the proposed records and selected invariants. The replay helper is a fixture harness, not a complete compiler, registry, policy engine or native-protocol adapter. Real OCI import, remote MCP/A2A exchange, process attachment, workspace transactions, independent test assessment and GB10/Muse execution require implementation qualification.

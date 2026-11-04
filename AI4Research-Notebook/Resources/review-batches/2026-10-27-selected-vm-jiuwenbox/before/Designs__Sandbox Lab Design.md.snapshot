@@ -1,0 +1,113 @@
+---
+id: sandbox-lab-design-m2
+status: m2-proposal-runtime-unverified
+source: Sources/Prompts/2026-10-26-adaptive-sandbox-replacement.txt; https://chatgpt.com/share/6adf9a5b-2320-83e9-afeb-ff63c4f96671
+last_reviewed: 2026-10-26
+next_action: Review the adaptive research loop and first workload experiment before specifying M2
+---
+# Sandbox Lab Design
+
+
+A sandbox lab is a durable research project in which AI4Research can investigate a goal, learn that its first approach was wrong, and choose better next experiments without losing useful work. The sandbox supplies bounded execution and recovery; AI4R supplies the research decisions; capability capsules supply the tools and specialist work. The design succeeds only if that combination makes our research more useful at an acceptable cost.
+
+The central change is **persistent goals, revisable strategy, and durable execution**. We keep AI4R's capability and checking machinery and change when future work becomes committed. Plan to the next meaningful uncertainty boundary, observe the result, then decide what follows. Several justified independent tasks can still run together.
+
+This replaces the previous sandbox explanation and delivery order. It is the current M2 proposal for discussion, not implemented adaptive execution or an amendment to M1. Start with the [research-loop diagram](Sandbox%20Lab%20Diagrams/04-adaptive-work.png), then the [delivery plan](Lab%20Capsule%20and%20Factory%20Design%20Plan.md). Other deployment/package diagrams are supporting detail.
+
+## The AI4R problem this solves
+
+Our first lab investigates workload profiling and whether historical traces can help predict hardware needs on other machines with limited direct access. Before investigating, AI4R may not know which counters are available, whether traces are comparable, or whether a proposed performance unit transfers. A full experiment DAG commits to answers that research is supposed to discover. Better capsules alone do not remove that mismatch.
+
+At the inspected M1 checkpoint, `Scheduler.run` receives the Compiler Brief, obtains a static or Planner proposal, calls the protected binder's `freeze`, and executes that plan. The bounded planning correction/linked continuation handles specified planning failures; it is not ongoing scientific replanning. The source does **not** establish that initial intent compilation happens after planning. The remaining issue is that a compiled brief cannot contain the findings of investigation that has not yet run. Later clarification may also change the task. [Source evidence](#evidence-and-reuse).
+
+For example, start with “test whether normalized workload features predict memory demand on a held-out machine.” Clarify the data, success measure, budget and web permission. Inspect authorized traces first. If counters have incompatible meanings, replace the planned model-fitting work with a comparability experiment or narrow the claim. Retain unrelated valid measurements. If web access is denied, use supplied material and report the evidence gap. Neither a failed premise nor missing permission should trigger an invented finding.
+
+## Three kinds of state, within the existing runtime
+
+| State | Contains | Changes when |
+|---|---|---|
+| Research objective | Human direction, completion criteria, authoritative constraints and permissions; separately labelled hypotheses and open questions | The human revises intent, or authorized clarification resolves it; observations update knowledge without becoming user instructions |
+| Working strategy | Current explanation of how to reach the goal, assumptions, unresolved subgoals and next investigation boundary | Material evidence changes the approach, a prerequisite fails, or progress stalls |
+| Execution record | Concrete CC invocations, inputs, versions, assigned checks, effects, job status and results | The runtime dispatches and records work; a revision creates new work rather than rewriting an executed attempt |
+
+These are records and responsibilities in AI4R, not three new services. The strategy may describe distant work provisionally. Only the next justified batch becomes an executable DAG with fixed invocation contracts. The project objective outlives those batches and individual agent sessions.
+
+![Adaptive research with bounded execution](Sandbox%20Lab%20Diagrams/04-adaptive-work.png)
+
+## How the loop works
+
+1. **Clarify and constrain.** Resolve enough intent, resources, cost and completion criteria to choose useful work. Substantive web investigation waits for permission. Missing information blocks dependent work; unrelated permitted work can continue. In unattended mode, an unanswered required clarification produces a visible waiting state rather than a guessed answer.
+2. **Plan a bounded investigation.** Select existing operations and a batch whose relevance follows from current knowledge. State what result would change the strategy. An investigation boundary is explicit: do not invent the downstream experiment before its prerequisite findings exist.
+3. **Bind and execute.** Existing protected machinery checks types, required inputs, effects, resources, budgets and mandatory checks. The dispatcher rechecks current permission and resource availability. The infrastructure controller runs the authorized work and retains its outcome.
+4. **Assess the result.** Host checks and the selected review profile assess assigned obligations. Acceptance of an artifact does not establish that the research objective is achieved. A negative or inconclusive result can be useful and accepted; a crash or missing artifact remains an operational failure.
+5. **Continue or revise.** Routine observations update knowledge without invoking a full planner. Reconsider strategy at a declared investigation boundary, changed user direction/permissions, invalidated assumption, missing prerequisite, unrecoverable failure, or idle work with unmet goals. A bounded no-progress review catches missed triggers. Stop when completion criteria are supported, the budget is spent, or a blocker requires intervention.
+
+Begin with explicit boundaries and deterministic trigger rules. A capability can suggest that a result matters, but its suggestion is an observation, not permission to mutate the plan. Evaluate a semantic staleness detector only if the first trial shows that fixed rules miss valuable changes or cause excessive planning. Planning calls, checks, failures and repair attempts all consume the cumulative project budget. Enforce a revision/no-progress bound and report why work stopped.
+
+Specialists can adjust methods inside their assigned objective, budget and effects. They escalate discoveries that change shared assumptions, completion criteria or another branch. A central planner need not micromanage source selection or every analysis step. Larger composite capabilities remain subject to the same external obligations and limits.
+
+## Revising work without corrupting results
+
+The initial migration is a new bounded batch after a completed investigation, with explicit import of accepted, still-relevant artifacts. This is an extension of current execution, not a claim that the M1 scheduler already accepts arbitrary cross-run outputs. Its same-run proof checks need an explicit M2 transfer contract.
+
+If concurrent research later needs revisions within a running project, the Planner proposes a scoped patch against a specific plan and knowledge revision. The runtime commits it atomically only if that revision is still current, dependencies are acyclic, inputs remain valid, and permissions, checks and cumulative budgets are satisfied. Reject a stale proposal and recompute from current state. Patch validation controls execution legality; it does not prove scientific wisdom.
+
+| Existing work | Revision behavior |
+|---|---|
+| Unstarted | Withdraw or replace before dispatch; rebind against current state |
+| Running and independent | Keep original contract and let it finish; do not change its version in place |
+| Running and affected | Fence new dependent work; cancel if necessary and supported, otherwise reconcile completion and quarantine its output from the active strategy |
+| Completed and still relevant | Reuse only with accepted artifact identity, compatible scope/assumptions, implementation and check context |
+| Completed but premise changed | Preserve the historical result, mark its current use invalid and prevent affected descendants from consuming it |
+| Failed or effect uncertain | Retain the attempt; inspect actual job/service state before retrying; never blindly replay an external effect |
+
+An accepted result can become irrelevant without becoming historically false. Cache equality alone cannot establish validity: a prompt can stay unchanged while a dataset, permission, application state or hidden dependency changes. Track the dependencies that matter for reuse, conservatively rerunning affected work when they cannot be established. A revoked permission stops new prohibited dispatch immediately and requests cancellation of affected active work; it cannot undo data already transmitted.
+
+Local qualified CC updates become eligible for new bindings automatically under the lab's compatibility policy. They do not replace active invocations or sessions. A new version is a reason to consider a better method, not a mandatory global replan. The CC factory produces candidates; the RSI owner controls broader improvement and harness changes; independent qualification controls admission. Central AI4R adoption remains separate from local eligibility.
+
+## What the sandbox supplies
+
+A lab retains its own AI4R fork, goal/knowledge records, CC selection, application state and research artifacts. Deployment instances are replaceable. A restart reloads the research state and reconciles outstanding work before dispatch; the planner must not reconstruct everything from conversation alone.
+
+Use one permitted Linux Docker host for the first slice. Compose can host AI4R and any required application service. An existing narrow controller/broker interface owns launch, limits, stop and reconciliation. Agents receive scoped operations and resource handles; the controller owns Docker access and policy. A VM remains an optional outer profile, chosen for a demonstrated isolation or deployment requirement. Spark is optional execution hardware, with build preparation elsewhere where practical.
+
+| Existing responsibility | What this proposal requires | Why it matters to research |
+|---|---|---|
+| AI4R Planner/runtime | Project state, next-batch selection, progress assessment and revision | New evidence can change the next experiment |
+| Binder, dispatcher and checks | Fixed invocation contracts, current authorization, independently assigned checks, accepted artifact transfer | Adaptation cannot bypass the checks that make results usable |
+| Lab controller | Resource/deadline limits, scoped files/network, mutable-service leases, external stop and job reconciliation | Runaway or conflicting experiments do not destroy the project |
+| Durable storage | Separate project records, accepted artifacts, application checkpoints, scratch and secrets; verified independent backup/restore | A replaced app or failed experiment does not erase accumulated work |
+| CC factory and qualification | Candidate construction, fixed independent criteria, compatible future eligibility | Acquire missing functionality only when a real research need justifies it |
+
+Containment targets mistakes, faulty harness changes and runaway experiments. Container names and model instructions do not establish isolation. Qualify effective mounts, network policy, process/resource limits and disk behavior on the selected host. Keep control policy and the stable recovery path outside mutable candidate code. Disk pressure stops growth rather than deleting unique findings. Restore must fence the old writer and verify the required data, not merely restart a process. Measurement jobs need an exclusive slot or an explicit co-running-load limitation.
+
+CC packages can expose several named operations over an embedded tool, batch job or managed/attached application. Bind the selected operation to exact implementation, inputs, effects and application identity. An attached endpoint grants no implicit reset/upgrade authority. Stateful applications declare reset/checkpoint semantics and serialize conflicting commands. A durable job handle represents submission/progress, not scientific acceptance. Robotics can validate this later; a small stateful fixture can test protocol behavior first without claiming simulator integration.
+
+Review payloads follow the selected qualified profile. Historical output-only review remains available; the October 26 checkpoint also has opt-in evidence-aware review, with its own limits. This planning change neither silently broadens reviewer access nor treats an older output-only description as the only current mode. [Current review evidence](../Activities/2026-10-26%20M1%20Reliability%20and%20ML%20Readiness%20Checkpoint.md).
+
+## Evidence and reuse
+
+Source inspected on October 26: our published M1 `ab0d9c7fe8ceadf45c61d04e94e2dd9b44b867a7`, read from Git objects in the reviewed-integration checkout; installed OpenJiuwen SDK source `9e3390195a9ea15235b2b5f7412cb2aa440622cc`; upstream JiuwenSwarm checkout `02b37f47fbefe80a58e4ed88606120818ca44ac3`. Those identities describe different codebases. No runtime compatibility or speedup was tested for this design update.
+
+| Evidence | Supported design inference | Limit |
+|---|---|---|
+| M1 `research/scheduler.py`: `run`, `binder.freeze`, `_committed_node`; `planning.py`: bounded continuation | Keep existing execution/checking and introduce explicit project/batch boundaries | Current same-run and frozen-plan proofs do not directly permit mutable or cross-batch execution |
+| M1 `research/native.py`: tools/subagents disabled, task loop/planning disabled, `enable_swarmflow=False` for the Planner Leader | Narrow orchestration is deliberate in our adapter | It is not a missing upstream capability; simply enabling flags would bypass the integration design |
+| Pinned SDK `harness/goal/{schema,manager,store}.py` | Persistent goals and budget/progress state offer a reuse candidate | Its completion assessments are not independent scientific acceptance |
+| Pinned SDK `agent_teams/workflow/engine/journal.py`: `call_signature`, `get_cached`; `primitives.py`: `agent`; `runtime.py`: `run_id` | Structural path, content signature and run isolation support selective workflow replay | Prompt/options/schema reuse is not complete research-dependency validation or arbitrary live-DAG patching |
+| [JiuwenSwarm release notes](https://github.com/openJiuwen-ai/jiuwenswarm/releases): persistent goals; SwarmFlow modify/replay with unchanged-operator cache | Investigate upstream goal/replay mechanisms before building equivalent machinery | Release descriptions alone do not prove coexistence with independent live branches |
+| [Magentic-One](https://microsoft.github.io/autogen/stable/user-guide/agentchat-user-guide/magentic-one.html): task and progress ledgers, stall-driven revision | Separate enduring task understanding from progress and next action | Frequent orchestration can cost more; no AI4R benefit follows from its benchmarks |
+| [SyncPlan](https://arxiv.org/abs/2608.01652) and [Learning When to Plan](https://arxiv.org/abs/2509.03581) | Test selective replanning rather than assuming every result deserves a new plan | Their environments and learned mechanisms do not establish transfer to AI4R research |
+| [Temporal workflow messages](https://docs.temporal.io/develop/python/workflows/message-passing) | External events and durable execution have established implementation patterns | A pattern reference; adopting another runtime is not a prerequisite |
+
+The first reuse investigation should exercise the pinned SDK goal/replay paths through a small adapter spike and compare the work needed with extending our existing store and scheduler. Do not replace the framework just to obtain a loop. JiuwenSymbiosis and LangGraph are optional follow-up references; neither is a dependency of this proposal.
+
+## Evidence that would make this valuable
+
+The first demonstration uses workload research with a controlled late discovery: initially comparable-looking traces turn out to have incompatible counter semantics. AI4R should replace the dependent fitting step with a useful comparability investigation or a narrower supported conclusion, preserve an unrelated valid measurement, and respect a no-web policy. Repeat with a user scope change, a failed prerequisite and a process interruption. A driver can test mechanics; only an actual Planner-selected change demonstrates autonomous adaptation.
+
+Compare the same capabilities, task inputs, injected discovery, checking criteria, model configuration and total budget under three planning policies: fixed initial DAG, replanning at every batch boundary, and selective replanning. Use independently assessed research quality, correct responses to changed information, stale-result consumption, reuse of unaffected work, planning/checking cost, total runtime and recovery behavior. Freeze the scoring rules before the runs; report all attempts and a useful negative result if adaptation does not help. Use held-out discovery cases and repeated paired trials before asserting general benefit.
+
+The case for this structure is strongest if selective replanning improves independently verified outcomes on changing-information tasks, preserves static-task quality, and costs less than frequent replanning at comparable quality. Set the acceptable cost and quality tradeoff before measurement. We have not established any of these outcomes yet. One controlled successful revision establishes feasibility only; a short restart trial does not establish day-long autonomy. Hardware-transfer prediction accuracy and CC effectiveness remain separate experiments.
+
+The remaining discussion choices are the first uncertainty boundary, the quality/cost tradeoff, which upstream goal/replay pieces fit our checks, and when concurrent live patches become necessary. The [replacement plan](Lab%20Capsule%20and%20Factory%20Design%20Plan.md) orders the work around those questions. Earlier VM, container and factory notes are implementation references only where compatible with this proposal.

@@ -1,0 +1,39 @@
+---
+id: workstream-lab
+status: active
+source: Sources/Research Intent; Designs/cc-containerization-and-lab-isolation
+last_reviewed: 2026-10-20
+next_action: Draft VM topology and container CC contracts, then complete the local factory design
+---
+# Lab infrastructure
+
+**Problem:** research needs independent places to run and change AI4Research without mixing code, mutable state, credentials, or results. Each lab must be able to contribute useful changes back to the central project.
+
+The first lab runs on one host. Its manager creates sandboxes from pinned code and images, gives each separate runtime resources, observes them, and exports evidence outside disposable state. A sandbox may contain an AI4Research instance that evolves during its own work; its published candidate must identify what changed from the starting pin.
+
+## Initial boundary
+
+[[Resources/lab/README|The lab CLI]] is an operator tool outside the product hot path. Product agents do not receive the Docker socket or manager credentials. Existing sidecar and RSI contracts remain the reference for integration; this local prototype does not amend them.
+
+| Capability | Required evidence |
+|---|---|
+| Create pinned experiments | Exact commit, image digest, limits, and independent paths recorded |
+| Run simultaneously | Two sandboxes with distinct state; exclusive measurement jobs serialize |
+| Inspect and stop | Attributable lifecycle state and termination result |
+| Export | Logs, reports, artifacts, provenance, and integrity checks survive cleanup |
+| Recover | Interrupted operations reconciled without silently creating duplicate runs |
+| Contribute back | Patch or branch plus evidence; central adoption recorded separately |
+
+## Validation order
+
+Validate manager logic locally, then [[Resources/Lab Host Validation|real Docker lifecycle and isolation]], then the actual M1 image and API, and finally GB10 resources. GPU capability and performance findings require host-specific checks. A mock test cannot establish containment or GPU availability.
+
+The first prototype excludes distributed scheduling and automatic central promotion. Multi-owner labs and a lab network stay future extensions once this boundary is demonstrated.
+
+## Current target
+
+[[Designs/Lab Capsule and Factory Design Plan]] defines one evolving AI4R and independent factory/image store per VM, separate projects and selected contributions to a tested central base. The single-host prototype remains bounded evidence and reusable tooling. Next: shared contracts/topology, factory journey and native M1 reconciliation.
+
+## M2 scope
+
+The user explicitly places VM labs, container CCs and independent factories in M2. [[Designs/Docker Architecture Review and Feasibility]] and [[Designs/Lab Capsule and Factory Design Plan]] now own feasibility, provisioning and development order. Earlier M1 references remain migration context, not scope restrictions on this work.

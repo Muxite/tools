@@ -1,0 +1,101 @@
+---
+id: vm-lab-infrastructure-design
+status: proposed-m2
+source: Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt
+last_reviewed: 2026-10-21
+next_action: Select the first VM provider and implement the CPU reference deployment
+---
+# M2 VM lab infrastructure
+
+Parent: [[Designs/Lab Capsule and Factory Design Plan]]. Review: [[Designs/Docker Architecture Review and Feasibility]]. M2 target architecture; M1 is the migration baseline.
+
+## Concrete deployment
+
+One lab is one Linux VM with a local Docker Engine. The factory is a module/worker of that lab's AI4R with independent jobs and versions. An operator-installed host broker owns Docker access. Compose runs the persistent app and model bridge; the broker creates short-lived sibling CC containers on that same engine. No Docker daemon runs inside a CC.
+
+```mermaid
+flowchart TB
+    P[Operator VM provisioner] --> V
+    R[Tested M2 release and image registry] --> V
+    subgraph V[Lab Linux VM]
+        direction TB
+        APP[Compose - AI4R app and local factory]
+        MODEL[Compose - scoped model bridge]
+        BROKER[Host broker - system service]
+        ENGINE[Local Docker Engine]
+        BUILDER[BuildKit builder and cache]
+        IMG[Engine local image store]
+        CC[Short-lived CC containers]
+        DISK[Project, jobs and sealed evidence]
+        APP -->|authorized job API over Unix socket| BROKER
+        BROKER --> ENGINE
+        ENGINE --> BUILDER
+        BUILDER -->|explicit load| IMG
+        ENGINE --> CC
+        IMG --> CC
+        CC -->|invocation-scoped IPC| MODEL
+        BROKER --> DISK
+        CC -->|staged input and output paths only| DISK
+    end
+    APP -.->|candidate source, image and evidence| Q[Central qualification]
+```
+
+Only broker/operator identities access the Docker socket. The app submits typed jobs with artifact IDs, approved image identity, limits and grants. Broker policy derives paths/options; callers cannot supply arbitrary Docker flags, host paths, devices or commands. Factory build credentials, protected dispatch credentials and local admission have distinct scopes.
+
+The broker is privileged infrastructure. Docker control can affect the VM; generated builds execute code too. Each disposable lab VM is the starting outer boundary. A BuildKit container on that daemon is not a second VM boundary. A later adversarial-build profile may need a separate build VM. [Docker daemon security](https://docs.docker.com/engine/security/).
+
+## Creating a new VM
+
+Use a checksummed Linux cloud image, cloud-init and a versioned bootstrap/configuration script. Start with one Linux KVM/libvirt reference backend; cloud/Hyper-V are later provider adapters. Creating lab VMs inside Docker Desktop is not the deployment model.
+
+1. Select lab/project IDs, architecture, VM size/storage/network and tested M2 release. Generate unique cloud-init instance ID, hostname and operator access. Never clone live sessions or credentials.
+2. Create a fresh guest disk from the verified image; optionally attach a project-data disk. Boot with metadata/user-data, wait for cloud-init completion and record the provider identity. NoCloud uses instance identity to distinguish first boot. [NoCloud](https://docs.cloud-init.io/en/latest/reference/datasources/nocloud.html).
+3. Install release-selected Docker Engine, Compose/Buildx and broker versions; create service accounts/directories, log rotation and quotas. Keep package versions in a tested release lock. [Engine installation](https://docs.docker.com/engine/install/ubuntu/).
+4. Fetch the release manifest/Compose definition and source commit. Create a standalone Git clone and local development branch. Import seed CC/admission records and pull compatible images by registry digest. Seed resources separately.
+5. Enroll scoped credentials outside Git/images/templates. Start the host broker and stable Compose services. Missing required pins or credentials produces a visible failed/blocked preparation state.
+6. Check app/API health, broker authorization, platform/image availability, output ownership, effective limits, model route and a known CC invocation. Record evidence before READY; boot completion alone is insufficient.
+
+Illustrative operator command on a prepared Linux virtualization host; this is not an implemented lab CLI and was not executed here. Paths/image/network must be prepared. The example assumes x86_64; ARM requires matching provider/image support.
+
+```bash
+virt-install --name ai4r-lab-a --memory 4096 --vcpus 2 \
+  --os-variant detect=on,name=ubuntunoble \
+  --disk size=40,backing_store=/srv/vm-images/verified-ubuntu-amd64.qcow2 \
+  --cloud-init user-data=/srv/lab-specs/a/user-data,meta-data=/srv/lab-specs/a/meta-data \
+  --network network=default --noautoconsole
+```
+
+Based on cloud-init's [libvirt procedure](https://docs.cloud-init.io/en/latest/howto/launch_libvirt.html). Verify provider behavior and retention during implementation. Resource numbers are a lightweight CPU test hypothesis, not validated AI4R requirements.
+
+## Host paths and versioned state
+
+```text
+/opt/ai4r/releases/<release>/   compose and release metadata
+/srv/ai4r/source/              standalone clone and local branch
+/srv/ai4r/state/               database, catalog and factory ledger
+/srv/ai4r/resources/           versioned datasets and prepared sources
+/srv/ai4r/jobs/<attempt>/      staged inputs, outputs, temporary work
+/srv/ai4r/evidence/            sealed records and verified exports
+/run/ai4r-broker/              authenticated local sockets
+Docker-managed storage        images/layers and BuildKit cache
+```
+
+These are VM-host paths. Broker maps artifact references to them; capsules see only invocation mounts. Separate ownership prevents capsule UID writes to sealed evidence, catalog or broker policy. Pre-create writable output directories for the capsule UID, rather than making broad directories world-writable.
+
+Release execution uses an image built from a captured source tree. A development override may mount live source for fast iteration, but results are development-only until replayed against an immutable image. Cross-VM labs are standalone clones; Git worktree metadata from another machine is not copied. Record source revision and any uncommitted/untracked delta separately.
+
+## Compose, jobs and access
+
+Compose describes stable app/model-bridge services, versioned state mounts, health checks and restart policy. Factory initially runs inside the app; split a worker only when concurrency warrants it. The system broker owns dynamic CC containers and labels lab/run/attempt resources. Do not add a permanent Compose service for every generated CC. [Single-server Compose](https://docs.docker.com/compose/how-tos/production/).
+
+Tool CCs start with no network. Agent CCs get invocation-scoped model IPC and no general app/database access. Use guest-loopback UI plus an operator tunnel initially. A private-LAN ingress is an explicit later deployment choice. A Compose network is not a destination allowlist; service DNS only works on attached networks. [Compose networking](https://docs.docker.com/compose/how-tos/networking/).
+
+## Capacity, backup and recovery
+
+Reserve headroom for app/OS/engine. Cap builds separately from CC concurrency. Memory/CPU/PID launch limits do not provide disk quotas or log retention; implement those separately. A shared model server is an external dependency, not shared lab catalog/source state.
+
+Quiesce affected jobs and use a database-consistent backup procedure. Capture source/catalog/resource/evidence manifests and back up outside the VM. Saved images exclude mounted data; caches are not backups. Re-pull pinned images or archive selected local candidates with hashes. Restore into a new lab identity; retain historical run IDs as history. [Docker volumes](https://docs.docker.com/engine/storage/volumes/).
+
+Broker persists launch intent and container identity, then reconciles its ledger with labeled Docker resources after restart. Retain stopped containers for diagnostic collection; never replay effects automatically. Cleanup requires verified export. Image/cache pruning must protect active/retained run pins and serialize with builds. Rollback restores a compatible app/catalog/database set, not just an older app image.
+
+First VM acceptance: reproducible boot/readiness, two independent projects/factories, interrupted build/run recovery, evidence export, fresh-VM restore and selective update/rollback. GPU passthrough is a separate target-host trial; a guest container cannot expose hardware the guest lacks.

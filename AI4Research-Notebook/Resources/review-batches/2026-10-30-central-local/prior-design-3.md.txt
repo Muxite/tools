@@ -1,0 +1,150 @@
+# AI4R communication adapter: design for approval
+
+October 29, 2026. **Design review only. No further runtime implementation is requested.** Existing experimental code is reference material, not an approved deployment or a reason to adopt its implementation choices. This amendment clarifies LAB-IF-001 responsibilities without approving a new runtime backend.
+
+The October 30 [capsule support amendment](capsule-support.md) adds the distinct host execution-provider boundary for containerized CCs. Native research relay remains separate. Lifecycle ownership is enforced per concrete resource, with explicitly owned fixed services and dynamic capsule jobs.
+
+## Decision proposed for approval
+
+Keep one host-side Lab Manager. Its **AI4R communication adapter is a small client module inside that process**, using the lab's existing native research API. It is not a new research agent, scheduler or compulsory daemon inside every lab. The lab already exposes its native API; do not build another semantic protocol beside it.
+
+Keep Docker Compose as the proposed baseline because it matches the existing deployment and persistent multi-service lab model. OpenSandbox is a viable **alternative runtime provider and transport toolkit**, not a replacement for AI4R's research contract. Choose one coherent runtime-provider arrangement for a lab. Fixed services and dynamic CC jobs may have separate explicit owners; never let Compose and another controller reconcile the same container.
+
+OpenSandbox can save implementation of command/file handling, endpoint discovery, runtime status, metrics and its supported lifecycle operations. It cannot decide what AI4R considers a research request, terminal outcome, valid scientific result, checkpoint, or permitted merge. Since our selected AI4R already exposes HTTP submission/status/cancellation, direct HTTP is less glue for those operations than launching a shell command for each request. This is an engineering judgment, not a measured effort or speed result.
+
+## Three separate interfaces
+
+| Interface | Owner and meaning | Baseline | OpenSandbox alternative |
+|---|---|---|---|
+| Research | AI4R owns research requests, runs, progress, results and cancellation | Adapter calls existing native AI4R HTTP API directly | Same adapter and native API; endpoint may be discovered through OpenSandbox |
+| Runtime control | Provider owns container/process existence, ports and basic resource status | Manager calls Compose/Docker | Manager calls our self-hosted OpenSandbox lifecycle service, backed by Docker |
+| Model calls | Existing AI4R model abstraction owns model identity and inference requests | Lab calls our shared inference API, or lab-private model | Same; research requests and model prompts do not travel through the lifecycle service |
+
+Infrastructure health and command exit codes are observations, not research success. A stopped container is not a cancelled research run. Successful inference is not scientific verification.
+
+```mermaid
+%%{init: {"theme":"neutral","fontFamily":"Segoe UI"}}%%
+flowchart LR
+  C[Researcher or central AI4R] <-->|research requests and responses| M
+  subgraph Host[Host Lab Manager process]
+    M[Public API and lab registry] --- A[Thin AI4R client adapter]
+    M --- R[Runtime provider client]
+  end
+  A <-->|native authenticated HTTP| N
+  R -->|lifecycle control only| D[Compose / Docker]
+  D -->|owns container lifecycle| N
+  subgraph Lab[One lab; repeat for A, B and others]
+    N[Existing AI4R native API and research runtime]
+    N --- S[Own writable Git clone, CCs and persistent research state]
+  end
+  N <-->|existing model abstraction| I[Our shared inference API]
+```
+
+Mother AI4R supplies a selected committed revision only during explicit lab creation/update. Each lab has independent Git metadata. No writable mother mount is required. Manual contribution/export is a separate human workflow, not a research-message path.
+
+## What is actually inside the adapter
+
+| Responsibility | Small AI4R-specific behavior | Reuse |
+|---|---|---|
+| Target resolution and authentication | Resolve lab ID to its current native endpoint and credential reference; verify compatible API/readiness; keep unavailable distinct from absent | Existing native bearer authentication; provider endpoint discovery where useful |
+| Request translation | Convert a central outcome/request into native intake and submission fields; retain workspace identity and explicit completion criteria | Existing native intake and submission API; no parallel planner |
+| Durable correlation | Persist central request ID, request-content fingerprint, lab ID, prepared native submission and allocated native run ID | Existing native `client_request_id` lookup and allocation guarantees |
+| Progress and result projection | Return native run state/events and result/artifact references; show infrastructure health separately | Existing status, event, result and artifact endpoints; transport streaming/polling as appropriate |
+| Research cancellation | Forward cancellation to the native run; show accepted, pending and terminal states without claiming a checkpoint was created | Existing native cancellation/checkpoint behavior |
+| Reconnection and errors | Re-resolve endpoints after runtime changes; query the same request ID after a lost response; retain uncertain states | Native lookup/idempotency; provider status; ordinary HTTP retry handling for safe reads |
+
+A representative routing record contains `{lab_id, central_request_id, request_fingerprint, native_client_request_id, prepared_submission, native_run_id, last_native_status, last_contact, error}`. Endpoint and credential references can live in the lab record. These are conceptual fields, not a new frozen schema. Do not copy the scientific run database into Lab Manager, store raw tokens in routing records, or equate the HTTP transport request ID with AI4R's durable research identity.
+
+The adapter does **not** contain research planning, CC scheduling, result judgment, model selection/fallback, GPU arbitration, Git merging or sandbox construction. Those responsibilities remain with native lab AI4R, the existing model abstraction, manager resource/lifecycle policy and the human reviewer respectively.
+
+## Submission, interruption and cancellation
+
+1. The manager records the stable central ID and content fingerprint before forwarding. Same ID with different content is a conflict.
+2. The adapter checks the supported native API and looks up the mapped native client-request ID. An existing allocation is reused. Network, auth, routing errors and ambiguous 404s never mean “safe to create a new run.”
+3. Only the native lookup contract's authenticated, authoritative no-allocation response permits intake/submission. Persist the exact prepared native submission before sending it.
+4. If delivery times out, show `delivery unknown`. Query the same native ID after reconnecting. Retry the exact submission with that ID only under native idempotency guarantees; otherwise require inspection. Do not claim exactly-once delivery from HTTP or OpenSandbox.
+5. Status and result inspection are read-only. They never silently submit pending work. Native AI4R remains the authority for run state and scientific outcomes.
+6. Graceful stop first requests native cancellation/checkpointing and waits within a defined grace period. Runtime termination is a separate explicit escalation; report interruption when clean cancellation cannot be confirmed. A command interrupt or container kill does not guarantee scientific cancellation or a checkpoint.
+
+```mermaid
+%%{init: {"theme":"neutral","fontFamily":"Segoe UI","sequence":{"width":240,"actorMargin":100,"wrap":true,"mirrorActors":false}}}%%
+sequenceDiagram
+  participant C as Central caller
+  participant M as Host manager and adapter
+  participant L as Lab AI4R API
+  C->>M: Stable request ID and intended outcome
+  M->>M: Persist ID, fingerprint and target lab
+  M->>L: Lookup mapped native client_request_id
+  alt Existing native allocation
+    L-->>M: Same native run ID and status
+  else Authenticated native no-allocation result
+    M->>L: Native intake preparation
+    L-->>M: Intake reference and submission defaults
+    M->>M: Persist exact prepared submission
+    M->>L: Submit with same durable native ID
+  end
+  Note over M,L: Delivery unknown after timeout.<br/>Reconnect and query the SAME native ID.
+  M-->>C: Native run identity or explicit uncertain state
+  C->>M: Inspect progress, result or request cancellation
+  M->>L: Native status, events, result or cancel
+  L-->>M: Native outcome
+  M-->>C: Native outcome projected for caller
+```
+
+## OpenSandbox: what it covers and the concrete compatibility gap
+
+Source inspection at **`97031ea81fee1b853e4cd89e5490b1be9f5ead55`** checked lifecycle/execd OpenAPI contracts, the Python `Sandbox.get_endpoint()` implementation, lifecycle routing and the server proxy's header filtering. This is a fresh source observation, not a runtime compatibility test and not the earlier `7feb734...` source snapshot. SDK/server/execd must ultimately be pinned and qualified together.
+
+- The lifecycle API provides sandbox identity/state, endpoint discovery and supported lifecycle controls. Its optional expiration policy must be configured explicitly for persistent labs; expiry must not silently discard a project.
+- Execd provides commands, foreground/background status, stdout/stderr streaming, files and metrics. Those can supply bootstrapping, diagnostics and selected file transfer. Durable research IDs/results still belong to AI4R.
+- `Sandbox.get_endpoint(port)` selects direct or server-proxy routing through `use_server_proxy`. Endpoint discovery alone does not guarantee host reachability or native authentication compatibility.
+- **The inspected server proxy explicitly filters inbound `Authorization` and cookies. AI4R's existing native API requires `Authorization: Bearer ...`.** Therefore that proxy is not a drop-in transparent path for the present native API. OpenSandbox credentials do not replace AI4R credentials. Do not remove native authentication to make it fit.
+
+For the OpenSandbox alternative, prefer a reachable **direct discovered native endpoint** with normal AI4R bearer authentication. Keep the lifecycle key, execd token and native AI4R grant separate. If direct reachability is unavailable, a small explicit authentication bridge could translate a dedicated forwarded credential into the native bearer header, but that adds code, credential-handling responsibility and qualification; it is not included in the minimal recommendation.
+
+```mermaid
+%%{init: {"theme":"neutral","fontFamily":"Segoe UI"}}%%
+flowchart LR
+  subgraph Host[Host: our infrastructure]
+    A[AI4R client adapter in Lab Manager]
+    R[Runtime provider client in Lab Manager]
+    O[Our OpenSandbox lifecycle service]
+    D[Docker backend]
+  end
+  subgraph Lab[Lab container]
+    N[Existing AI4R native API]
+    E[Execd: optional command and file transport]
+  end
+  A <-->|direct native HTTP with AI4R bearer| N
+  A <-->|endpoint lookup and reply only| O
+  R -->|OpenSandbox lifecycle API| O
+  O -->|runtime control| D
+  D -->|owns lab container| N
+```
+
+The logical endpoint-lookup edge denotes a request/reply, not forwarding of research payloads. The optional execd path is omitted from normal research submission. The lab remains a persistent project with independent source/state; pause/resume, process restart and recreation must be defined against the chosen backend. Do not assume OpenSandbox is a Compose project controller or supplies multi-container private-model coordination, a durable project catalog, manual export policy, or our exclusive-GPU handover.
+
+## Approval checklist and diagram invariants
+
+| Scenario | Required designed outcome |
+|---|---|
+| Two labs | Different source/state and native run identities, even when requests have identical text |
+| Lost submit response | Same native client ID is queried; no new ID and no blind research replay |
+| Manager restart or changed endpoint | Re-resolve the lab endpoint; retain durable research mapping; runtime health and research availability remain distinct |
+| Native auth failure / incompatible API | Explicit unavailable/incompatible state; no automatic credential bypass or alternative protocol |
+| Native cancel vs runtime stop | Native cancel first; interrupted work identified if a later force-stop is needed |
+| OpenSandbox server proxy | Native bearer incompatibility remains an explicit gate; direct path or separately reviewed bridge required |
+| Provider ownership | Each concrete resource has exactly one controller; fixed services and CC jobs have explicit owners |
+| Persistence / expiration | Lab source, configuration, results and checkpoints outlive container replacement; no implicit TTL loss |
+| Shared model or GPU work | Model traffic bypasses the adapter; GPU exclusivity remains manager policy, not an OpenSandbox command status |
+| Contributions | Selected export followed by human review and manual merge; no automatic mother write-back |
+
+Every diagram distinguishes host/lab placement, source/state ownership, lifecycle control, research HTTP and model calls. Request/reply links are labelled; no arrow implies automatic merge or research judgment. Infrastructure stop, research cancellation, research completion and scientific validity remain separate concepts. All OpenSandbox compatibility statements are source-backed design candidates pending an integration check after approval.
+
+## Primary sources
+
+- [OpenSandbox lifecycle contract](https://github.com/opensandbox-group/OpenSandbox/blob/97031ea81fee1b853e4cd89e5490b1be9f5ead55/specs/sandbox-lifecycle.yml)
+- [Execd contract](https://github.com/opensandbox-group/OpenSandbox/blob/97031ea81fee1b853e4cd89e5490b1be9f5ead55/specs/execd-api.yaml)
+- [Python endpoint discovery](https://github.com/opensandbox-group/OpenSandbox/blob/97031ea81fee1b853e4cd89e5490b1be9f5ead55/sdks/sandbox/python/src/opensandbox/sandbox.py)
+- [Proxy header filtering](https://github.com/opensandbox-group/OpenSandbox/blob/97031ea81fee1b853e4cd89e5490b1be9f5ead55/server/opensandbox_server/api/proxy.py)
+- AI4R native source at working base `db34c50d1398870f356e6cc65b35c58a61c9436b`: `jiuwenswarm/gateway/channel_manager/web/research_http.py`, `jiuwenswarm/research/shell_auth.py`, `jiuwenswarm/research/control.py`.

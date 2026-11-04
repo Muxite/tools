@@ -1,0 +1,7 @@
+flowchart TB
+  CC[Work or verifier CC] -->|optional self-report| API[Diagnostic API]
+  API -->|non-blocking, labeled CC-reported| RAW[(CC diagnostic data)]
+  RUN[Runner measurements] --> OBS[Trusted invocation observation]
+  RAW --> POST[Post-run profile]
+  OBS --> POST
+  API -. failure does not stop .-> CONT[CC execution]

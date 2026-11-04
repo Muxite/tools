@@ -1,0 +1,90 @@
+---
+id: sandbox-design-presentation
+status: design-proposal-rendered-runtime-unverified
+source: Sources/Prompts/2026-10-27-sandbox-system-presentation.txt; Designs/Sandbox Lab Design
+last_reviewed: 2026-10-27
+next_action: Review the ten main slides and use the appendix to settle the bounded integration criteria
+---
+# Sandbox design presentation
+
+[PowerPoint: AI4Research Sandbox Design rev4](output/AI4Research%20Sandbox%20Design%20rev4.pptx). [Live editable deck](page://page_7a233186a3548191869c85106fc552b4).
+
+Ten main slides explain the complete system; seven hidden appendix slides support questions. The goal and intended AI4R value come first. The near-front Karpathy quotation motivates retained project state while explicitly distinguishing it from continual learning in model weights. The workload example is removed. VM per lab remains selected, using the comparison's visual style. Research is cyclical, with local retries and overlapping independent work.
+
+The large diagrams are embedded as editable PowerPoint objects. The upstream Figure 2 is an attributed original image. All slides include source/limit notes. The diagrams below are previews of the same slide content, not replacements for the editable diagrams in the PPTX.
+
+| Slide | Content |
+|---|---|
+| 1 | Purpose and intended AI4R value |
+| 2 | Complete environment in each lab VM |
+| 3 | Inside the lab AI4R |
+| 4 | Continuing research cycle |
+| 5 | Overlapping investigations and local retry |
+| 6 | Vendored container CC intake and use |
+| 7 | Model routing for AI4R and containerized CCs |
+| 8 | Private models and fine-tuning |
+| 9 | Persistence, stop and recovery |
+| 10 | Technology stack and first proof |
+| 11 | Appendix navigation |
+| 12 | Original OpenJiuwen Figure 2 |
+| 13 | Corresponding AI4R responsibilities |
+| 14 | Evidence and reuse limits |
+| 15 | Acceptance scenarios |
+| 16 | Tradeoffs and resource constraints |
+| 17 | JiuwenBox requirements fit and remaining integration |
+
+## Diagram previews
+
+### Complete environment in each lab VM
+
+![Complete environment in each lab VM](review-system/slide-2.png)
+
+### Inside the lab AI4R
+
+![Inside the lab AI4R](review-system/slide-3.png)
+
+### Continuing research cycle
+
+![Continuing research cycle](review-system/slide-4.png)
+
+### Overlapping investigations and local retry
+
+![Overlapping investigations and local retry](review-system/slide-5.png)
+
+### Vendored container CC intake and use
+
+![Vendored container CC intake and use](review-system/slide-6.png)
+
+### Model routing for AI4R and containerized CCs
+
+![Model routing for AI4R and containerized CCs](review-system/slide-7.png)
+
+### Private models and fine-tuning
+
+![Private models and fine-tuning](review-system/slide-8.png)
+
+### Persistence, stop and recovery
+
+![Persistence, stop and recovery](review-system/slide-9.png)
+
+The model interface now explicitly serves containerized CCs and AI4R. Lab configuration maps logical roles/aliases to compatible endpoints, injects scoped client configuration, and records the actual model per invocation. Endpoint relocation requires no CC code change; model substitution follows explicit policy. Private models stay lab-scoped. LiteLLM is a routing precedent, not a selected dependency.
+
+Slide 3 now puts the supervisor above the CC library, with straight execution/admission lines and a separate routed library-selection line. Appendix 17 maps JiuwenBox to execution, restrictions, shutdown, model transport, operational state and whole-lab control. The source includes graceful stop plus signal escalation; actual deployment termination remains untested.
+
+## Evidence and limits
+
+- Karpathy publisher transcript, October 17, 2025: https://www.dwarkesh.com/p/andrej-karpathy . The exact short quotation concerns memory/continual learning. Durable external state addresses continuity only.
+- OpenJiuwen paper, August 28, 2026: https://arxiv.org/html/2608.27969v1 . Slides 12 and 13 enable an adjacent visual comparison. Similarity supplies precedent, not proof of our VM, packaging or privacy.
+- Anthropic, April 8, 2026: https://www.anthropic.com/research/managed-agents . Stable interfaces and separated state/execution support implementation flexibility as a design precedent.
+- Model alias management precedent: https://docs.litellm.ai/docs/proxy/model_management . JiuwenBox routing/key injection: https://github.com/openJiuwen-ai/jiuwenswarm/blob/develop/jiuwenbox/README.md . These do not prove our integrated routing contract.
+- vLLM official API serving: https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/ . Candidate interface with feature/capacity checks still required.
+- Docker security/resource controls: https://docs.docker.com/engine/security/ and https://docs.docker.com/engine/containers/resource_constraints/ . Effective configuration requires verification.
+- VM lifecycle: https://libvirt.org/manpages/virsh.html . Shutdown, force-off and storage deletion have distinct semantics.
+
+Pinned source review separates our M1 `ab0d9c7`, SDK `9e339019` and upstream JiuwenSwarm `02b37f47`. JiuwenBox source supplies sandbox/job mechanisms, not an integrated OCI/whole-VM guarantee. OpenJiuwen compatibility and possible contributions remain targets. Current M1 freezes a run; accepted-result transfer and adaptive cross-batch execution remain explicit integration work.
+
+This is ready for a design discussion. No integrated runtime, termination, privacy, GPU access, long-duration reliability or research improvement result is implied. Slide 15 states observations required before those claims. Resource savings and research value remain hypotheses to measure.
+
+## Reusable source
+
+`system_deck.mjs` is the current native slide source; `modelRouting` updates slide 7 and the related stack/evidence/acceptance tables after the base callbacks; `jiuwenboxFit` adds the reuse map on slide 17 and updates the appendix index; `export_jiuwenbox.mjs` exports the reviewed live state for local PowerPoint because this external session supports inspection and PNG previews only. `build_slides.mjs` and `review/` retain the previous story. Current renders are in `review-system/`; the full original upstream figure is in `references/`. Page ID: `page_7a233186a3548191869c85106fc552b4`. Reconnect that page for future live edits.

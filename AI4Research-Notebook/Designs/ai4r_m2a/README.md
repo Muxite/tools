@@ -1,0 +1,54 @@
+---
+id: ai4r-m2a-readme
+status: proposed-runtime-unverified
+source: ai4r_m2a/3-agent-reference/source-manifest.json
+last_reviewed: 2026-10-30
+next_action: Implement against the acceptance matrix and attach measured evidence
+---
+# ai4r_m2a — adaptive research with dependable capabilities
+
+**Design proposal · 29 October 2026 · runtime acceptance NOT RUN.** The goal is JiuwenSwarm that is substantially better at long-running, open-ended research: it can change its next action as evidence changes, while preserving accuracy, reproducibility, recoverability and useful deliverables.
+
+JiuwenSwarm remains the agent platform. AI4R supplies a pool of portable capability capsules (CCs), enforced verification, research evidence and artifact release rules. A capsule is a category package containing related capabilities, their declarations and checks. A long research project is not a frozen chain of stage nodes.
+
+![Capability pool metaphor](diagrams/pool-illustration.png)
+
+The bot keeps the research project outside the pool and enters to select useful capabilities. Color represents compatibility with the current need; incompatible inputs exclude a capability before relevance ranking. Distance represents current relevance among eligible choices. Floatie handles represent bundled checks. The circulation filter observes use and triggers reevaluation; it does not replace those checks. Admission brings qualified releases in; withdrawal removes active availability while retaining evidence. This illustration is explanatory; the diagrams and rules below define the design.
+
+## First build target: Stage 1
+
+**Coding agents must start with [Stage 1 — one dependable research loop](1-human-required/00-stage-1.md).** Build the two-capsule slice and pass its seven exit criteria before continuing to Waves B–D. Stage 1 is the first checkpoint, not full M2a completion.
+
+## Level 1 — required human reading
+
+Read these five short views in order. Each has a diagram and a concrete decision boundary.
+
+1. [System and research loop](1-human-required/01-system.md): what it does, who owns what, and a late-discovery example.
+2. [Capabilities and capsules](1-human-required/02-capsules.md): what is packaged, compatibility, and standalone use.
+3. [Reliability and scientific accuracy](1-human-required/03-reliability.md): checks, recovery, reevaluation, reproducibility.
+4. [Artifacts and long-running work](1-human-required/04-artifacts.md): durable progress, accepted outputs and delivery.
+5. [Build scope and definition of done](1-human-required/05-build-and-done.md): initial capsules, incremental delivery and measured acceptance.
+
+## Level 2 — relevant human detail
+
+[Runtime and discovery](2-human-relevant/runtime-and-discovery.md) · [Verification and lifecycle](2-human-relevant/verification-and-lifecycle.md) · [Portability and providers](2-human-relevant/portability-and-providers.md) · [Artifacts and recovery](2-human-relevant/artifacts-and-recovery.md) · [Evaluation and decisions](2-human-relevant/evaluation-and-decisions.md).
+
+The core above is independent of today's code diff. [Conversion and integration](2-human-relevant/conversion-and-integration.md) is the separately maintained mapping from an existing codebase to this target. A different JiuwenSwarm checkout can follow the same core without inheriting our old stage architecture.
+
+## Level 3 — coding-agent reference
+
+Start at [agent handoff](3-agent-reference/README.md). It links draft schemas, fixtures, obligations, conversion inventory, source receipts and the package validator. Ask “am I following the plan?” against the obligation IDs; ask “am I done?” against their runtime evidence, not whether a diagram or a schema exists.
+
+## Authority and limits
+
+This folder is a self-contained proposal in the library, not a claim that M1/M1plus or upstream already implements it. Level 1 and Level 2 define behavior; Level 3 serializes that behavior and must be changed with it. Conversion notes do not override core requirements. No runtime acceptance has been demonstrated by authoring this package.
+
+Existing lab choices (a VM boundary, containerized execution, external stop control) can host this design. This package neither replaces that infrastructure design nor requires a new lab controller to demonstrate the research loop. A lab's execution provider must enforce the same effect, recovery and evidence contracts. Factory/RSI integration uses the admission boundary; rebuilding either is outside this first delivery.
+
+The full folder can be copied into another Obsidian vault. Required links stay inside it. Historical source snapshots are immutable provenance, not required transitive reading. [Source map](3-agent-reference/sources.md) distinguishes direct requests, prior evidence, our modified implementation and upstream pins.
+
+[Diagram sources and previews](diagrams/README.md) · [Package integrity results](package-validation.json). Runtime qualification is recorded separately and remains NOT_RUN.
+
+## Capsule packaging and positioning — 30 October update
+
+[Portable, vetted capability packages](2-human-relevant/capability-capsule-positioning.md) is the recommended explanation. The [packaging and trust contract](2-human-relevant/capsule-packaging-and-trust.md) makes container images, dependency locks, clean add/remove, dedicated verification, historical quality thresholds and RSI permissions explicit. Basic lifecycle support belongs in M2a; broad spatiotemporal composition remains deferred. The user reports implementation and trials underway; this documentation task has not independently qualified those runs.

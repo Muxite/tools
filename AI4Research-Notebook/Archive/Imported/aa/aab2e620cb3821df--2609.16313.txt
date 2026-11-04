@@ -1,0 +1,1657 @@
+
+
+===== page 1 =====
+Cognitive Admission Control:
+Risk-Conditioned Assurance for Consequential Actions
+in Agentic Distributed Systems
+Jun He
+OpenKedge.io
+Deying Yu
+OpenKedge.io
+Abstract
+In agentic distributed systems, an agent may be authorized to
+mutate external infrastructure while lacking evidence that the
+mutation is ready to execute. Cognitive Admission Control
+(CAC) makes this evidence requirement explicit. A policy
+maps a typed action and its modeled risk to assurance obli-
+gations specifying predicates, evidence classes, scope, fresh-
+ness, and witness-set constraints. A deterministic evaluator
+distinguishes satisfied, violated, and unresolved obligations;
+unresolved conditions produce targeted evidence-acquisition
+requests. Successful admission produces a certificate binding
+the action, its witness manifest, and dispatch-time guards.
+We formalize the admission calculus and the assumptions
+connecting it to mediated execution. The guarantees are
+policy-relative: physical safety additionally requires sound
+evidence, an adequate environment model, and preservation
+of relevant conditions through the effect. A TypeScript pro-
+totype is evaluated in 2,730 controlled local trials with in-
+dependent effect observation and matched fault schedules.
+Across 390 CAC trials, 120 effects complete without mod-
+eled harm and no harmful effects occur. A live-policy base-
+line achieves the same completion count but admits the con-
+structed correlated-witness failure. Mechanism ablations iso-
+late guard, evidence-class, structural-cut, and remediation
+behavior. A further 9,000 measurements exercise the com-
+plete local dispatch path with persistent replay protection.
+These results establish tested implementation behaviors and
+local costs, not production failure rates or comparisons of
+language-model capability.
+1
+Introduction
+In agentic distributed systems [1], an autonomous agent au-
+thorized to promote a database replica may still lack evidence
+that the replica is current, that the old primary is fenced, or
+that the proposed target matches the approved scope. The
+access decision and the operational preconditions answer dif-
+ferent questions. This distinction matters when a runtime
+accepts a generated tool call whose supporting observations
+may be incomplete, stale, or derived from a shared faulty
+source.
+Existing systems already separate untrusted computation
+from trusted enforcement. Access-control engines evalu-
+ate policy predicates, proof-carrying code checks consumer-
+specified safety conditions, and agent transaction runtimes
+validate proposed work before commitment [2–4]. The prob-
+lem addressed here is how to make missing evidence an ex-
+plicit part of this interface: which evidence must an action
+supply, what remains unresolved, and which parts of a suc-
+cessful evaluation must still hold when execution begins?
+We propose Cognitive Admission Control (CAC), a
+policy-governed admission layer for consequential actions
+in agentic distributed systems. CAC maps a typed proposal
+and a controller-visible risk profile to a set of assurance obli-
+gations. Each obligation specifies a predicate, acceptable
+evidence classes, scope, freshness, and any set-level require-
+ments. The evaluator returns satisfied, violated, or unknown.
+Missing evidence produces a remediation contract; affirma-
+tive violation produces denial. A successful evaluation yields
+a certificate binding the proposal, the supporting witnesses,
+and dispatch-time guards.
+Consider a failover policy requiring a receipt for replica-
+tion state and a separate receipt confirming primary fencing.
+A fresh lag measurement cannot discharge the fencing obli-
+gation, regardless of how many times the agent repeats it or
+how much reasoning it performs. Once both obligations are
+satisfied, the certificate remains usable only within its scope
+and validity interval. If a bound state version changes, the
+gateway rejects dispatch. Preserving the same conditions until
+the database applies the effect requires target-side conditional
+execution or a transaction protocol.
+This design makes a policy’s assurance requirements in-
+spectable and actionable. It does not make the policy correct
+by construction. An omitted dependency can produce an in-
+complete obligation set, and an authentic sensor can report a
+false value. We therefore separate policy-relative admission,
+mediated dispatch, and physical-world safety throughout the
+1
+arXiv:2609.16313v1  [cs.DC]  14 Sep 2026
+
+
+===== page 2 =====
+model.
+1.1
+Contributions
+The paper makes three contributions:
+1. A typed admission calculus connecting risk-conditioned
+obligation selection, ternary evidence discharge, and
+targeted evidence acquisition (Sections 3–4).
+2. Explicit refinement conditions connecting a successful
+evaluation to a witness manifest, a bounded capabil-
+ity, and guarded dispatch. The formal results state the
+information and trust assumptions needed for these con-
+nections (Section 5).
+3. A TypeScript prototype with bounded witness search and
+persistent local replay protection, evaluated in 2,730 con-
+trolled trials and 9,000 complete-path timing samples.
+Independent effect observation, matched fault schedules,
+and mechanism ablations make the tested behaviors re-
+producible (Sections 7–10).
+The contribution is the admission interface and its compo-
+sition rules, not a new access-control expressiveness result, a
+proof of general agent safety, or an empirical comparison of
+language models. The current evaluation establishes selected
+prototype behaviors; it does not establish a production safety
+rate.
+2
+From Authority to Readiness
+Authorization and readiness can be evaluated by the same pol-
+icy engine. Their distinction is informational: a check over
+identity and scope cannot determine an operational condi-
+tion absent from its inputs. ABAC may incorporate dynamic
+state, and a sufficiently expressive policy engine can imple-
+ment CAC’s predicates. CAC specifies the evidence lifecycle
+around those predicates: acquisition, provenance, conflict
+handling, expiration, and binding to dispatch.
+2.1
+Resources, Evidence, and Discharge
+Let R bound tokens, context, retrieval calls, inspection calls,
+verification compute, elapsed time, and cost:
+R = ⟨T, Cctx, M, Atool, Vcpu, L, $⟩.
+(1)
+A process consumes resources to produce evidence E; the
+evaluator checks E against required obligations Ω:
+R
+acquisition
+−−−−−→E
+discharge under Π
+−−−−−−−−−→admission verdict.
+(2)
+More compute can improve reasoning [5, 6]. Its allocation
+alone does not certify that a particular observation was made
+or remains current. Likewise, a database role observation does
+not establish replication completeness: distinct predicates
+require evidence with the appropriate semantics.
+2.2
+Independent Enforcement
+The proposer may generate proofs, collect telemetry, or sug-
+gest verification steps. It cannot set the evaluator’s required
+predicates or unilaterally mark them satisfied. Model confi-
+dence is usable only if the governing policy explicitly defines
+and justifies its evidentiary role; confidence is not a general
+substitute for a fresh external observation.
+The admission verdict and canonical witness selection are
+deterministic for fixed proposal, modeled state, evidence, and
+evaluation context. Certificate issuance additionally uses an
+issuance time and a fresh nonce, so repeated evaluations need
+not produce byte-identical certificates. The trust boundary
+separates the evidence-producing process from the code that
+interprets evidence and authorizes dispatch.
+2.3
+Consequential and Lightweight Paths
+Policy classifies operations by their modeled consequences.
+Operations below its threshold may use ordinary authorization
+and lightweight mediation. Consequential actions require the
+obligation-based admission path. Read-only operations are
+not automatically low-risk: disclosure, resource contention,
+or diagnostic side effects may make them consequential. Clas-
+sification belongs to the trusted control plane; a classification
+miss is outside the conditional guarantee for correctly classi-
+fied actions.
+3
+System, Risk, and Evidence Model
+3.1
+State and Trust Boundary
+An agent proposes operations to an execution gateway K. The
+agent may produce incorrect plans or evidence, but cannot
+modify the trusted evaluator, signing keys, policy, or gateway.
+Complete mediation requires that target credentials and net-
+work access remain confined to K. Identity, observation chan-
+nels, policy configuration, and the gateway’s state sources are
+explicit trust dependencies, not properties established by the
+agent.
+Let S∗be the external state space and S the space of
+controller-visible snapshots. A valid snapshot s ∈S rep-
+resents a nonempty set γA(s) ⊆S∗of possible external
+states under environment model A. The live state s∗need
+not be uniquely determined by s. Model fidelity requires
+s∗∈γA(s) and coverage of relevant external transitions. An
+inconsistent snapshot with empty concretization is rejected,
+not treated as vacuously safe. An agent’s internal belief ˆs is a
+separate object and supplies no privileged access to s∗.
+3.2
+Intent and Action
+Definition 1 (Intent and proposal).
+An intent i
+=
+⟨goal, scope, constraints⟩specifies desired external states,
+2
+
+
+===== page 3 =====
+permitted targets, and operational constraints. A proposal
+is
+q = ⟨i, a, params, scope,
+principal, sv, constraints⟩,
+(3)
+where a identifies a tool operation and sv is the state version
+used to formulate it. The evaluator checks a normalized,
+schema-valid proposal. Its canonical representation includes
+every field affecting interpretation or execution.
+Definition 2 (Modeled consequence and safety). Let
+PostA(q, s) contain all possible external post-states at-
+tributable to q from states in γA(s) under the declared transi-
+tion model. The proposal is consequential when its worst-case
+modeled loss crosses a policy threshold:
+sup
+x∈γA(s)
+y∈PostA(q,x)
+LossΠ(x, y) ≥τΠ.
+(4)
+Here PostA(q, x) denotes transitions from a particular exter-
+nal state x; their union defines PostA(q, s). Modeled safety
+is
+SafeΠ(q, s) ⇐⇒∀y ∈PostA(q, s) : InvariantΠ(y). (5)
+Loss thresholds classify actions; they do not themselves prove
+safety. Unknown or unsupported transition models require
+conservative classification or escalation.
+3.3
+Risk and Policy
+The controller computes a policy-relative risk vector
+ρ(q, s) = ⟨C, Bblast, I, U, D, P⟩∈R,
+(6)
+representing consequence severity, blast radius, irreversibility,
+observational uncertainty, dependency exposure, and adverse
+plausibility. Each coordinate has a declared preorder. The
+product preorder is ρ1 ⪯ρ2 iff every coordinate of ρ1 is
+below the corresponding coordinate of ρ2. Profiles can be
+incomparable. These are policy categories, not calibrated
+probabilities unless an estimator is separately validated.
+The policy snapshot Π maps the proposal, snapshot, and
+risk to obligations. The mapping is trusted configuration.
+Determinism makes its output reproducible, not necessarily
+conservative or adequate.
+3.4
+Evaluation Context and Receipts
+Definition 3 (Evaluation context).
+χ = ⟨Πeval, teval, Bop, Deval, Aeval⟩
+(7)
+pins policy and source registrations, evaluation time, opera-
+tional budget, dependency topology, and authorization state.
+Declarative admissibility is independent of Bop; budget ex-
+haustion may terminate the operational procedure without
+changing whether the evidence logically satisfies policy.
+All receipt timestamps must be comparable in a declared
+clock domain. We use a normalized time scale with no future-
+dated receipts. A distributed deployment must provide authen-
+ticated time normalization and conservative skew bounds; un-
+related local monotonic-clock readings cannot be subtracted
+directly.
+Definition 4 (Evidence receipt).
+e = ⟨id, claim, class, source, provenance,
+scope, tobs, νs, integrity, dependencies⟩.
+(8)
+The receipt binds a typed claim to its source, observation time,
+scope, and state version. Receipt identifiers are unique and
+content-bound; duplicate identifiers with different contents
+are rejected. Authenticity establishes origin and integrity
+under the registered trust roots. It does not establish the truth
+of the claim.
+3.5
+Obligations and Witness Eligibility
+Definition 5 (Assurance obligation). An obligation ω de-
+clares a predicate, verification kind, scope, accepted evidence
+classes Eclass, freshness horizon ∆tmax, set constraints, op-
+tional EFD requirement, guard templates, and enforcement
+mode (required or advisory). Typical kinds are observation,
+verification, simulation, quorum, and dual control. Its identi-
+fier and policy epoch bind these fields.
+A receipt is locally eligible exactly when it is authentic,
+belongs to an accepted class, covers the required scope, has a
+compatible state version, and satisfies
+0 ≤teval −e.tobs ≤ω.∆tmax.
+(9)
+We
+denote
+this
+conjunction
+by
+LocallyEligibleΠ(e, ω, s, teval)
+and
+its
+candidate
+pool
+by Eω. Rejection diagnostics may overlap: an untrusted
+receipt can also be stale.
+For W ⊆Eω, WitnessValidΠ(W, ω, s) checks the de-
+clared set constraints, such as distinct-source cardinality, prin-
+cipal separation, or reconciliation. Counting receipts does
+not count independent sources. Separate entailment relations
+determine whether W supports the predicate or its negation.
+Both polarities must satisfy their declared witness-validity
+requirements; a single negative receipt is not automatically
+a valid quorum counter-witness. A policy may separately
+declare that one trusted veto is sufficient.
+3.6
+Structural Epistemic Fault Domains
+Following EFD [7], let BE be a finite basis of modeled root
+faults, D(v) ⊆BE the exposure set of verifier v, and Γ a
+nonempty family of nonempty decisive coalitions of a panel
+Q. The structural cut is
+κE(Q, Γ) = min{|F| : F ⊆BE, ∃C ∈Γ,
+∀v ∈C, F ∩D(v)̸ = ∅}.
+(10)
+3
+
+
+===== page 4 =====
+The minimum of an empty feasible set is +∞. In a deploy-
+ment, an unknown exposure profile must be rejected rather
+than interpreted as a fault-free verifier. The shorthand κE(W)
+uses the distinct sources in W and the obligation’s declared
+coalition rule, proposition, and temporal context.
+A cut of at least k excludes decisive corruption by fewer
+than k modeled roots only if every erroneous approval is cov-
+ered by an active root, the exposure map is conservative, and
+Γ matches the actual authorization rule. This is a structural
+guarantee, not a statement of statistical independence.
+4
+Cognitive Admission Control
+4.1
+Required Obligations
+The policy selects obligations using the typed proposal and
+modeled state:
+ΩΠ(q, s) = FΠ(ρ(q, s), q, s).
+(11)
+Required obligations constrain admission; advisory obliga-
+tions produce diagnostics. Policies may emit dual-control
+requirements when risk exceeds autonomous authority. An
+approval receipt cannot override a separate violated obliga-
+tion.
+4.2
+Discharge Semantics
+For a required obligation ω, let W+
+ω and W−
+ω be the finite
+sets of eligible, valid witness sets supporting its predicate
+and its negation, respectively. Entailment and validity are
+total policy-defined procedures over a restricted predicate
+language. They do not invoke an unrestricted theorem prover
+with an assumed termination guarantee.
+A policy supplies a strict partial preference order on valid
+witnesses. Let Mω be the maximal elements of W+
+ω ∪W−
+ω .
+Write Pω and Nω for the presence of positive and negative
+witnesses in Mω, respectively. The discharge result Dω =
+Discharge(ω, E, s, χ) is:
+Dω =
+
+
+
+
+
+
+
+
+
+SATISFIED(W)
+Pω ∧¬Nω,
+VIOLATED(W)
+Nω ∧¬Pω,
+UNKNOWN(Conflict)
+Pω ∧Nω,
+UNKNOWN(c)
+¬Pω ∧¬Nω.
+(12)
+A witness cannot support both polarities under a well-formed
+entailment relation. Equal-priority or incomparable oppos-
+ing witnesses produce conflict. Only after the polarity is
+established does the evaluator select a canonical witness from
+Mω.
+When no valid witness exists, c identifies a failed structural
+constraint, stale or future-dated evidence, untrusted prove-
+nance, incompatible version, or missing usable evidence. A
+fixed diagnostic precedence makes c reproducible; it does
+not alter the semantic verdict. The policy must distinguish a
+missing observation from evidence that its predicate is false.
+Canonical selection and finite search.
+Among maximal
+witnesses of the selected polarity, the specification ranks by
+policy priority, best worst-case freshness, structural cut when
+required, smallest sufficient cardinality, and a canonical en-
+coding tie-breaker. This defines a unique result on finite
+inputs. It does not imply efficient exhaustive subset search:
+a pool of n receipts has 2n subsets. Implementations must
+restrict the witness grammar or bound search. A truncated
+search returns unknown or abort, never a permit inferred
+from incomplete conflict inspection. The prototype enumer-
+ates both polarities up to twelve unique eligible receipts per
+obligation and otherwise returns unknown. It implements
+a policy-defined priority order over exact source identifiers;
+witnesses with equal priority remain incomparable across
+polarities.
+4.3
+Declarative Admissibility
+Definition 6 (CAC admissibility). AdmissibleΠ(q, s, E, χ)
+holds when:
+1. q is schema-valid, bound to an injective canonical encod-
+ing, authorized under χ.Aeval, and statically compliant
+with Π = χ.Πeval;
+2. the policy resolver enumerates every obligation triggered
+by the fixed inputs;
+3. every required obligation returns SATISFIED(Wω) under
+the discharge rule;
+4. the derived guard set Gq and permitted invocation enve-
+lope Eq satisfy the coverage conditions below.
+Admissibility is independent of operational budget. It makes
+no assertion about obligations absent from the policy.
+Witness manifest.
+The manifest preserves the relation be-
+tween each required obligation and its canonical witness:
+Wq = {(ω, Wω) : ω ∈Required(ΩΠ(q, s))}.
+(13)
+Local eligibility supplies freshness and version compatibil-
+ity. Set validity supplies the declared quorum and separation
+conditions. Advisory results are recorded separately.
+Envelope coverage.
+An exact-action certificate allows
+only q.
+An envelope certificate may allow a variant
+q′, but parameter attenuation alone is insufficient:
+a
+different target can require different evidence.
+Define
+ManifestCoversΠ(Wq, q′, s, χ) to require that every obliga-
+tion for q′ has a compatible manifest witness which remains
+eligible, valid, and affirmatively entails that obligation under
+the same conflict semantics. Envelope soundness requires,
+for every allowed consequential q′,
+ManifestCoversΠ(Wq, q′, s, χ)
+∧RequiredGuardsΠ(q′, s, χ) ⊆Gq.
+(14)
+4
+
+
+===== page 5 =====
+The controller restricts envelope mode to approved templates
+with independently justified semantic coverage. The template
+also fixes the subject and action interpretation and establishes
+static compliance for each allowed variant; the gateway sep-
+arately rechecks live authorization. The controller checks
+template identity, policy epoch, parameter domain, coverage
+requirements, and guards online. Exact-action mode reduces
+coverage to q itself, but still requires guard completeness.
+General envelope verification is not claimed to be decidable;
+signed template approval is a trust assumption, not a substitute
+for its semantic justification.
+4.4
+Operational Decisions and Remediation
+The controller returns one of five outcomes:
+• PERMIT(Cq) when admissibility and certificate validity
+checks succeed;
+• DENY for authorization, static-compliance, or decisive
+required-obligation violation;
+• DEFER with unresolved obligations and typed acquisi-
+tion requests;
+• ESCALATE when unresolved approval obligations need
+an authorized reviewer, retaining all other unresolved
+requirements;
+• ABORT when evaluation cannot finish within its opera-
+tional bounds.
+Exhaustion may prevent a permit even when the logical ad-
+mission conditions are satisfiable. A fresh evaluation context
+is captured on each remediation turn; evidence obtained after
+one evaluation is reconsidered in the next. Finite budgets
+bound the number of attempts, but useful completion requires
+available evidence and a sufficiently stable environment.
+A consequential diagnostic action must itself undergo ad-
+mission or use a separately approved bounded diagnostic
+capability. Recursive evidence acquisition cannot bypass the
+execution boundary. Preventing cyclic dependencies requires
+an additional well-founded acquisition discipline; it is not
+implied by the discharge rules.
+4.5
+Certificates and Expiration
+A certificate binds the subject, authority context, mode, pro-
+posal digest, envelope, policy epoch, witness digest, guards,
+issuance and expiration times, nonce, and signature. Digests
+use domain-separated canonical encodings:
+ProposalDigest(q) = H(dprop∥Canon(q)),
+WitnessDigest(Wq) = H(dwit∥Canon(Wq)).
+(15)
+The distinct fixed tags dprop and dwit prevent cross-type in-
+terpretation. Canonicalization rejects ambiguous encodings
+and includes all security-relevant fields.
+The earliest expiry of a supporting receipt bounds certifi-
+cate lifetime:
+twit =
+min
+(ω,W )∈Wq, e∈W(e.tobs + ω.∆tmax),
+(16)
+with +∞for an empty manifest. The mint enforces
+tissued ≤texp ≤min(twit, tpolicy, tauth, tcap).
+(17)
+If the bound precedes issuance, admission must be refreshed.
+A distributed clock implementation must subtract any uncer-
+tainty needed to make this expiry conservative.
+4.6
+Gateway Validation and Dispatch
+The gateway authenticates the presenter as the certified sub-
+ject and validates the certificate without consuming it:
+AdmissionValid(C, q′, χlive) ⇐⇒
+VerifySig(C)
+∧PresenterAuthorized(C)
+∧tissued ≤tnow ≤texp
+∧NonceUnused(C)
+∧EnvelopeValid(C, q′)
+∧GuardsHold(C.G, slive)
+∧PolicyEpochCompatible(C)
+∧AuthorizationStillValid(C, q′)
+∧NotRevoked(C).
+(18)
+The live context fixes the authenticated requester, current
+time, policy, authorization, and observed guard state for this
+check. A comparison of untrusted identity strings is not
+authentication. Unknown guards fail closed.
+After successful validation, the gateway performs an
+atomic unused-to-consumed nonce transition. Only the win-
+ner may dispatch:
+AuthorizedDispatchK ⇐⇒
+AdmissionValid(C, q′, χlive)
+∧CAS(C.nonce, Unused, Consumed).
+(19)
+Here CAS denotes an operational event, not a pure logical
+query. Both exact-action and envelope certificates are single-
+use. The forwarded operation must be the operation validated,
+and retries by the gateway or transport must not silently du-
+plicate it. Consumption and forwarding need not be atomic
+with each other; a crash between them can lose the operation.
+Nor are guard reads atomic with target execution. Section 5
+separates those guarantees.
+5
+Formal Properties
+The first two results explain why limited observations or
+resource accounting alone do not establish readiness. The
+5
+
+
+===== page 6 =====
+remaining results state implementation obligations connecting
+the calculus to dispatch. They are conditional properties
+of the specified controller; the prototype is not a verified
+implementation of the entire specification.
+5.1
+Information and Non-Substitution
+Theorem 1 (Authority–readiness separation). Fix q. Let
+an authorization mechanism observe only α(q, s). Suppose
+states s1, s2 share an allowed projection α0, but a required
+readiness predicate p is true in s1 and false in s2. The mech-
+anism allows both states and hence does not establish p. If
+CAC requires an obligation for p whose satisfaction implies
+p(s), it cannot admit s2.
+Proof. Equal projections give equal authorization decisions.
+Since α0 is allowed, authorization succeeds in s2, where p
+fails. Sound discharge of the required obligation would imply
+p(s2), a contradiction.
+The result concerns missing information, not the expres-
+siveness of authorization languages. It does not apply to a
+mechanism whose inputs and policy already establish p.
+Theorem 2 (Budget does not determine admission). Fix
+q, s, χ with sufficient operational budget.
+Suppose two
+evidence-acquisition procedures are feasible within the same
+resource envelope R: one returns evidence satisfying all ad-
+mission conditions, and the other omits a required witness
+without establishing a violation. Then allocation of R alone
+does not determine admission.
+Proof. The first procedure permits admission. The second
+cannot satisfy the missing obligation and yields a non-permit
+outcome. Both are feasible under the same budget.
+The feasibility assumption is necessary: a zero-budget pro-
+cess or an unsatisfiable policy need not admit either execution.
+The result does not imply that additional compute cannot im-
+prove evidence acquisition.
+Proposition 1 (Compensatory scores can bypass a required
+condition). Suppose a scalar rule admits when f(z) ≥θ. A
+required obligation remains unsatisfied along an attainable
+sequence zn, while f(zn) →+∞through unrelated proxy
+features. For every finite θ, the scalar rule admits some zn
+that violates conjunctive admission.
+Proof. By divergence, there is an n for which f(zn) ≥θ.
+The required obligation remains unsatisfied by assumption,
+so CAC admissibility is false.
+This applies, for example, to a positive-weight unbounded
+proxy in an additive score. It excludes non-compensatory
+scalar encodings of conjunction and does not assume that all
+practical proxy features are unbounded.
+5.2
+Admission and Enforcement
+Theorem 3 (Admission refinement). Assume finite, schema-
+valid inputs; complete policy resolution; total determin-
+istic discharge with sound witness validation; and suc-
+cessful guard/envelope validation. If Algorithm 1 returns
+PERMIT(Cq), then AdmissibleΠ(q, s, E, χ) holds and every
+required obligation has a corresponding valid witness in the
+bound manifest.
+Proof. The algorithm reaches minting only after authoriza-
+tion and static compliance succeed. Each required obligation
+must either add a satisfied witness or prevent the permit path
+by violation, unresolved status, or failure. Complete reso-
+lution ensures no triggered obligation is omitted. The final
+guard/envelope check establishes the remaining admission
+condition. Canonical manifest construction binds exactly the
+collected obligation–witness pairs.
+This is a refinement argument for the specified algorithm,
+not a proof that its evidence claims are true or that a particular
+implementation matches every premise.
+From
+admission
+to
+modeled
+safety.
+Let
+ConditionsΠ(q, s) mean that the semantic conditions
+required by policy actually hold. Evidence soundness means
+AdmissibleΠ(q, s, E, χ) =⇒ConditionsΠ(q, s).
+Policy adequacy is the independent specification obligation
+PolicyAdequate(Π, A) ⇐⇒∀q, s : ConditionsΠ(q, s)
+=⇒SafeΠ(q, s).
+(20)
+Combining the two gives modeled safety at the evaluated
+state. External safety additionally requires model fidelity and
+preservation or atomic revalidation of all decisive conditions
+until the effect. These assumptions cannot be derived from a
+certificate signature.
+Property 1 (Mediated dispatch). Assume complete media-
+tion, authentic certificates issued only by the specified mint,
+correct gateway validation, and a durable linearizable nonce
+store shared by all gateway workers. Every governed dispatch
+has a valid certificate and consumes its nonce exactly once.
+No certificate authorizes more than one gateway dispatch.
+Proof. Complete mediation makes the gateway the only dis-
+patch path. Validation rejects an invalid certificate. Atomic
+unused-to-consumed transition has at most one successful
+caller per nonce; only that caller may dispatch. Unforgeabil-
+ity and correct minting connect an accepted certificate to an
+admission evaluation, except with negligible cryptographic
+failure probability.
+A crash after consumption can lose an operation. A failed
+or ambiguous target response does not permit reuse. Thus the
+6
+
+
+===== page 7 =====
+property gives at-most-once gateway dispatch, not exactly-
+once effects, successful execution, or automatic recovery.
+Durability and retention must prevent nonce resurrection after
+restart.
+Property 2 (Execution-envelope preservation). Assume
+collision-resistant hashing of an injective canonical encoding
+and correct gateway checks. In exact-action mode, a dis-
+patched proposal matches the certified proposal. In envelope
+mode, it satisfies the explicit envelope predicate. If the tem-
+plate’s semantic coverage and guard-preservation obligations
+hold, the manifest covers every required obligation of the
+dispatched variant at the evaluated snapshot.
+Proof. A different exact-action encoding fails digest equality
+except with negligible collision probability. In envelope mode
+the gateway rejects a false envelope predicate; the universal
+template assumption supplies coverage and guard preserva-
+tion for an accepted variant.
+Parameter bounds alone do not prove semantic coverage.
+A signature on an approved template authenticates approval,
+not its proof.
+Property 3 (Guard-bound dispatch validity). If any required
+bound guard is false or cannot be evaluated at gateway val-
+idation time, the gateway rejects dispatch. This requires
+fail-closed evaluation of every bound guard and binding of
+the checked request to the forwarded request.
+Proof. Guard validity is a conjunct of AdmissionValid. Fail-
+ure of a conjunct prevents the nonce-consumption and dis-
+patch path.
+Validation versus effect time.
+Mode A checks guards be-
+fore forwarding. Mode B translates relevant guards into
+atomic target-side preconditions, covering only the state those
+preconditions protect. Mode C delegates preservation through
+commitment to a separately justified transaction protocol. The
+nonce CAS serializes capability use; it does not freeze the
+environment or serialize changes to unrelated guard state.
+5.3
+Monotonicity and Structural Cuts
+Proposition 2 (Threshold-policy monotonicity). Fix pro-
+posal, policy epoch, and all non-risk inputs. If ΩΠ(ρ) =
+{ωj : τj ⪯ρ} for fixed obligations ωj, then ρ1 ⪯ρ2 implies
+ΩΠ(ρ1) ⊆ΩΠ(ρ2).
+Proof. If τj ⪯ρ1, transitivity gives τj ⪯ρ2.
+Replacing an obligation by a stronger predicate requires
+a semantic strength order, not literal set inclusion. Nothing
+follows for incomparable risk profiles or changing non-risk
+inputs.
+Untrusted proposer and evidence producers
+Trusted policy resolver and evaluator
+Typed obligations; discharge; remediation
+Certificate mint
+Proposal, witnesses, guards, expiry, nonce
+Execution gateway
+Authentication, validation, nonce consumption
+Target adapter and external service
+Conditional effect or separate transaction
+Remediation
+(missing evidence)
+Figure 1: Proposed deployment interface. The prototype
+exercises local evaluator, certificate, and gateway calls; a
+production boundary additionally requires credential and net-
+work confinement.
+Proposition 3 (Structural-cut bound, imported from EFD).
+Assume conservative exposure, closed causal accounting, au-
+thorization alignment with Γ, and that an uncorrupted verifier
+rejects a false proposition. If κE(Q, Γ) ≥k, fewer than k
+active modeled roots cannot induce a decisive false approval.
+Proof. Any decisive false approval requires every member
+of some C ∈Γ to be corrupted. Closed causal accounting
+and conservative exposure then require the active fault set
+to intersect every member’s exposure set, contradicting the
+minimum in Equation (10).
+The bound concerns modeled roots. It gives no probability
+of failure and no protection against omitted common causes.
+Appendix A gives explicit counterexamples at the boundaries
+of these statements.
+6
+Reference Controller and Trust Boundary
+The prototype separates schemas, policy resolution, evidence
+checks, work-loop evaluation, certificates, gateway valida-
+tion, and domain adapters into TypeScript packages. The
+benchmark invokes them in one process. Figure 1 shows the
+intended deployment boundary; network confinement and
+authenticated remote interfaces are deployment requirements,
+not consequences of package separation.
+6.1
+Trust Requirements
+The enforcement TCB contains the policy resolver, evidence
+evaluator, mint, gateway, and replay store. Their correctness
+establishes policy-relative enforcement. External identity,
+time, telemetry, and topology services supply trusted inputs.
+7
+
+
+===== page 8 =====
+Algorithm 1 CAC admission specification
+Require: Typed q, snapshot s, evidence E, context χ
+1: if budget exhausted or verification cannot finish then
+2:
+return ABORT
+3: end if
+4: if schema, authorization, or static compliance fails then
+5:
+return DENY
+6: end if
+7: Ω←FΠ(ρ(q, s), q, s)
+▷Complete resolution
+8: W ←∅; U ←∅
+9: for each required ω ∈Ωdo
+10:
+r ←Discharge(ω, E, s, χ)
+11:
+if r = VIOLATED(W) then
+12:
+return DENY
+13:
+else if r = UNKNOWN(c) then
+14:
+U ←U ∪{ω}
+15:
+else
+16:
+Add (ω, W) from r to W
+17:
+end if
+18: end for
+19: if U contains approval obligations then
+20:
+return ESCALATE(U)
+21: else if U̸ = ∅then
+22:
+return DEFER(U)
+23: end if
+24: Derive Gq, Eq from approved policy templates
+25: if coverage, guards, or issuance bounds are unverified
+then
+26:
+return ABORT
+27: end if
+28: Cq ←Mint(q, W, Gq, Eq, χ)
+29: return PERMIT(Cq)
+Evidence-producing models remain outside the TCB, but
+any model output accepted as a witness inherits the policy’s
+explicit verifier assumptions.
+The gateway requires an authenticated subject binding and
+exclusive access to target credentials. The replay store must
+be shared and durable across workers. The prototype sup-
+plies both an in-memory store and a persistent local-file store.
+The latter uses exclusive creation followed by file and di-
+rectory flushes before dispatch; an eight-process race and a
+restarted store produce one successful nonce consumption.
+This requires local-filesystem semantics and does not estab-
+lish distributed linearizability, storage behavior under hard-
+ware failure, or network isolation.
+6.2
+Specification Algorithm
+Algorithm 1 states the permit-path conditions needed by Theo-
+rem 3. Unsupported inputs, indeterminate template coverage,
+and exhausted verification bounds must prevent permit.
+Table 1: Corrected local scenario families. Each named case
+has thirty parameter instances per controller.
+Family
+Cases and tested boundary
+Target state
+Healthy, excessive lag, offline candidate
+Evidence
+Initially missing, unavailable, wrong class,
+invalid rollback
+Dispatch change
+Candidate drift, authorization revocation
+Target response
+Benign failure, committed effect with lost
+response
+Source dependence
+Correlated witnesses, independent witnesses
+6.3
+Implementation Coverage
+The artifact implements typed receipts, Ed25519 signatures,
+policy-defined guard templates, and nonce consumption. Both
+positive and negative witnesses must satisfy the same set con-
+straints. Exhaustive bounded subset search replaces singleton-
+or-aggregate selection, and canonical ranking uses the com-
+puted structural cut rather than source count. The direct
+eligibility helper and diagnostics reject future timestamps
+consistently. Predicate evaluation uses a bounded conjunction
+language over typed fields and literal comparisons; it honors
+declared thresholds and cannot substitute a generic success
+flag for missing evidence. Unsupported guards fail closed.
+The controller’s normal permit path mints an exact-action
+certificate. Envelope utilities now independently bind the
+action class and evidence-covered proposal, reject absent
+constrained values, and enforce validity bounds. They con-
+servatively require readmission when a proposal changes,
+even if the new resource is allowed by the template. Gen-
+eral semantic coverage across distinct proposals therefore
+remains outside the implemented fragment. Guard anno-
+tations remain authored policy, not automatically verified
+invariant-preservation proofs. The 133 passing tests support
+the exercised behaviors; they are not a proof of conformance
+to the entire calculus.
+7
+CACBench: Controlled Local Scenarios
+CACBench exercises the model’s enforcement and avail-
+ability boundaries. The corrected suite contains thirteen lo-
+cal failover state machines, summarized in Table 1. It in-
+cludes useful completion, harmful execution, refusal, and
+ambiguous-response cases. The suite is constructed around
+CAC’s mechanisms and is not a representative sample of
+operational incidents.
+State and evidence.
+The world records primary and can-
+didate identities, candidate role, unreplicated bytes, rollback
+validity, and effect counters. The tested policy requires zero
+reported replication lag, standby health, and a rollback attes-
+tation. Telemetry receipts carry source identity, class, obser-
+vation time, scope, and state version. The initial-evidence
+and acquisition paths can be controlled independently: an
+8
+
+
+===== page 9 =====
+underprepared but healthy target supplies missing evidence,
+while an unavailable source supplies none.
+Faults at the boundary.
+Dispatch drift takes the candi-
+date offline after initial evidence is available. Revocation
+removes the actor’s authority at the same pre-dispatch phase.
+A harmful effect can still return a successful acknowledge-
+ment, forcing the evaluator to distinguish target response from
+ground-truth outcome. The benign-failure case returns an er-
+ror before changing state; the ambiguous case changes state
+successfully before losing its response.
+Correlated approval.
+Three approving sources share one
+modeled root in the correlated-witness case. The policy re-
+quires all three and a structural cut of at least two. The
+paired independent-witness case uses three disjoint roots and
+a healthy target. These fixtures test enforcement of declared
+exposure maps with synthetic receipts. They do not invoke
+language models, a formal solver, or a deployed telemetry
+service.
+Legacy diagnostics.
+The historical F1–F11, E1, remedia-
+tion, and assumption-violation fixtures remain in the artifact.
+Their archived logs are retained for provenance, and selected
+fixtures remain regression tests. They are not pooled into the
+corrected comparison. The new state machines are defined in
+repairedScenarios.ts; the observer and run protocol
+are described next.
+8
+Evaluation Methodology
+8.1
+Execution and Observation
+We evaluate the TypeScript implementation in thirteen con-
+trolled local state machines. Each scenario instantiates a
+failover proposal, visible state, telemetry producers, autho-
+rization state, and a target transition function. The runner
+retains a separate privileged world snapshot and records ev-
+ery attempted target effect. These experiments execute the
+controller and its cryptographic checks; the target is a local
+model, not a deployed PostgreSQL or Kubernetes service. No
+language-model API is invoked.
+For each scenario, thirty seeds vary cluster identifiers, can-
+didate identities, and, where applicable, the magnitude of
+excessive replication lag. Every controller receives a fresh
+world for the same scenario and seed. Controller order ro-
+tates across seeds. The matrix contains 13 × 7 × 30 = 2,730
+trials. Seeds instantiate parameters within constructed fail-
+ure categories; they do not sample independent operational
+incidents.
+Independent outcome observation.
+The runner withholds
+privileged world state and scoring functions from the partici-
+pating controllers. Before and after each target invocation, it
+copies the world state and its completed-effect and harmful-
+effect counters. The target transition updates those counters
+according to the scenario’s preconditions; controller verdicts
+and response codes do not set the outcome labels. Traces
+retain invocation parameters, telemetry receipts, dispatch-
+boundary events, pre/post snapshots, and target responses.
+This is separation within one trusted process, not isolation
+against malicious controller code.
+The distinction is tested explicitly. A harmful transition
+can return a successful acknowledgement; a request can fail
+without modifying state; and an operation can complete while
+its response is lost. The observer records these cases sep-
+arately. Ambiguous responses do not trigger an automatic
+retry.
+Matched interventions.
+A shared pre-dispatch hook in-
+jects state drift or revokes authority immediately before each
+controller’s final execution gate. CAC therefore checks live
+guards after the same scheduled transition that the live-policy
+baseline sees. Evidence availability and the telemetry API are
+common across controllers; the number and timing of calls
+are part of each strategy. This schedule tests pre-gate drift, not
+the later interval between forwarding and effect application.
+8.2
+Comparators and Ablations
+AuthOnly checks an actual in-memory authorization snap-
+shot and static proposal constraints before proceeding to dis-
+patch. LivePolicy additionally rechecks live authorization,
+reacquires typed replica and rollback observations at the dis-
+patch boundary, and evaluates the required predicates. It
+rejects missing evidence and affirmative counterevidence. It
+does not issue an admission certificate or enforce EFD struc-
+tural cuts. This comparator tests the contribution relative to
+an environmental policy check, without claiming to reproduce
+a published access-control engine.
+The CAC controller uses the evidence work loop, certifi-
+cate, gateway, and declared EFD policy. Four ablations each
+remove one mechanism: NoGuard skips dispatch guards;
+NoEFD removes structural-cut requirements; NoRemedia-
+tion denies on deferral; and NoTypedEvidence broadens eli-
+gible evidence classes. The typing ablation does not change
+tool selection. We exclude the historical extra-simulation-
+obligation intervention because an unavailable receipt cannot
+establish a general cost of static policy.
+8.3
+Outcomes and Reproducibility
+For each intent trajectory j, the observer determines whether
+a harmful effect occurred and whether an effect completed
+without harm:
+UIER = 1
+N
+N
+X
+j=1
+1[UnsafeEffect∗(j)].
+(21)
+9
+
+
+===== page 10 =====
+SICR = 1
+N
+N
+X
+j=1
+1[Complete(j)
+∧¬UnsafeEffect∗(j)].
+(22)
+These predicates refer to the local transition model. Com-
+pletion without modeled harm does not certify authorization:
+a failover after revocation may complete physically while
+violating access policy. We report counts and individual
+mechanism contrasts, without population-level confidence
+intervals or significance claims.
+The run protocol fixes scenarios, seeds, controller identi-
+ties, source revision, and measurement settings. The study
+saves full JSONL traces and a SHA-256 manifest in a new di-
+rectory, refusing to overwrite existing output. An independent
+Python analysis checks file hashes, unique trial IDs, response
+categories, effect counters, aggregate counts, and timing sam-
+ple counts before generating the paper’s tables. The revised
+source passes 133 tests and strict TypeScript checking. One
+test compares the production structural-cut routine with di-
+rect fault propagation for all 43,561 three-voter profile/rule
+combinations over three roots.
+Historical archive.
+The previous 5,261-record batch is pre-
+served separately. Its controller-dependent labels, scripted
+model comparators, and incomplete timers cannot be repaired
+retrospectively. Its statistical and cost reports are not evidence
+for the results below. The corrected experiments report no
+model-token or monetary savings.
+9
+Observed Prototype Results
+9.1
+Completion, Refusal, and Harm
+Table 2 reports the corrected local matrix. CAC attempts
+150 target effects across 390 trials, completes 120 with-
+out modeled harm, and produces no harmful effects.
+It
+completes the healthy, underprepared, ambiguous-response,
+and independent-witness scenarios in all thirty parameter in-
+stances each. Thirty additional attempts encounter the benign
+target failure and leave state unchanged. The remaining 240
+trials do not reach the target. The zero-harm count describes
+these fixtures, not a bound on deployment failure probability.
+AuthOnly attempts all 390 effects, producing 180 harmful
+effects and 180 completions without modeled harm. Its com-
+pletion count includes physically successful operations after
+authorization revocation; it is not a count of policy-compliant
+executions. LivePolicy completes the same 120 intents as
+CAC, incurs the same thirty benign failures, and permits
+thirty harmful effects in the correlated-witness scenario. This
+suite therefore does not establish a general utility advantage
+over a competent live-policy check.
+Table 2: Independently observed local effects across thirteen
+constructed scenarios and thirty parameter seeds. Completion
+means an observed completed effect without harm; it does not
+certify authorization. Counts are descriptive, not population
+estimates.
+Controller
+Trials
+Attempts
+Complete
+Harm
+AuthOnly
+390
+390
+180
+180
+LivePolicy
+390
+180
+120
+30
+CAC
+390
+150
+120
+0
+NoGuard
+390
+180
+120
+30
+NoRemediation
+390
+120
+90
+0
+NoTypedEvidence
+390
+180
+120
+30
+NoEFD
+390
+180
+120
+30
+9.2
+Isolated Mechanism Contrasts
+Dispatch guards.
+All controllers encounter the same
+candidate-offline transition before their final gate. CAC and
+LivePolicy prevent target invocation. NoGuard proceeds in
+thirty trials, each producing an observed harmful effect. This
+isolates the tested guard check under a matched schedule. It
+does not validate atomic preservation after forwarding.
+Evidence classes.
+The wrong-class fixture supplies an au-
+thenticated static-verification receipt claiming zero lag while
+the world contains excessive unreplicated data. CAC refuses it
+as replica telemetry. NoTypedEvidence admits thirty harmful
+actions, with the same initial evidence and tool API. Unlike
+the archived F11 contrast, this intervention changes eligibility
+alone. It illustrates one erroneous evidence substitution, not
+the completeness of the evidence-class taxonomy.
+Structural cuts.
+The correlated-witness fixture supplies
+three approving sources exposed to one common fault, with
+an all-of-three policy requiring a cut of at least two. CAC
+rejects the resulting cut of one. NoEFD and LivePolicy each
+admit thirty harmful transitions. When the three sources
+instead have disjoint modeled roots and report a healthy world,
+CAC completes all thirty trials. This checks enforcement of a
+supplied dependency model; it does not measure errors from
+actual model panels or discover hidden correlations.
+Evidence acquisition and availability.
+CAC completes
+thirty initially underprepared intents after obtaining telemetry.
+NoRemediation completes none of those trials, reducing its
+total from 120 to 90. Both refuse all thirty intents for which
+evidence remains unavailable, even though the modeled target
+would otherwise be safe. Evidence availability therefore
+limits completion; failure to observe harm alone is insufficient
+to assess usefulness.
+10
+
+
+===== page 11 =====
+Table 3: Complete local path, in milliseconds: range of per-
+process medians and p99s over three fresh processes, each
+with 1,000 measured samples per workload. Includes file-
+backed guard reads and persistent nonce consumption; target
+execution is an in-process callback.
+Obligations/receipts
+Median range
+p99 range
+1/1
+4.65–5.69
+10.28–37.37
+4/4
+5.89–9.66
+14.46–22.48
+8/8
+24.91–26.86
+41.41–58.39
+9.3
+Response Semantics and Boundaries
+In the benign-failure fixture, CAC reaches the target thirty
+times, receives failure responses, and records neither com-
+pletion nor harm. In the ambiguous-response fixture, thirty
+effects complete but their responses are lost. The independent
+observer records completion, while the gateway returns an
+ambiguous outcome and does not retry. These cases show
+why response status, execution attempt, completion, and harm
+must remain separate fields.
+The older assumption-violation fixtures remain diagnostic
+examples of omitted dependencies, false trusted evidence,
+and insufficient guards. The corrected study makes no claim
+to eliminate those boundaries. Its results establish executable
+enforcement and recovery behaviors in a controlled model,
+including matched comparisons and observed effects. Oper-
+ational reliability still requires real workloads, deployment-
+level observers, and target-side concurrency tests.
+10
+Complete Local Execution Costs
+We measure a complete local path on macOS/ARM64 with
+Node.js v25.2.1 and an Apple M4 reported as ten logical
+CPUs. Three fresh processes each execute 1,000 measured
+iterations for workloads with one, four, or eight obligations
+and the corresponding number of distinct Ed25519-signed re-
+ceipts. Twenty warm-up iterations per workload are excluded.
+The archive retains all 9,000 measured samples and actual
+host metadata. We do not assume an isolated host or pool
+process repetitions into a population confidence interval.
+10.1
+Measurement Boundary
+Each iteration resolves policy, discharges every required obli-
+gation, constructs the witness manifest, and mints a fresh
+certificate. It then awaits a live-state JSON read from the
+local filesystem and invokes the gateway with that new certifi-
+cate. The gateway checks signature, binding, authorization,
+guards, time, and policy epoch; atomically creates a spent-
+nonce record; flushes the file and its directory; and invokes an
+instrumented target callback. Every iteration asserts success-
+ful discharge, exactly one target call, successful dispatch, and
+a consumed nonce. A subsequent replay rejection is checked
+and timed separately.
+The total is the elapsed interval from resolution through
+the awaited target return. It includes assertions within that
+interval, local guard-read cost, and persistent replay protec-
+tion. It excludes receipt acquisition, model inference, remote
+service execution, and subsequent replay-check timing. The
+target callback increments an execution counter; it is not a
+database mutation. These measurements establish local im-
+plementation cost, not end-to-end deployment latency.
+10.2
+Scaling and Limits
+Separate sweeps use one, four, eight, and twelve distinct
+receipts. They time eligibility, full discharge, canonical en-
+coding, and a manifest containing the entire receipt set; no
+receipt count is silently capped. Full-discharge timing in-
+cludes eligibility and canonical selection as well as subset
+search, so these components must not be interpreted as a non-
+overlapping decomposition. A separate EFD sweep varies
+both voters and roots over two, four, six, and eight, with dis-
+joint exposures and a two-of-n rule. The computed cut is two
+at every size. Each process repeats each scaling point five
+times.
+The discharge implementation enumerates nonempty sub-
+sets and checks both polarities. It is deliberately bounded at
+twelve unique eligible receipts per obligation; larger pools
+return unknown. Exact cut computation is also combinatorial.
+These measurements do not establish high-throughput behav-
+ior for large coalitions. Stronger witness search and durable
+replay protection cost more than an unchecked primitive call,
+and remote evidence acquisition may dominate both. A de-
+ployment evaluation must measure that additional work and
+effect-time concurrency under its actual storage and service
+configuration.
+The full-discharge sweep illustrates the cost of that bound:
+per-process medians increase from 0.072–0.079 ms for one
+receipt to 67.31–72.69 ms for twelve. This supports explicit
+admission input limits, not an extrapolation to thousands of
+receipts. Variation across the three full-path processes also
+cautions against treating a single median or p99 as a stable
+service-level objective.
+11
+Integration with Execution Systems
+Admission and commitment address different stages of
+an operation within post-deterministic distributed systems
+(PDDS) [1]. A migration can have a conflict-free read set
+yet lack a policy-required backup receipt. Conversely, an ad-
+mitted migration can conflict with another transaction before
+commitment. A CAC certificate therefore supplies authoriza-
+tion to attempt the bounded operation; the storage or workflow
+runtime must still enforce its own isolation and settlement
+rules [8–10].
+11
+
+
+===== page 12 =====
+Target-side preconditions.
+A target that supports atomic
+conditional mutation can check certified versions at the same
+linearization point as the effect. This covers only the pred-
+icates represented by those preconditions. Checking one
+resource version does not atomically validate an arbitrary
+multi-resource guard set. When guards span services, their
+preservation requires a suitable transaction or coordination
+protocol; generic composition alone provides no serializabil-
+ity theorem.
+Capability gateways.
+CAC can supply the evidence-
+discharge decision to a capability broker such as SAB [11].
+The broker supplies authentication, confinement, and revoca-
+tion; the admission policy supplies the required evidence and
+its interpretation. Such integration remains an architectural
+interface in this work, not an evaluated deployment.
+Policy updates.
+Learned lessons and incident analyses may
+propose new obligations. They cannot alter the active pol-
+icy without the governing approval process. Policy epochs,
+evidence-source registrations, and envelope templates are
+trusted configuration. A revision to any of them may invali-
+date previously issued certificates.
+12
+Discussion and Limitations
+Policy adequacy.
+CAC exposes the obligations used to jus-
+tify an action; it does not infer a complete safety specification
+from natural-language intent. Policy authors must connect
+each obligation to a domain invariant and justify the associ-
+ated guards. An omitted dependency, permissive entailment
+rule, or incomplete envelope proof can preserve syntactic
+admission correctness while permitting harm.
+Evidence trust.
+Signatures establish provenance under a
+key-trust model, not the truth of a sensor reading. Struc-
+tural cuts provide a lower bound on modeled fault coverage
+only when exposure maps conservatively include the causes
+of erroneous approval and the coalition rule matches actual
+authorization. Undisclosed common dependencies can invali-
+date that bound. Reconciliation can detect some discrepancies
+but cannot repair arbitrary coordinated falsehoods.
+Availability and cost.
+A conjunctive policy can block in-
+definitely if a required witness is unavailable. Operational
+budgets bound attempts but do not guarantee completion.
+Recursive admission for consequential diagnostics needs a
+well-founded dependency discipline or a bounded failure path.
+Evidence collection can dominate controller processing, and
+false refusal matters as much as unsafe dispatch when evalu-
+ating an operational system.
+Prototype scope.
+The corrected study uses independently
+observed local state transitions, a live-policy comparator, and
+matched interventions. Its target models still encode a small
+set of known preconditions and serialize each effect. They do
+not implement database replication, fencing, network parti-
+tions, or service recovery. The complete-path timings include
+real local file operations but an in-process target callback.
+These limits preclude claims of production reliability, model-
+family generalization, economic savings, or high-throughput
+EFD scaling.
+Validation needed.
+A deployment evaluation should extend
+the implemented observer and matched-schedule protocol to
+separate services. It should include realistic safe workloads,
+expensive sensors, harmful partial failures, process crashes,
+distributed replay stores, and post-forwarding races. The
+present multi-process replay test and performance repetitions
+address local behavior; representative scenario sampling is
+still required for population inference. Comparisons should
+also include a neighboring deterministic admission implemen-
+tation and real proposer/verifier execution. General envelope
+coverage needs a domain-specific proof or a checked coverage
+relation before relaxed action binding is enabled.
+Long-running workflows.
+A single admission certifies one
+bounded dispatch. Multi-step migrations or progressive roll-
+outs need fresh admission at relevant transitions and separate
+recovery semantics. Continuous monitoring may complement
+that design, but its safety and liveness properties are outside
+the present model.
+13
+Related Work
+Authorization and proof-carrying execution.
+Complete
+mediation and separation of privilege are established protec-
+tion principles [2]. ABAC explicitly includes environmental
+conditions [12]; it is not restricted to static identity checks.
+CAC’s predicates can be implemented in a sufficiently expres-
+sive policy engine. The proposed distinction is the contract
+for acquiring, retaining, and revalidating evidence for those
+predicates.
+Proof-carrying code requires an untrusted producer to pro-
+vide a consumer-checkable proof of compliance with a safety
+policy [3]. CAC shares that producer/checker separation. Its
+witnesses also include time-sensitive observations and policy-
+governed verifier receipts, which need not be formal proofs
+of a program’s semantics. CAC adds a missing-evidence pro-
+tocol and dispatch binding; it inherits rather than replaces the
+need to justify the consumer’s policy.
+Agent admission and repair.
+Mnemosyne separates gener-
+ated proposals from deterministic admission under executable
+constraints and supports bounded repair, compensation, and
+12
+
+
+===== page 13 =====
+active contract records [4]. These overlap directly with CAC’s
+enforcement boundary and work loop. We therefore do not
+claim deterministic admission, obligations, or repair in isola-
+tion as novel. CAC concentrates on risk-conditioned evidence
+selection, receipt-level freshness and provenance, and struc-
+tural witness requirements. Whether this interface improves
+upon a configured Mnemosyne-style runtime requires an im-
+plementation comparison absent from the current study.
+Commitment and freshness.
+Commit-time authorization
+binds durable effects to authority evidence that remains
+eligible at commitment [13].
+CAC shares freshness and
+effect-binding requirements but specifies which evidence
+must first be acquired. Pre-dispatch checking is weaker than
+commitment-time checking unless the target preserves the
+bound conditions. Atomix coordinates effect grouping and
+progress-aware settlement [10]; database concurrency control
+supplies separate isolation mechanisms [8, 9]. Admission
+does not subsume either form of settlement.
+Verifier structure and capabilities.
+The structural-cut def-
+inition and fault-coverage bound are imported from EFD [7],
+whose controller already enforces cuts for quorum admis-
+sion. CAC integrates that requirement with other typed obli-
+gations; it does not introduce EFD-based admission itself.
+Capability boundaries such as SAB [11] address the broker
+and credential interface. Their enforcement properties remain
+independent deployment assumptions here.
+Reasoning and verification.
+ReAct interleaves reasoning
+and actions, Reflexion uses feedback, and process supervision
+and test-time compute can improve reasoning quality [5,14–
+16]. CAC can consume evidence produced by such methods.
+Its logical separation result says that resource allocation alone
+does not certify an external condition; it does not show that
+these methods are ineffective, nor does the scripted B0–B5
+comparison measure them.
+14
+Conclusion
+Cognitive Admission Control makes evidence requirements
+explicit at the execution boundary between autonomous agent
+proposals and external services in agentic distributed sys-
+tems. A policy maps action risk to typed obligations; the
+controller distinguishes satisfied, violated, and unresolved
+conditions, requests missing evidence, and binds a successful
+evaluation to a scoped certificate and dispatch guards. Its
+guarantees concern admission and mediated dispatch under
+stated assumptions. Physical safety additionally depends on
+the adequacy of the policy, evidence sources, environment
+model, and target-side enforcement.
+The repaired TypeScript prototype exercises bounded wit-
+ness search, independently bound certificates, live guards,
+and persistent local replay protection. Controlled experiments
+observe effects independently, isolate selected mechanisms,
+and measure the complete local dispatch path. CAC and a
+live-policy baseline achieve equal completion on the tested
+suite, while structural-cut enforcement blocks the constructed
+correlated-witness failure. CAC’s practical value now de-
+pends on whether deployed systems can obtain the required
+evidence at acceptable cost while completing useful work
+under realistic faults.
+AI-Use Disclosure. OpenAI Codex and Google Antigravity
+assisted with LaTeX formatting, draft structuring, language
+editing, implementation and test development, notation and
+schema consistency checks, analysis scripting, and figure
+preparation. The authors remain responsible for the study,
+code, and reported results. All reported measurements come
+from executed code and frozen artifacts rather than model-
+generated estimates.
+References
+[1] Jun He and Deying Yu. Post-deterministic distributed
+systems: A new foundation for trustworthy autonomous
+infrastructure. arXiv preprint arXiv:2606.01722, 2026.
+[2] Jerome H. Saltzer and Michael D. Schroeder. The pro-
+tection of information in computer systems. Proceed-
+ings of the IEEE, 63(9):1278–1308, 1975.
+[3] George C. Necula. Proof-carrying code. In Proceed-
+ings of the 24th ACM SIGPLAN-SIGACT Symposium on
+Principles of Programming Languages, pages 106–119,
+1997.
+[4] Edward Y. Chang, Longling Geng, and Emily J. Chang.
+Mnemosyne: Agentic transaction processing for vali-
+dating and repairing AI-generated workflows. arXiv
+preprint arXiv:2607.00269, 2026.
+[5] Charlie Snell, Jaehoon Lee, Kelvin Xu, and Aviral Ku-
+mar. Scaling LLM test-time compute optimally can be
+more effective than scaling model parameters. arXiv
+preprint arXiv:2408.03314, 2024.
+[6] Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten
+Bosma, Fei Xia, Ed Chi, Quoc V. Le, and Denny Zhou.
+Chain-of-thought prompting elicits reasoning in large
+language models. Advances in Neural Information Pro-
+cessing Systems, 35:24824–24837, 2022.
+[7] Jun He and Deying Yu. The illusion of independent
+quorums: Epistemic fault domains and correlated cog-
+nitive failures in agentic quorums.
+arXiv preprint
+arXiv:2609.02925, 2026.
+[8] H. T. Kung and John T. Robinson. On optimistic meth-
+ods for concurrency control. ACM Transactions on
+Database Systems, 6(2):213–226, 1981.
+13
+
+
+===== page 14 =====
+[9] Dan R. K. Ports and Kevin Grittner. Serializable snap-
+shot isolation in PostgreSQL. Proceedings of the VLDB
+Endowment, 5(12):1850–1861, 2012.
+[10] Bardia Mohammadi, Nearchos Potamitis, Lars Klein,
+Akhil Arora, and Laurent Bindschaedler.
+Atomix:
+Timely, transactional tool use for reliable agentic work-
+flows. arXiv preprint arXiv:2602.14849, 2026.
+[11] Jun He and Deying Yu. Sovereign assurance boundary:
+Certificate-bound admission for agentic infrastructure.
+arXiv preprint arXiv:2606.11632, 2026.
+[12] Vincent C. Hu, David Ferraiolo, Rick Kuhn, Adam
+Schnitzer, Kenneth Sandlin, Robert Miller, and Karen
+Scarfone.
+Guide to attribute based access control
+(ABAC) definition and considerations. Technical Re-
+port SP 800-162, National Institute of Standards and
+Technology, 2014. Updated August 2019.
+[13] Igor Santos-Grueiro. Temporary authority, permanent
+effects: Commit-time authorization for LLM agents.
+arXiv preprint arXiv:2607.10487, 2026.
+[14] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak
+Shafran, Karthik Narasimhan, and Yuan Cao. ReAct:
+Synergizing reasoning and acting in language models.
+arXiv preprint arXiv:2210.03629, 2022.
+[15] Noah Shinn, Federico Cassano, Ashwin Gopinath,
+Karthik Narasimhan, and Shunyu Yao.
+Reflexion:
+Language agents with verbal reinforcement learning.
+Advances in Neural Information Processing Systems,
+36:8634–8652, 2023.
+[16] Hunter Lightman, Vineet Kosaraju, Yura Burda, Harri
+Edwards, Bowen Baker, Teddy Lee, Jan Leike, John
+Schulman, Ilya Sutskever, and Karl Cobbe. Let’s verify
+step by step. arXiv preprint arXiv:2305.20050, 2023.
+A
+Formal Boundary Examples
+A.1
+Projection and Budget Counterexamples
+For Theorem 1, consider two snapshots with the same prin-
+cipal, database identifier, and failover permission. The can-
+didate is fenced in one snapshot and unfenced in the other.
+Authorization based on those shared fields cannot distinguish
+them. The conclusion requires a sound fencing obligation; a
+falsely signed assertion can defeat the safety premise while
+preserving syntactic admission.
+For Theorem 2, let both procedures have access to one
+observation call. One calls a source that establishes the sole
+required predicate; the other reads unrelated documentation.
+Equal allocation permits different evidence outcomes. If the
+required source is inaccessible to both, the example does not
+establish that either can obtain admission.
+For Proposition 1, take f(x, y) = x + y, threshold 1, and
+require x ≥1. Along (0, n) the required condition fails
+while the score eventually exceeds the threshold. In contrast,
+the scalar indicator 1[x ≥1 ∧y ≥1] faithfully represents
+conjunction. The issue is substitutability, not scalar notation
+itself.
+A.2
+Monotonicity Scope
+The threshold proposition fixes the rule base and all non-risk
+inputs. A policy that removes a backup obligation when a
+new emergency flag becomes true is not covered even if its
+risk estimate increases. Similarly, replacing a five-second
+freshness obligation by a one-second obligation strengthens
+policy semantically but does not preserve literal identity of
+obligation records.
+A.3
+Quorum Extension
+Let Q = {a, b, c} use a two-of-three rule with D(a) =
+D(b) = {f} and D(c) = {g}. Coalition {a, b} is decisive
+and covered by {f}, so κE = 1. Add d with exposure {h}
+while keeping a two-vote threshold. Coalition {a, b} remains
+decisive, hence the cut remains one. An independent new
+source cannot repair a coalition rule that still permits approval
+by the original correlated pair.
+By contrast, requiring both members of {c, d} gives a cut
+of two when their exposure sets are disjoint and the declared
+basis covers all error causes. This is a property of the coalition
+structure and exposure model together.
+A.4
+Conflicts, Expiration, and Envelopes
+If equally preferred valid witnesses support opposite polari-
+ties, deterministic tie-breaking must not select a polarity by
+receipt identifier. The verdict is unknown; identifier order-
+ing may select a canonical witness only after the semantic
+decision.
+A receipt dated after the evaluation instant satisfies an
+upper-age bound alone, even if arbitrarily far in the future.
+The lower bound in Equation (9) excludes it. Cross-host time
+comparison requires the declared normalization assumptions.
+Finally, an exact proposal digest prevents substitution but
+does not derive a missing guard. If a policy omits primary
+fencing, hashing the exact failover request does not make the
+omission safe. Envelope soundness requires witness cover-
+age and guard completeness in addition to syntactic action
+binding.
+A.5
+Bounded Exhaustive Cross-Checks
+The
+independent
+script
+scripts/check_finite_
+model.py enumerates three voters and three modeled roots,
+all 343 nonempty exposure profiles, and all 127 nonempty
+families of nonempty coalitions. Across 43,561 profile/rule
+14
+
+
+===== page 15 =====
+{
+"id": "replication-current",
+"kind": "OBSERVE",
+"predicate": "replication_lag_bytes <= 0",
+"target": "cluster.candidate",
+"scope": ["postgres/prod-cluster-a"],
+"maxFreshnessMs": 2000,
+"evidenceClasses": ["POSTGRES_TELEMETRY"],
+"efdRequirement": null,
+"setConstraints": null,
+"enforcement": "REQUIRED"
+}
+Listing 1: Illustrative replication observation obligation; the
+two-second horizon is a policy example, not an evaluated
+optimum.
+combinations and 348,488 fault states, minimum coalition
+coverage agrees with direct propagation of faults to voters,
+and no sub-cut fault set covers a decisive coalition. The
+script also verifies the quorum-extension counterexample
+and threshold monotonicity for all 216 comparable pairs in a
+three-coordinate, three-level risk domain. These finite checks
+supplement the arguments above; they neither prove the
+unbounded results nor test the TypeScript implementation.
+B
+Illustrative Policy Contract
+A failover policy should distinguish the observed lag con-
+dition from the fencing condition. The following design
+example uses fields corresponding to the prototype’s obli-
+gation records. It is an excerpt, not a complete deployable
+profile; source registration, predicate interpretation, version
+compatibility, and guard bindings must also be supplied.
+The claim must identify the primary and candidate and the
+replication positions it compares. A role-only observation
+cannot establish this predicate. Policy separately requires
+evidence that the old primary is fenced and that the chosen
+target remains the intended standby. Guards must preserve the
+relevant conditions or translate them into target-side atomic
+preconditions. Zero observed lag at one instant does not by
+itself exclude a concurrent write before fencing.
+A simple trace illustrates the three discharge outcomes.
+With no receipt, the replication obligation is unknown and the
+controller requests telemetry. An eligible receipt affirmatively
+showing positive lag violates this example’s zero-lag require-
+ment. An eligible zero-lag receipt satisfies this obligation, but
+admission still waits for fencing and every other required con-
+dition. A valid certificate becomes unusable when a bound
+version changes or the earliest supporting receipt expires.
+The archived R1 fixture uses a positive lag tolerance and a
+fixed safe oracle. The corrected local study evaluates a literal
+zero-lag predicate and observes target effects separately, but
+its serial transition model does not validate primary fencing
+or exclude concurrent writes in a real database.
+C
+Open Problems
+Guard sufficiency.
+Automatically deriving a minimal guard
+set requires a semantic connection from each witness to the
+state on which its claim depends. A dependency annotation
+supplies a candidate, not a proof that all relevant changes
+are covered. Multi-resource guards also need a target-side
+preservation mechanism.
+Conservative risk classification.
+The policy must account
+for indirect effects and incomplete dependency graphs. A
+typed operation narrows the interpretation problem but does
+not determine all consequences. Unknown scope or unre-
+solved aliases should produce a conservative bound or escala-
+tion, not an unqualified low-risk classification.
+Bounded evidence search.
+General witness selection and
+fault-cut computation can be combinatorial. An implemen-
+tation needs a restricted evidence language and explicit re-
+source bounds. A useful research target is a sound conserva-
+tive approximation that improves availability without treating
+incomplete search as proof of satisfaction.
+Remediation liveness.
+A diagnostic action can depend on
+admission of another diagnostic action. Shared budgets bound
+attempts, but deadlock freedom and successful completion
+require additional assumptions about the dependency graph,
+sensor availability, and environmental stability.
+Fault-profile validation.
+Exposure maps must match actual
+evidence paths and authorization coalitions. Attestation may
+establish a declared configuration, while empirical correla-
+tion studies can expose some missing dependencies. Neither
+method by itself proves that all common causes have been
+enumerated.
+15

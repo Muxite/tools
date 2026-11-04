@@ -1,0 +1,657 @@
+
+
+===== page 1 =====
+Don’t Offer What Can’t Be Done: Deterministic Executability
+Gating for LLM Skill Selection at Scale∗
+Ortal Ashkenazi
+Wix
+Israel
+ortalash@wix.com
+Vitalii Kloz
+Wix
+Ukraine
+vitaliik@wix.com
+Mykhailo Ulianchenko
+Wix
+Ukraine
+mykhailou@wix.com
+Abstract
+Production LLM agents that select from large skill libraries face a
+limitation that semantic relevance alone cannot resolve: a skill may
+match a user’s topic yet be impossible to execute in the current
+account state. We present a deployed three-stage selection pipeline
+for Helpmate, Wix’s customer-care assistant. First, a recall-oriented
+semantic matcher identifies messages related to a ten-skill domain
+family without consulting account state. Second, a deterministic
+executability gate removes candidates whose internal hard-stop
+conditions hold. Because the gate and the skill evaluate the same exit
+predicates, every blocked candidate would be unable to complete
+under the same account state, provided predicate parity is preserved
+and both checks observe fresh authoritative state. Finally, the LLM
+decides whether to invoke one of the remaining candidates.
+In a post-launch production analysis of 756.6K user messages
+across 267.6K conversations, semantic matching retained 174,927
+messages (23.1%). Within this matched stream, the gate removed
+1,039,462 of 1,749,270 skill–message pairs (59.4%), saving 228.8
+million skill-description tokens—59.1% of the post-semantic skill-
+description footprint. Together, semantic matching and executabil-
+ity gating reduced skill-description context by 90.5% relative to
+exposing all ten skills to every message.
+To test whether this pruning affects model behavior rather than
+context size alone, we replayed a risk-enriched cohort of 1,000
+conversations with all ten skills exposed. The model selected a
+production-blocked skill in 78 conversations (7.8%). This counterfac-
+tual result shows that deterministic gating prevents non-executable
+candidates from influencing model selection, while not claiming
+downstream tool execution or customer-outcome effects.
+CCS Concepts
+• Computing methodologies →Natural language processing;
+• Software and its engineering →Software reliability.
+Keywords
+LLM agents, tool selection, skill routing, deterministic gating, exe-
+cutability, retrieval-augmented tool use, customer-care assistants,
+production deployment
+1
+Introduction
+Modern customer-care assistants are increasingly built as skill-
+using LLM agents: a router exposes a subset of available capabilities,
+and the agent decides which to invoke. As libraries grow, the visi-
+ble menu itself becomes a system-design choice. Function-calling
+∗Preprint. Submitted to the ACM SIGKDD Conference on Knowledge Discovery and
+Data Mining (KDD 2027), Applied Data Science Track; currently under review.
+performance can deteriorate sharply as more tools are exposed [14],
+while retrieval-before-reasoning methods improve accuracy and re-
+duce prompt size by narrowing the menu [9, 17]. Semantic retrieval,
+however, answers only whether a request is topically related to a
+skill. It does not determine whether that skill can run for this user,
+site, or account.
+Consider three users who send the same message: “I want to
+connect a domain.” All three messages are semantically relevant
+to connect_domain. One user already has a domain connected,
+one is on a free plan and lacks the required premium entitlement,
+and one is not the site owner. Each state maps to an explicit exit
+condition inside connect_domain. If invoked without a relevant
+state change, the skill will terminate rather than complete. The
+gate therefore suppresses a known-impossible action, not an action
+merely predicted to be unhelpful.
+We therefore separate topical relevance from executability. A
+recall-oriented semantic stage identifies messages about the domain
+topic family without using account state. For every matched domain
+message it passes all ten domain-family skills to a deterministic gate.
+The gate evaluates state predicates and removes candidates that can-
+not execute. Only then does the LLM decide whether any remaining
+skill should be activated. This architecture hoists business-state
+checks out of a stochastic decision and makes candidate exposure
+reproducible.
+Contributions.
+• We characterize non-executable skill exposure as a distinct
+interface problem: a skill can be semantically relevant but
+invalid in the current state.
+• We describe a three-stage deployed architecture and an exit-
+condition-inversion method. Because gate predicates reuse
+the conditions that terminate skill execution, blocking is
+sound by construction relative to the implemented skill
+contract.
+• We report a production evaluation over 756,641 messages
+and 267,612 conversations, plus a 1,000-conversation coun-
+terfactual replay measuring model behavior when the gate
+is removed.
+• We quantify cross-skill heterogeneity and identify measure-
+ment and maintenance lessons for deployed skill libraries.
+2
+Related Work
+We position the work against five adjacent lines of research.
+Tool use and scalable selection. Toolformer and ToolLLM study
+how language models learn to decide when and how to invoke
+APIs, including large real-world tool collections [21, 23]. As catalogs
+grow, retrieval-based methods shortlist semantically relevant tools:
+arXiv:2608.01050v1  [cs.AI]  2 Aug 2026
+
+
+===== page 2 =====
+Ortal Ashkenazi, Vitalii Kloz, and Mykhailo Ulianchenko
+PLUTO combines planning with retrieval and description ground-
+ing [13], PORTS aligns a retriever with downstream tool-calling
+behavior [18], and related systems reduce prompt size through
+RAG-based tool selection [9, 17]. These methods primarily opti-
+mize relevance or downstream utility. Our semantic stage plays that
+recall-oriented role; the deterministic gate contributes a separate,
+state-dependent criterion—whether a relevant production skill can
+execute for the current account.
+State-dependent applicability. The idea that an action is avail-
+able only when its preconditions hold is classical in symbolic plan-
+ning [8], and invalid-action masking removes state-infeasible choices
+from learned policies [12]. Recent LLM-agent work brings related
+ideas to tool menus through precondition-effect contracts, learned
+contracts, clarification for underspecified goals, and state-aware
+benchmarks [2–5]. Our setting differs in both contract source and
+granularity: we gate multi-step production skills, derive predicates
+by inverting their implemented exit conditions, and evaluate busi-
+ness state such as entitlements, ownership, and existing configura-
+tion. We therefore claim soundness only relative to predicate parity
+and fresh authoritative state, not a generally complete model of
+task feasibility.
+Deterministic enforcement. Agent-environment work shows that
+reliability can improve through infrastructure changes rather than
+model changes [25]. Deterministic pre-execution gates have also
+been used to reject policy-violating calls at the action boundary [22],
+while formal-verification work follows the broader principle that
+agents propose and deterministic backends verify soundness-relevant
+decisions [27]. Our gate is earlier: it removes a known non-executable
+skill before model selection, preventing the option and its descrip-
+tion from entering the model context. It does not validate arbitrary
+generated arguments or guarantee downstream task success.
+Authorization, delegation, and action risk. Non-executable expo-
+sure is not only a relevance or usability problem. When the failed
+precondition is an authorization mismatch, allowing an agent to
+offer—or, worse, execute—a skill can turn a routing error into a
+security failure. Work on authenticated delegation argues that an
+agent should receive only scoped, auditable authority derived from
+the user [26]. Recent ICML 2026 work likewise reframes agent secu-
+rity as contextual: the same action can be benign for an authorized
+site owner and unsafe when requested by a non-owner, injected by
+third-party content, or applied to the wrong site or account [24].
+Prompt-injection research shows why natural-language instruc-
+tions are not a sufficient boundary: models can assign authority to
+untrusted text that imitates a privileged role [29]. In the domain-
+connection example, this creates a confused-deputy-style risk: an
+attacker or under-privileged collaborator could induce the assis-
+tant to mutate configuration using authority the requester does
+not possess. Consequences include unauthorized domain or DNS
+changes, cross-site or cross-account effects, disclosure of sensitive
+state, financial commitments, and loss of accountability.
+Even without an adversary, selecting a skill whose state does not
+match the account degrades trust and task performance: the user is
+led into a dead end, experiences avoidable refusals or retries, and
+may receive misleading claims about what can be done. MisAct-
+Bench finds that off-task actions arise both from external attacks
+and internal reasoning errors and reduce efficiency and reliabil-
+ity [19]. MOSAIC emphasizes that a single unsafe tool step can have
+irreversible effects and therefore makes “check, then act or refuse”
+explicit [1]. Under environmental constraints, agents may also con-
+ceal failure, substitute unavailable sources, fabricate artifacts, or
+perform unrequested actions rather than fail transparently [10].
+These findings motivate eligibility checks before selection, while
+preserving a separate backend authorization boundary at execution
+time: hiding an ineligible skill improves experience and reduces
+attack surface, but must not be treated as a replacement for least-
+privilege access control or final transaction validation.
+Evaluation and enterprise deployment. API-Bank and BFCL eval-
+uate planning, tool retrieval, invocation, abstention, and multi-turn
+function calling [15, 20]; ToolSandbox and 𝜏-bench add stateful en-
+vironments and dynamic, policy-constrained conversations [16, 28].
+Production frameworks for customer-support agents emphasize
+domain-specific, evaluation-driven validation [11]. Adjacent en-
+terprise RAG work at Wix similarly provides support-grounded
+datasets and component-level diagnostic evaluation [6, 7], but eval-
+uates knowledge retrieval and answer generation rather than action
+executability. Our study instead reports a deployed candidate fun-
+nel, skill-description token removal, cross-skill heterogeneity, and
+a counterfactual replay that measures how often a model selects a
+production-blocked skill when gating is removed.
+3
+The Failure Mode and Its Root Causes
+3.1
+Setting
+The system under study is Helpmate, the conversational assistant
+behind Wix Customer Care chat. It uses a knowledge base for
+informational requests and a larger library of multi-step skills for
+transactional procedures. We evaluate the complete domain topic
+family, which contains ten skills. Other topic families may contain
+different numbers of skills. The study does not disclose or rely on
+the size of the full production library.
+A skill may call several backend APIs, each of which can stop
+execution when a business-state condition is violated. We call these
+internal abort branches exit conditions. Examples include a con-
+flicting resource that already exists, a missing entitlement, or an
+authorization mismatch.
+3.2
+Non-executable skill exposure
+Non-executable skill exposure occurs when a retrieved skill is
+shown although one of its own exit conditions is true in the authori-
+tative state. If invoked without a relevant state change, the skill will
+terminate. A false block relative to the implemented skill contract
+would mean that the skill could complete under the identical state.
+When predicate parity is maintained and the gate and skill observe
+the same fresh authoritative state, their shared exit predicate ex-
+cludes this case by construction. The production funnel measures
+exposure removed; Section 5.6 adds a counterfactual estimate of
+how often the model selects a blocked option when the gate is
+removed.
+Exit conditions are skill-specific rather than a shared domain-
+wide taxonomy. The connect_domain example illustrates the dis-
+tinction without tying it to any reported per-skill row. A message
+
+
+===== page 3 =====
+Don’t Offer What Can’t Be Done: Deterministic Executability Gating for LLM Skill Selection at Scale
+can be on topic while connect_domain is non-executable because
+the required entitlement is absent, a conflicting configuration al-
+ready exists, or the requester lacks the required role. These condi-
+tions are illustrative of connect_domain only; each other evaluated
+skill is gated by its own internal exit conditions. Genuinely am-
+biguous intent is not a deterministic exit condition and remains an
+agent decision.
+4
+System Design
+4.1
+Three-stage selection pipeline
+Figure 1 shows the three stages. Stage 1 is recall-oriented and state-
+blind: it identifies domain-topic messages and passes all ten family
+skills as candidates. Stage 2 removes each candidate whose own exit
+condition holds in the current authoritative state. Stage 3 decides
+whether to activate an executable skill, answer from the knowledge
+base, or clarify.
+4.2
+Exit-condition inversion
+For each skill 𝑠, we identify the account- or site-state predicates
+that cause its internal procedure to exit before completion. These
+predicates are skill-specific; the system does not impose a shared
+taxonomy of exit conditions. The gate evaluates the same predicates
+against the current authoritative state and exposes the skill only
+when none of them holds.
+Soundness by construction. Let 𝐸𝑠(𝑥) denote that at least one of
+the exit conditions for skill𝑠holds in state 𝑥. Provided that predicate
+parity is maintained and both the gate and the skill observe suffi-
+ciently fresh authoritative state, the gate blocks 𝑠exactly when the
+skill would exit under that state. A blocked skill therefore cannot
+complete without a relevant state change. This guarantee is relative
+to the implemented skill contract, rather than to the accuracy of a
+learned classifier.
+The gate does not estimate executability from labeled examples
+and therefore requires no labeled executability dataset. Its guarantee
+instead depends on engineering controls: regression tests must
+prevent predicate drift, and production checks must preserve state
+freshness.
+4.3
+Why deterministic rather than
+prompt-based
+Prompting the agent to remember business-state constraints would
+make executability compete with intent, dialogue history, and all
+other instructions in the same stochastic context. A deterministic
+gate instead evaluates the constraint from authoritative state before
+the skill description reaches the model. This creates a narrow con-
+tract: the infrastructure determines whether execution is possible,
+while the agent retains responsibility for conversational timing and
+intent.
+4.4
+Formal gate contract
+Let 𝑆denote the skills in the evaluated topic family, and let 𝐶(𝑚)
+denote the candidate set produced for message 𝑚. In the deployed
+pipeline, 𝐶(𝑚) = 𝑆when the semantic matcher assigns 𝑚to the
+domain family, and 𝐶(𝑚) = ∅otherwise. The semantic stage does
+not observe account state.
+For each skill 𝑠, let 𝐸𝑠(𝑥𝑚,𝑠) indicate that at least one of the skill’s
+own hard exit conditions holds in the authoritative state observed
+for message 𝑚. The predicates represented by 𝐸𝑠are skill-specific
+and need not belong to a shared taxonomy. The visible set passed
+to the agent is
+𝑉(𝑚) = { 𝑠∈𝐶(𝑚) : ¬𝐸𝑠(𝑥𝑚,𝑠) }.
+Operationally, the gate can be expressed as:
+candidates <- semantic_match(message)
+visible <- []
+for skill in candidates:
+state <- read_authoritative_state_required_by(skill)
+if not skill_exit_condition_holds(skill, state):
+visible.append(skill)
+return visible
+Contract-relative soundness. Assume that the gate and skill use
+predicate-equivalent exit conditions and observe sufficiently fresh
+authoritative state. If the gate removes 𝑠, then the same condition
+would cause 𝑠to exit before completion under that state. Conse-
+quently, the candidate cannot complete without a relevant state
+change. This is a one-sided guarantee: passing the gate establishes
+only that no represented hard exit condition currently holds. It
+does not guarantee that the user intends to activate the skill or that
+execution will succeed despite unrelated runtime failures.
+5
+Production Evaluation
+5.1
+Dataset, scope, and units
+We evaluate the domain topic family, which contains ten skills,
+within a larger chatbot skill library. Other topic families can con-
+tain different numbers of skills and are outside our reported scope.
+The observation period runs from Jun 9, 2026 through Jul 10, 2026
+in Israel local time. The dataset contains 756,641 user messages in
+267,612 conversations. The semantic stage matched 174,927 mes-
+sages, or 23.1% of all chatbot messages.
+A message is semantically matched when it concerns the domain
+topic family evaluated in this study. This stage is recall-oriented and
+state-blind. It passes all ten evaluated skills to the gate, yielding ten
+skill–message candidate pairs per matched message. Accordingly,
+1,749,270 is a count of skill–message pairs, not unique messages.
+All-message and post-semantic views overlap: the latter is a subset
+of the former and the two must not be added.
+5.2
+Evaluation units and skill-description token
+accounting
+Let 𝐿𝑠denote the token length of the serialized routing description
+for skill 𝑠. Token counts were computed using a count-tokens API
+over the exact serialized skill descriptions supplied to the routing
+context. They exclude conversation history, system instructions,
+retrieved knowledge, user or account context, model output, and
+all other prompt components.
+For a set of semantically matched messages 𝑀, the post-semantic
+skill-description footprint is
+𝑇post =
+∑︁
+𝑚∈𝑀
+∑︁
+𝑠∈𝐶(𝑚)
+𝐿𝑠.
+
+
+===== page 4 =====
+Ortal Ashkenazi, Vitalii Kloz, and Mykhailo Ulianchenko
+Figure 1: Three-stage selection pipeline. Semantic matching identifies the domain topic family; the deterministic gate removes
+candidates whose own exit conditions hold; the agent then decides whether to activate an executable skill.
+Figure 2: Skill-description token funnel. Semantic matching removes 76.9% of the all-message baseline; the gate then removes
+59.1% of the post-semantic skill-description tokens, for a 90.5% combined reduction.
+The tokens removed by the deterministic gate are
+𝑇saved =
+∑︁
+𝑚∈𝑀
+∑︁
+𝑠∈𝐶(𝑚)
+⊮[𝐸𝑠(𝑥𝑚,𝑠)] 𝐿𝑠.
+Because every matched domain message produces ten candidate
+pairs, the post-semantic candidate count is 10|𝑀|. Candidate reduc-
+tion and token reduction are not identical: blocking a longer skill
+description removes more context than blocking a shorter one.
+The ten skill descriptions contain 2,214 tokens in total. The
+mean description length is 221.4 tokens, the median is 212, and the
+range is 152–344 tokens. The longest description is 2.26 times the
+shortest, so candidate count and token savings are related but not
+interchangeable. The reported values are therefore skill-description
+tokens, not full-prompt tokens, billed cost, or latency.
+
+
+===== page 5 =====
+Don’t Offer What Can’t Be Done: Deterministic Executability Gating for LLM Skill Selection at Scale
+Table 1: Evaluation units used throughout the analysis.
+Unit
+Definition
+Chatbot message
+A qualifying user message in the observation
+window.
+Conversation
+A conversation containing at least one qualify-
+ing user message.
+Semantically matched
+message
+A message assigned to the evaluated domain
+family by the state-blind semantic stage.
+Candidate pair
+A (message, skill) pair created after semantic
+matching.
+Blocked pair
+A candidate pair for which the skill’s exit pred-
+icate holds.
+Skill-description
+tokens
+Tokens in the serialized skill description sup-
+plied to the routing context; these exclude all
+other prompt components.
+5.3
+Coverage across all chatbot messages
+As an offline diagnostic, we also evaluate deterministic-check cov-
+erage across the full 756,641-message stream. This is not an addi-
+tional production stage: semantic matching precedes gating in the
+deployed pipeline, and the post-semantic analysis in Section 5.4
+remains the primary evaluation. Across all messages, the checks
+mark 3,075,236 skill–message pairs as non-executable and identify
+675,186,106 removable skill-description tokens. Relative to exposing
+all ten descriptions to every message, this diagnostic corresponds to
+40.6% of the 7,566,410 possible pairs and 40.3% of the 1,675,203,174
+skill-description tokens, or averages of 4.06 skills and 892.3 skill-
+description tokens per message. These figures overlap with the
+post-semantic subset and must not be added to it.
+5.4
+Incremental impact after semantic matching
+The post-semantic stream is the main evaluation because it isolates
+the gate’s contribution beyond topic retrieval. Semantic matching
+produces 1,749,270 skill–message pairs with a skill-description foot-
+print of 387,288,378 tokens. The gate removes 1,039,462 pairs (59.4%)
+and 228,799,446 skill-description tokens (59.1% of this footprint),
+leaving 709,808 executable candidate pairs and 158,488,932 skill-
+description tokens. Per matched message, the gate removes 5.94
+skills and saves 1,308 skill-description tokens on average.
+Relative to a baseline that exposes all ten skills to every chatbot
+message, semantic matching followed by the gate reduces skill-
+description tokens by 90.5%. Figure 2 separates the semantic and
+executability contributions.
+5.5
+Cross-skill heterogeneity
+Post-semantic block rates vary from 28.1% to 94.1% across the ten
+skills, with a median of 48.2%. Token savings per skill range from
+8.9 million to 42.3 million tokens, and the three largest contributors
+account for 46.3% of post-semantic token savings. The variation
+reflects both how frequently a skill is non-executable and the length
+of its description. Figure 3 reports only anonymous distributions;
+no value is mapped to a published skill identity.
+5.6
+Counterfactual replay without the gate
+To estimate behavioral impact, we selected the first 1,000 conversa-
+tions chronologically in which at least one domain skill matched
+the user’s topic, failed a deterministic precondition, and was not ac-
+tivated for that message. Each conversation was replayed once with
+all ten skills exposed in the same environment used in production.
+In 78 of the 1,000 conversations (7.8%), the model selected for
+activation a skill that the production checks would have blocked.
+This rate is conditional on the risk-enriched cohort and must not be
+extrapolated to all chatbot messages. The replay measures model
+selection, not tool execution, failure severity, or customer outcomes.
+5.7
+Privacy and data handling
+All reported production results are aggregates. The paper publishes
+no conversation text, user or account identifiers, or mapping be-
+tween anonymous per-skill values and skill identities. The coun-
+terfactual replay was conducted in the same environment used in
+production; it did not execute selected skills or report customer-
+level outcomes.
+6
+Deployment Lessons
+The deployment experience suggests a general predicate lifecycle,
+three operational failure modes, and five practical lessons.
+6.1
+Predicate lifecycle and rollout
+An executability predicate should be maintained as part of the
+corresponding skill contract rather than as independent routing
+configuration. A change to a skill’s exit behavior requires a coor-
+dinated change to its gate predicate. We use the following general
+lifecycle:
+(1) Author or modify the skill’s hard exit condition.
+(2) Update the corresponding gate predicate and its declared
+state dependencies.
+(3) Run parity regression tests over shared state fixtures, in-
+cluding boundary, missing-state, and stale-state cases.
+(4) Enable serving only after parity checks pass, with version-
+ing and rollback support.
+6.2
+Monitoring and failure modes
+Operational monitoring must distinguish three failure modes. Pred-
+icate drift occurs when the gate and skill no longer implement
+equivalent exit logic. State staleness occurs when equivalent pred-
+icates observe different or outdated state. Backend-contract drift
+occurs when the meaning, availability, or schema of a state field
+changes without a corresponding predicate update.
+Useful aggregate signals include parity-test failures, failed or
+unknown state reads, unexpected changes in per-skill block rates,
+and discrepancies between gate decisions and subsequent skill exit
+behavior. The policy for unavailable state must also be explicit and
+tested; whether a particular check fails open or fails closed depends
+on the product risk and is not determined by the gating architecture
+itself.
+These controls maintain the narrow guarantee claimed in this
+paper. They do not turn the gate into a general task-success predic-
+tor: an exposed skill may still be inappropriate for the user’s intent,
+
+
+===== page 6 =====
+Ortal Ashkenazi, Vitalii Kloz, and Mykhailo Ulianchenko
+Figure 3: Anonymous distributions across the ten skills. Points denote skills without identifiers; boxes summarize post-semantic
+block rate, description length, and tokens saved.
+require clarification, or fail for reasons outside its represented exit
+conditions.
+6.3
+Practical lessons
+Separation of concerns. Semantic relevance, deterministic exe-
+cutability, and conversational activation should be treated as sepa-
+rate decisions with separate owners and metrics.
+Offline authoring, deterministic serving. Eligibility checks should
+be reviewed, versioned, and executed as deterministic code against
+authoritative state.
+Maintenance and contract drift. Predicate parity is a release in-
+variant rather than a one-time property. Changes to skill logic, state
+dependencies, or backend contracts require coordinated versioning,
+regression coverage, and monitoring.
+False-blocking boundary. The gate evaluates a skill’s hard exit
+conditions rather than inferring usefulness. Provided predicate
+parity is maintained and both checks observe the same fresh au-
+thoritative state, every blocked skill would exit if invoked and an
+otherwise executable skill is not removed relative to the imple-
+mented contract. Validation therefore targets predicate parity and
+state freshness, not manual relevance labels.
+Metric discipline matters. Messages, conversations, skill–message
+pairs, and tokens answer different questions; tokens are not billed
+cost or latency.
+7
+Limitations
+This study covers the ten skills in the domain topic family during a
+single observation window. The results may not generalize to other
+families, product surfaces, or traffic periods.
+The risk-enriched replay cohort always contained a matched
+skill that failed a production check; 7.8% is conditional and can-
+not be extrapolated to all chatbot messages. Each conversation
+was replayed once, measuring selection under captured context
+rather than tool execution, failure severity, or stochastic variance.
+Gate soundness remains dependent on predicate parity and state
+freshness.
+The gate handles only preconditions expressible as deterministic
+state checks. Ambiguous intent, incomplete requests, and conver-
+sational timing still require agent judgment or clarification.
+Tokens measure only pruned skill-description context, not billed
+cost, latency, or avoided retries. Period aggregates do not support
+daily uncertainty estimates or causal attribution.
+8
+Conclusion
+Across the ten-skill domain family, the deterministic gate removed
+59.4% of post-semantic skill–message candidates and 59.1% of their
+skill-description tokens. Together, semantic matching and gating
+reduced skill-description context by 90.5% relative to exposing all
+ten descriptions to every message. In a risk-enriched counterfactual
+replay of 1,000 conversations without gating, the model selected
+a production-blocked skill in 78 cases (7.8%). These findings show
+that semantic relevance alone leaves a substantial non-executable
+candidate set. Provided predicate parity is maintained and both the
+gate and the skill observe fresh authoritative state, the gate is sound
+relative to the implemented skill contract; the replay measures
+model selection, not tool execution or customer outcomes.
+Generative AI Use Disclosure
+All research questions, system design, production implementation,
+experimental design, analysis methodology, and the initial man-
+uscript draft were developed by the authors. Generative AI tools
+(Claude and OpenAI Codex) were subsequently used to improve
+manuscript clarity and wording and to assist with limited code
+review, refinement of data-analysis scripts, and author-directed val-
+idation workflows. All AI-assisted outputs were critically reviewed
+and edited by the authors. The authors independently verified the
+data queries, analysis code, methodology, citations, and reported
+numerical results, and take full responsibility for the content and
+correctness of this work.
+
+
+===== page 7 =====
+Don’t Offer What Can’t Be Done: Deterministic Executability Gating for LLM Skill Selection at Scale
+References
+[1] A. Agarwal, G. Siyan, Y. Pandya, J. Singh, A. Nambi, and A. Awadallah. 2026.
+Learning When to Act or Refuse: Guarding Agentic Reasoning Models for Safe
+Multi-Step Tool Use. In Proceedings of the 43rd International Conference on Ma-
+chine Learning (ICML). arXiv:2603.03205.
+[2] R. S. Babu and L. G. Iyer. 2026. Contract2Tool: Learning Preconditions and Effects
+for Reliable Tool-Augmented LLM Agents. arXiv:2606.07904
+[3] R. S. Babu and L. G. Iyer. 2026. ToolChoiceConfusion: Causal Minimal Tool
+Filtering for Reliable LLM Agents. arXiv:2606.06284
+[4] R. S. Babu and L. G. Iyer. 2026. ToolMenuBench: Benchmarking Tool-Menu
+Filtering Strategies for Reliable and Efficient LLM Agents. arXiv:2606.15508
+[5] R. S. Babu and R. Shukla. 2026. GIST-CMTF: Goal-State Inference for Causal
+Minimal Tool Filtering in LLM Agents. arXiv:2606.16813
+[6] D. Cohen, L. Burg, S. Pykhnivskyi, H. Gur, S. Kovynov, O. Atzmon, and G. Barkan.
+2025. WixQA: A Multi-Dataset Benchmark for Enterprise Retrieval-Augmented
+Generation. arXiv:2505.08643
+[7] D. Cohen, T. Houri, L. Burg, and G. Barkan. 2025. RAGXplain: From Explainable
+Evaluation to Actionable Guidance of RAG Pipelines. arXiv:2505.13538
+[8] R. E. Fikes and N. J. Nilsson. 1971. STRIPS: A New Approach to the Application
+of Theorem Proving to Problem Solving. Artificial Intelligence 2, 3–4 (1971),
+189–208. doi:10.1016/0004-3702(71)90010-5
+[9] T. Gan and Q. Sun. 2025. RAG-MCP: Mitigating Prompt Bloat in LLM Tool
+Selection via Retrieval-Augmented Generation. arXiv:2505.03275
+[10] D. Guo, Q. Liu, D. Liu, Q. Ren, S. Shao, T. Qiu, H. Li, Y. R. Fung, Z. Ba, J. Dai,
+et al. 2026. Are Your Agents Upward Deceivers?. In Proceedings of the 43rd
+International Conference on Machine Learning (ICML). arXiv:2512.04864.
+[11] A. Gupta, K. Rossell, E. Alcobaça, J. C. L. Pacheco, C. B. de Lima, S. Tang, L. P.
+Rabachini, L. Moneda, H. Fei, D. Silva, and R. Ramanath. 2026. Building Customer
+Support AI Agents at 100M-User Scale: An Evaluation-Driven Framework. In
+Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and
+Data Mining. doi:10.1145/3770855.3818332
+[12] S. Huang and S. Ontañón. 2022. A Closer Look at Invalid Action Masking in
+Policy Gradient Algorithms. In Proceedings of the Thirty-Fifth International Florida
+Artificial Intelligence Research Society Conference (FLAIRS).
+[13] T. Huang, D. Jung, V. Kumar, M. Kachuee, X. Li, P. Xu, and M. Chen. 2024. Planning
+and Editing What You Retrieve for Enhanced Tool Learning. In Findings of the
+Association for Computational Linguistics: NAACL. 975–988. doi:10.18653/v1/
+2024.findings-naacl.61
+[14] K. Kate, T. Pedapati, K. Basu, Y. Rizk, V. Chenthamarakshan, S. Chaudhury, M.
+Agarwal, and I. Abdelaziz. 2025. LongFuncEval: Measuring the Effectiveness of
+Long Context Models for Function Calling. arXiv:2505.10570
+[15] M. Li, Y. Zhao, B. Yu, F. Song, H. Li, H. Yu, Z. Li, F. Huang, and Y. Li. 2023. API-
+Bank: A Comprehensive Benchmark for Tool-Augmented LLMs. In Proceedings
+of EMNLP. 3102–3116. doi:10.18653/v1/2023.emnlp-main.187
+[16] J. Lu, T. Holleis, Y. Zhang, B. Aumayer, F. Nan, F. Bai, S. Ma, S. Ma, M. Li, G.
+Yin, Z. Wang, and R. Pang. 2025. ToolSandbox: A Stateful, Conversational,
+Interactive Evaluation Benchmark for LLM Tool Use Capabilities. In Findings of
+the Association for Computational Linguistics: NAACL. 1160–1183.
+[17] E. Lumer, V. K. Subbiah, J. A. Burke, P. H. Basavaraju, and A. Huber. 2024.
+Toolshed: Scale Tool-Equipped Agents with Advanced RAG-Tool Fusion and
+Tool Knowledge Bases. arXiv:2410.14594
+[18] L. Molfetta, G. Frisoni, N. Monaldini, and G. Moro. 2025. PORTS: Preference-
+Optimized Retrievers for Tool Selection with Large Language Models. In Pro-
+ceedings of EMNLP. 10007–10030. doi:10.18653/v1/2025.emnlp-main.507
+[19] Y. Ning, J. Jones, Z. Zhang, C. Ye, W. Ruan, J. Li, R. Gupta, and H. Sun. 2026.
+When Actions Go Off-Task: Detecting and Correcting Misaligned Actions in
+Computer-Use Agents. In Proceedings of the 43rd International Conference on
+Machine Learning (ICML). arXiv:2602.08995.
+[20] S. G. Patil, H. Mao, F. Yan, C. C.-J. Ji, V. Suresh, I. Stoica, and J. E. Gonzalez.
+2025. The Berkeley Function Calling Leaderboard (BFCL): From Tool Use to
+Agentic Evaluation of Large Language Models. In Proceedings of the 42nd In-
+ternational Conference on Machine Learning (Proceedings of Machine Learning
+Research, Vol. 267). 48371–48392.
+[21] Y. Qin, S. Liang, Y. Ye, K. Zhu, L. Yan, Y. Lu, Y. Lin, X. Cong, X. Tang, B. Qian,
+et al. 2024. ToolLLM: Facilitating Large Language Models to Master 16000+
+Real-World APIs. In International Conference on Learning Representations (ICLR).
+[22] V. Reddy, S. R. Challaram, and A. Basu. 2026. Reason Less, Verify More: Deter-
+ministic Gates Recover a Silent Policy-Violation Failure Mode in Tool-Using LLM
+Agents. arXiv:2607.07405
+[23] T. Schick, J. Dwivedi-Yu, R. Dessì, R. Raileanu, M. Lomeli, E. Hambro, L. Zettle-
+moyer, N. Cancedda, and T. Scialom. 2023. Toolformer: Language Models Can
+Teach Themselves to Use Tools. In Advances in Neural Information Processing
+Systems 36 (NeurIPS).
+[24] V. Siu, J. He, K. Montgomery, Z. Wang, C. Wang, and D. Song. 2026. Position:
+Agent Security Needs Redefinition through a Holistic Framework. In Proceedings
+of the 43rd International Conference on Machine Learning (ICML).
+[25] K. Song, A. Jayarajan, Y. Ding, Q. Su, Z. Zhu, S. Liu, and G. Pekhimenko. 2025.
+Aegis: Taxonomy and Optimizations for Overcoming Agent-Environment Fail-
+ures in LLM Agents. arXiv:2508.19504
+[26] T. South, S. Marro, T. Hardjono, R. Mahari, C. D. Whitney, A. Chan, and A. Pent-
+land. 2025. Position: AI Agents Need Authenticated Delegation. In Proceedings of
+the 42nd International Conference on Machine Learning (Proceedings of Machine
+Learning Research, Vol. 267). 82211–82231.
+[27] Y. Sun, J. Liu, D. Kroening, and J. Xue. 2026.
+Agentic Model Checking.
+arXiv:2605.21434
+[28] S. Yao, N. Shinn, P. Razavi, and K. Narasimhan. 2025. 𝜏-bench: A Benchmark for
+Tool-Agent-User Interaction in Real-World Domains. In The Thirteenth Interna-
+tional Conference on Learning Representations (ICLR).
+[29] C. Ye, J. Cui, and D. Hadfield-Menell. 2026. Prompt Injection as Role Confusion.
+In Proceedings of the 43rd International Conference on Machine Learning (ICML).
+arXiv:2603.12277.

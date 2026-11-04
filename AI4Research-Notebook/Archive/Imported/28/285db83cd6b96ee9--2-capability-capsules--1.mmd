@@ -1,0 +1,12 @@
+flowchart LR
+    A[Author declaration and body] --> AD[Admission: validate, pin check bundle, record]
+    AD --> L[(Library snapshot)]
+    L --> P[Template or Planner pins the exact version]
+    P --> R[Frozen run uses it unchanged]
+    L --> W[RSI workbench builds a child inside may_change]
+    W --> H[Human admits, then activates it for RSI sandbox runs]
+    H --> L
+    L --> X[Human suspends, revokes or rolls back]
+    AA[Automatic admission] -.-> L
+    GEN[Generated CCs] -.-> A
+    CMP[Composite CCs] -.-> A

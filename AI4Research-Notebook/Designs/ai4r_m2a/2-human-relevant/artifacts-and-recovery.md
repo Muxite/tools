@@ -1,0 +1,40 @@
+---
+id: ai4r-m2a-2-human-relevant-artifacts-and-recovery
+status: proposed-runtime-unverified
+source: ai4r_m2a/3-agent-reference/source-manifest.json
+last_reviewed: 2026-10-30
+next_action: Implement against the acceptance matrix and attach measured evidence
+---
+# Evidence, publication and recovery contract
+
+[Home](../README.md) · [Artifact overview](../1-human-required/04-artifacts.md)
+
+## State that outlives an agent session
+
+Persist project identity, user intent and amendments, contract revisions, permission/budget ledger, editable agenda, hypotheses and assumptions, evidence dependencies, experiment protocol/trial ledger, calls/jobs and publication manifests. Agent summaries are navigation aids; authoritative facts resolve to immutable evidence. Store an append-only event journal plus a recoverable projection, rather than trusting conversation memory. A minimal implementation can use a transactional local database and content-addressed files; distributed infrastructure is not required.
+
+Every effectful call has a persisted intent/idempotency key and reserved budget before dispatch. Providers return stable operation IDs. The journal records observations separately from accepted conclusions. Restart reconstructs pending work, reconciles provider state, checks expired leases and remaining budget, then resumes through JiuwenSwarm. Concurrent writers use transaction/version guards; no double spend or silent last-writer-wins acceptance.
+
+Long jobs periodically persist progress or checkpoint handles when supported. Unsupported mid-job checkpointing is declared, not fabricated; restart may rerun a pure job within the budget but must not duplicate uncertain effects. Cancellation records request and confirmed outcome separately. Resource enforcement must occur outside cooperative agent reasoning; an external supervisor retains the ability to stop a wedged worker.
+
+## Publication order
+
+1. Producer writes to invocation-scoped staging. Treat paths, filenames and generated instructions as untrusted. Prevent path traversal and access outside authorized input/output roots.
+2. Store seals immutable bytes, computes SHA-256, records size/media type, origin and confidentiality. Checkers read these sealed bytes and the bound evidence scope.
+3. Persist check results, terminal receipt and references to sealed outputs. Required checks must all pass for accepted status. A receipt includes output hashes; it does not include the final delivery manifest hash, avoiding a circular digest.
+4. In one transaction or equivalent recovery-safe operation, publish a manifest referencing durable receipts and output objects. The manifest's hash is stored by the enclosing project event, not by itself. Do not expose accepted links before this boundary.
+5. Delivery checks confirm obligation coverage, completeness and accessible evidence. Render the human report from the same immutable references; do not let report prose introduce unsupported claims.
+
+Crash before step 3 leaves staged/provisional work. Crash after receipt persistence but before publication may safely resume publication using the same identity. Crash after publication returns the existing manifest, not a duplicate delivery. Dangling refs and hash mismatches block release. Garbage collection retains objects referenced by published manifests, pending jobs, retained receipts or explicit reproduction snapshots. Withdrawal of availability never authorizes deletion of this evidence.
+
+## Research acceptance and artifact status
+
+Call status and project outcome are separate. A calculation can be accepted while the overall hypothesis is disproven. A failed study can still produce an accepted diagnostic report that explicitly says the scientific objective was not achieved. Delivery statuses are COMPLETE, PARTIAL, INFEASIBLE or CANCELLED; acceptance of a report's honesty must not transform PARTIAL into COMPLETE. Quality evaluation scores these separately.
+
+Every substantive report claim points to accepted evidence or is marked hypothesis/uncertain. Record exploratory versus confirmatory analyses; do not cherry-pick the best run without disclosing trial selection. Sample sizes, uncertainty estimates and statistical procedures are part of the task-specific protocol, not universal schema fields that magically validate science. The final project obligations govern what is adequate.
+
+Reproduction levels: **exact replay** for deterministic operations with retained inputs/environment; **controlled replication** for stochastic/model experiments using pinned settings and a declared tolerance/protocol; **evidence inspection only** where an external service/data license prevents replay. Declare the strongest actually demonstrated level per output, and prohibit an evidence-inspection-only output from satisfying an obligation requiring replication. Model alias/version drift is recorded and tested as a changed environment.
+
+## Privacy and exports
+
+Evidence/checkers get only permitted source scopes. External reviewers, model providers and exports obey audience/data-use restrictions before execution. Artifacts include audience and retention labels; an export manifest may redact restricted objects and list omissions, but cannot claim complete reproducibility if necessary data is omitted. Secrets remain provider-owned. Artifact integrity checking does not grant permission to disclose the artifact.

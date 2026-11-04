@@ -1,0 +1,55 @@
+---
+id: cc-protocol-02-compiler-and-release
+status: proposed-runtime-unverified
+source: November 3 single-CC workshop, M2a contracts and reviewed Muse addendum
+last_reviewed: 2026-11-04
+next_action: Replay against a qualified carrier before deployment
+---
+# Software Factory, compiler and release
+
+## Inputs and outputs
+
+The compiler takes a declaration, a resolver for pinned materials, and a target build environment. It produces an immutable release or structured diagnostics. A Factory may additionally accept a brief, design and implement a change, and return a source product. The compiler step starts when an implementation binding exists.
+
+## Compilation stages
+
+| Stage | Required work | Observable failure |
+|---|---|---|
+| Parse and normalize | Apply the [declaration grammar](01-declaration.md). Check field ownership, unique IDs, references, schemas, names and profiles. | `INVALID_DECLARATION`, `UNRESOLVED_REFERENCE`, `UNSUPPORTED_PROFILE` |
+| Resolve | Fetch by scope. Hash raw bytes. Confirm OCI platform/config, recipe commit and tree, build context, base and locks. Refuse mutable carriers or redirected bytes with a different digest. | `MUTABLE_CARRIER`, `DIGEST_MISMATCH`, `MISSING_MATERIAL` |
+| Materialize | For an image, inspect it and verify process executable paths or the pinned adapter and supported native binding. For a recipe, build in the pinned context, verify target ABI and record the resulting single-platform executable image. Tools may use an existing small adapter image. Large models, fixtures and run secrets are bound separately. | `MISSING_ENTRYPOINT`, `BUILD_FAILED`, `INCOMPATIBLE_ABI` |
+| Seal | Persist the normalized declaration and descriptors. Produce the release manifest below, hash its exact stored bytes and save build lineage. Reuse matching content on retry. Publish only after all objects exist. | `PERSIST_FAILED`; no discoverable partial release |
+| Register and qualify | Register the immutable release after structural and integrity checks. Establish baseline compliance with a bounded adapter run. Apply independent semantic qualification only where operation or consumer policy requires it. The catalog records the observed scope. Runner rechecks policy, revocation, providers and lease at dispatch. | `UNQUALIFIED` when required by policy, `REVOKED`, `UNSUPPORTED_HOST` |
+
+## Release manifest
+
+- Exactly `{cc, declaration, bindings, materials}`.
+- Here `cc` is `"1"`, `declaration` is the Ref to normalized JSON bytes, `bindings` maps each local operation ID to exactly `{image, platform}`, and `materials` is a list of unique Refs to all transitive external declaration definitions and build inputs stored as files.
+- Keep native Git and OCI subjects in the declaration and build record.
+- Each binding uses a resolved single-platform image digest and verified OS/architecture[/variant].
+- Manifest bytes are the release digest subject.
+- Image bytes, model shards and the release manifest have distinct identities.
+- Store generated JSON as UTF-8 without BOM.
+- Consumers verify exact persisted bytes before parsing.
+- Identical semantics alone do not guarantee byte-identical builds.
+
+## Diagnostics
+
+Return one or more objects `{code, path, message}` on failure. Path is a JSON Pointer into the declaration, or the empty string for the whole build. Include the failing port, material, or ABI in the message. Build success means the artifact exists. Qualification records the checks and scope. Catalog installation and call admission are separate policy decisions. A failed migration or build may remain a draft.
+
+## Examples
+
+- A cataloged CPU utility executes from a digest-pinned image.
+- A Strata reader may instead use a pinned ARM64 recipe, but its released binding still identifies the resulting runnable image.
+- A Factory that delivers only a modified engine returns a product identifying its source/recipe/image.
+- That engine enters the Lab as the experiment subject.
+- Only separately declared, reusable tools enter the CC catalog.
+- A local Lab patch creates a new measured subject under the parent engine and never silently replaces a catalog release.
+
+## Delivery and adoption
+
+[Distribution and interoperability](06-distribution-and-interoperability.md) specifies the registry, offline and hosted forms. A received YAML declaration must be compiled before it represents an installed release. The host generates MCP tool views from operation contracts. A persistent agent deployment may expose A2A with a verified mapping to the release.
+
+## Qualification scope
+
+Baseline compliance covers protocol behavior, input/output integrity and effect enforcement. It is host-generated. Domain qualification adds independently checked guarantees for a defined environment and workload. Neither the publisher nor a tool process may self-assign independent acceptance. The [quality model](07-quality-and-improvement.md) defines what is mandatory and what can remain optional.

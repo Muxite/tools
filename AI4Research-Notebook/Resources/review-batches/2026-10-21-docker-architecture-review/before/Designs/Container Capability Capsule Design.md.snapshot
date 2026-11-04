@@ -1,0 +1,47 @@
+---
+id: container-cc-initial-design
+status: proposed
+source: Sources/Prompts/2026-10-21-vm-capsule-factory-design-plan.txt
+last_reviewed: 2026-10-21
+next_action: Specify package and invocation exchange and binder-runner-check ownership
+---
+# Container capability capsules
+
+Parent: [[Designs/Lab Capsule and Factory Design Plan]]. Initial proposed architecture, not a runtime result.
+
+Every executable CC version is delivered through a pinned image. Its declaration remains the governed capability contract; the image is its executable carrier. Supporting files need not each become CCs. Capsules can reuse base layers while retaining distinct versions.
+
+## Shared contract
+
+| Object | Required meaning |
+|---|---|
+| Capsule package | CC identity, declaration hash, source lineage, image digest/platform, entrypoint/protocol, build recipe/locks, resource needs, independent check/profile references and candidate status |
+| Invocation | Unique attempt/node, frozen CC/image/declaration pins, typed input refs/hashes, grants/policy, model route/settings, budgets, output/evidence destinations and lab manifest revision |
+| Result | Status, output artifacts/hashes and schema/media types, diagnostics, time and resource use; transport completion is separate from acceptance |
+| Evidence | Effective image/platform, relevant host/driver details, exact inputs/outputs, external model/dependency identities or unavailable pins, logs, checks and host gate decisions |
+
+These define payload meaning, not a final schema. Reconcile with existing declaration, run-plan and execution records before assigning serialization or IF revisions.
+
+Start with a short-lived container per invocation. Propose file-based exchange: read-only inputs/manifest, a dedicated writable output location, temporary workspace and a result manifest. Host code validates and seals output artifacts into its own custody before independent checking. Exit zero cannot accept outputs. Missing manifest, corrupted hashes or failed output writes are protocol/infrastructure failures, not successful empty results.
+
+A persistent service carrier needs explicit reset, per-invocation isolation, concurrency, health and state ownership before eligibility. A coherent multi-operation CC can expose multiple operations under one declaration. A containerized adapter to a remote service does not pin that remote service's implementation.
+
+## Execution and checking
+
+The binder selects an eligible compatible version and freezes image, declaration, checks and grants. The runner validates image/platform availability and enforces the intersection of declaration, invocation and run policy. Build-time and run-time network grants are separate. Model calls use a scoped bridge; credentials are never baked into images.
+
+Protected host checks retain required input/runtime access. The semantic verifier receives only the pinned declaration and exact output. Verifier CCs also use the container carrier with that restricted manifest; packaging must not expose producer task/source context. Gates remain host-owned; factory-generated self-tests cannot replace independent checks.
+
+A missing/incompatible image fails preparation; never rebuild or select a nearby tag inside a frozen run. Cancellation stops the owned invocation and retains partial evidence with outputs unaccepted. Recovery reconciles state; subsequent attempts get distinct identities. Reconcile non-idempotent effects before another attempt. Current M1 no-retry semantics remain until a separate development profile specifies bounded repair.
+
+## Reproducibility and performance
+
+Separate rerunning an existing image, rebuilding from source and reproducing a scientific result within stated tolerances. Containerization improves software-environment capture; none of those claims implies the next. Record input/data hashes, model identity/settings/seeds where available, mutable services, CPU/GPU architecture and drivers. Explicitly report unpinnable dependencies.
+
+Store large datasets/weights as separately versioned resources mounted under contract. Preserve dependency snapshots required for offline rebuilds; a lockfile cannot preserve vanished packages. A changed rebuild digest is a distinct artifact requiring qualification and a provenance link.
+
+Measure build, transfer/pull, cold/warm startup, execution, checks, storage and total journey time separately. Reuse pinned layers/caches without changing identity. Full conversion is the target; overhead measurements guide capacity and implementation choices.
+
+## Conversion path
+
+Inventory all executable CCs and their dependencies/check owners. Prove a stateless tool first, then an agent CC with model bridge, then a verifier with restricted payload, then remaining research stages including Builder/Benchmark resource needs. Compare behavior and failures to the existing carrier under the same contracts. No silent in-process fallback for missing images. Include denied mounts/network, corruption, unavailable dependencies and cancellation before widening rollout. Carrier acceptance and CC accuracy are separate evidence claims.

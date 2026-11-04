@@ -1,0 +1,11 @@
+flowchart TD
+    run["Released CC in real workloads"] --> evidence["Receipts, failures and scoped assessments"]
+    evidence --> proposal["Improvement proposal against parent release"]
+    proposal --> factory["Factory builds candidate release"]
+    factory --> comparison["Independent comparison on frozen workloads"]
+    policy["Protected checks and acceptance policy"] --> comparison
+    comparison --> decision{"Promotion decision"}
+    decision -->|pass and authorized| catalog["Publish eligible release"]
+    decision -->|fail or inconclusive| record["Retain evidence and revise or stop"]
+    catalog --> run
+    catalog --> rollback["Retain prior release for rollback"]

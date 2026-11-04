@@ -1,0 +1,167 @@
+{
+  "recorded_at": "2026-11-04T17:44:04.061184+00:00",
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "image": "docker.io/library/python@sha256:1148dbb014615300fa7e713b2f94f550c0d1c69780c0805f84f093ceee34dd0b",
+  "worker_sha256": "58a921f6a4c00394abc8f9341dd578a3a44d7a30b928a1071e2bad6150f28b1d",
+  "native_cases": [
+    {
+      "command": [
+        "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "C:\\Users\\m50066326\\huawei\\AI4Research-Notebook\\Designs\\CC and Strata delivery\\CC Protocols\\reference\\examples\\portable\\tool.py"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"outcome\": \"ok\", \"outputs\": {\"trimmed\": \"Hello, portable CC!\"}}\n",
+      "stderr": "",
+      "packet": {
+        "call": "direct-probe",
+        "attempt": "0",
+        "capability": "trim",
+        "inputs": {
+          "text": " \tHello, portable CC!\r\n"
+        },
+        "output_dir": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\cc-v2-portable-u50yim5h\\out",
+        "resources": {}
+      },
+      "expected": {
+        "outcome": "ok",
+        "outputs": {
+          "trimmed": "Hello, portable CC!"
+        }
+      },
+      "passed": true
+    },
+    {
+      "command": [
+        "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "C:\\Users\\m50066326\\huawei\\AI4Research-Notebook\\Designs\\CC and Strata delivery\\CC Protocols\\reference\\examples\\portable\\tool.py"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"outcome\": \"ok\", \"outputs\": {\"trimmed\": \"\\u00a0 retain Unicode whitespace \\u00a0\"}}\n",
+      "stderr": "",
+      "packet": {
+        "call": "direct-probe",
+        "attempt": "1",
+        "capability": "trim",
+        "inputs": {
+          "text": "\u00a0 retain Unicode whitespace \u00a0"
+        },
+        "output_dir": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\cc-v2-portable-u50yim5h\\out",
+        "resources": {}
+      },
+      "expected": {
+        "outcome": "ok",
+        "outputs": {
+          "trimmed": "\u00a0 retain Unicode whitespace \u00a0"
+        }
+      },
+      "passed": true
+    },
+    {
+      "command": [
+        "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "C:\\Users\\m50066326\\huawei\\AI4Research-Notebook\\Designs\\CC and Strata delivery\\CC Protocols\\reference\\examples\\portable\\tool.py"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"outcome\": \"ok\", \"outputs\": {}}\n",
+      "stderr": "",
+      "packet": {
+        "call": "direct-probe",
+        "attempt": "2",
+        "capability": "empty",
+        "inputs": {},
+        "output_dir": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\cc-v2-portable-u50yim5h\\out",
+        "resources": {}
+      },
+      "expected": {
+        "outcome": "ok",
+        "outputs": {}
+      },
+      "passed": true
+    },
+    {
+      "command": [
+        "C:\\Users\\m50066326\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "C:\\Users\\m50066326\\huawei\\AI4Research-Notebook\\Designs\\CC and Strata delivery\\CC Protocols\\reference\\examples\\portable\\tool.py"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"outcome\": \"ok\", \"outputs\": {\"value\": {\"a\": [null, true, 0, \"\\u4e2d\\u6587\"], \"nested\": {}}}}\n",
+      "stderr": "",
+      "packet": {
+        "call": "direct-probe",
+        "attempt": "3",
+        "capability": "echo",
+        "inputs": {
+          "value": {
+            "a": [
+              null,
+              true,
+              0,
+              "\u4e2d\u6587"
+            ],
+            "nested": {}
+          }
+        },
+        "output_dir": "C:\\Users\\M50066~1\\AppData\\Local\\Temp\\cc-v2-portable-u50yim5h\\out",
+        "resources": {}
+      },
+      "expected": {
+        "outcome": "ok",
+        "outputs": {
+          "value": {
+            "a": [
+              null,
+              true,
+              0,
+              "\u4e2d\u6587"
+            ],
+            "nested": {}
+          }
+        }
+      },
+      "passed": true
+    }
+  ],
+  "image_attempt": {
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "-i",
+      "--network",
+      "none",
+      "--read-only",
+      "--mount",
+      "type=bind,source=C:\\Users\\m50066326\\huawei\\AI4Research-Notebook\\Designs\\CC and Strata delivery\\CC Protocols\\reference\\examples\\portable,target=/cc/bundle,readonly",
+      "--mount",
+      "type=bind,source=C:\\Users\\M50066~1\\AppData\\Local\\Temp\\cc-v2-portable-u50yim5h\\in,target=/cc/in,readonly",
+      "--mount",
+      "type=bind,source=C:\\Users\\M50066~1\\AppData\\Local\\Temp\\cc-v2-portable-u50yim5h\\out,target=/cc/out",
+      "docker.io/library/python@sha256:1148dbb014615300fa7e713b2f94f550c0d1c69780c0805f84f093ceee34dd0b",
+      "python",
+      "/cc/bundle/tool.py"
+    ],
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.\n",
+    "packet": {
+      "call": "image-probe",
+      "attempt": "0",
+      "capability": "trim",
+      "inputs": {
+        "text": " \tHello, portable CC!\r\n"
+      },
+      "output_dir": "/cc/out",
+      "resources": {}
+    },
+    "expected": {
+      "outcome": "ok",
+      "outputs": {
+        "trimmed": "Hello, portable CC!"
+      }
+    },
+    "passed": false,
+    "status": "blocked"
+  },
+  "equivalence": "not established: image process did not execute",
+  "native_status": "passed"
+}

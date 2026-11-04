@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sealed application-boundary savepoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "savepointId",
+    "parentRun",
+    "parentAttempt",
+    "epoch",
+    "boundary",
+    "releaseLock",
+    "requestTape",
+    "effectiveSettings",
+    "hostProfile",
+    "filesystemImage",
+    "writableVolumes",
+    "completedArms",
+    "externalEffectReceipts",
+    "nextArm",
+    "consistency",
+    "resumeMode"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ai4r.lab.arm-savepoint.v1alpha1"
+    },
+    "savepointId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parentRun": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parentAttempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "epoch": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "boundary": {
+      "const": "between-arms"
+    },
+    "releaseLock": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "requestTape": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "effectiveSettings": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "hostProfile": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "filesystemImage": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "writableVolumes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mount",
+          "snapshotManifest"
+        ],
+        "properties": {
+          "mount": {
+            "type": "string",
+            "minLength": 1
+          },
+          "snapshotManifest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      },
+      "uniqueItems": true
+    },
+    "completedArms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "armId",
+          "receipt"
+        ],
+        "properties": {
+          "armId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "receipt": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      },
+      "uniqueItems": true
+    },
+    "externalEffectReceipts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "uniqueItems": true
+    },
+    "nextArm": {
+      "type": "string",
+      "minLength": 1
+    },
+    "consistency": {
+      "const": "quiesced"
+    },
+    "resumeMode": {
+      "const": "restart-processes-and-warmup"
+    }
+  }
+}

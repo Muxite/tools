@@ -1,0 +1,144 @@
+---
+id: coder-prompt-benchmark-runner
+status: ready-to-send
+source: Sources/Prompts/2026-10-22-runner-cli-interface.txt; Sources/Prompts/2026-10-22-benchmark-main-app-alignment.txt; Sources/Prompts/2026-10-22-benchmark-runner-orchestrator-request.txt; Sources/Prompts/2026-10-22-separate-baseline-container-request.txt; Sources/Prompts/2026-10-22-standalone-human-judged-benchmarks.txt; Sources/Prompts/2026-10-22-benchmark-runner-branch-and-runtime-safety.txt
+last_reviewed: 2026-10-22
+next_action: Implement in our AI4Research branch of JiuwenSwarm; protect user files during every benchmark run
+---
+# benchmark-runner
+
+## For human
+
+- **What it is:** A developer tool in our AI4Research branch of JiuwenSwarm, run by developers or their delegated agents.
+- **Interface:** CLI only for the first version, usable by developers and their agents.
+- **Runs:** Loads a test matrix and processes cases in parallel using isolated containers and workspaces.
+- **Compares:** Runs AI4R branch A versus branch B, or AI4R with capsules/workflow versus plain JiuwenSwarm/OpenJiuwen using the same Codex backend. Direct Codex is an optional additional target.
+- **Exports:** Saves actual outputs, execution details and artifacts as reviewable reports and files.
+- **Protects:** Uses unique benchmark folders; never overwrites user files or alters existing projects/live app data during a run.
+- **Leaves judgment to humans:** Records the programs' own decisions and execution status; does not grade test correctness or choose an A/B winner.
+- **App changes:** Fix missing app support as part of implementation; keep benchmark execution isolated from user files.
+- **Setup:** Start with a CLI on the remote Docker host. A human must connect Codex when preflight requests authentication.
+
+Optional Spark deployment: [[Resources/Coder Prompts/spark-benchmark-setup|spark-benchmark-setup]] prepares the host and connects the existing containers. It is not a prerequisite; this runner must also work on another compatible Docker host.
+
+## For AI: implementation objective and existing design
+
+Implement **benchmark-runner in our AI4Research branch of JiuwenSwarm**, following that repository's instructions and native task/spec process. Normal authorized development edits to implement the runner and necessary integration are allowed; preserve unrelated work. Package it as a modular development-tool command above the target applications, off the research hot path. Source location and runtime ownership are different: its code belongs in our branch, while benchmark execution uses isolated copies and output directories. No separate runner repository is required.
+
+### Deliver a usable runner package: CLI first
+
+The deliverable is the **benchmark runner for our system**, not only a Codex wrapper, container recipe or deployment proposal. Package it as an installable module/command in our branch with a documented invocation, example campaign and working end-to-end path. Its targets include the Codex-backed app configurations described below. Codex is a target runtime/backend; it does not replace the runner's queue, lifecycle control or result collection.
+
+**First version: CLI only.** Do not build a web UI, require a browser or add a UI server. Provide one consistent `benchmark-runner` entry point for `doctor`, `run`, `status`, `resume`, `cancel`, `compare`, `export` and `cleanup`, with useful top-level and per-command help. Reuse existing implementations behind that interface instead of adding a second queue or lifecycle manager.
+
+Support an explicit campaign/config file, data root, target selections and concurrency. Validate configuration before launching work and show the resolved target commits, output destination and resource ownership. Match the branch's supported configuration conventions and document precedence. Provide readable status/progress for humans and a versioned `--json` mode for agents. Keep progress/log messages on stderr so stdout can contain parseable results. Return documented exit codes distinguishing command completion, invalid configuration, missing prerequisites and execution failure; exit codes never grade research correctness. Noninteractive commands must not hang on an unexpected prompt; report required authentication or approval with a clear next action.
+
+Every control operation identifies its campaign and validates ownership. Status may inspect retained records, but resume/cancel/cleanup must refuse ambiguous or foreign resources. A graceful CLI interruption must follow the documented cancel/detach behavior and preserve reconciliation records; it must never cancel unrelated app work. Run the CLI on the chosen Docker host, including through SSH, rather than assuming local paths are visible to a remote daemon. Preserve the existing app commands, endpoints, ports and user configuration. Unique campaign names, isolated volumes/networks/workspaces and atomic output creation must allow the app, runner and another campaign to coexist.
+
+Validate the actual installed command, help/config errors, JSON output, concurrent campaign ownership and interruption/recovery. Document a short sequence from `doctor` through run/status to export, plus resume/cancel/cleanup examples. A developer or authorized agent must be able to use that sequence without editing Python files or overwriting user state.
+
+### Start with the actual M1 branch
+
+The inspected branch is **`ai4r_M1`** (capital `M`) in `Stellven/jiuwenswarm`. Its head was `7cc7c2d843bc4ac22a7e9e731dc0efb2e09439e3` on 2026-10-22. Recheck the available branch and current commit before editing; this is a source review, not proof that its containers or model runs work.
+
+Read `AGENTS.md`, the current `TASKS.md` for M1, the relevant registered task/spec files and their design sources. Locate the design files named `benchmark-runner.md` (Platform benchmark runner), `automation.md`, and the `README.md` pages titled **AI4Research sidecar container** and **Test runner (client validation in the sidecar container)**. Use the branch's registered source locations. Do not assume paths from another machine. The task register already contains M1 work; do not create a duplicate because an older instruction says registration is pending.
+
+Reuse the existing `research_sidecar` code, especially `client.py`, `runner.py`, `launcher.py`, `ledger.py`, `reconcile.py`, `campaign.py`, `cleanup.py` and export/report helpers. Inspect `deploy/m1` Dockerfiles and Compose files, including `compose.sidecar.yaml`. The inspected launcher has a fixed set of case families, and its sidecar configuration requires score/report mounts. Extend this into a generic case-driven mode that works without score files or a referee. Reuse useful code; wrapping the existing fixed CLI alone does not meet this request.
+
+The existing design describes sequential campaigns and automatic referee scoring. This request changes those parts for **benchmark-runner**: run independent cases in parallel, use separate baseline containers, and leave assessment to humans. Record these changes through the native task/spec process and update affected interface and deployment documentation. Preserve existing scoring functionality for other callers; this mode must not invoke it or depend on it. Keep the authenticated client/export boundary, app verification gates and separation from product startup.
+
+### Required app changes and context discipline
+
+**If the main app cannot support this benchmark workflow, modify and realign the main app as part of this task.** This includes necessary API, readiness, input import, request reconciliation, cancellation, output export, configuration and container startup changes. Trace the real request path from client to app and exported result. Fix missing or disconnected implementation in our branch and add focused integration checks. Do not deliver a disconnected wrapper, leave implementation gaps as permanent blocked cases, or ask for separate permission for changes already required by this task. Preserve unrelated user work and update the relevant registered contracts and task records.
+
+Implement these changes during development, then build and pin the target image before a campaign starts. A running campaign must never patch its target or alter the original checkout. A deliberately selected older branch may lack a capability; record that incompatibility honestly instead of modifying the historical target. An unavailable remote host, human login or external service is a real external blocker; an interface you still need to implement is unfinished work.
+
+Keep the primary goals visible: load cases, run isolated targets concurrently, collect actual results, and export them for human review without overwriting user files. Read the relevant code and registered design before changing it. Keep a short record of decisions, current changes, validation, blockers and next steps so work can continue after context loss. Distinguish current instructions from historical delivery notes; earlier task-specific limits do not cancel this requested implementation and its focused validation. Do not expand into a new platform, research workflow redesign, automatic judge or unrelated infrastructure project. Use plain technical English in code documentation and the final handoff.
+
+### Non-negotiable ownership and judging boundaries
+
+Place runner source, tests, schemas, adapters and deployment assets in our branch through the normal development workflow; keep credentials, queues and generated results out of versioned source. The runtime places state/workspaces/results under a configured benchmark data root outside existing user project folders by default. During execution, original checkouts, supplied files and live app data are read-only: never switch their branches, install into their environments, generate POC files there or clean them up. Use independent runner-owned clones/worktrees for target builds. Runtime never patches a target to make a case pass. Implement required app support during development as specified above, then test the resulting pinned build.
+
+Create a unique campaign directory atomically, then separate target/case/repeat subdirectories. Existing destinations are refused or assigned a fresh unique name, never overwritten or reused merely because a filename matches. Resume is explicit, requires the matching campaign manifest/ownership and appends or versions records while preserving earlier evidence and human assessments. Export to a new destination; never overwrite user reports, datasets or files. Validate resolved paths, symlink/junction escapes and ownership before any write/remove. Cleanup is restricted to proven runner-owned disposable resources, preserves retained exports and refuses user/foreign paths.
+
+A developer or developer-commanded agent is an authorized caller. Support unattended execution of the approved campaign without repeated per-case confirmation. This authorization does not permit overwriting existing files, deleting unrelated resources or bypassing authentication; missing Codex setup is the documented human checkpoint.
+
+Report execution states such as completed, failed, blocked, cancelled and timed out. Record target exit codes and any program-produced gate/verdict text as observations, not the runner's judgment. Human assessment starts as **not reviewed**. Provide a human-editable per-case matrix/review sheet; do not automatically assign test PASS/FAIL, correctness scores, A/B winners, semantic judgments or merge/release decisions. Mechanical checks of the runner's own isolation, transport and evidence integrity are allowed; these do not establish task correctness. Do not add an LLM judge or external automatic referee.
+
+### 1. Deploy above the target apps
+
+Use a small host-side launcher/orchestrator, durable queue/ledger and bounded client workers. Start with Docker Compose plus the project's existing language/tooling and a simple transactional local store such as SQLite; no Kubernetes, distributed scheduler, web UI or new message-broker stack is needed for the first release.
+
+Run the orchestrator on the selected remote Docker host so checkouts, mounts and artifacts are resolved there. Allow local development using the same configuration shape. Remote setup must be documented and repeatable; laptop access may launch it through SSH and retrieve exports. Do not assume a local laptop directory exists on a remote Docker daemon. Do not expose an unauthenticated Docker TCP socket.
+
+The runner-owned host launcher alone owns its Docker lifecycle and source preparation. Target apps, client workers and baseline adapters do not get the Docker socket or broad host credentials. Reporting summarizes observed execution; human review remains separate. Product startup does not depend on this tool.
+
+### 2. Branch selection and collision-free targets
+
+Configuration must support at least **AI4R branch A versus AI4R branch B** and **AI4R versus upstream JiuwenSwarm/OpenJiuwen**. Do not invent branch names or endpoints. Each target descriptor records repository, requested ref, resolved commit, dirty-tree status if relevant, adapter type, build recipe/lock, image identity, model/configuration and expected instance identity.
+
+Resolve a branch once to a full commit before campaign freeze using a runner-owned clone/mirror. Prepare independent runner-owned clones or detached worktrees from that owned mirror; never administer the user's checkout or mutate a source tree underneath a running build/target. Do not share Git alternates or mutable source storage with the user's repository. Build each distinct immutable candidate once and reuse it across cases. Selecting another branch creates/reuses an isolated target, not an in-place checkout inside a live container. Generated POC code may run only in disposable target workspaces, never in the user's original project directories.
+
+AI4R and JiuwenSwarm run in **different target containers**, with separate Compose project identities, app state/database volumes, writable workspaces, logs, configuration, session/Codex state and endpoints. A/B AI4R instances get the same isolation. Use campaign/target/worker ownership labels; avoid fixed `container_name`, global named volumes and fixed published ports that collide. A worker must have an unambiguous route to its target: use a target-specific network/alias or a dedicated worker on that target's network. Never rely on an ambiguous `app` alias across multiple networks. Publish only necessary operator endpoints on configured private/loopback interfaces.
+
+### 3. Load cases and run a real parallel queue
+
+Load versioned YAML/JSON case files and a campaign manifest specifying targets, resources/setup, steps, timeouts, repeats, budgets and human-review references. Restricted expectations/answer keys are not product inputs. Keep the apparatus generic; do not embed supplied examples or held-out test specifics in implementation prompts or agent contexts.
+
+Provide configurable worker concurrency and queue the case × target × repeat matrix. **Actually run independent cases/targets concurrently** when capacity permits, including both sides of A/B. If an app supports only one active run, give each worker its own target instance or serialize only that instance; do not turn the whole campaign into a sequential loop. This requires no parallelism or restructuring inside a research DAG.
+
+Persist pending/claimed/running/terminal queue state, leases and correlated campaign/case/repeat/target/request/run IDs transactionally. After runner/connection restart, reconcile uncertain submissions and resume observation without duplicate runs or blindly repeating effects. A failed case is recorded and unrelated work continues unless the configured stop policy or shared-resource failure requires otherwise. Never omit unfinished cases or count missing evidence as success. Support status/progress, explicit cancellation and a finite job deadline; cancellation preserves collected evidence and touches only owned runs.
+
+Separate ordinary throughput mode from comparable performance mode. Parallel jobs sharing models/GPU/CPU can affect timing; record concurrency/contention. Resource-exclusive measurements must serialize through a declared reservation. Do not call concurrently contaminated timings isolated performance gains. Match case/resource/model/seed/budget pins for paired comparisons, including AI4R's verification overhead, and explicitly flag incomparable pairs.
+
+### 4. Clean Docker mounts and working APIs
+
+Preflight the resolved Compose configuration and actual mounts before admitting a target. Resolve paths against the remote host's configured campaign root, create only owned directories, verify required files, ownership and UID/GID access, and reject traversal/foreign paths. Use read-only case/resource mounts or supported import operations; writable app state/output is target-specific. Never let Docker silently create an empty directory where a required file was expected. Inspect mounts and prove representative input-read/output-write behavior inside the actual containers. Do not bake host-specific absolute paths or credentials into images.
+
+AI4R uses its supported readiness, submit, reconcile, status, event/timeline, retrieve and cancel operations with scoped authentication. Verify the actual routes and capabilities; do not invent endpoints. Verify target instance/build, contract version and model/storage prerequisites, then check exported identity matches the target. Inside a target network use its service DNS/container port, not a worker's localhost. Implement compatibility in the adapter and fix required missing app operations/exports during development. During a campaign, unexpected incompatibility is recorded as a limitation or block; never patch source, import private modules to bypass the API or mount the app database into the runner. Do not weaken research verification, evidence requirements or effect controls to obtain an output. Preserve the M1 semantic verifier boundary: it receives the pinned declaration and exact output, not original sources or producer context.
+
+Implement a runner-owned JiuwenSwarm/OpenJiuwen adapter with `prepare`, `run`, `collect` behavior using its existing SDK/CLI/API. It addresses the separate baseline target and does not assume AI4R API compatibility. Record exact upstream repository/commit, agent/harness version and effective model; modified AI4R is not an upstream baseline. Missing internal gates/traces are explicit limitations, not fabricated values or judgments. Export both targets' terminal artifacts in the same reviewable format. Make necessary integration changes in our AI4R branch; keep an upstream baseline at its recorded upstream commit. Any baseline harness or adapter must be versioned and disclosed, without silently substituting our modified AI4R for upstream.
+
+### Codex-backed baseline and optional direct Codex target
+
+Support the following comparison as a first-class campaign configuration:
+
+| Target | Behavior |
+|---|---|
+| AI4Research + Codex | Our capsule execution, planning workflow and verification gates, using the selected Codex backend |
+| Plain JiuwenSwarm/OpenJiuwen + Codex | The selected native agent runtime with a minimal Codex provider/bridge integration, without AI4Research capsules, static research DAG or AI4Research verification pipeline |
+| Direct Codex, optional | A packaged Codex CLI/app-server agent in its own container, without either application's orchestration |
+
+The required comparison is the first two targets. Allow a separately selected direct-Codex adapter; do not make it a prerequisite for that comparison. Native agent reasoning, planning and ordinary tool use remain allowed in the plain baseline. "No workflow" means no imposed AI4Research workflow, not disabling the baseline's normal agent capabilities.
+
+Package the Codex client/runtime and adapter with pinned dependencies in the appropriate target image or an explicitly scoped bridge service. Codex model execution is provided by its authenticated backend; bundling the client does not package model weights or make inference local. The benchmark runner remains the coordinator and collector, not a Codex agent performing or judging the cases. Keep target containers, case sessions, writable state and credentials isolated, while reusing the same pinned bridge implementation where practical. Use a documented headless integration; OpenAI documents CLI, SDK and app-server options in [Codex as a platform](https://developers.openai.com/blog/codex-as-a-platform). Verify the interface supported by the actual pinned version.
+
+Use upstream JiuwenSwarm/OpenJiuwen plus the minimum versioned Codex integration needed to execute the same tasks. If upstream lacks that provider, build the adapter in our branch and record the upstream commit, patch/harness hash and effective settings separately. Label it **upstream with Codex integration**, not unmodified upstream. Do not copy AI4Research's capsules, planner, research instructions or gate policy into this baseline. Do not substitute direct Codex and label it OpenJiuwen.
+
+The inspected `ai4r_M1` source at `7cc7c2d843bc4ac22a7e9e731dc0efb2e09439e3` includes `interface_codex.py` and `codex_subscription/transport.py`, but that ordinary-chat slice rejects tools/attachments/team requests and rejects server requests for host tools/approvals. It is a reuse lead, not proof of a tool-capable baseline. Reinspect the current implementation and implement the missing native tool/result/approval integration needed by selected cases. An agentic task must not silently fall back to a text-only response. Keep the existing chat profile intact where other callers rely on it.
+
+Give each target the same case brief, permitted source snapshots, external tool capabilities and effect permissions, with matched model identifier, reasoning effort where supported, time/resource/token budgets and repeats. Record actual Codex/runtime/provider versions, effective model identity, target instructions and any unmatched settings, including unavailable usage metrics. Keep AI4Research's real verification cost in its budget. Start with fresh case sessions and do not share solution history or warm-start one target with another's output. Parallel requests may share account limits; record rate-limit waits/contention and do not claim their wall times measure isolated speed.
+
+This primary comparison measures the whole AI4Research system against the native agent setup. It does not isolate the individual contribution of capsules versus planning versus verification; that requires separately specified ablations. Export observed outputs, tool traces where exposed, time and usage for human review, with no automatic correctness scores or winner. Verify both required targets can complete a representative tool-backed task, export its real artifacts, cancel and reconcile without cross-target effects before claiming the comparison works.
+
+### 5. Codex readiness and human setup
+
+Provide a `doctor`/preflight path that distinguishes container liveness from working model authentication and an actual authorized model call. Detect the configured Codex runtime/bridge for each target; use its documented login/setup flow and tell the human which target/session requires action. Never invent a login command, copy a developer's entire home directory or expose tokens in logs/reports/images. Keep writable authentication/session state isolated per target or use an explicitly supported scoped bridge arrangement.
+
+If authentication is unavailable, finish independent implementation/container/mock checks, report **BLOCKED: human Codex setup required**, and provide the exact supported next step and rerun command. Queued model work must wait or remain blocked honestly; do not fabricate a successful baseline. After setup, verify real model-backed work for both systems, cancellation and record export. Mocks remain labeled and excluded from real comparison claims. Do not make model credentials part of the exported campaign bundle.
+
+### 6. Evidence, results and file export
+
+For every target/case/repeat, retain submitted inputs/setup and hashes, code/image/configuration/model identities, effective budgets/environment, requests/events, actual outputs, relevant provenance, program-produced check/gate decisions and downstream actions where exposed, terminal reasons, time/usage and limitations. Host inventory and peak sampling remain attributable per job, with concurrent host activity identified. Never infer a program decision that its exported evidence does not expose.
+
+Generate JSON results, a CSV matrix and a readable Markdown/HTML summary. Include per-case **Inputs and Setup**, **Actual Output and Observations**, artifact links, program-produced outcomes, execution coverage/failures/blocks, incomplete work and descriptive timing/usage deltas. Give humans blank **Assessment**, **Evidence references** and **Review notes** fields, with optional criteria supplied by them; do not prefill a verdict. Distinguish process failure from a scientific negative reported by the app. Do not turn missing metrics/cost into zero, use app-verifier verdicts as ground truth, or silently retry/repair to improve apparent results.
+
+Export an inspectable campaign directory/archive containing reports, execution records, manifests/hashes and permitted artifacts, sufficient for human review after disposable containers are removed. Record oversized/excluded artifacts and retained references. Reports rebuild from saved records without rerunning agents and preserve separately entered human assessments. Restricted human criteria/answer keys must not reach targets/models or unauthorized export audiences; credentials never enter the bundle. No score records or automated referee are required for this tool.
+
+### 7. Fast, bounded delivery and acceptance
+
+First deliver the command/module in our branch with configuration, two isolated targets, a generic case queue, concurrency greater than one, actual results and safe file export. Supply `doctor`, `run`, `status`, `resume`, `cancel`, `compare`, `export` and owned-resource cleanup (or equivalents). Provide a generic example with placeholder repo/ref/host values, not leaked tests or personal paths. Reuse existing tooling rather than building a platform. Automatic scoring is not a prerequisite. Build a working M1 developer tool using the existing app and container structure.
+
+On the remote host, validate actual Compose isolation and API calls, not only mocks. Prove concurrent targets use intended commits/images, write only owned state and retain attributed outputs. Pre-populate sentinel user files/folders and a same-named export; show a developer or delegated agent can run the campaign without changing them. Verify collision refusal/fresh naming, explicit resume, cancelled/failed exports, symlink escapes and cleanup safety. Prove branch selection leaves the original checkout and other target untouched; resume does not duplicate work; target failure preserves the other result; missing Codex setup is reported. Then verify a real AI4R-versus-JiuwenSwarm campaign after human authentication. Keep implementation/tests in our branch and generated evidence in owned output storage. Do not claim remote/model success without access or fill human acceptance fields automatically.
+
+Keep disk/cache/log growth bounded during development and queued campaigns: small build contexts, shared immutable dependency layers, build-once images, per-job disk/memory/CPU/model limits, capacity-aware admission and bounded concurrency. Record the actual remote host architecture, memory and disk capacity; do not assume unlimited space. Share immutable model files/caches only through supported safe access, while keeping writable app/session state separate. Do not retain every failed image or tar export. Cleanup removes only labeled owned resources after export verification and preserves required replay pins. Do not add VM provisioning or a capsule factory to this delivery.

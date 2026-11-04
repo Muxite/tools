@@ -1,0 +1,41 @@
+---
+id: supervised-m1-integration-20261023
+status: local-candidate-verified-with-explicit-exclusions
+source: Sources/Prompts/2026-10-23-supervised-merge-direction.txt; Resources/review-batches/2026-10-23-supervised-integration/integration-receipt.json
+last_reviewed: 2026-10-23
+next_action: Reconcile with ongoing shared M1 work after its deliberate deployment revert, then qualify connected dynamic execution
+---
+# Supervised M1 integration
+
+**The deployment, required Planner, four optional capsule candidates and development guide are combined locally at `ee6c010` on `m1/reviewed-integration-20261023`.** This is a preserved integration candidate, not shared M1 or runtime acceptance. No feature was pushed or automatically admitted/activated.
+
+Shared `ai4r_M1` advanced during this work to `1fd17ab`, deliberately reverting deployment while other M1 work continues. Its commit message preserves these branches for later. The review did not undo it. A merge-tree rehearsal against that current main found an OPERATIONS modify/delete conflict; plain merging old ancestry must not silently restore or discard the deliberately reverted behavior.
+
+The [repository integration status](../../AI4Research-Development/jiuwenswarm-m1-reviewed-integration/deploy/m1/INTEGRATION-STATUS.md) owns the detailed merge table, findings, corrections, exclusions and next integration sequence. The [receipt](../Resources/review-batches/2026-10-23-supervised-integration/integration-receipt.json) pins commits, working design hashes and the verified portable Git bundle. The maintained PRD/design remain in their owning repository; this note does not create a second maintained design.
+
+## What changed and why
+
+Two `gpt-6-luna` reviewers handled small workflow and merge/state tasks. The supervisor checked their sources and conclusions, then gave named-file follow-ups. A reviewer initially treated bounded Planner correction as forbidden; the supervisor rejected that finding against the later exact user direction. This is an example of why agent conclusions require checking.
+
+The required core Planner is now combined with deployment and capsule source. A real state-compatibility risk was corrected: an old admitted optional Planner could remain selectable after its worker was removed. New snapshots make that identity non-selectable while retaining standing and historical snapshots. Static acceptance and scheduler-stop fixtures were corrected to exercise their current protected boundaries; no production guard was weakened.
+
+## Actual verification extent
+
+- Final combined Windows run: **187 passed, 4 deselected in 46.16 seconds**; [exact command](../Resources/review-batches/2026-10-23-supervised-integration/selected-checks-command.json), [log](../Resources/review-batches/2026-10-23-supervised-integration/selected-checks.log), [JUnit](../Resources/review-batches/2026-10-23-supervised-integration/selected-checks.xml).
+- Three connected scheduler cases were explicitly excluded; connected/native execution remains unqualified. One Windows custody-fixture failure was reproduced on shared M1; the routing source/test are unchanged from the earlier baseline. Its rejection guard was preserved.
+- Initial hash checks failed on unchanged CRLF working files retained after merging new Git checkout rules. Refreshing only line-converted files from exact Git bytes resolved this; no release pin was rewritten. Planner/PDF pin verification and Git whitespace checks pass.
+- The earlier combined suite passed 115 checks. A wider exploratory run was interrupted after failures and is not represented as a pass. The final selected count is its own run, not a sum of historical totals.
+
+A genuinely dynamic generic DAG has not been demonstrated all the way through real dispatch, independent checks and terminal delivery here. Model quality, production calibration, actual Docker/SSH, ARM64/Spark and full scientific execution remain unverified. This bounded review did not attempt to find every design mismatch.
+
+## Scope and next merge
+
+RSI and the model router remain owned elsewhere. The integration document identifies protected admission/promotion, selected-Capsule export, finalized contract and route/call evidence boundaries plus the tests to run when those owners supply actual commits. Existing seam checks are not verification of future code.
+
+After ongoing shared M1 work is ready, pin its new base, deliberately reintroduce desired deployment changes as a new reviewed delta, reconcile this candidate and resolve the known conflict. Then qualify desired capsules and run a connected generic success/rejection campaign. Historical plans and evidence stay immutable. No runtime or research acceptance is inferred from a source merge.
+
+Seven existing library notes were backed up byte-for-byte before editing; the source-capture manifest has a separate backup. Navigation and current intent link here while earlier delivery checkpoints remain visible. This session's new instruction supersedes older notebook-only scope wording for this authorized local integration work.
+
+## Later final merge authorization
+
+[[Activities/2026-10-23 Final M1 Merge]] supersedes the candidate-only next step above. New upstream AI4R was supplied and the user explicitly authorized final edits and merging. The earlier isolated-candidate and pause observations remain historical evidence.

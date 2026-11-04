@@ -1,0 +1,15 @@
+%%{init: {"theme":"neutral","fontFamily":"Segoe UI"}}%%
+flowchart LR
+  C[Researcher or central AI4R] <-->|research requests and responses| M
+  subgraph Host[Host Lab Manager process]
+    M[Public API and lab registry] --- A[Thin AI4R client adapter]
+    M --- R[Runtime provider client]
+  end
+  A <-->|native authenticated HTTP| N
+  R -->|lifecycle control only| D[Compose / Docker]
+  D -->|owns container lifecycle| N
+  subgraph Lab[One lab; repeat for A, B and others]
+    N[Existing AI4R native API and research runtime]
+    N --- S[Own writable Git clone, CCs and persistent research state]
+  end
+  N <-->|existing model abstraction| I[Our shared inference API]

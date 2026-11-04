@@ -1,0 +1,102 @@
+PLEASE IMPLEMENT THIS PLAN:
+# AI4Research next stage: CC effectiveness, lab infrastructure, and a personal research notebook
+
+## Summary
+
+Create a new Obsidian vault at `C:\Users\m50066326\huawei\AI4Research-Notebook` covering all your personal work in this workspace: designs, code activities, research, presentations, experiments, meeting notes, prompts, and decisions.
+
+Run two equally important research tracks:
+
+- **CC effectiveness:** establish whether capability capsules improve outcomes over a plain agent, then investigate improvements.
+- **Lab infrastructure:** build a single-host prototype supporting isolated, concurrent AI4Research experiments and evidence export.
+
+Use milestone exit criteria without committing to dates. Preserve workload characterization for future hardware design as a separate, unresolved research problem.
+
+## Notebook design
+
+Adopt the design package’s progressive reading structure across the whole notebook:
+
+| Level | Purpose | Contents |
+|---|---|---|
+| Overview | Understand current work quickly | Home, active stage, priorities, blockers, latest evidence, next actions |
+| Workstreams | Understand each area | Goals, problem statements, designs, experiments, decisions, progress |
+| Detailed records | Inspect and reproduce work | Exact prompts, meeting sources, run records, artifacts, references, historical versions |
+
+Organize content under `Workstreams`, `Designs`, `Experiments`, `Activities`, `Decisions`, `Sources`, `Resources`, `Archive`, and `Templates`.
+
+- Maintain one canonical note per item, connected through links and indexes.
+- Give active notes a stable ID, status, source links, last-reviewed date, and explicit next action. Label proposals, observations, decisions, and unknowns distinctly.
+- Use plain Markdown, Obsidian links, properties, and Mermaid; essential navigation must work without community plugins.
+- Keep maintained design and code repositories authoritative. The vault holds design exploration, commentary, historical snapshots, and links to current contracts.
+- Preserve your supplied message verbatim, including repetition and unfinished wording. Place its interpretation in a separate linked note.
+- Record subsequent prompts verbatim when supplied or imported, retaining revisions and linking them to resulting work. Never reconstruct unavailable chat text.
+- Distinguish activity completion, experiment results, and accepted conclusions so a completed task cannot imply proven improvement.
+
+Seed workstream pages for CC effectiveness, lab infrastructure, workload characterization, skill-to-CC development, and ongoing M1 design/code/test work.
+
+## Historical consolidation and cheaper-agent migration
+
+Cover personal work throughout the workspace, including current and superseded designs. Index third-party repositories as references without importing their documentation wholesale.
+
+1. **Inventory and classify.** Enumerate candidate sources with paths, file types, sizes, hashes, dates, and likely workstream. Exclude dependencies, caches, and generated build trees from content migration.
+2. **Delegate bounded batches.** Use cheaper agents, defaulting to `gpt-6-luna` where available, for source classification, extraction, link mapping, and draft summaries. Partition batches by source collection and assign each agent a separate staging output.
+3. **Review centrally.** A coordinating agent resolves source authority, conflicting versions, ambiguous dates, duplicates, and proposed relationships. Cheaper-agent summaries remain drafts until checked against their sources.
+4. **Build the hybrid archive.** Copy personal source notes and selected frozen artifacts into the vault. Link maintained repositories, large datasets, and large generated collections. Preserve originals throughout migration.
+5. **Reconcile coverage.** Every inventoried item receives a disposition: copied, linked, duplicate, excluded with reason, or awaiting review.
+
+Maintain a migration manifest mapping original locations to vault destinations, hashes, processing status, and review results. Exact copies retain source bytes; summaries explicitly identify their sources. Credentials and sensitive configuration are excluded from agent batches and copied archives.
+
+Do not delete or relocate originals in this stage. Keep the vault under local version control for text history, with a documented backup procedure covering attachments as well.
+
+## Research and lab milestones
+
+### 1. Establish the starting point
+
+- Audit available M1 code, current design contracts, existing tests, and runtime evidence.
+- Record exact code revisions and distinguish designed, implemented, runnable, and verified behavior.
+- Create separate problem statements for CC effectiveness, lab management, and future workload characterization.
+- Exit: a usable notebook, reconciled source inventory, and an evidence-backed readiness assessment.
+
+### 2. Establish a CC comparison protocol
+
+Use both runnable M1 tasks and representative daily research tasks: intent/requirements work, literature synthesis, coding, experiment design, and reporting.
+
+- Compare a plain agent with an agent using current CCs under matched models, task inputs, tools, and budgets. Document unavoidable differences.
+- Separate development cases from held-out evaluation cases.
+- Freeze task-specific scoring criteria before evaluation. Use executable checks where appropriate and independent review for qualitative outputs.
+- Record exact prompts, CC versions, model configuration, outputs, failures, retries, elapsed time, and measured usage or cost. Mark unavailable measurements explicitly.
+- Treat failed and interrupted runs as results; report paired outcomes, regressions, variability, and limitations.
+- Exit: a reproducible pilot report showing where CCs help, hurt, or provide insufficient evidence.
+
+### 3. Build the minimal lab
+
+Start with one host and multiple isolated sandboxes, reusing compatible M1 sidecar and workbench concepts.
+
+- Separate the lab manager from experimental AI4Research instances.
+- Pin each experiment’s code revision and configuration. Use separate worktrees for code changes and separate containers, volumes, networks, and credentials for runtime state.
+- Provide create, start, inspect, stop, export, and cleanup operations.
+- Define a lab manifest containing experiment identity, code/image pins, configuration, resource requests, workspace, and evidence destination.
+- Support concurrent runs with explicit resource limits and exclusive scheduling where measurements require it.
+- Export reports, logs, artifacts, and provenance outside disposable sandboxes before cleanup.
+- Return code and CC candidates through reviewed patches or branches; adoption into central AI4Research is a separate action.
+
+GB10 access enables target-host validation. Until access exists, record host-dependent checks as pending.
+
+### 4. Improve CCs and evaluate containerization
+
+Use observed failures to select bounded changes to prompts, instructions, tools, dependencies, or capsule boundaries.
+
+Evaluate per-CC containerization separately from whole-lab sandboxing. Compare dependency reproducibility, isolation, startup overhead, state transfer, observability, and development effort. Change one factor at a time and retain the existing approach unless evidence supports a change.
+
+Develop skill-to-CC conversion, Spec Kit integration, and skill discovery as explicitly tracked experiments. Keep automatic self-modification and distributed lab coordination outside the initial prototype.
+
+Exit: an improvement report with measured findings and a reasoned containerization decision, including inconclusive outcomes.
+
+## Validation and assumptions
+
+- **Notebook:** verify navigation, source links, provenance, readable page structure, and migration coverage. Spot-check every migrated verbatim-text format and every authority classification.
+- **CC study:** verify reproducible inputs, matched comparison conditions, protected evaluation cases, and honest accounting of failures and missing measurements.
+- **Lab:** demonstrate two isolated experiments, evidence export, interruption recovery, cleanup that preserves exported evidence, and unchanged code pins during execution.
+- **Research boundary:** GB10 measurements describe that environment. Hardware-independent workload units and mappings to future heterogeneous hardware remain hypotheses requiring their own validation.
+- **Authority:** notebook proposals do not silently change the PRD or maintained design. Promote accepted implementation changes through the existing project process.
+- **Completion:** this stage succeeds by producing a trustworthy work record, reproducible CC findings, and a functioning lab prototype; a finding that CCs do not yet improve outcomes is a valid result.

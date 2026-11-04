@@ -1,0 +1,76 @@
+---
+id: docker-lab-architecture-feasibility
+status: reviewed-m2-proposal
+source: Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Resources/review-batches/2026-10-21-docker-architecture-review/source-receipt.json; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt; Sources/Prompts/2026-10-23-m2-component-handoffs.txt
+last_reviewed: 2026-10-23
+next_action: Follow current scoped M2 handoffs; qualify provider and carrier on available hardware
+---
+# Docker architecture review and feasibility
+
+## October 23 implementation handoff
+
+[[Resources/Handoffs/m2-labs/README|Current scoped handoff]] is the implementation route. Spark is primarily a restricted benchmark host; development/builds happen elsewhere where practical. The existing no-sudo two-image benchmark workflow stays independent. VMs, a registry, shared local inference and a full capacity controller are not bootstrap prerequisites. M2 infrastructure remains unimplemented by this documentation revision. The full target below is retained; first-delivery scope and sequencing follow the handoff.
+
+
+**Assessment:** feasible as an M2 infrastructure design, subject to actual host qualification. Use Linux CPU lab VMs with local Docker engines, Compose-managed AI4R services, VM brokers and sibling CC containers. On the Spark, shared host inference and one model store replace per-VM GPU/model ownership; CPU virtualization still needs qualification. Every lab retains its own factory, catalog and development history. Resource admission and bounded retention are prerequisites for sustained iteration on the 2 TB SSD.
+
+Start with [[Designs/Lab Capsule and Factory Design Plan]], then [[Designs/VM Lab Infrastructure Design]], [[Designs/Container Capability Capsule Design]] and [[Designs/Per Lab Capability Factory Design]]. These are M2 designs. M1 is the starting code/contract baseline, not the scope authority for M2.
+
+## Spark-specific superseding assessment
+
+[[Designs/Spark Shared Services and Storage]] fixes the target: the supplied 2 TB/128 GB GB10 Spark, ARM64 CPU lab guests, central host model storage/inference and bounded resource pools. Older workstation observations and generic sizing below remain historical context. GPU passthrough is excluded from this target rather than treated as an ordinary unqualified VM feature. CPU guest support still requires actual host qualification. [NVIDIA support](https://docs.nvidia.com/dgx/dgx-spark/support.html).
+
+## Review findings and corrections
+
+| First-draft gap | Revised design |
+|---|---|
+| Logical boxes did not identify Docker processes | One daemon per VM. Compose manages stable AI4R services; a host broker creates sibling invocation containers. No Docker daemon inside a CC. |
+| Building seemed to make an image immediately runnable | Explicit Buildx export: load into the VM engine, or push/pull through a registry. Build cache is not the engine image store. |
+| Every immutable pin was called a digest | Distinguish local image/config ID, registry manifest digest, multi-platform index and archive hash. |
+| App paths looked usable as Docker bind sources | Broker resolves artifact IDs to VM-local paths. A path inside the app is not automatically a valid daemon-host path. |
+| VM creation and application startup were mixed | Create a clean cloud-image VM with cloud-init, install engine/broker, then deploy an AI4R release. Fork source/catalog snapshots rather than a running lab disk. |
+| Worktree analogy lacked a cross-machine mechanism | Each VM gets a standalone Git clone, parent pin and local branch; image/data state stays outside Git. |
+| Current runner seemed close to image dispatch | Inspected candidate runner registers Python callables and supplies scoped artifact helpers. A serialization/carrier adapter is necessary, not just Dockerfiles. |
+| Existing prototype seemed to export evolved worktrees | Its source is mounted read-only; export refuses dirty/untracked worktrees. Reuse labels/recovery/evidence patterns, but implement a separate candidate-source export path. |
+
+Docker documents the build export and host-mount behavior; our topology is a design inference from those mechanics. [Buildx driver](https://docs.docker.com/build/builders/drivers/docker-container/), [bind mounts](https://docs.docker.com/engine/storage/bind-mounts/).
+
+## Feasibility by layer
+
+| Layer | Assessment | Missing evidence |
+|---|---|---|
+| Docker inside Linux VMs | Credible standard infrastructure | VM boot, engine/storage/network checks and effective resource limits |
+| AI4R and a local factory per VM | Credible with independent state/versions | Working app deployment and implemented factory/broker contracts |
+| One image per executable CC version | Credible with shared layers | Tool, agent and verifier conversions preserving current boundaries |
+| Moving CCs across labs | Credible via registry or verified archive | Platform compatibility, dependencies, admission and real calls |
+| CPU VMs using a model bridge | Suitable first route | Authorized model access and exact payload/provenance checks |
+| Spark GPU in lab VMs | Unsupported by current NVIDIA guidance; excluded from target | Use host inference; qualify a host accelerator-job path separately |
+| Whole-system improvement | Credible as separately evaluated releases | Platform-change pipeline and controlled installation, beyond generated wrappers |
+
+The local observation found about 15.7 GiB RAM and a running hypervisor, but the Docker Desktop Linux engine endpoint did not respond. This does not qualify a two-VM host. Earlier synthetic Docker receipts remain historical evidence. No new Docker, VM or model trial ran during this review.
+
+A CPU-only planning profile could start at 2 vCPU, 4 GiB RAM and 40 GiB disk per lab for lightweight tests using an external model. This is a sizing hypothesis, not an AI4R minimum or proof that concurrent builds fit. Budget OS/app memory, peak build memory, active CCs, caches, data and retained evidence separately. Docker does not impose resource constraints by default; inspect effective limits. [Resource constraints](https://docs.docker.com/engine/containers/resource_constraints/).
+
+GPU access requires qualification at the VM host, hypervisor and guest layers before the container layer. Installing the NVIDIA toolkit does not create a guest GPU. Start with CPU labs and scoped model access; qualify GPU execution separately on actual target hardware. [NVIDIA prerequisites](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+
+## Migration from M1 into M2
+
+| Current owner/source | Follow-on departure |
+|---|---|
+| PRD 4.6.3: local subprocess dispatch; external container runtimes excluded | Docker carrier under the frozen-node execution contract |
+| PRD 4.9.1: dynamic Docker provisioning excluded from Builder | Separate factory/build path; scientific POC Builder is not silently widened |
+| PRD 5.4.3: VM sandboxing/heavy orchestration excluded | VM labs become the follow-on deployment boundary; IPC and fixture protections remain |
+| PRD 3.1.2, R5 and D45: supplied inputs, prepared dependencies, offline Builder | Authorized source preparation/build dependency access as a separate factory stage |
+| D20/D21/D46 and run-plan contract | Preserve output-only semantic review, admission/activation and frozen plans; composition is separately designed |
+
+These describe what M2 changes relative to its starting baseline. M1 exclusions do not block M2 design or require extending M1 scope. Reuse current module ownership where appropriate and register M2 implementation through the native TASK/SOP process rather than inventing new M1 assignments. The inspected development checkout has older branch-local instructions and is candidate implementation evidence; maintained design authority remains the owner checkout recorded in the source receipt.
+
+## Development recommendation
+
+First implement one manually authored tool image behind the current runner's protected contract. Serialize accepted inputs, run by immutable image ID, seal outputs, and feed current host checks. Then provision that stack into one VM and repeat from the same release in another VM. Add factory generation after a manual image works. This separates carrier defects from generated-code defects.
+
+Use a small host broker with build/launch/inspect/stop/export operations and narrow authorization. Reuse current Compose assets, artifact-scope concepts and lab-prototype lifecycle patterns selectively. Compose manages stable services; the broker manages dynamic jobs. Kubernetes and distributed scheduling are unnecessary for the first independent VMs. [Compose deployment](https://docs.docker.com/compose/how-tos/production/).
+
+Strength: portable software environments and independent evolution. Weakness: adapter work and additional version/state relationships. Opportunity: repeatable CC exchange without recreating labs manually. Threat: mistaking a successful build, VM snapshot or self-reported test for central correctness evidence.
+
+Select one real VM provider and CPU architecture before provisioning implementation. Keep the first provider adapter narrow. The revised VM design supplies a concrete reference path; no host software was installed and no VM was created here.

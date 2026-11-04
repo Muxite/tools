@@ -1,0 +1,14 @@
+  145  if results and (outcome == "refutes" or rejected):
+  146      verdict, support_class, confidence = "not_supported", "unsupported", 0.9
+   ...
+  148  elif results and scope_risks:
+  149      verdict, support_class, confidence = "insufficient", "insufficient_evidence", 0.35
+   ...
+  151  elif results and outcome == "supports" and experiment_evidence and matched:
+  152      verdict, support_class, confidence = "supported", "supported", 0.9
+   ...
+  154  elif not results and source_reported_exact:
+  155      verdict, support_class, confidence = "partially_supported", "source_reported", 0.85
+   ...
+  160  else:
+  161      verdict, support_class, confidence = "insufficient", "insufficient_evidence", 0.3

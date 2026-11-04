@@ -1,0 +1,81 @@
+---
+id: per-lab-factory-initial-design
+status: proposed-m2
+source: Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt
+last_reviewed: 2026-10-21
+next_action: Prove a manual source-to-image pipeline, then automate it as a lab-local AI4R workflow
+---
+# M2 per-lab capability factory
+
+Parent: [[Designs/Lab Capsule and Factory Design Plan]]. The factory is part of each VM's AI4R, initially a module/worker in its app service. It owns independent jobs, source templates, local candidate records and evolution history. Docker Engine owns local images; BuildKit owns separate build/cache state; neither is the eligibility catalog.
+
+## Spark development profile
+
+[[Designs/Spark Shared Services and Storage]] owns storage/memory policy. Each factory remains independent in its CPU VM, but model/repository acquisition is host-managed. Reserve peak bytes before every build, pull, export or repair. Start with one heavyweight storage operation machine-wide and a 30 GB GC target per lab builder, inside the guest disk ceiling. Weights and datasets are not image content.
+
+Generalist gap-filling attempts retain source/evidence deltas rather than unlimited images, contexts, clones or VM snapshots. Parent journeys cap attempts and cumulative new bytes. Publish selected candidates, then reclaim unleased local replicas through reference-aware retention. Registry blobs and each VM's loaded layers consume separate physical allocations. Model calls use host inference through the scoped relay; a STORAGE_BLOCKED result is scheduling, not a scientific verdict.
+
+## Source-to-image pipeline
+
+```mermaid
+flowchart LR
+    S[Authorized prepared source] --> A[Author declaration and implementation]
+    A --> C[Capture immutable build context]
+    C --> B[Host broker runs Buildx and BuildKit]
+    B --> L[Explicit load into local Engine]
+    L --> I[Record local image ID and platform]
+    I --> T[Independent sandbox qualification]
+    T --> E[Local admission for future plans]
+    I --> X[Candidate image and source export]
+    T --> X
+    X --> Q[Central rebuild and qualification]
+    Q --> R[Tested release and registry pins]
+```
+
+The qualification path can inspect a candidate before it is admitted for research use, under a separate sandbox-job permission. The factory may submit checks/evidence, but cannot assign its own admission outcome. Export may preserve failed candidates for diagnosis; publication and central adoption are never inferred from a successful upload.
+
+## Build mechanics
+
+Use one named Buildx builder per lab with the `docker-container` driver initially. The broker provisions the tested BuildKit image/version and applies build concurrency/resource limits. BuildKit is itself an infrastructure container on the VM engine. Its cache/state is separate from Engine images; build results require an output exporter. [Docker container driver](https://docs.docker.com/build/builders/drivers/docker-container/).
+
+Illustrative operator commands inside an already prepared VM, not calls available directly to CC agents:
+
+```bash
+docker buildx create --name lab-a-builder --driver docker-container
+docker buildx build --builder lab-a-builder \
+  --platform linux/arm64 --load \
+  --tag ai4r-candidate/analysis:attempt-a1 \
+  --metadata-file /srv/ai4r/jobs/build-a1/build-metadata.json \
+  /srv/ai4r/jobs/build-a1/context
+docker image inspect --format '{{.Id}}' ai4r-candidate/analysis:attempt-a1
+```
+
+The actual builder creation pins the selected BuildKit image and limits from release configuration; commands above omit those deployment values rather than inventing them. The candidate tag is a discovery handle only. Resolve and bind the full local image ID before testing/admission. This single-platform `--load` path avoids requiring a registry during every local iteration. A multi-platform release uses separate native builds and registry manifests; do not claim amd64 images execute natively on ARM. [Buildx output/platform options](https://docs.docker.com/reference/cli/docker/buildx/build/).
+
+For sharing, push the already-qualified local artifact through a candidate-only registry credential or produce a verified image archive. Record registry manifest/platform/local-ID relationships or archive hashes and inspect after import. Central release rebuilds from the submitted context and checks the exact resulting image, which may have a new digest. Registry transfer preserves image content but does not grant admission. A saved image excludes project volumes/state. [Image archive export](https://docs.docker.com/reference/cli/docker/image/save/).
+
+## Build context, dependencies and secrets
+
+Factory captures a source snapshot before build; it does not build from a mutable live checkout. Hash the context manifest, Dockerfile, declaration, vendored resources and locks. Stage only required files and enforce an exclusion policy: no `.git` internals, credentials, datasets not declared for packaging, lab database or evidence store. Never send the whole lab directory as context.
+
+Resolve prepared dependency/base-image access in a separate preparation stage. The BuildKit container has its own content/cache view; loading a base into Engine alone is not an offline-build guarantee. Qualify the actual builder's base/content availability. `--network=none` for build steps is not a complete offline policy: base pulls/frontends or remote source instructions can still need access. The broker must control allowed context/frontend/base sources and build environment egress, then validate a truly offline profile separately. Normal online factory builds have explicit preparation/build grants, distinct from invocation grants.
+
+Use pinned base references and locked/vendored dependencies where practical. For the first profile, use operator-owned Dockerfile templates and reject arbitrary privileged build entitlements. Generated Dockerfiles and dependency installers remain executable code; same-VM builds do not provide a hostile-build isolation guarantee. Build credentials use scoped temporary secret mounts rather than image ENV/ARG. Build scripts can still misuse credentials they legitimately receive; minimize their scope. [Build secrets](https://docs.docker.com/build/building/secrets/).
+
+## Qualification, jobs and evolution
+
+Independent qualification checks protocol conformance, real invocation, source/reference fidelity where required, dependencies, declared effects and failure cases. Input-dependent checks stay host-owned. Semantic verifier receives only work declaration and output. A paper-only request may produce a reading resource rather than a CC; missing reference data/model/license conditions block or narrow the output explicitly.
+
+Persist job stages: PREPARED, BUILDING, BUILT, QUALIFYING, then CANDIDATE/ELIGIBLE/REJECTED/BLOCKED as appropriate. Persist broker operation IDs so restart reconciles an existing build rather than starting a duplicate. A build command that times out may still have work in progress; confirm cancellation/ownership before resubmission. Changed source, recipe or requirements produces a new attempt and invalidates dependent evidence. Preserve logs and failed images under retention policy.
+
+Bootstrap factories with the tested AI4R app, templates and seed CCs. New factory output is not required to build that same factory. Factory-stage CCs and a later composite workflow can be introduced after stable boundaries are proved. Full CC containerization does not imply every infrastructure function is a CC.
+
+Lab source/platform changes are native Git patches or captured trees, not necessarily CCs. Factory templates, runner, planner and app evolve as distinct release candidates. The active stack does not hot-rewrite itself mid-job. Operator/broker-controlled activation drains or preserves jobs, builds a new app/factory image, runs fixed incumbent checks and switches future work to a compatible release. Database changes need forward/rollback procedures.
+
+## Central contribution and lab independence
+
+Each VM has its own clone, local images/catalog and resources. Candidate export captures parent commit, committed patch range, uncommitted/untracked source snapshot where present, declaration/recipe, immutable images, checks, limitations and evidence hashes. Do not assume the earlier read-only experiment manager already supports this developer export.
+
+Sibling candidates from two labs retain lineage; central tests both against a common baseline and requalifies any merged result. CC-only releases can be adopted independently when compatible. Runner/factory/planner dependencies must be explicit; platform changes have a separate release path. Central publication does not update running labs. A lab chooses selective import or an explicit rebase, with new plans using the updated catalog while frozen runs retain old pins.
+
+First acceptance: A builds one bounded capability, rejects one bad candidate, admits the good candidate locally, and invokes it in a new plan. B independently imports/reconstructs and qualifies it while retaining its own project. Demonstrate interruption, missing dependency, verified export and separate central adoption. Later show a factory/platform change with migration/rollback to establish improvement beyond wrapper generation.

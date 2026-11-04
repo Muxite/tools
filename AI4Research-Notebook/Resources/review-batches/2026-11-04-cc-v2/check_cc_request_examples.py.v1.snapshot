@@ -1,0 +1,79 @@
+"""Bounded request/materialization fixture checks, not a production compiler."""
+from copy import deepcopy
+from pathlib import Path
+import json
+import re
+import runpy
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+DOC = ROOT / 'Designs/CC and Strata delivery/CC Protocols'
+core = runpy.run_path(str(Path(__file__).with_name('check_cc_protocol_examples.py')))
+normalize = core['normalize']
+Loader = core['UniqueLoader']
+
+
+def require(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+def resolve(record, answers):
+    require(set(record) <= {'format', 'kind', 'id', 'desired', 'open', 'materials', 'constraints'}, 'unknown field')
+    require({'format', 'kind', 'id', 'desired', 'open'} <= set(record), 'missing field')
+    require(record['format'] == 'cc-request/1' and record['kind'] == 'request', 'not an executable request instance')
+    require(isinstance(record['id'], str) and bool(record['id'].strip()), 'invalid id')
+    require(isinstance(record['desired'], dict) and isinstance(record['open'], dict), 'invalid objects')
+    require(set(answers) == set(record['open']), 'answer set mismatch')
+    # This fixture resolver deliberately supports only the demonstrated root fields.
+    # Nested pointers and external constraints require the future profile compiler.
+    require(not record.get('constraints') and not record.get('materials'), 'external semantics unsupported by fixture')
+    result = deepcopy(record['desired'])
+    for pointer, question in record['open'].items():
+        require(pointer in {'/carrier', '/run'}, 'unsupported open pointer')
+        require(set(question) == {'owner', 'question'}, 'invalid decision descriptor')
+        require(question['owner'] in {'requester', 'implementer'}, 'invalid owner')
+        require(isinstance(question['question'], str) and bool(question['question'].strip()), 'empty question')
+        field = pointer[1:]
+        require(field not in result, 'cannot overwrite fixed value')
+        require(answers[pointer] is not None, 'unresolved answer')
+        result[field] = deepcopy(answers[pointer])
+    return result, normalize(result)
+
+
+def rejects(record, answers):
+    try:
+        resolve(record, answers)
+    except (ValueError, AssertionError, KeyError, TypeError):
+        return
+    raise AssertionError('invalid request accepted')
+
+
+def main():
+    text = (DOC / '10-requests-and-materialization.md').read_text(encoding='utf-8')
+    request = yaml.load(re.search(r'```yaml\n(.*?)\n```', text, re.S)[1], Loader=Loader)
+    readme = (DOC / 'README.md').read_text(encoding='utf-8')
+    ready = yaml.load(re.search(r'```yaml\n(.*?)\n```', readme, re.S)[1], Loader=Loader)
+    answers = {'/carrier': ready['carrier'], '/run': ready['run']}
+    completed, normalized = resolve(request, answers)
+    require(normalized == normalize(ready), 'materialized contract differs')
+    require(all(completed[k] == v for k, v in request['desired'].items()), 'fixed field changed')
+    rejects(request, {'/run': ready['run']})
+    rejects(request, dict(answers, **{'/carrier': None}))
+    rejects(request, dict(answers, **{'/carrier': 'example:latest'}))
+    rejects(request, dict(answers, **{'/changes': ['write']}))
+    for mutation in (
+        {'kind': 'template'}, {'extra': True}, {'id': ''},
+        {'open': dict(request['open'], **{'/absent/child': {'owner': 'implementer', 'question': 'x'}})},
+        {'desired': dict(request['desired'], run='/fixed')},
+        {'open': dict(request['open'], **{'/run': {'owner': 'model', 'question': 'x'}})},
+    ):
+        changed = deepcopy(request)
+        changed.update(mutation)
+        rejects(changed, answers)
+    print('PASS: request resolves to existing CPU declaration; 10 rejection fixtures; fixed fields preserved.')
+    print('SCOPE: local fixture semantics only; no build, external constraint resolution or remote execution.')
+
+
+if __name__ == '__main__':
+    main()

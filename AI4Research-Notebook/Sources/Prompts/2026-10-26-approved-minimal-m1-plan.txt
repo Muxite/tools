@@ -1,0 +1,33 @@
+PLEASE IMPLEMENT THIS PLAN:
+# Minimal M1 fixes and Docker test preparation
+
+## Approach
+
+Continue on the merged integration branch. Make only changes needed to run and verify current capsules. Use the existing app and benchmark-runner containers, with generated programs running inside the app container as selected. M2 lab sandboxing stays deferred.
+
+## Code changes
+
+- Keep **OpenJiuwen responsible for agent history, actions, iteration and repair**. Codex supplies one completion per governed model call through the existing subscription bridge. It is not an API key or a second coding agent.
+- Harden that completion boundary: disable Codex tools, reject unexpected tool activity, preserve model identity, cancellation and budgets, and prohibit hidden retries or CLI-agent fallback. Keep the existing sign-in mechanism; no authentication migration. [Official app-server documentation](https://learn.chatgpt.com/docs/app-server).
+- Add an explicitly selected M1 process-execution path using the existing job recipes and workspace handling. Remove its dependency on bubblewrap, delegated host cgroups and sandbox qualification. Retain non-root job execution, timeouts, bounded output and process cleanup.
+- Record the enforcement actually provided by ordinary Docker and process controls. Update affected declarations and checks so they do not requireâ€”or falsely reportâ€”nested isolation.
+- Preserve tested-snapshot custody, independent checks, separate verifier calls and the immutable Benchmark handoff. Fix current-path failures without weakening these checks.
+- Keep dependencies and test tooling in Docker. Use Compose and container commands for the normal workflow; host requirements are Docker and a browser. The existing Python launcher remains optional.
+
+## Human and automated steps
+
+**You drive:** Docker availability, browser sign-in/MFA, and any existing explicit activation decision that requires you.
+
+**Automated:** image builds, dependency installation, startup checks, test preparation, scoped runner credentials through the existing mechanism, capsule execution, evidence collection and result summaries. Credentials remain in the applicationâ€™s private volume.
+
+No new operator service, credential copying from your desktop, or manual WSL dependency installation.
+
+## Verification and documentation
+
+1. Validate completion-only Codex behavior and OpenJiuwenâ€™s bounded edit/test/repair loop.
+2. Run focused current-release tests: core capsules, four utilities, classification, Ï€, custody and Benchmark handoff. Keep unrelated historical failures visible without expanding this task into their redesign.
+3. Build the container pair and verify startup on **localhost:5175** without host cgroup preparation.
+4. Prepare reproducible live commands. After sign-in, run capsule demonstrations, the independently benchmarked Ï€ build, and a small complete research pipeline.
+5. Update branch documentation and notebook notes with backups, exact commits, commands, results and remaining blockers. Promote to `ai4r_M1` after the relevant checks pass; retain separate status for live system acceptance.
+
+No RSI, model-router changes, M2 lab infrastructure, or unrelated refactoring.

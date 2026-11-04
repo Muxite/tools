@@ -1,0 +1,12 @@
+flowchart LR
+    S[Authorized prepared source] --> A[Author declaration and implementation]
+    A --> C[Capture immutable build context]
+    C --> B[Host broker runs Buildx and BuildKit]
+    B --> L[Explicit load into local Engine]
+    L --> I[Record local image ID and platform]
+    I --> T[Independent sandbox qualification]
+    T --> E[Local admission for future plans]
+    I --> X[Candidate image and source export]
+    T --> X
+    X --> Q[Central rebuild and qualification]
+    Q --> R[Tested release and registry pins]

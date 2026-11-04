@@ -1,0 +1,71 @@
+---
+id: capsule-branches-and-factory-direction
+status: implemented-local-checks
+source: Sources/Prompts/2026-10-23-capsule-branches.txt; Sources/Prompts/2026-10-23-capsule-development-process.txt; Sources/Prompts/2026-10-23-factory-agent-or-pipeline.txt
+last_reviewed: 2026-10-23
+next_action: Independently qualify and activate desired integrated candidate source
+---
+# Capsule branches and factory direction
+
+**Later integration status:** the observed remote M1 source at `809351f8` now includes the required Planner and optional capsule source. Earlier separate-branch statements below are historical. Source integration is not qualification, activation or runtime acceptance. See [[Resources/Handoffs/m2-labs/implementation-status]] and [[Activities/2026-10-23 M2 Component Handoffs]].
+
+
+**Later correction:** [[Activities/2026-10-23 Required M1 Planner]] supersedes
+the optional-Planner framing below. Core typed planning belongs in M1;
+individual new work capsules remain optional. This page preserves the earlier
+branch handoff and evidence.
+
+Implemented isolated, committed local branches in our AI4R implementation, based on latest checked remote `ai4r_M1` at `bfc30ba291c762d09f464c3e6a6c25f011826a33`. Source work is in `AI4Research-Development/jiuwenswarm-m1-capsules`. No push, central M1 merge, candidate admission or activation occurred. Other developers' research internals checkouts were not overwritten. The earlier deployment work is committed separately on `deployment-usability` as `e296d2b`.
+
+## Functional handoff
+
+| Branch | Function |
+|---|---|
+| `deployment-usability` | Repository-owned local/SSH benchmark build, stage, start, inspect, verified result retrieval and bounded temporary-resource expiry |
+| `capsules/planner-foundation` | Opt-in typed DAG policy, explicit evidence coverage, optional candidate discovery and protected calibration integration; original default POC workflows preserved |
+| `capsules/generalist-m1` | Low-trust fallback producing frozen-task-bound files/data and bounded pure expression results, with gap provenance and checks |
+| `capsules/table-normalize-m1` | Explicit JSON/CSV parsing preserving original values, types and row/column order |
+| `capsules/calculate-m1` | Explicit decimal count/sum/mean/min/max with independent recomputation |
+| `capsules/markdown-report-m1` | Deterministic Markdown artifact/manifest from supplied content, retaining evidence and trust |
+| `capsules/development-guide` | Capsule authoring, testing, qualification and release guide; factory design implications |
+| `capsules/m1-integration-check` | Clean combined merge rehearsal plus actual utility-composition test |
+
+Foundation first; each optional capsule has its own disjoint package/docs/tests and can merge independently. Deployment is independent. Exact branch identities are captured in `Resources/review-batches/2026-10-23-capsule-branches/branch-refs.json`. The convenience integration branch contains selected features but does not replace maintained M1.
+
+## Definition and verification choices
+
+Read historical Generalist sources through [[Designs/CC History]] before implementation: the original report and workshop schema v2.10b Â§4.14 describe a small declaration, frozen task intention and lowest trust. They are historical motivation, not current runtime authority.
+
+The user-authorized M1 extension deliberately differs from the earlier Generalist deferral and D20/D24 restriction on task criteria hidden in output. Generalist explicitly publishes a host-authenticated frozen task projection in its exact output. Host checks compare objective, requirement IDs, parent/policy/attempt identity and actual expression result before the fixed semantic task-alignment criterion runs. No original input, worker conversation or private test suite is added to reviewer context. Specialists retain ordinary declaration/output review. The Planner cannot choose arbitrary judge code, waive checks or grant permissions. Low trust is preserved through utilities; passing is not specialist certification or proof of scientific truth.
+
+The new DAG policy permits any compatible acyclic order with exact pins, typed dependencies, coverage, budgets/effects and one attempt per node. Scientific work still requires Scientific Evaluation and scientific Delivery. The node cap is 12 because the current public schema permits 12, refining the earlier suggested 16; Generalist is capped at two nodes. A generic packet is an interoperability envelope, not implicit compatibility with every scientific port. Operation settings must be supplied and actual inputs validated; missing adapters/capabilities remain blocked.
+
+Generalist code files are generated artifacts. Actual execution is limited to a bounded pure JSON expression language using Python syntax, with no eval/exec/imports, loops, arbitrary Python, network, package installation or ambient host access. This is a deliberate narrow first implementation; a broader native agent executor needs a separately designed isolation profile. Capsule modules currently ship inside the `ai4r` image; container-per-capsule and factory automation remain M2 work.
+
+## Actual evidence and remaining work
+
+A clean combined merge was tested from a fresh committed Git checkout: **103 passed on Windows; 102 passed and 1 skipped on Ubuntu 24.04 WSL**. The skip is Linux Compose rendering because that plugin was unavailable. Windows real Compose rendering passed without a daemon. The focused suite covers deployment safety, capsule functions/negatives, frozen tasks, provenance/taint, typed graph checks, ordinary gates/admission boundaries and existing sequential runner collection. A real deterministic CSV â†’ decimal calculation â†’ Markdown trial used exact registered check assets and retained original files. Model responses in Generalist tests were fixtures.
+
+Original compiler/scientific and versioned PDF release catalogs reproduce from fresh bytes. Explicit Git attributes resolve cross-platform source pinning while preserving the legacy frozen CRLF review-instruction bytes. Focused Ruff checks, Git whitespace and repository documentation links passed. This was not the entire repository test suite.
+
+Independent protected calibration, human admission/activation, a live app DAG, Docker builds/two-container campaigns, actual SSH/Docker, unattended schedule activation, ARM64 and native Spark remain unrun. Docker Desktop's ingest-socket startup error was retained as a limitation; no unrelated host reset or deletion was performed. Preparing or merging candidates grants no standing.
+
+## Factory conclusion
+
+Recommend **both**: a fixed durable production lifecycle with bounded adaptive agents inside authoring stages. Fixed control owns source/dependency identity, declarations, independent checks, stage gates, budgets, leases, retries/cancellation, qualification and promotion. Adaptive workers handle repository differences and public development feedback within finite permissions/budgets. They cannot see private held-outs, weaken checks, admit their own products or mutate a live graph. This is a proposal, not implemented factory automation.
+
+The factory produces immutable candidates. RSI improves an existing declared capability with lineage; both may share builders/evaluators, but neither is the admission authority. Durable labs can propose useful local results to shared AI4R without automatic promotion. Build on development machines/CI; use Spark primarily for benchmark execution, with shared model weights/inference and bounded owned scratch. The existing protected results/inputs/models/credentials/rollback policy and seven-day temporary-only expiry remain relevant.
+
+## Repository reading route
+
+- [Development process](../../AI4Research-Development/jiuwenswarm-m1-capsules/docs/capsules/development.md)
+- [Factory alternatives and proposed lifecycle](../../AI4Research-Development/jiuwenswarm-m1-capsules/docs/capsules/factory-direction.md)
+- [Branches and functional descriptions](../../AI4Research-Development/jiuwenswarm-m1-capsules/docs/capsules/branches.md)
+- [Actual validation and unrun checks](../../AI4Research-Development/jiuwenswarm-m1-capsules/docs/capsules/validation.md)
+- [Design-package entry](../../AI4Research-Development/jiuwenswarm-m1-capsules/docs/architecture/design-package/capsule-development.md)
+
+## Portable handoff and notebook validation
+
+A verified incremental Git bundle contains all eight committed branch tips, requiring the checked M1 base. [Portable handoff and import instructions](../../AI4Research-Development/ai4r-m1-feature-handoff-20261023/README.md) include functional descriptions, safe review-namespace fetch commands, exact commit identities and bundle checksum. This allows transfer without pushing or changing another developer's working files.
+
+Notebook validation reported only the two pre-existing presentation links (`Paper2Agent Talk rev9.pptx` and `review-rev9/`); no new broken note links, capture hashes or archive failures were introduced. These unrelated presentation artifacts were left unchanged.

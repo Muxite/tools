@@ -1,0 +1,10 @@
+TIME 1:15
+SAY: Main points:
+- Ten experiment sets: idle floor, hardware ceilings, LLM prefill and decode by model size, training, speech and NVENC, batching versus separate copies, every task pair, cold start, A then B then both sequences, and the GPU-code cache
+- 140 measured runs plus 1,760 timed container starts
+- Host sampling every 100 ms, GPU counters at 10 kHz, kernel traces from Nsight Systems
+- Repeats are small, 2 to 12 per point, so treat single numbers as indicative
+- Everything here is one Ryzen 7 plus RTX 5070 Ti machine, not the GB10
+Supplemental points:
+- Run counts come from the report's run id ranges: X0 6, X1 3, X2 21, X3 8, X4 28, X5 32, X6 6, X7 28, JIT 8
+- Repeat agreement: X7 within 0.3 points, X2 throughput within 2%, most pair slowdowns within about 0.1x except LLM beside training (x1.7 to x2.4)

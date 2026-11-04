@@ -1,0 +1,19 @@
+flowchart TB
+    author["Tool author"] --> declaration["CC declaration"]
+    declaration --> factory["Software Factory"]
+    factory --> release["Immutable CC release"]
+    factory --> build["Build provenance"]
+    release --> qualifier["Registration and policy qualification"]
+    qualifier --> catalog["CC catalog"]
+    catalog -->|operation discovery| agent["Lab agent"]
+    agent -->|request and inputs| admission["Admission and call binding"]
+    release -->|release identity| admission
+    admission --> boundCall["Bound call"]
+    boundCall --> runner["Runner"]
+    runner --> outputs["Outputs"]
+    runner --> receipt["Receipt"]
+    receipt -.->|identifies| boundCall
+    boundCall -.->|pins| release
+    build -.->|identifies build subject| release
+    outputs --> evaluation["Independent evaluation"]
+    receipt --> evaluation

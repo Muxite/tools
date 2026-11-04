@@ -1,0 +1,55 @@
+---
+id: strata-image-template
+status: proposed-runtime-unverified
+source: Sources/Prompts/2026-11-02-cc-image-template.txt
+last_reviewed: 2026-11-02
+next_action: Resolve the fixture release against a qualified Spark environment
+---
+# Capability capsules as image-backed templates
+
+A capsule tells an agent what it can accomplish, what it must supply, which software will do the work and what counts as evidence. Publish the declaration as a small OCI artifact. Pull an executable image only after a consumer selects a capability. Keep large model shards separately addressable. One template can describe several operations, image roles and a whole experiment.
+
+**Workshop decision.** Extend the existing M2a package and capability records by composition. Maintain their original schema IDs and validators. The new envelope adds discovery purpose, role-to-image bindings and an optional MoE experiment profile. The generic bundle remains usable outside inference. The November workshop’s v3alpha1 omnibus record is a source of requirements for this narrower proposal. Existing M2a declarations continue to validate in their own dialect. Migration to the new envelope requires explicitly supplying each new binding.
+
+## Read and build
+
+1. Open [the worked declaration](contracts/strata-template.example.json) and compare it with [the new schema](contracts/cc-template.schema.json). Existing M2a contract files referenced by the schema travel in the contracts folder. The fixture marks synthetic references. The converter and proposed reader need implementation.
+2. Read [the Strata source trace](Strata%20source%20trace.md). Use the upstream baseline before adding an experimental representation.
+3. Run `python contracts/validate_template.py` from this folder with Python, jsonschema 4.x and referencing. This checks shape and cross-record rules offline. Admission must additionally fetch real bytes, verify signatures, check license and validate the platform.
+4. Implement the first vertical slice: index one admitted declaration; select a measure operation by purpose, ports and hardware; resolve the native release; qualify the baseline; return the native benchmark output and an independent receipt. Run the same test after unregistering the capability and prove it is unavailable to new runs.
+
+## Ownership from template to observation
+
+| Object | Writer and lifecycle | Consumer and rejection rule |
+|---|---|---|
+| Published template | CC Factory wraps pinned project operations. Papers can supply hypotheses or tests. A paper-only candidate stays a draft until executable behavior is independently checked. | Agent index reads purpose, typed ports, required providers, effects and scope. Discard incompatible or unapproved results before relevance ranking. Use selected package digest and capability ID in the plan. |
+| Product lock | Software Factory invokes the admitted build or transformation. Resolve image role, source and dependency pins, reader ABI, model shards, native index, fixture, recipe and effective settings. Sign the resulting lock. | Central rejects mutable or unresolved outputs, mismatched file digests, platform fallback, unavailable artifacts or unauthorized bindings. The authoring template can name an output before its bytes exist. |
+| Run request | Central binds the template digest and product lock to a run ID, deadline, approved host profile and resource budget. A retry gets a fresh attempt. | Lab Manager admits only if host inventory, policy and resources agree. The node receives a bounded assignment and only its required registry and data grants. |
+| Receipt and evidence | Benchmark records native rows. Host captures resource and network evidence. An independent checker issues the verdict with input and output digests. | RSI groups failures by template, change, target and phase. It can propose a new recipe, rank or reader. Protected fixtures, permissions, checkers and promotion remain outside its write scope. |
+
+The same template digest can be communicated to multiple labs. Each receives a different authorization and can independently reproduce the locked inputs. A pointer alone grants no permission. Standalone consumers can pull the specified artifact and invoke the documented entrypoint; an AI4R consumer additionally enforces admission, budgets and evidence collection.
+
+## Deployment, profiling and withdrawal
+
+Use OCI manifests for images, an index for supported platform variants, the registry for content distribution and existing provenance tools to attest the build. Account for source revisions, submodules and dependency locks during factory build. Record external inputs and driver/accelerator prerequisites explicitly. A Linux ARM64 digest alone cannot qualify a CUDA workload on a Mac. Select an appropriate carrier or decline with the missing capability. Reproducibility includes prompts, randomness, settings and external state in addition to executable bytes. [OCI manifest](https://github.com/opencontainers/image-spec/blob/v1.1.1/manifest.md)
+
+Record workload profiles by resolved release, model, hardware, precision, context, batch and load policy. Emit standard OTLP spans/logs/metrics and store full native benchmark rows by digest. Separate observed hardware usage from requested limits. Remove a template from the pool to withdraw it. Keep referenced images, models and receipts until all active leases and retention pins clear. Garbage collection follows registry policy. [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
+
+## Acceptance before enabling compression
+
+- Show one positive wrapper-versus-native comparison and one rejection of a wrong pack, reader or digest.
+- Demonstrate one exclusive Spark lease; an unsupported host returns a reason before it pulls the weights.
+- Prove the experiment can produce a scientifically useful negative verdict. Charge every unique byte required for serving, including a retained GGUF and metadata. Measure peak host shared memory, prefill, decode and held-out quality independently.
+- Qualify another domain by using the generic bundle with different capabilities and checks. A robotics simulator does not require fabricated MoE fields.
+
+## November 3 — requests, domain profiles and source delivery
+
+[CC forms 0.2](CC%20forms/README.md) adds a common envelope for change requests, implementations and evaluations. It removes the image requirement from a structured request and supports patch, bundle, commit or image delivery. The earlier 0.1 template remains valid through its own schema and can be referenced by a capability-bundle envelope. Both are design proposals; dispatch and verification remain unimplemented.
+
+## November 3 single-CC workshop
+
+[[Designs/CC and Strata delivery/CC and Software Factory/README|CC and Software Factory]] and [[Designs/CC and Strata delivery/Strata Research Lab/README|Strata Research Lab]] now own the single-CC proposal. Factory briefs, products and evaluations are companion records. The November 2 image template and November 3 interchange forms remain historical design inputs.
+
+## November 3 protocol specification
+
+[CC Protocols](../CC%20Protocols/README.md) defines the proposed YAML declaration, build boundary, call protocol and provenance model. The workshop records remain the source for migration and comparison.

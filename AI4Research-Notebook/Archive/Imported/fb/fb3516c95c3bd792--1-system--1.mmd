@@ -1,0 +1,14 @@
+flowchart LR
+    subgraph P[Protected platform code: all control flow]
+        BND[Binder] --> SCH[Scheduler] --> CHK[Check runner] --> GH[Gate host]
+        ADM[Admission]
+    end
+    subgraph C[One CC: the work]
+        DEC[Declaration]
+        BODY[Body: prompts, code]
+    end
+    P -->|reads| DEC
+    SCH -->|inputs, limits, permissions| BODY
+    BODY -->|outputs only| CHK
+    EX[Confined executor: generated code] -.->|own OS identity| BODY
+    RSI[RSI workbench] -->|child changes only may_change| ADM

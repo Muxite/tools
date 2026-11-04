@@ -1,0 +1,33 @@
+flowchart TB
+    U[User browser or CLI on the LAN or VPN] <-->|Server private address, session token in every request header| Web
+    subgraph Host[Server host: GB10, Docker Compose]
+        subgraph Net[One private Docker network]
+            subgraph W[App container]
+                direction LR
+                UI[Built web frontend assets]
+                Web[Web server and control API]
+                Runtime[Workflow runtime and modules]
+                UI -->|Same-origin UI and API| Web
+                Web --> Runtime
+            end
+            subgraph SC[Sidecar container]
+                J[Job coordinator]
+                B[Platform benchmark runner]
+                T[Test runner]
+                J --> B
+                J --> T
+            end
+        end
+        S[(Volumes: SQLite state, artifacts, records)]
+        O[(Benchmark campaign outputs)]
+        L[Host launcher: optional job executor]
+        D[Job-owned disposable targets]
+        Runtime --> S
+        B --> O
+        J -.->|job-scoped requests| L
+        L -->|bounded preparation and lifecycle| D
+        L -->|inventories and diagnostics| O
+    end
+    B -->|Same client contract, own scoped token| Web
+    T -->|Same client contract, own scoped token| Web
+    Runtime -->|Audited model access| M[Configured model endpoint]

@@ -1,0 +1,10 @@
+flowchart LR
+    L[(Eligible immutable library parent)] --> Profile[Protected target profile and frozen contract]
+    Profile --> P[Bounded proposer using audited model boundary]
+    P --> Guard[Mutation guard and isolated child runner]
+    Guard --> Referee[Independent referee and fixture custodian]
+    Referee -->|approved aggregate loop feedback only| P
+    Referee --> Export[Paired evidence and inactive candidate]
+    Export --> Admission[Protected admission]
+    Admission --> Human[Explicit human activation or rollback]
+    Human -->|future selection only| L

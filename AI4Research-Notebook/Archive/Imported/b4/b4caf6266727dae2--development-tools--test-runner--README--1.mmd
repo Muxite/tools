@@ -1,0 +1,13 @@
+flowchart TB
+ Launcher[Launcher using Docker Compose on the server host]
+ Launcher -->|start and clean up owned environment| App
+ Launcher -->|start finite job| Runner
+ subgraph Net[Private Docker network]
+ subgraph SC[Sidecar container]
+ Runner[Test runner]
+ end
+ App[App container: service app, port 5173]
+ Inputs[(Visible case inputs, read only)] --> Runner
+ Runner -->|own scoped token, client contract| App
+ Runner --> Reports[(Retained reports)]
+ end

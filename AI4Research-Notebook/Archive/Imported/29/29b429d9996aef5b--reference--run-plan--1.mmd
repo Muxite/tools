@@ -1,0 +1,23 @@
+flowchart LR
+    B[Accepted Brief] --> P[Planner CC]
+    L[Library snapshot] --> P
+    R[Resource inventory] --> P
+    O[Plan policy] --> P
+    P --> PP[plan_proposal]
+    T[static_template] --> BI
+    PP --> BI[Protected binder]
+    L --> BI
+    R --> BI
+    O --> BI
+    B --> BI
+    BI --> G[Plan gate]
+    G -->|rejected or infeasible| X[Halt. A planned run starts a linked Intention Compiler attempt. A rejected static template ends with an escalation record]
+    G --> RP[run_plan frozen]
+    RP --> S[Scheduler]
+    S --> D[dispatch_record per node attempt]
+    classDef work fill:#E8F0FE,stroke:#2563EB,color:#172554
+    classDef control fill:#FEF3C7,stroke:#B45309,color:#451A03
+    classDef data fill:#DCFCE7,stroke:#15803D,color:#052E16
+    class P work
+    class BI,G,S,X control
+    class B,L,R,O,PP,T,RP,D data

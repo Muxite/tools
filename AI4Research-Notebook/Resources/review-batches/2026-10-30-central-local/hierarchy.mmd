@@ -1,0 +1,32 @@
+flowchart TB
+  Central[Central AI4R and operator] --> CM[Central Lab Manager: one per machine]
+  Mother[Maintained mother source] -->|selected base for lab creation| CM
+  Registry[Central image and capability registry] -->|versioned read-only catalog| CM
+  subgraph A[Lab A: isolated project]
+    subgraph WA[AI4R worker A]
+      LA[Local Lab Manager A] <--> RA[Native AI4R and M2a runtime]
+    end
+    CA[Lab A CC jobs and private candidates]
+    DA[Lab A source, registry overlay and evidence]
+    RA -->|guarded capability calls| CA
+    RA --- DA
+    CA --- DA
+  end
+  subgraph B[Lab B: isolated project]
+    subgraph WB[AI4R worker B]
+      LB[Local Lab Manager B] <--> RB[Native AI4R and M2a runtime]
+    end
+    CB[Lab B CC jobs and private candidates]
+    DB[Lab B source, registry overlay and evidence]
+    RB -->|guarded capability calls| CB
+    RB --- DB
+    CB --- DB
+  end
+  CM <-->|commands, catalog assignments and progress| LA
+  CM <-->|commands, catalog assignments and progress| LB
+  CM -->|scoped host lifecycle control| CA
+  CM -->|scoped host lifecycle control| CB
+  RA -->|permitted outbound access| Services[Our model API and internet services]
+  RB -->|permitted outbound access| Services
+  CM -->|review requests and candidate references| Gate[Human approval gate]
+  Gate -->|approved transfer and manual merge or publication| Mother

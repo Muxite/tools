@@ -1,0 +1,148 @@
+PLEASE IMPLEMENT THIS PLAN:
+# CC Protocol v2: simple contracts, flexible execution, practical agent integration
+
+## 1. Goal and mental model
+
+Produce a cleaned-up v2 specification and a small feasibility demonstration centered on JiuwenSwarm and real use cases. The goal is to establish that the design is useful and reasonable to implement today.
+
+Use four concepts consistently:
+
+| Concept | Meaning |
+|---|---|
+| **Capsule** | A versioned package containing related capabilities and their implementation bindings. |
+| **Capability** | One callable action, with its own inputs, outputs, prerequisites and permitted effects. |
+| **Call** | One capability invoked with actual inputs, workspace/resources and execution limits. |
+| **Receipt** | What ran, what happened, where the results are, and what evidence supports them. |
+
+A capsule may represent a utility, scientific method, coding toolkit or subagent. Calling one capability does not automatically invoke or authorize the others.
+
+Keep the existing folder location, publish it as **CC Protocol v2**, and preserve the current draft as historical material.
+
+## 2. Simplify the contract and support native and image execution
+
+### Declaration and data flow
+
+- Use `cc: "2"` and one canonical `capabilities` map. Remove the competing authoring forms.
+- Require capsule identity/version, an implementation binding, and each capability’s description and ports.
+- Retain `takes`, `gives`, `needs`, `changes` and `guarantees`, with one authoritative location for each fact.
+- Define shared implementation bindings once. Capabilities inherit the default; only exceptions specify another binding.
+- Support simple port kinds: `json`, `text`, `artifact` and host-issued resource handles. JSON Schema is optional when tighter validation provides value.
+- Validate protocol structure, required ports, artifact identity and supported bindings. Broad JSON objects remain open unless their author supplies a restrictive schema.
+- Permit capabilities with no inputs or no returned data. A valid empty result is distinct from missing required output.
+- Keep large data, model state, source snapshots and patches in artifacts. The host stages local paths; callers do not manage container-specific paths.
+- Provide built-in meanings for common prerequisites and effects. Small tools do not need separate policy documents merely to declare ordinary workspace access.
+
+### Execution bindings
+
+Implement three binding adapters behind the same call/receipt interface:
+
+| Binding | Implementation |
+|---|---|
+| **Native command** | Execute an argument vector directly using the selected local environment. |
+| **Image command** | Execute the same process contract inside a pinned image. |
+| **JiuwenSwarm subagent** | Delegate through native subagent/session interfaces while retaining workspace, permissions and task identity. |
+
+Native and image commands share stdin JSON, stdout JSON, stderr logs and artifact staging. No shell interpolation is implicit.
+
+Start with explicit **trusted-local execution**. Record that it provides no OS isolation. Use existing JiuwenSwarm permission controls where available; distinguish enforced restrictions from declarations and observed workspace changes.
+
+Seal local source and configuration before a call, recording interpreter/dependency information. Existing images use resolved digests. No registry, signatures or reproducible-build service is required for local experiments.
+
+### Requests and construction
+
+- Update requests/templates to v2 and reuse the capability contract vocabulary.
+- Represent missing implementation choices explicitly; incomplete requests cannot execute.
+- Resolution fills declared open choices. Changed fixed requirements produce a revised request.
+- Provide a v1 migration command/report. Never silently interpret v1 as v2.
+
+## 3. Make coding subagents a first-class case
+
+Expand the coding design beyond the existing propose/test/apply sequence.
+
+| Role | Required behavior |
+|---|---|
+| Inspect and explain | Read assigned code, search symbols and report findings. |
+| Plan | Return a plan and unresolved questions without editing. |
+| Implement | Edit an assigned worktree using normal coding tools. |
+| Test and diagnose | Run selected checks and return actual results and logs. |
+| Review | Inspect changes independently and report findings. |
+| Propose/apply patch | Support callers that need a separate application step. |
+
+Default implementation work to **direct edits in an assigned worktree**. Return a change summary, base/result identities, changed-file manifest, diff or snapshot, executed checks and remaining issues.
+
+Additional rules:
+
+- Preserve native agent sessions, worktrees and tools; do not require every internal edit to become a separate capsule call.
+- A delegated subagent receives only the parent-authorized workspace, tools, network access and budget.
+- Treat test execution, dependency installation, model/API use, Git publication and deployment as distinct effects.
+- Test success requires observed test execution. A subagent’s completion message is supporting information.
+- Support progress, input-required pauses, cancellation and final delivery through the existing host task lifecycle.
+- Keep patches optional as an execution workflow but available as delivery evidence.
+- Handle existing dirty files, concurrent edits, stale patch bases, binary/untracked files and interrupted edits explicitly.
+- Never automatically replay an edit after an uncertain transport failure.
+
+## 4. Demonstrate usefulness through JiuwenSwarm and a paper method
+
+### First experiment
+
+Use a pinned MAPIE checkout and small synthetic CPU data. Expose:
+
+1. `fit_calibrate` → fitted/calibrated model artifact.
+2. `predict_intervals` → predictions and intervals.
+3. `evaluate` → observed coverage and interval-width report.
+
+Use artifact references for model state so calls do not depend on hidden in-memory objects. Record that serialized model artifacts are trusted inputs.
+
+Document which repository functions implement each methodological step, relevant assumptions, dataset split/seed and omitted paper behavior. The demonstration establishes the selected workflow, not reproduction of every published claim.
+
+### JiuwenSwarm integration
+
+- Use official upstream `26acdadd` with an isolated environment and temporary configuration.
+- Expose generated capability tools through the existing stdio MCP integration first.
+- Exercise discovery, argument delivery and invocation through actual upstream interfaces using deterministic calls.
+- Preserve receipts through the pinned client’s content extraction behavior.
+- Generate invocation keys before transport retries and store calls/results in a small local SQLite ledger.
+- Keep unknown MCP permissions subject to existing host policy; do not invent automatic trust.
+- Demonstrate a coding-subagent operation through native delegation rather than routing all subagent behavior through generic chat.
+- Run a live model-driven loop when an existing model configuration is available; record it separately from host-dispatch evidence.
+
+Run native experiments first. Then start Docker Desktop and execute one equivalent capability in a container, comparing outputs, receipt meaning and provenance. Container availability must not block the native demonstration.
+
+### Factory and Lab examples
+
+Specify the minimum Factory workflow:
+
+**Read paper/repository → identify useful methodological steps → wrap existing functions → declare capabilities → validate → package → demonstrate calls.**
+
+The Factory must be able to return partially supported methodology with explicit limitations, or explain an unavailable dependency without fabricating success.
+
+Keep the inference engine as a separate product artifact carried through CC ports. Demonstrate its handoff structure using native Strata manifests and exact candidate identities; retain actual Spark measurement as a separate hardware trial.
+
+## 5. Adversarial review and acceptance
+
+Use three independent adversarial agents during implementation. Give them the draft and fixtures without the author’s rationale.
+
+| Reviewer | Major challenges |
+|---|---|
+| **Coding-agent reviewer** | Direct editing, concurrent worktrees, dirty repositories, dependency installs, nested delegation, partial changes and cancellation. |
+| **Factory/scientific reviewer** | Stateful paper methods, large artifacts, missing weights, unsupported environments, methodological mismatch and valid negative results. |
+| **Protocol/usability reviewer** | Excessive typing, duplicated declarations, native/image differences, retries, ambiguous results and unnecessary author burden. |
+
+Require each reviewer to submit a concrete scenario, attempted declaration/call and the exact failure or ambiguity. Resolve findings through simplification, a general mechanism, or an explicit supported boundary. Add replay cases for demonstrated defects.
+
+Acceptance requires:
+
+- A novice can explain capsule versus capability and author a small valid CC from the README.
+- A Factory implementer can produce a valid package using the specification, template and validator.
+- MAPIE capabilities execute locally through actual upstream tool interfaces and produce traceable artifacts.
+- A coding subagent edits an assigned worktree and returns independently inspectable changes and test evidence.
+- One container run uses the same logical data/result contract.
+- Broad JSON inputs work without unnecessary domain schemas.
+- Wrong required inputs, stale artifacts, conflicting invocation keys and unsupported bindings receive clear diagnostics.
+- Invalid input, execution failure, partial evidence, empty success and a scientifically negative result remain distinguishable.
+- All demonstrations report their evidence level: declaration validation, host invocation, live agent execution or hardware measurement.
+
+Consolidate the documents into a short reading route: mental model and quickstart; declaration and bindings; calls/data/effects; Factory construction and requests; coding subagents; provenance and Lab delivery; examples and conformance. Move detailed upstream findings into a reference appendix.
+
+The implementation remains a focused feasibility slice. Production isolation, distributed recovery, remote A2A execution and full Factory automation are subsequent integrations against the same contract.
+

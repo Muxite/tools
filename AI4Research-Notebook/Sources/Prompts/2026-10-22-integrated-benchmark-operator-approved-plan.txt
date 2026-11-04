@@ -1,0 +1,43 @@
+PLEASE IMPLEMENT THIS PLAN:
+# Make AI4R benchmarking self-contained and easy to operate
+
+## Summary
+
+Deliver a repository-owned workflow for **build → stage → start → run/inspect → retrieve results**, usable locally and against an SSH-connected Spark. Reuse the existing sequential runner and two images, `ai4r` and `benchmark-runner`.
+
+All required executable code and configuration templates ship in AI4R. Private runtime directories may hold generated state and credentials, but must contain no required scripts. Spark testing is not required for this implementation.
+
+## Integrated commands and deployment
+
+- Add one host entry point: `python deploy/m1/ai4r.py`. Provide `setup`, `doctor`, `build`, `stage`, `start`, `stop`, `logs`, `fetch`, and `gc`; forward existing campaign commands through `runner`.
+- Use a generated deployment profile containing target, Compose project, architecture, image identities, paths and credential references. Support local Docker and SSH targets through the same commands. Keep profile/state outside tracked source.
+- Prefer the selected Docker context. Allow explicit WSL distribution selection; remove assumptions about `Ubuntu`, workstation paths and existing installations. Report missing prerequisites clearly.
+- Replace imports of private operator scripts with checked-in helpers. Use existing app initialization and scoped-grant commands for setup and credential refresh. Human authentication remains an explicit step; setup must explain how to complete it.
+- Make setup repeatable and preserve state. Keep localhost port **5175**, existing app execution isolation, and separate runner mounts. Existing installations require explicit adoption; never silently replace them.
+- Retain old launch commands as thin compatibility wrappers where practical.
+
+## Builds, remote execution and storage
+
+- Parameterize builds for `linux/amd64` and `linux/arm64`. Use existing multi-stage Dockerfiles, frozen dependency locks and BuildKit caching. Cached rebuilds remain optional and require compatible pinned dependencies.
+- Record source revision, dirty-source identity, platform and immutable image identities. Build away from Spark by default; staging never builds or patches the running target.
+- Use SSH/SCP and Docker image archives for the initial remote delivery path; no registry is required. Transfer only selected images, repository-owned deployment helpers and permitted campaign inputs. Skip already verified files/images. Interrupted files remain temporary and are retransferred safely.
+- Keep cases and inputs read-only, outputs persistent, and credentials separate. `fetch` copies a stable campaign snapshot into a fresh local directory, verifies hashes and publishes it atomically. Fetching results does not delete their Spark copies.
+- Preserve the existing authenticated runner interface and sequential execution behavior. Add no research API redesign, workflow changes, VM provisioning or capsule-factory requirements.
+- Report storage usage, cap deployment logs and dedicated build caches, and check staging/build capacity while retaining **20% filesystem headroom**. Refuse new growth when capacity is insufficient.
+
+## Automatic temporary-resource expiry
+
+- Implement repository-owned garbage collection with a default **seven-day TTL**, configurable per deployment.
+- Expire only explicitly owned, inactive temporary transfers, completed build contexts and disposable scratch resources. Images require no active or retained deployment reference before removal.
+- Protect results, inputs, credentials, app/account volumes, model weights and rollback pins regardless of age. Unknown or interrupted run state prevents cleanup.
+- Provide `gc --dry-run`, ownership checks, locking and deletion receipts. Never use global Docker pruning.
+- Run expiry during setup and before new allocations. Provide daily scheduling through systemd timers on Linux and Task Scheduler on Windows. If unattended scheduling is unavailable, report that limitation without blocking ordinary benchmarking.
+
+## Validation and documentation
+
+- Test configuration, Docker/WSL selection, command construction, SSH transfer failures, hash verification, repeated setup and expiry boundaries locally.
+- Where Docker is available, verify fresh-checkout setup, two-container connectivity, persistent mounts, stop/start recovery and a small sequential campaign. Preserve sentinel user files.
+- Exercise the remote path against a local Linux SSH/Docker target where available. Treat ARM64 build checks and native Spark execution as separate evidence.
+- Do not require Spark access or model authentication to finish independent implementation. Report any connected checks that remain unrun.
+- Add a short operational design with a Mermaid flow and a quick-start runbook. Update the notes library with the repository-only requirement, selected expiry policy and implementation status, preserving source captures and previous notes.
+- Keep changes concentrated in deployment tooling and runner integration so ongoing AI4R internals work can merge independently.

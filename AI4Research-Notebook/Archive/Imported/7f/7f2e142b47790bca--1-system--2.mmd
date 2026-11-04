@@ -1,0 +1,17 @@
+flowchart LR
+    API[Control API] --> BND[Binder and freeze]
+    LIB[(Library)] --> BND
+    BND -->|frozen run_plan| SCH[Scheduler]
+    SCH -->|Node Execution Contract| RUN[CC runner]
+    RUN --> BRG[Model bridge] --> RP{RouterPort}
+    RP -->|default, or any router failure| CX[Codex route]
+    RP -.->|IPC, when enabled| RT[API router process]
+    RUN --> EX[Confined executor]
+    RUN -->|outputs| CHK[Check runner]
+    CHK -->|check results| GH[Gate host]
+    SCH -->|after mandatory checks pass| VER[Verifier CC calls]
+    VER --> GH
+    GH -->|decisions, accepted outputs| ST[(Run store)]
+    ST -->|node released| SCH
+    ST --> XP[(Record export)]
+    INB[(Admission inbox)] --> ADM[Admission command] --> LIB

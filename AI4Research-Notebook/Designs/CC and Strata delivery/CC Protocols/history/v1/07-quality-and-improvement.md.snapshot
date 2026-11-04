@@ -1,0 +1,110 @@
+---
+id: cc-protocol-07-quality-and-improvement
+status: proposed-runtime-unverified
+source: November 3 workshop and November 4 protocol revisions
+last_reviewed: 2026-11-04
+next_action: Qualify the binding and evidence policy before production use
+---
+# Quality, verification and recursive improvement
+
+## Why use CC
+
+CC gives tools a common, enforceable record of what was called, what it could change, what it produced and how the result was checked. The value comes from the host enforcing this contract and reusing the evidence across tools.
+
+| Structure | Verification benefit | Limit |
+|---|---|---|
+| Typed operation ports | Reject malformed inputs and outputs at a common boundary | A well-typed result can be wrong. |
+| Immutable implementation and input identities | Trace a result to the actual release and data | A digest proves byte identity, not truth or publisher trust. |
+| Scoped effect declaration and grants | Constrain execution before an irreversible action | A receipt cannot undo an external effect. |
+| Independent check references | Bind criteria and checker identities before output is observed | A weak check gives weak evidence. |
+| Separate state, completeness and assessment | Preserve useful partial evidence and visible uncertainty | Consumers must honor evidence scope. |
+| Release and attempt lineage | Compare versions, reproduce failures and roll back discovery | Nondeterministic models and external services may permit only controlled replication. |
+
+A conventional tool with the same checks, isolation and lineage can achieve the same assurance. CC standardizes that work across authors, hosts and consumers. A declaration by itself creates no verified quality.
+
+## A small mandatory baseline
+
+| Mandatory fact or behavior | Owner | Author burden |
+|---|---|---|
+| Package identity/version and implementation binding | Author; compiler resolves bytes | Declare once per package. |
+| Description and typed ports for each operation | Author | Define what callers need to know. |
+| Input and output shape checks | Host | Generated from port types. |
+| Immutable release, attempt and output identities | Compiler and host | Generated automatically. |
+| Explicit failure and completeness behavior | Adapter and host | Default protocol behavior. |
+| External access denied without a declared need/effect and grant | Host | Declare only access actually needed. |
+| Resource limits, deadlines and cleanup | Host policy | Use deployment defaults. |
+
+Baseline compliance is a measured host/adapter property. A package with unresolved schemas or an unsupported binding is not runnable. A package that has never been exercised may be installed for a bounded qualification attempt, but its behavior remains unverified until that attempt produces evidence. A signed publisher claim alone cannot confer compliance.
+
+A simple CPU tool needs identity, version, carrier, description, entrypoint and ports. It needs no authored provenance fields, custom check suite, GPU profile, research objective, evaluator, or RSI settings.
+
+## Optional declarations with precise defaults
+
+| Field | Omission means | When required |
+|---|---|---|
+| `takes` | No input ports | At least one input is consumed. |
+| `needs` | No additional provider or resource dependency | The operation needs a model, endpoint, attached process or persistent workspace. |
+| `changes` | No effect outside private execution and returned outputs | It mutates external state, calls a service or perturbs another process. |
+| `guarantees` | No additional semantic commitment | The author promises a property beyond baseline validation. |
+| `defs`, `rules` | No shared definitions | An operation references a shared type or rule. |
+| `profiles` | Core semantics only | A domain requires additional mandatory interpretation. |
+| Qualification record | No independently established qualification | A consumer policy requires specific evidence. |
+
+Optional does not mean silently ignored. Once a guarantee is declared, it is bound and checked. An unavailable required check gives an inconclusive assessment. Every listed profile is mandatory to understand. Consumers may impose extra checks without editing the published declaration.
+
+## Quality thresholds belong to use cases
+
+| Use | Minimum acceptance requirement |
+|---|---|
+| Format or trim local text | Baseline-valid result. Semantic verification may be not_requested. |
+| Inspect a partial profiler trace | Valid trace, known target and coverage, no unresolved effects. Consumer records limited use. |
+| Claim a performance improvement | Pinned baseline/candidate/workload, complete required measurements, comparable environment, independent policy checks. |
+| Apply a coding patch | Known base, path/effect restrictions, patch validation and the checks required by workspace policy. |
+| Publish an improved CC | New immutable release, compatibility evidence, held-out comparison and separately authorized promotion. |
+
+There is no universal percentage or quality score. Define the threshold per workload, risk and consumer policy. Store the scope of a passing assessment. Do not rank a five-second profiler qualification as proof of every future capture, or a passing unit suite as proof of arbitrary code correctness.
+
+## Check definitions and evidence
+
+Existing `guarantees` reference pinned check-definition records. A definition must specify input/output evidence contracts, stage, checker identity, limits, applicability, failure behavior and evidence access scope. The host also binds any consumer-required checks before execution.
+
+Prefer a deterministic checker where it can establish the property. Use independent behavioral tests for observable behavior. Semantic review may supplement those checks with an explicit scope and limitations. A producer's explanation and producer-run test log are evidence inputs. A protected checker determines the recorded verdict. An LLM reviewer also needs independent policy and must not rewrite candidate artifacts while judging them.
+
+Required check sets are immutable for an attempt. New assessments may add evidence under a separately identified policy, while preserving the original result. The CC host must retain failed, skipped and unavailable checks.
+
+## RSI cycle
+
+Here RSI means recursive system improvement through candidate generation, evaluation and versioned promotion. CC supplies stable units, observable failures and comparable evidence for that cycle.
+
+```mermaid
+flowchart TD
+    run["Released CC in real workloads"] --> evidence["Receipts, failures and scoped assessments"]
+    evidence --> proposal["Improvement proposal against parent release"]
+    proposal --> factory["Factory builds candidate release"]
+    factory --> comparison["Independent comparison on frozen workloads"]
+    policy["Protected checks and acceptance policy"] --> comparison
+    comparison --> decision{"Promotion decision"}
+    decision -->|pass and authorized| catalog["Publish eligible release"]
+    decision -->|fail or inconclusive| record["Retain evidence and revise or stop"]
+    catalog --> run
+    catalog --> rollback["Retain prior release for rollback"]
+```
+
+| Step | Required record |
+|---|---|
+| Diagnose | Parent release, operation, workload scope, failures and cost/quality observations. |
+| Propose | Target change, expected benefit, allowed change surface and evidence links. |
+| Build | New source/recipe/dependency identities and new immutable release. |
+| Compare | Parent and candidate on the same held-out workload and frozen checker/policy identities. Record sample counts and uncertainty appropriate to the task. |
+| Promote | Decision authority, accepted scope, evidence and catalog update. Existing bound calls keep their original release. |
+| Observe and roll back | Monitor real regressions under the same metrics and retain the previous eligible release. |
+
+A candidate cannot change its own evaluator, hidden tests, acceptance threshold or permissions during the comparison. An evaluator or host can itself improve only through a separately governed release and evaluation epoch. Promotion authority can be human or automated according to the deployment policy. No self-promotion is implied by a passed check.
+
+A bundle may change one operation while retaining others. The release digest still changes. Assess the affected dependency and operation closure, replay shared-state regressions, and retain per-operation qualification scopes. Improvement of one capability does not automatically qualify every capability in its package.
+
+The maintained M1 design currently limits RSI scope and retains manual activation. This protocol describes a broader future mechanism; it does not amend those product constraints.
+
+## Measuring the value of CC
+
+Compare a native tool, a thin wrapper with the same checks, and a CC-hosted wrapper under matched workloads. Measure invalid-output detection, escaped effects, false rejection of useful outputs, reproducibility, integration effort, latency and evidence coverage. For RSI, compare candidate acceptance and post-promotion regressions on held-out tasks. Attribute gains to measured checks and enforcement, not to the package label.

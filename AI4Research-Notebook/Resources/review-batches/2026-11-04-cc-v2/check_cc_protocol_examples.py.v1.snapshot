@@ -1,0 +1,334 @@
+"""Replay the Markdown design corpus against local CC and M2a contracts (no hardware)."""
+import copy
+import hashlib
+import json
+import re
+import runpy
+import subprocess
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+import yaml
+from jsonschema import Draft202012Validator as Schema, ValidationError
+
+VAULT = Path(__file__).resolve().parents[2]
+DELIVERY = VAULT / 'Designs/CC and Strata delivery'
+DOC = DELIVERY / 'CC Protocols'
+M2A = VAULT / 'Designs/ai4r_m2a/3-agent-reference'
+LEGACY = DELIVERY / 'CC and Software Factory/shared'
+SHA = r'[0-9a-f]{64}'
+IMAGE = rf'[^\s@]+@sha256:{SHA}'
+PRIMITIVES = {'string', 'integer', 'number', 'boolean', 'object', 'array', 'null'}
+
+
+def require(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+class UniqueLoader(yaml.SafeLoader):
+    def construct_mapping(self, node, deep=False):
+        keys = [self.construct_object(k) for k, _ in node.value]
+        require(all(isinstance(k, str) for k in keys), 'non-string key')
+        require(len(keys) == len(set(keys)), 'duplicate key')
+        return super().construct_mapping(node, deep)
+
+
+def load_json(path):
+    return json.loads(path.read_bytes())
+
+
+def valid_ref(ref):
+    require(set(ref) == {'uri', 'sha256'} and ref['uri'] and
+            re.fullmatch(SHA, ref['sha256']), 'invalid ref')
+
+
+def normalize(raw):
+    decl = copy.deepcopy(raw)
+    require(decl['cc'] == '1', 'generation')
+    require(re.fullmatch(r'[a-z][a-z0-9._-]*', decl['id']), 'package ID')
+    for key, default in [('defs', {}), ('rules', {}), ('profiles', {}), ('tags', [])]:
+        decl.setdefault(key, default)
+    require(not decl['profiles'], 'unsupported required profile')
+    opfields = {'does','run','takes','gives','needs','changes','guarantees'}
+    if 'operations' not in decl:
+        decl['operations'] = {'run': {k: decl.pop(k) for k in opfields if k in decl}}
+    require(set(decl) == {'cc','id','version','defs','rules','profiles','tags','carrier','operations'},
+            'conflicting or unknown package field')
+    carrier = decl['carrier']
+    if isinstance(carrier, dict):
+        common = load_json(LEGACY / 'contracts/common.schema.json')
+        Schema({'$ref':'#/$defs/recipe', **common}).validate(carrier)
+    else:
+        require(re.fullmatch(IMAGE, carrier), 'mutable carrier')
+    used = set()
+    def port(t, shared=False):
+        if isinstance(t, str):
+            if t.startswith('$'):
+                require(not shared and t[1:] in decl['defs'], 'unresolved reference')
+                return t
+            require(t in PRIMITIVES, 'invalid port')
+            return {'type':t}
+        if 'artifact' in t:
+            require(set(t)=={'artifact'} and '/' in t['artifact'], 'conflicting artifact fields')
+        elif 'schema_ref' in t:
+            require(set(t)=={'schema_ref'}, 'conflicting schema fields')
+            valid_ref(t['schema_ref'])
+        else:
+            Schema.check_schema(t)
+        return t
+    decl['defs'] = {k:port(t, True) for k,t in decl['defs'].items()}
+    for op in decl['operations'].values():
+        require(set(op) <= opfields | {'carrier'} and op['does'], 'operation')
+        binding = op['run']
+        if isinstance(binding, str):
+            require(binding.startswith('/') and '..' not in binding.split('/'), 'process path')
+        else:
+            require(set(binding) == {'kind', 'provider', 'operation', 'protocol'}, 'binding fields')
+            require(binding['kind'] in {'mcp', 'a2a'}, 'unsupported binding')
+            require(binding['provider'] in op.get('needs', []), 'binding provider must be admitted')
+            require(binding['operation'] and binding['protocol'], 'unresolved native binding')
+        for side in ('takes','gives'):
+            op[side] = {k:port(t) for k,t in op.get(side,{}).items()}
+        require(op['gives'], 'missing outputs')
+        for group,kind in [('needs','need'),('changes','effect'),('guarantees','check')]:
+            refs = op.setdefault(group, [])
+            require(len(refs)==len(set(refs)), 'duplicate rule')
+            for ident in refs:
+                rule = decl['rules'].get(ident, {})
+                require(rule.get('kind')==kind and rule.get('meaning'), 'unresolved or wrong-kind rule')
+                valid_ref(rule['definition'])
+            used.update(refs)
+            refs.sort()
+    require(used==set(decl['rules']), 'unused rule')
+    decl['tags'].sort()
+    return decl
+
+
+def ref(name, value):
+    data = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',',':')).encode()
+    return {'uri':'fixture:'+name, 'sha256':hashlib.sha256(data).hexdigest()}
+
+
+def validate_ports(decl, ports, data, partial=False):
+    require(set(data)<=set(ports) if partial else set(data)==set(ports), 'port set mismatch')
+    for k,payload in data.items():
+        t = ports[k]
+        if isinstance(t,str):
+            t = decl['defs'][t[1:]]
+        if 'artifact' in t:
+            require(set(payload)=={'ref'}, 'expected artifact')
+            valid_ref(payload['ref'])
+        else:
+            require(set(payload)=={'value'}, 'expected inline value')
+            require('schema_ref' not in t, 'external fixture unavailable')
+            Schema(t).validate(payload['value'])
+
+
+def validate_receipt(decl, request, view):
+    op = decl['operations'][request['op']]
+    state = view['state']
+    require(state in {'running','succeeded','failed','blocked','cancelled','unknown'}, 'execution state')
+    require(view['completeness'] in {'none','partial','complete'}, 'completeness')
+    require(view['completeness'] != 'complete' or state == 'succeeded', 'complete failed execution')
+    require(view['completeness'] != 'none' or not view['outputs'], 'none with outputs')
+    validate_ports(decl, op['gives'], view['outputs'], partial=view['completeness'] != 'complete')
+    assessment = view['assessment']
+    require(set(assessment) == {'verdict','checks'}, 'assessment shape')
+    required = set(op['guarantees'])
+    results = assessment['checks']
+    ids = [check['id'] for check in results]
+    require(len(ids) == len(set(ids)) and set(ids) <= required, 'assessment check identities')
+    if not required:
+        require(assessment == {'verdict':'not_requested','checks':[]}, 'unrequested assessment claimed')
+        return
+    if state == 'running':
+        require(assessment['verdict'] == 'pending', 'running checks')
+        return
+    require(set(ids) == required, 'missing bound check')
+    for check in results:
+        require(set(check) == {'id','verdict','evidence'}, 'check fields')
+        require(check['verdict'] in {'PASS','FAIL','UNAVAILABLE','INCONCLUSIVE'}, 'check verdict')
+        require(check['verdict'] not in {'PASS','FAIL'} or check['evidence'], 'unsupported check claim')
+        for evidence in check['evidence']:
+            valid_ref(evidence)
+    verdicts = {check['verdict'] for check in results}
+    expected = 'failed' if 'FAIL' in verdicts else 'inconclusive' if verdicts & {'UNAVAILABLE','INCONCLUSIVE'} else 'passed'
+    require(assessment['verdict'] == expected, 'assessment aggregation')
+
+
+def bridge(decl, request, view):
+    op = decl['operations'][request['op']]
+    call = load_json(M2A/'examples/call.json')
+    call.update(id=view['call'],package_id=decl['id'],capability_id=decl['id']+'/'+request['op'],
+                release_digest=request['release'], input_refs=[ref('inputs',request['inputs'])],
+                required_check_ids=sorted({'core.input','core.output',*op['guarantees']}),
+                authorized_effects=op['changes'], idempotency_key=request['key'],
+                provider_bindings=[{'id':n,'digest':'d'*64,'scope':['fixture-target']} for n in op['needs']])
+    receipt = load_json(M2A/'examples/receipt.json')
+    state=view['state']
+    status={'running':'running','failed':'rejected','blocked':'blocked','cancelled':'cancelled','unknown':'unknown','succeeded':'rejected'}[state]
+    if state == 'succeeded' and view['completeness'] == 'complete':
+        status = {'not_requested':'accepted','passed':'accepted','failed':'rejected','inconclusive':'blocked','pending':'blocked'}[view['assessment']['verdict']]
+    receipt.update(call_id=call['id'], bound_call_ref=ref('bound-call', call),
+                   status=status,terminal=status!='running',reason_code=view['reason'],
+                   job_id=view.get('job'),required_check_ids=call['required_check_ids'],
+                   observed_effects=[], effect_state='unknown' if status=='unknown' else 'none',
+                   checks=[],output_refs=[])
+    receipt['usage']['attempt']=view['attempt']
+    if view['reason']=='MISSING_PROVIDER':
+        call['provider_bindings']=[]
+        call['authorized_effects']=[]
+        receipt['bound_call_ref']=ref('bound-call',call)
+    if op['changes'] and state == 'succeeded':
+        receipt.update(observed_effects=list(op['changes']), effect_state='confirmed')
+    if state == 'succeeded':
+        receipt['checks']=[{'id':c,'checker_digest':'b'*64,'verdict':'PASS',
+                            'evidence_refs':[ref('check',c)]} for c in ['core.input','core.output']]
+    for check in view['assessment']['checks']:
+        receipt['checks'].append({'id':check['id'],'checker_digest':'b'*64,
+                                  'verdict':check['verdict'],
+                                  'evidence_refs':check['evidence'] or [ref('missing-check',check['id'])]})
+    for name,value in view['outputs'].items():
+        descriptor=value.get('ref') or ref(name,value['value'])
+        t=op['gives'][name]
+        if isinstance(t,str):
+            t=decl['defs'][t[1:]]
+        # Opaque artifact size and observations are synthetic host fixture data.
+        size=12 if 'ref' in value else len(json.dumps(value['value'],ensure_ascii=False,separators=(',',':')).encode())
+        receipt['output_refs'].append(dict(id=name,**descriptor,media_type=t.get('artifact','application/json'),
+                                           bytes=size,audience=['caller'],reproduction='evidence_inspection_only'))
+    for kind,record in [('call',call),('receipt',receipt)]:
+        Schema(load_json(M2A/f'schemas/{kind}.schema.json')).validate(record)
+    semantics=runpy.run_path(str(M2A/'tools/validate_package.py'))['semantics']
+    require(not semantics('receipt',receipt,{'call':call}), 'M2a receipt semantics')
+    return call,receipt
+
+
+def rejected(action):
+    try:
+        action()
+    except (ValueError, ValidationError):
+        return
+    raise AssertionError('expected rejection')
+
+
+def main():
+    source='\n'.join((DOC/name).read_text(encoding='utf-8') for name in
+                     ['05-examples-and-conformance.md','08-coding-capsule.md'])
+    cases=re.findall(r'```yaml\n(.*?)\n```\s*```json\n(.*?)\n```',source,re.S)
+    require(len(cases)==8, 'missing worked case')
+    declarations={}
+    exchanges=0
+    for raw,rows in cases:
+        decl=normalize(yaml.load(raw,Loader=UniqueLoader))
+        declarations[decl['id']]=decl
+        for row in json.loads(rows):
+            request,view=row['request'],row['receipt']
+            op=decl['operations'][request['op']]
+            check=lambda: validate_ports(decl,op['takes'],request['inputs'])
+            if view['reason']=='INVALID_INPUT':
+                rejected(check)
+            elif decl['id']=='strata.lab-tools':
+                rejected(check)  # native validators are deliberately unresolved fixture references
+            else:
+                check()
+            validate_receipt(decl,request,view)
+            bridge(decl,request,view)
+            exchanges+=1
+    cpu=declarations['text.trim']
+    readme=(DOC/'README.md').read_text(encoding='utf-8')
+    require(cpu==normalize(yaml.load(re.search(r'```yaml\n(.*?)\n```',readme,re.S)[1],Loader=UniqueLoader)),'README drift')
+    dictionary=(DOC/'01-declaration.md').read_text(encoding='utf-8')
+    golden=json.loads(re.search(r'```json\n(.*?)\n```',dictionary,re.S)[1])
+    require(cpu==golden, 'published normalized record differs')
+    # No optional semantic checks means no semantic quality claim.
+    first = json.loads(cases[0][1])[0]
+    claimed = copy.deepcopy(first['receipt'])
+    claimed['assessment']['verdict'] = 'passed'
+    rejected(lambda: validate_receipt(cpu, first['request'], claimed))
+    # A useful partial trace must still fail its promised full coverage check.
+    profile_rows = json.loads(cases[1][1])
+    partial = profile_rows[1]
+    require(partial['receipt']['state'] == 'succeeded' and
+            partial['receipt']['completeness'] == 'partial' and
+            partial['receipt']['assessment']['verdict'] == 'failed', 'partial evidence lost')
+    _, legacy_partial = bridge(declarations['lab.sampler'], partial['request'], partial['receipt'])
+    require(legacy_partial['status'] == 'rejected' and legacy_partial['output_refs'],
+            'partial legacy projection lost artifacts or claimed acceptance')
+    missing = copy.deepcopy(partial['receipt'])
+    missing['assessment']['checks'] = []
+    rejected(lambda: validate_receipt(declarations['lab.sampler'], partial['request'], missing))
+    # Test execution and patch acceptance must remain distinct.
+    coding_rows = json.loads(cases[-1][1])
+    coding_test = coding_rows[1]
+    require(coding_test['receipt']['state'] == 'succeeded' and
+            not coding_test['receipt']['outputs']['report']['value']['tests_passed'] and
+            coding_test['receipt']['assessment']['verdict'] == 'not_requested',
+            'test report was promoted to independent verification')
+    coding = declarations['coding.workspace']
+    require(coding['operations']['test']['changes'] == [] and
+            coding['operations']['apply']['changes'] == ['write'] and
+            coding['operations']['propose']['changes'] == ['infer'], 'bundle effect leakage')
+    # Native bindings still require the declared provider; they cannot bypass needs.
+    for kind, version in [('mcp','2026-07-28'),('a2a','1.0.0')]:
+        native = yaml.load(cases[-1][0], Loader=UniqueLoader)
+        native['operations']['propose']['run'] = {
+            'kind':kind, 'provider':'model', 'operation':'propose', 'protocol':version}
+        normalize(native)
+        native['operations']['propose']['needs'] = []
+        rejected(lambda: normalize(native))
+    cpu_raw=yaml.load(cases[0][0],Loader=UniqueLoader)
+    long_form={k:v for k,v in cpu_raw.items() if k in {'cc','id','version','carrier'}}
+    long_form['operations']={'run':{k:v for k,v in cpu_raw.items() if k not in long_form}}
+    require(normalize(long_form)==golden, 'single and named forms differ')
+    rejected(lambda: yaml.load('id: one\nid: two',Loader=UniqueLoader))
+    for mutation in [{'operations':{'run':{}}},{'carrier':'example:latest'},
+                     {'takes':{'text':'$absent'}},{'profiles':{'unread':{}}},
+                     {'gives':{'trimmed':{'artifact':'text/plain','type':'string'}}},
+                     {'changes':['unknown']}]:
+        rejected(lambda: normalize(dict(cpu_raw,**mutation)))
+    profiler=declarations['lab.sampler']
+    rejected(lambda: Schema(profiler['operations']['run']['takes']['seconds']).validate(11))
+    rejected(lambda: validate_ports(cpu,cpu['operations']['run']['gives'],{'trimmed':{'value':3}}))
+    report=declarations['research.report']['operations']
+    require(report['preview']['takes']['packet']==report['deliver']['takes']['packet'] and
+            'send' not in report['preview']['changes'] and 'send' in report['deliver']['changes'],'shared port or grant drift')
+    legacy=load_json(LEGACY/'examples/cc-qualified.json')
+    adapted=declarations['strata.lab-tools']
+    request={'key':'scope-test','release':'e'*64,'op':'inspect','inputs':{}}
+    view={'call':'call.scope','attempt':1,'state':'failed','completeness':'none','reason':'UNDECLARED_EFFECT',
+          'outputs':{},'assessment':{'verdict':'inconclusive','checks':[]}}
+    bound,incident=bridge(adapted,request,view)
+    incident.update(observed_effects=['attempt.artifacts'], effect_state='confirmed')
+    semantics=runpy.run_path(str(M2A/'tools/validate_package.py'))['semantics']
+    require('effect outside bound authorization' in semantics('receipt',incident,{'call':bound}),
+            'legacy export accepted an undeclared inspector effect')
+    for side in ('takes','gives'):
+        for port in legacy[side]['items']:
+            require(adapted['defs'][port['name']]=={'schema_ref':port['contract']}, 'legacy port contract')
+    for old in legacy['operations']:
+        op=adapted['operations'][old['id']]
+        require(op['run']==old['entrypoint'] and adapted['carrier']==legacy['carriers'][old['carrier_index']]['image'],'legacy binding')
+        for oldkey,newkey in [('takes','takes'),('gives','gives'),('checks','guarantees'),('needs','needs'),('changes','changes')]:
+            require(set(old[oldkey])==set(op[newkey]), 'legacy capability scope changed')
+    # Exercise the child process contract independently of any OCI carrier.
+    child="import json,sys; p=json.load(sys.stdin); print(json.dumps({'outcome':'ok','outputs':{'trimmed':{'value':p['inputs']['text']['value'].strip(' ')}}}))"
+    for original,expected in [('  ',''),(' x ','x'),('\tx\t','\tx\t')]:
+        packet={'call':'local.1','attempt':1,'inputs':{'text':{'value':original}}}
+        proc=subprocess.run([sys.executable,'-c',child],input=json.dumps(packet),capture_output=True,text=True,check=True)
+        reply=json.loads(proc.stdout)
+        validate_ports(cpu,cpu['operations']['run']['gives'],reply['outputs'])
+        require(reply['outputs']['trimmed']['value']==expected,'trim behavior')
+    failed=subprocess.run([sys.executable,'-c','raise SystemExit(2)'],capture_output=True)
+    require(failed.returncode!=0 and not failed.stdout, 'missing process failure fixture')
+    for path in DOC.glob('*.md'):
+        for target in re.findall(r'\]\(([^)]+)\)',path.read_text(encoding='utf-8')):
+            if not urlparse(target).scheme:
+                require((DOC/target).is_file(),'broken internal link: '+target)
+    print(f'PASS: {len(cases)} declarations, {exchanges} call/receipt projections, rejecting fixtures, legacy bindings, local process smoke and internal links.')
+
+
+if __name__=='__main__':
+    main()

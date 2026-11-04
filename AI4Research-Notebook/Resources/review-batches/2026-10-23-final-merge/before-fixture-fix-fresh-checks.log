@@ -1,0 +1,54 @@
+........................................................................ [ 32%]
+........................................................................ [ 64%]
+......................FFF.....................................................                                                                [100%]
+================================== FAILURES ===================================
+_ test_partial_output_retains_source_null_reason_and_protected_stop_receipt[integrity_fault] _
+tests\unit_tests\research\test_scheduler.py:34: in test_partial_output_retains_source_null_reason_and_protected_stop_receipt
+    result=await runner.run(contract_ref,plan_ref,bundle_id=bundle['bundle_id'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jiuwenswarm\research\runner.py:695: in run
+    return await self._run(contract_ref,check_plan_ref,bundle_id=bundle_id,verifier_contract_refs=verifier_contract_refs,dispatch=dispatch)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jiuwenswarm\research\runner.py:730: in _run
+    inputs=self._decode_inputs(contract)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jiuwenswarm\research\runner.py:684: in _decode_inputs
+    validate(port['contract_id'],value)
+jiuwenswarm\research\contracts\validators.py:191: in validate
+    raise ContractError("contract_invalid", f"{contract_id}: {details[0]['message']}", {"errors": details})
+E   jiuwenswarm.research.contracts.validators.ContractError: contract_invalid: urn:jiuwenswarm:m1-design:research-brief:3.0.0: '3.0.0' was expected
+_ test_partial_output_retains_source_null_reason_and_protected_stop_receipt[security_fault] _
+tests\unit_tests\research\test_scheduler.py:34: in test_partial_output_retains_source_null_reason_and_protected_stop_receipt
+    result=await runner.run(contract_ref,plan_ref,bundle_id=bundle['bundle_id'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jiuwenswarm\research\runner.py:695: in run
+    return await self._run(contract_ref,check_plan_ref,bundle_id=bundle_id,verifier_contract_refs=verifier_contract_refs,dispatch=dispatch)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jiuwenswarm\research\runner.py:730: in _run
+    inputs=self._decode_inputs(contract)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jiuwenswarm\research\runner.py:684: in _decode_inputs
+    validate(port['contract_id'],value)
+jiuwenswarm\research\contracts\validators.py:191: in validate
+    raise ContractError("contract_invalid", f"{contract_id}: {details[0]['message']}", {"errors": details})
+E   jiuwenswarm.research.contracts.validators.ContractError: contract_invalid: urn:jiuwenswarm:m1-design:research-brief:3.0.0: '3.0.0' was expected
+_ test_partial_output_retains_source_null_reason_and_protected_stop_receipt[AUDIT_UNAVAILABLE] _
+tests\unit_tests\research\test_scheduler.py:34: in test_partial_output_retains_source_null_reason_and_protected_stop_receipt
+    result=await runner.run(contract_ref,plan_ref,bundle_id=bundle['bundle_id'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jiuwenswarm\research\runner.py:695: in run
+    return await self._run(contract_ref,check_plan_ref,bundle_id=bundle_id,verifier_contract_refs=verifier_contract_refs,dispatch=dispatch)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jiuwenswarm\research\runner.py:730: in _run
+    inputs=self._decode_inputs(contract)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jiuwenswarm\research\runner.py:684: in _decode_inputs
+    validate(port['contract_id'],value)
+jiuwenswarm\research\contracts\validators.py:191: in validate
+    raise ContractError("contract_invalid", f"{contract_id}: {details[0]['message']}", {"errors": details})
+E   jiuwenswarm.research.contracts.validators.ContractError: contract_invalid: urn:jiuwenswarm:m1-design:research-brief:3.0.0: '3.0.0' was expected
+=========================== short test summary info ===========================
+FAILED tests/unit_tests/research/test_scheduler.py::test_partial_output_retains_source_null_reason_and_protected_stop_receipt[integrity_fault]
+FAILED tests/unit_tests/research/test_scheduler.py::test_partial_output_retains_source_null_reason_and_protected_stop_receipt[security_fault]
+FAILED tests/unit_tests/research/test_scheduler.py::test_partial_output_retains_source_null_reason_and_protected_stop_receipt[AUDIT_UNAVAILABLE]
+3 failed, 219 passed, 4 deselected, 3 subtests passed in 70.13s (0:01:10)

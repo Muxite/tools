@@ -1,0 +1,7 @@
+TIME 0:50
+SAY: Same question for skills. Existing ways for agents to write their own skills barely beat having no skills. CoEvoSkills adds 2 checks. A verifier in its own session writes tests against the skill's outputs and sends back detailed failures, and a final check on the task's hidden tests only says pass or fail. With the pass or fail alone, skills reach 41%, no better than reading the background material. With the verifier's feedback as well, 71%, above human-written skills. So the builder needs detailed feedback from something separate, while the final tests stay hidden. And the loop is bounded: at most 5 tries against those hidden tests, and most skills need about 2.
+IF ASKED:
+- The hidden tests are the task's own, on the same tasks the skills were evolved on
+- The 41.1% and 42.4% ablations are single runs
+- The verifier never sees the skill's code or the hidden tests
+- The budget is 5 oracle rounds and 15 repair retries against the verifier; returns diminish past 3 oracle rounds, and the 10 tasks that never pass are the ones that run it out

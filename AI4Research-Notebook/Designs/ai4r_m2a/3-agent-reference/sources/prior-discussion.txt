@@ -1,0 +1,268 @@
+" take all these failures and draft up a "super internal report" which is just going over why ai4r is flawed and eveyr flaw that we have. i want to do a very large change in the system for M2, and i want this data to help inform what that change is gonna look like. i think the whole plan then do nodes idea is fully flawed and will not work. what id want CC to demonstrate is that instead of just carrying a skill or a tool, they should be bundled with verified verification tools, the chekcs, the input chekcs and everything, cuz an agent isnt 100% reliable at realizing their tool is wrong before using it. so we bundle verification and everything together. also i think for M2, the pipeline doesnt work, if each node has a 5% chance of failing, the longer it gets the more it stacks until the chance of finishing is very low. id rather have a reactive agent system, agent at the core, CCs are installed and the agent is able to use these CCs. highly flexible with powerful tools.
+
+  Ran 6 shell commands
+
+The evidence backs your thesis: native JiuwenSwarm completed the POC in 13 calls, while the AI4R pipeline failed to reach Delivery in any attempt from 10-26 to 10-28, stalling at different nodes each time. I'm now writing the internal report detailing each flaw and its M2 implications.
+
+  Ran 2 shell commands
+
+● Write(outputs\m2-input\AI4R-M1-FLAWS-INTERNAL-20261028.md)
+Wrote 289 lines to outputs\m2-input\AI4R-M1-FLAWS-INTERNAL-20261028.md
+AI4R M1: every flaw we found, and what it means for M2
+Super internal. Not for the report, the director deck, or oth
+er teams.
+Written 2026-10-28 from the M1 benchmark and POC work of 10-26
+to 10-28. Every claim points to a file under huawei/outputs/
+(see the evidence index at the end).
+Bottom line
+… +282 lines
+
+  Ran 2 shell commands, wrote 1 memory
+
+The internal report is on your Desktop: AI4R-M1-FLAWS-INTERNAL-20261028.md. The source copy is in huawei/outputs/m2-input/. It's marked internal-only and I haven't published it anywhere.
+
+The evidence backs both of your M2 ideas.
+
+The pipeline doesn't finish. On the same POC task, plain JiuwenSwarm delivered a usable study in 13 calls. The M1 pipeline never reached Delivery in 7 attempts, and each attempt stopped somewhere different:
+- setup;
+- Screening, on a contract violation;
+- Requirements, on an invented default;
+- Intent, on a timeout;
+- Builder, three times: a masked fault, a runner exit, and a scope conflict.
+Most of those stops were the model breaking a strict handoff format, not bad science. At a 5% failure rate per node, 8 nodes finish 66% of the time and 20 nodes 36%.
+
+Halting doesn't help completion. M1 uses its checks to end the run, so completion stays at that compounding rate. What raises it is detection plus recovery. With 90% of failures detected and one retry, 8 nodes finish 94% of the time and 20 nodes 87%. A reactive agent alone still compounds; the checks are what change the curve. That's the case for having both.
+
+Verification has to be bundled, and the data shows it directly. When the capsules were offered to the agent as optional MCP tools, it never called them. When the capsule served only the verified tool, the agent gave 0 wrong answers. Every CC win came from a check: admission tests, input checks, the held-out gate, the independent checker. Where a capsule was only a declaration, it gained nothing.
+
+The rest of the report covers:
+- Every flaw, with evidence paths. The pipeline, the planner (no measured value), CC as M1 built it, about 15 harness problems, measurement mistakes and withdrawn claims, RSI and routing, and how we built it (long one-shot Codex sessions).
+- What carries into M2. The admission tests, input checks, held-out gate, independent checkers, the portable capsule runtime, and named stops.
+- The M2 shape. A reactive agent core with category capsules installed as verified bundles. The checks sit on the call path. A failed check returns a reason the agent acts on, and full halts are kept for real hazards. RSI candidates must pass each capsule's gate.
+- Risks of the reactive design (looping, cost, agents ignoring capsules), with an answer to each.
+- What M2 must prove: completion, correctness, how completion holds up as tasks get longer, recovery rate, and cost.
+- Decisions still open: the capsule list, whether any fixed sequence survives, where Intent and Requirements live, and fixing the harness before any benchmark.
+I also saved the M2 direction to memory so later sessions build on it."
+
+here is what another agent said. this will be part of M2. In our testing today we have created M1plus, which is an amendment of M1 cuz some things are too broken. But at its core i think the AI4R legacy of using this node graph kinda thing is too limiting for a modern agent, especially when models have gotten so smart. Our tasks are very broad, and very open ended and long running. we cannot predict what we would want to have for lunch next year on november 15. many things will hapen til then. there is actually a sizable chance that these labs and activites run long enough that new tech and new software is released in the time between then and our finish. 
+
+You will need to adapt this to jiuwenswarm so we dont need to rebuild all their stuff, we wanna use them as best as we can.
+
+Here is our pool-model metaphor for AI4R.
+
+The agent is a swimmer, it goes through the water. in the water are flaoting capabilities in their capsules. the capabilities do a specific job, they represent skills, tools, mcps, even smaller agents, and even data. 
+
+an agent can swim without floaties, but floaties help. capabilitiy capsules provide the items that float in the pool, it allows us to safely and easily remove capaiblities or import new ones. the verficiations and the quality checks we do on them are how we maintain pool quality. yes, chaining nodes together can work, but it shouldnt be the core structure of AI4R.
+
+we emphasize very high fluidity and tracability through these units. the declarations are actually good for us, we can chunk and vectorize them and allow the agent tos earch the space and pick the closest floaties. at the same time, we know the inpouts outputs effects and past data, thus we can filter for certain things before using vectors, like if the capsule is text only, we would never consider it for processing our video. so instead of planning once and executing, we spread the planning work to every part of the agents actions. reconcile with jiuwenswarm to determine where our contributions should lay, and then propsoe a new structure. intent compiler is a good idea overall, but perhaps we need a new paradigm and intent compialtion will be placed elsewhere, perhaps as a userfacing feature that sends things to agent. 
+
+
+
+
+
+
+
+Wednesday 5:21 PM
+
+
+
+
+
+
+Worked for 3m 21s
+
+
+
+M2 should make JiuwenSwarm’s native agent the core, with AI4R supplying the capability pool, verification, and scientific evidence layer. M1plus repairs the existing architecture; your proposal changes what controls the research journey.
+
+I saved the full [M2 structure proposal](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-REACTIVE-CAPABILITY-POOL-PROPOSAL-20261028.md), grounded in the local implementation and M1/M1plus evidence.
+
+Your pool metaphor translates well into concrete responsibilities:
+Pool model	M2 responsibility
+Swimmer	JiuwenSwarm’s agent reasons, chooses actions, delegates, and adapts
+Floating capsules	Discoverable packages containing tools, skills, MCP integrations, specialist agents, or data
+Pool quality	Admission tests, input checks, execution controls, output checks, and independent verification
+Swimming history	Durable records linking actions, versions, inputs, results, and scientific claims
+
+
+The key change is when we commit. Keep the objective, constraints, and evidence obligations explicit. Bind exact versions, inputs, permissions, and checks when an action is dispatched. Let future actions change as discoveries arrive.
+
+This gives us the fluidity you described without losing reproducibility. An experiment retains its preregistered protocol; an unexpected result can lead the agent to design another experiment. New software can enter the pool after qualification and become available for subsequent actions.
+
+The proposed action cycle is:
+1. Assess the current goal, observations, unresolved questions, and budget.
+2. Discover eligible capabilities.
+3. Inspect the relevant declarations and select an operation.
+4. Execute through the capsule’s enforced checks.
+5. Record the outcome and decide what to do next.
+This uses the agent’s ordinary decision loop. It does not require a separate planning call before every action.
+
+Your declaration idea is particularly valuable. Use structured filtering first—modality, input compatibility, permissions, resources, admission status—then semantic search within eligible candidates. Load detailed contracts only for the shortlist. A text-only operation never competes for direct video processing, though an explicit conversion operation could make it useful afterward.
+
+The JiuwenSwarm reconciliation is concrete: its existing provider assembly, skill discovery, MCP configuration, session facilities, and optional Symphony planning offer integration points. AI4R’s contribution should concentrate on:
+- Capsule declarations, qualification, installation, updates, and revocation.
+- Discovery that combines compatibility filters with semantic relevance.
+- Guarded invocation that runs the required checks automatically.
+- Research state and evidence linking results to claims.
+- Structured failures that support repair, alternatives, or an honest stop.
+The portable capsule runtime is a useful starting point, but it still has gaps: process-local admission, incomplete portability of pipeline checks, timeout limitations, and semantic review that excludes original inputs. Those need explicit M2 work.
+
+I would retain node chains as optional recipes for bounded procedures. They should be capabilities the agent can select, rather than the mandatory structure governing every research task. Intent compilation likewise fits at the user boundary: clarify the request and produce an editable brief, then allow further clarification as research develops.
+
+There is external support for this direction: Anthropic describes research as dynamic and dependent on intermediate discoveries, and openJiuwen’s own harness paper emphasizes capability composition and runtime adaptation.
+
+One correction to the earlier report matters: reactive agents also accumulate errors. M2’s expected advantage comes from adaptation plus enforced detection and recovery, not simply removing the graph. The proposal therefore includes a matched evaluation against native JiuwenSwarm and M1plus, measuring independently correct completion, recovery, false rejection, and cost per correct completed task.
+
+  
+Wednesday 5:24 PM
+
+
+
+
+
+
+
+make the pool metaphor into a diagram that shows these features and what component is what. keep the visual aspects simple but enough for the user to get it. 
+
+
+
+
+
+
+
+Wednesday 5:31 PM
+
+
+
+
+
+
+Worked for 1m 28s
+
+
+
+
+[Download PNG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.png) · [Editable SVG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.svg)
+
+  
+Wednesday 5:32 PM
+
+
+
+
+
+
+
+just use a bot for the swimmer
+
+
+
+
+
+
+
+Wednesday 5:38 PM
+
+
+
+
+
+
+Worked for 9s
+
+
+
+
+[PNG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.png) · [Editable SVG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.svg)
+
+  
+Wednesday 5:38 PM
+
+
+
+
+
+
+
+show how the agent could be in 1 corner and thus is closer to some capability capsules than others, some are far away and not that relevant.
+
+
+
+
+
+
+
+Wednesday 5:38 PM
+
+
+
+
+
+
+Worked for 28s
+
+
+
+
+Distance now represents relevance to the current task, which changes as the work evolves.
+
+[PNG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.png) · [Editable SVG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.svg)
+
+  
+Wednesday 5:39 PM
+
+
+
+
+
+
+
+each CC call goes through filter in the way that its success rang and issues can change and thus they may need reevaluation. less relevant now should be generalized, skills mcps agents are relevant, so just say like 1 is skill A the other is skill B, and they also have different colors so we can sort by type (cuz we know the inputs and outputs too). the pool filter shouldnt really be the CC verifiers. each CC has features, like a pool floatie has handles. perhaps the verifiers in CCs are handles, they make the tool easier to use. the pool probably shouldnt be the whole research state, the agent lives outside the pool. but when it comes to selecting what it needs to do and tools its gonna use (am i gonna make a python script, do i need a full program? do i need to run benchmarks, do i need to ask questions? so the agent sits outside the pool and dives in when it has things to do.
+
+
+
+
+
+
+
+Wednesday 5:53 PM
+
+
+
+
+
+
+Worked for 1m
+
+
+
+
+[PNG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.png) · [Editable SVG](C:/Users/m50066326/huawei/outputs/m2-input/AI4R-M2-capability-pool.svg)
+
+  
+Wednesday 5:54 PM
+
+
+
+
+
+
+
+AI4Research Meeting Summary Topic: Capability Capsules (CC), tool validation, t…
+
+can you show the relation between capabilities and capaiblity capsules?
+
+
+
+
+
+
+
+Wednesday 5:57 PM
+
+
+
+
+
+
+Worked for 43s

@@ -1,0 +1,142 @@
+---
+id: m2-lab-capsules-factory-proposal
+status: proposal-with-user-decisions
+source: Sources/Prompts/2026-10-26-m2-lab-cc-factory-direction.txt; Resources/review-batches/2026-10-26-m2-lab-capsules/receipt.json
+last_reviewed: 2026-10-26
+next_action: Review operation contracts and service packaging with the CC owner; agree planning and RSI interfaces with their owners
+---
+# M2 Lab Capsules and Factory Proposal
+
+Build an experimental lab environment in which versioned CC packages expose several related operations, use persistent applications when appropriate, and can be created and updated automatically. Evaluate when this improves research work and where it fails. The intended deliverable is a credible prototype and evidence for a larger engineering team.
+
+Start with [[Designs/Labs and Capability Capsules]] for lab purpose and [[Designs/Durable Project Labs]] for durable identity. This proposal refines CC and factory boundaries. Its planner interface requires agreement with that component's owner; it does not implement or assign whole-system RSI to the CC owner.
+
+## Decisions supplied by the user
+
+- Isolation primarily contains mistakes, runaway experiments and faulty agent-generated harness changes. Malicious imported-code containment is outside this prototype's target.
+- Labs automatically adopt qualified new CC versions for now. This is a provisional experimental policy that can be revised.
+- The CC owner builds CCs and their factory. The RSI owner owns the overall improvement workflow, including harness changes; CC improvement is one integration within it.
+- Long-running research needs planning during execution. The existing complete-plan freeze is a design concern, rather than a requirement to carry forward unchanged.
+- A CC can package several capabilities verified together. Composition/fusion is relevant, but a package need not prescribe one execution sequence.
+
+The remaining sections are proposed mechanisms. Existing M1 contracts remain historical/current M1 behavior; this draft does not rewrite them or claim runtime acceptance.
+
+## A package with selectable operations
+
+Separate the package version, an operation, its deployment resources and an invocation. One admitted package can contain several operations sharing code, dependencies and a tested compatibility set. Each operation declares its purpose, inputs/outputs, effects, resource needs, checks and any required service state. Planner discovery exposes package summaries and operation signatures; detailed contracts can be loaded when selected.
+
+For example, `robotics_lab@1` could expose `inspect_scene`, `configure_episode`, `run_episode`, `read_metrics`, `compare_runs` and `export_checkpoint`. Some call the simulator; others process retained artifacts. Each dispatched operation gets its own identity, exact package pin and evidence. Resource grants remain operation-specific even when the package contains more powerful operations.
+
+Joint qualification covers the operation contracts, shared dependency/service versions and representative cross-operation journeys. It does not establish every possible sequence as correct. Explicit preconditions prohibit invalid calls; leases serialize competing writers to a simulator session. Operations can return a durable job/session handle for long work, with inspect/cancel/result operations. An unknown command outcome is reconciled before a retry that could duplicate effects.
+
+Composition remains useful: an optional `evaluate_controller` operation can orchestrate a tested recipe using pinned member operations. Individual operations stay available for exploration. Fusion is an implementation/package optimization requiring requalification, rather than the sole way to expose related functionality. Avoid one mandatory micro-capsule per function and avoid one opaque end-to-end action as the only interface.
+
+## Robotics placement and storage
+
+Logical CC packaging does not dictate one image or process. A package may identify an adapter image, a simulator image and their compatibility requirements. They remain inside the same lab boundary, while the simulator can outlive individual CC calls. CCs may contain simulator implementation code when that is the simplest tested library/batch deployment. A managed service profile references a separately built simulator image and contains the adapter plus deployment requirements. Both forms record the code and dependencies actually used.
+
+```mermaid
+flowchart TB
+    subgraph LAB[Persistent lab boundary]
+        AI[AI4R planner and research loop]
+        FACT[CC factory]
+        QUAL[Independent qualification and activation]
+        PKG[Versioned robotics CC package]
+        CTRL[Lab resource controller]
+        OPS[Scoped operation invocations]
+        SIM[Simulator service]
+        STATE[Lab metadata and service state]
+        ART[Versioned assets and sealed results]
+        AI -->|select operation| OPS
+        FACT -->|candidate| QUAL
+        QUAL -->|eligible version| PKG
+        PKG -->|operation contracts| OPS
+        PKG -->|resource requirements| CTRL
+        CTRL -->|start inspect stop and recover| SIM
+        OPS -->|bounded commands and session handles| SIM
+        SIM --> STATE
+        SIM --> ART
+        OPS -->|validated output import| ART
+        AI -->|accepted findings| STATE
+    end
+```
+
+| Material | Proposed home | Update and retention rule |
+|---|---|---|
+| Simulator source, CC adapters, recipes and locks | Version-controlled source; captured tree for each candidate | Development edits create candidates; execution records exact built identities |
+| Simulator and adapter executables | Immutable images or locked executable artifacts referenced by the package | Share immutable bytes where supported; never bake changing project state into an image |
+| Scenes, robot descriptions, datasets and model artifacts | Lab resource storage with version/hash manifests | Mount/read only required versions; retain resources referenced by retained experiments |
+| Mutable simulator data and checkpoints | Named service storage owned by the lab, scoped by instance/session | Record state schema; checkpoint before incompatible updates; storage survives service replacement |
+| Process memory and live physics state | Simulator process | Recovery requires an explicit supported checkpoint/reset policy; a disk volume alone does not preserve live physics |
+| Plans, admissions, jobs, leases and instance bindings | Existing transactional application store, or a small SQLite store for the prototype if needed | Store references and state transitions; reconcile interrupted operations |
+| Trajectories, videos and evaluation artifacts | Lab artifact directories/object storage | Import completed bytes into sealed custody with hashes and metadata; keep large bytes outside planner history |
+| Credentials | Separately managed runtime secrets | Bind scoped access at deployment; exclude secrets from packages and ordinary exports |
+
+For a first local prototype, directories plus a transactional store and Compose volumes are sufficient. Backup must cover the database and referenced data consistently; an image export is not a service-data backup. Versioned artifact refs keep trajectories/videos out of model context, following the same separation AWS recommends between workflow state and large S3 payloads.
+
+## Decide packaging through a few profiles
+
+| Profile | Choose when | Factory output |
+|---|---|---|
+| Embedded library or batch executable | No useful service lifetime; quick startup; bounded invocation | Adapter plus implementation/dependencies in a reproducible executable/image |
+| Managed lab service | Expensive startup, live sessions, GPU allocation, multiple operations or persistent application state | Adapter, pinned service artifact, health/lifecycle recipe, state volumes and compatibility tests |
+| Attached existing service | Lab already has a simulator/application instance | Adapter and required API/version checks, with a lab-local binding; no permission to delete or upgrade the attached service |
+
+The factory inspects supplied source/docs/APIs, proposes a profile and manifest, and builds/tests against operator-authored templates. The lab policy/controller resolves actual paths, credentials, resource allocation and placement. Admission tests verify claimed interfaces, lifecycle and state behavior before automatic activation. Ambiguous storage migration or unavailable GPU/API support yields a visible blocked candidate rather than a guessed configuration.
+
+Use the managed-service profile as the initial robotics example if the actual simulator supports a stable control API and meaningful session lifetime. Use embedded execution if its real API is a local library and each batch can start independently. The simulator author supplies the ordinary library/API, setup requirements and checkpoint/reset behavior; the CC adapter provides AI4R-specific contracts.
+
+## Planning interface for long running work
+
+Propose a mutable research agenda with immutable dispatch records. The planner can reconsider future work when results, failures, capability additions or human direction arrive. It may also request a planning turn without waiting for an entire graph to finish. Already executing work keeps its bindings until it completes or is explicitly cancelled.
+
+```mermaid
+flowchart LR
+    B[Approved brief and lab limits] --> P[Revise working agenda]
+    P --> C[Propose next operation or small batch]
+    C --> V[Validate and bind exact invocation]
+    V --> E[Execute and observe]
+    E --> Q[Independent checks and acceptance]
+    Q --> K[Retain result and update knowledge]
+    K --> P
+    Q -->|failure or inconclusive| P
+    N[New eligible CC version or user direction] --> P
+```
+
+Only accepted results become research facts; failures and uncertain observations remain visible context for further planning. Nonnegotiable scientific dependencies and mandatory checks stay explicit. Flexibility permits a new benchmark or investigation after unexpected results; it does not permit skipping evidence obligations or treating a failed gate as acceptance. Every repair is a new recorded attempt under cumulative time/cost/storage limits.
+
+A POC recipe can remain a useful default. For example, building still precedes testing a particular build, but a failed benchmark may motivate inspection, an alternative implementation or a new experiment rather than ending all research. Separate actual causal prerequisites from historical stage order. Compare a fixed recipe and adaptive operation selection on the same tasks before claiming the latter performs better.
+
+CC-side integration needs operation contracts, compatible package discovery, invocation evidence and version/admission events. Planner scheduling/replanning and whole-harness mutation stay with their owners. The current M1 frozen `run_plan` and node-failure behavior would need an explicit M2 agreement to implement this proposal.
+
+## Factory and RSI interface
+
+RSI or the lab research loop submits a capability request or revision target, input/source refs, expected interfaces, allowed changes and budget. The factory returns a candidate package, dependency/deployment requirements, evidence and limitations. It can author/adapt CC implementation and tests, but cannot change protected admission criteria or the lab controller.
+
+The lifecycle is capture source → build → independently qualify operations and package compatibility → automatically activate an eligible version for future dispatch. Automated admission is a protected process separate from candidate authorship. Failed candidates retain evidence within the storage budget. The RSI system decides how to compare/search improvement targets and how to change the harness.
+
+For stateful packages, activation means new work can select the new version after required service readiness and compatibility checks. Existing sessions keep the old service/version. A replacement service is used for a new session, or the controller drains/checkpoints/migrates with explicit supported rules. If capacity or migration support is missing, activation waits. It never hot-swaps an active physics experiment. Central export and adoption by other labs remain independent.
+
+## Patterns to borrow and boundaries of the analogy
+
+| Primary source | Mechanism documented there | Proposed use here |
+|---|---|---|
+| [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) | A server lists multiple named tools with schemas | Discover several operations within one CC package; MCP itself supplies neither package admission nor joint quality assurance |
+| [Docker Compose application model](https://docs.docker.com/compose/intro/compose-application-model/) | Services, volumes, configuration, secrets and project grouping | Reuse actual Compose for a small lab service deployment; project names alone are not an adversarial isolation guarantee |
+| [ROS 2 managed nodes](https://design.ros2.org/articles/node_lifecycle.html) | Standard lifecycle transitions under external supervision | Give services predictable configure/ready/active/error/stop behavior without exposing lifecycle details to the planner |
+| [Kubernetes Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) | Controllers automate application deployment, backup and upgrades | Borrow desired/observed state reconciliation in a small lab controller; installing Kubernetes is not required |
+| [Microsoft Magentic One](https://microsoft.github.io/autogen/dev/user-guide/agentchat-user-guide/magentic-one.html) | Task ledger, progress ledger and replanning when progress stalls | Offer the Planner owner a concrete adaptive-loop example; model reflection is not independent verification |
+| [Temporal message passing](https://docs.temporal.io/encyclopedia/workflow-message-passing) | Running workflows receive signals/updates and expose queries | Durable research state can respond to events; adopting the full Temporal service is optional and needs its own evaluation |
+| [AWS Step Functions data guidance](https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html) | Large payloads live in S3 while workflow state carries references | Keep large scientific artifacts in lab storage and pass refs, using local storage first |
+
+These are researched patterns and proposed adaptations, not demonstrated compatibility of these tools with AI4R. No external framework needs to become the new core platform to test the CC idea.
+
+## Small experimental delivery
+
+Start with one lab, one real application, one package exposing three to five operations, a manually authored deployment profile and retained artifacts. Show an experiment across several calls, a restart with declared recovery behavior, a mid-journey change of future work, and one factory-produced compatible CC update automatically used by a later invocation. Running work keeps its original pin.
+
+Compare fixed sequence versus selectable operations on matched tasks; record task success, verification failures/false rejection, runtime/cost, useful replans, restart recovery and packaging effort. For the factory, measure successful integration across library, managed-service and attached-service profiles, plus failed adoption and rollback. Negative cases include stale session, duplicate effect, runaway job, incompatible service version and missing checkpoint. Small results establish tested cases and limitations, not general self-improvement or production readiness.
+
+## Differences from earlier notes
+
+The older per-lab factory notes combine CC production and platform evolution. The CC factory here produces only CCs; platform/harness evolution belongs to the separate RSI owner. Earlier single-operation/short-lived-image assumptions become profiles underneath a multi-operation package. The proposed rolling planning boundary differs from M1's frozen whole-run DAG and requires owner coordination. Automatic local CC adoption is now explicit provisional user direction; it does not authorize central self-promotion or changing active invocations.

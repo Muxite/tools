@@ -1,0 +1,44 @@
+---
+id: ai4r-m2a-2-human-relevant-verification-and-lifecycle
+status: proposed-runtime-unverified
+source: ai4r_m2a/3-agent-reference/source-manifest.json
+last_reviewed: 2026-10-29
+next_action: Implement against the acceptance matrix and attach measured evidence
+---
+# Verification, recovery and lifecycle
+
+[Home](../README.md) · [Reliability overview](../1-human-required/03-reliability.md)
+
+## Four distinct kinds of evidence
+
+**Admission** qualifies a package release for declared environments and workload scope. Tests must include known invalid inputs, misleading outputs, unavailable providers and prohibited effects. A producer's self-tests help but are not the independent qualification decision. Admission is durable and bound to package, checker, provider/environment and policy digests; no process-local Boolean or caller flag can waive required admission.
+
+**Per-call checks** validate the actual inputs, effects, observed execution and outputs on every call. An admitted tool can still fail on this input. Local checks come from the package; project obligations are independently bound by protected policy. Required checks cannot be skipped because the caller is external, the pipeline is absent or a model judges them unnecessary.
+
+**Scientific assessment** tests the result against the research contract. An output can be structurally valid but scientifically unsupported. Claim evidence must include sources/data, provenance and evaluation protocol. Data splitting, leakage checks, suitable baselines, uncertainty, measurement conditions and accounting for failed trials are required when relevant to the study. Repeated exploratory tuning on a holdout invalidates its confirmatory status; collect a new held-out evaluation or label the result exploratory.
+
+**Lifecycle feedback** summarizes calls and environments to update eligibility, ranking or qualification. It never edits old receipts. Keep numerator, denominator, workload class, environment and reason taxonomy; blocked incompatible calls, tool defects and valid negative experiments are different signals. Small samples show uncertainty, not impressive unqualified percentages.
+
+## Finite checking and authority
+
+The protected binder selects required check definitions before execution, including independently owned task checks. Input and effect checks happen before dispatch. Output/evidence checks happen after observed results. Deterministic checks use trusted implementations and fixtures; semantic assessment uses a separately scoped reviewer with the original objective, permitted source evidence, accepted inputs and exact candidate output. The producer cannot choose its own reviewer verdict or pass private instructions as policy. The reviewer only assesses; repairs produce a new candidate attempt.
+
+Review terminates at one assessment round and, where specified, one independent adjudication. If the evidence remains ambiguous, verdict is INCONCLUSIVE and no acceptance of the disputed claim follows. Critical externally consequential or non-verifiable claims escalate to a human/scientific measurement under the contract. No infinite chain of “verify the verifier.” Checker releases are tested independently using adversarial held-out fixtures, pinned, protected from producer writes and included in admission. Checker disagreement is evidence of uncertainty, not a vote to ignore failure.
+
+Applicability is resolved by rule at binding. A check is either a required bound obligation, or explicitly out of scope with the rule and reason recorded before work. Every required obligation must PASS. Missing evidence, checker outage, timeout or NOT_APPLICABLE on a required bound check prevents accepted status. Hash equality alone does not establish source truth; it establishes identity.
+
+## Failure policy
+
+Named outcomes include INVALID_INPUT, NO_COMPATIBLE_CAPABILITY, MISSING_PROVIDER, EFFECT_DENIED, CHECK_FAILED, CHECK_UNAVAILABLE, INCONCLUSIVE, BUDGET_EXHAUSTED, NEEDS_INPUT, EXECUTION_FAILED, CANCELLED and EFFECT_UNKNOWN. Preserve structured details and a safe next-action hint. Scientific negatives are accepted observations with negative findings, not CHECK_FAILED merely because the hypothesis lost.
+
+Default bounded repair: at most two execution attempts per bound task (initial plus one repair), no identical retry without new evidence or a declared transient cause, and one finite semantic adjudication. Task policy may lower this. Raising it requires an explicit authorized budget/contract revision, not agent self-extension. Count all calls, waits where billable, execution and review tokens/time in the budget. Alternative methods still consume the same project/obligation budget, preventing an infinite series of “new” attempts.
+
+Provider outages may resume under a persisted retry-after policy within deadlines. A timeout is not proof that effects stopped. If the provider cannot cancel and confirm termination or idempotently reconcile an operation, mark EFFECT_UNKNOWN and block dependent/equivalent effectful retries. Harmless pure computations may restart with a new receipt; duplicated effects may not.
+
+## Eligibility transitions
+
+Candidate → qualifying → admitted → suspended/retired/revoked. A changed package/checker/environment creates a qualification requirement; only policy-approved compatible environment changes can reuse a certificate, with the compatibility rule recorded. A revoked package cannot be selected; the provider contains unsafe running work where possible. Safe retirement stops new dispatch but allows pinned, still-safe jobs to finish. A compromised release quarantines affected outputs for review; it does not delete audit records.
+
+Every call is journaled before execution and finalized afterward, including checks and cancellation. Feedback can be aggregated asynchronously; an unavailable metrics dashboard does not block correct execution when the durable journal works. If that journal is unavailable, effectful dispatch and accepted publication stop. Serious integrity/security failures suspend immediately; noisy scientific failures trigger investigation against a declared workload scope, not automatic universal banning.
+
+Factories and RSI produce candidates, not trusted replacements. A newer or faster release is not automatically better. Compare against the incumbent with held-out correctness, cost and failure fixtures; retain the incumbent when the candidate loses. Improving a checker requires independent qualification of that checker. This milestone does not implement recursive checker self-improvement.

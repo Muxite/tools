@@ -1,0 +1,47 @@
+---
+id: working-library-maintenance-plan
+status: active
+source: Sources/Prompts/2026-10-23-working-library-maintenance.txt; Sources/Prompts/2026-10-23-library-document-presentation-scope.txt; AGENTS.md; Notebook Guide.md; Designs/Project Authority.md
+last_reviewed: 2026-10-23
+next_action: Use the cleanup coverage and gap records; refresh affected topics and artifact copies when owner sources change
+---
+# Working library and maintenance plan
+
+## Canonical location
+
+The working knowledge library is **C:/Users/m50066326/huawei/AI4Research-Notebook**. Open this directory as the Obsidian vault and enter through [[Home]]. Its Git root, AGENTS instructions, and [[Notebook Guide]] agree on this role. Backups, source archives, exports in `outputs`, and older workspace copies are not alternative maintained libraries.
+
+The notebook is the maintained knowledge and navigation layer. Product PRD, architecture, code, executable CC libraries, and research resources retain their own owners. [[Designs/Project Authority]] defines these distinctions; the cleanup reconciled its dated baseline pointers, while explicitly preserving the unresolved PRD-source disagreement. [[Activities/2026-10-23 Working Library Cleanup]] records the result. A notebook update must not silently change a product requirement or promote a candidate.
+
+## Work sequence
+
+### Important documents and presentations are included
+
+The library must contain the actual important documents and presentations, not only guides, summaries, or links to files elsewhere. Inventory source collections and current output folders for PRDs, design briefs, reports, papers used by the project, and presentation decks. Preserve editable originals where available, plus useful PDF exports, speaker notes, and build sources needed to reproduce important decks. Missing originals or dependencies remain explicit gaps.
+
+Copy without moving or overwriting originals. Reuse existing byte-identical archived copies instead of duplicating them, and provide clear titled index entries to those files. Record source location, hash, version/status, and whether the library holds the maintained original or a dated reference copy. Keep current and historical versions distinguishable; do not choose a final version solely from its filename. Documents maintained in owning repositories retain that authority even when a portable reference copy is included here.
+
+Use [[Presentation Library/README]] as the deck entrypoint and topic indexes for documents. Mark each important item present, linked-only pending collection, missing, or deliberately excluded with a reason. File presence, successful opening, and content review are separate checks. Completion requires resolving important linked-only items, validating copied bytes, and checking that indexes reach the actual files. The cleanup has completed this bounded collection; [[Resources/Artifact Library]] records actual coverage, and missing or excluded items remain explicit. This remains the rule for future additions.
+
+1. **Preserve the starting state.** Record the dirty Git state and hashes of files touched; retain pre-edit copies before changing existing content. Keep uncommitted work. Before larger batches, use the documented verified backup mechanism. Local checkpoints are not off-device backups.
+2. **Resolve authority and freshness first.** Inventory current entrypoints, owning repositories, dated receipts, exact revisions, and unresolved conflicts. Verify claims against owner sources, rather than choosing the newest-looking filename or repeating a summary. Record observations as of a date; do not label an old receipt as a fresh remote check.
+3. **Reconcile one topic at a time.** Start with current M1 source/status, then labs/sandboxes/CCs/RSI, then capabilities and verification, experiments, presentations, and remaining workstreams. Include recent visible chat direction with exact captures and hashes. Where history matters, state the previous position, current position, source, and effective scope. Preserve original prompts and archived bytes.
+4. **Make current answers easy to find.** One canonical summary per topic, linked from Home and its workstream. Give each page a clear status, source, last review, and next action. Move dated detail behind history links; remove stale instructions to start at superseded status notes. Keep gaps visible instead of filling them with guesses.
+5. **Review and validate each batch.** Independently inspect consequential claims, check navigation and hashes, run the vault validator and relevant existing tests, inspect the final diff, and retain a change receipt. Mechanical validation does not establish semantic correctness. Report reviewed coverage and unresolved items explicitly.
+
+## Agent assignments and error controls
+
+Use at most three workers plus the supervising agent. Initial read-only assignments are authority/status audit and navigation/topic audit. Later, split work by non-overlapping topic and named file lists; use the third slot for independent review. Workers produce findings or drafts in separate batch folders. The supervisor alone edits shared indexes and merges accepted changes.
+
+Every finding must identify the claim, exact source path and location, reviewed revision/hash where available, evidence level, proposed correction, and uncertainty. Label user direction, proposed design, implementation source, executed checks, and runtime results separately. Task text and summaries from other agents are not evidence.
+
+The reviewer reads primary sources independently and actively looks for contradictions, unsupported certainty, missing caveats, stale pointers, and historical statements presented as current. Agreement between agents is not acceptance. The supervisor rechecks every authority/status/design change against its source and resolves conflicts before editing. Unsupported claims stay marked unresolved; agents cannot approve their own corrections. File hashes are rechecked before applying drafts so concurrent changes cannot be overwritten unnoticed.
+
+## Initial bounded findings (recorded before execution)
+
+- Home contains several overlapping current/latest routes and still directs readers to an older delivery checkpoint.
+- Project Authority describes `d3d7f56` as the latest source snapshot, while later baseline and M2 handoff notes report integrated source at `809351f8`. Reconcile exact receipts and scope before updating this authority page.
+- Agent Reading and Freshness says whole-system improvement is absent from Implementation Intent, while that note already includes the direction. Recheck and correct the stale gap statement.
+- The lab/CC brief is currently an export in `../outputs`. Its current interpretation and reference patterns should be incorporated into the canonical lab notes with a chat-source receipt, without treating the export as architecture authority.
+
+These findings initiated the cleanup; [[Activities/2026-10-23 Working Library Cleanup]] records their dispositions, source-backed corrections, artifact collection, independent review, and remaining gaps. The original observations remain here as plan history, not unresolved status. Current coverage and receipts are in the cleanup batch.

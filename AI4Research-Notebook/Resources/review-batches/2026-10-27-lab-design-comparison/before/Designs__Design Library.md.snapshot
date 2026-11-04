@@ -1,0 +1,107 @@
+---
+id: design-library
+status: active
+source: Resources/review-batches/personal-collections-and-readiness.md
+last_reviewed: 2026-10-26
+next_action: Read current design contracts for implementation; use older designs for provenance
+---
+# Design library
+
+**Current M2 sandbox route:** [[Designs/Sandbox Lab Design]] → [seven-view diagram set](Sandbox%20Lab%20Diagrams/README.md) → [[Designs/M2 Lab Capsules and Factory Proposal]]. This route supersedes conflicting details in the earlier VM/container/factory drafts for proposal discussion; the replacement [[Designs/Lab Capsule and Factory Design Plan|delivery plan]] prioritizes evidence-driven research adaptation before infrastructure expansion. Implementation agreements remain open.
+
+## Start with the current overview
+
+[[Designs/Labs and Capability Capsules]] is the concise component view for application developers. [[Resources/Artifact Library]] holds actual documents and reference copies; [[Presentation Library/Deck Catalog]] indexes actual decks. Use this index for detailed designs and historical lineage. The October 23 M2 handoff below is a proposed implementation route, not a requirement to adopt its topology in every lab.
+
+## Latest M2 handoff and source update
+
+[[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] is the portable implementation package for VM labs, container capsules and local factories. Shared identity/protocol/resource/admission contracts and acceptance scenarios are included; existing design notes retain the full target and provenance.
+
+
+**Current notebook reading package:** [[Designs/CC History]] · [[Designs/Project Authority]] · [[Designs/CC Reference]] · [[Designs/Lab Progression]] · [[Amendments/README]]. [[Resources/Current Baseline]] distinguishes the maintained design checkout from captured M1 implementation snapshots.
+
+[[Presentation Library/README|Presentation Library]] collects recurring talk, evidence, visual-density and review guidance. See [[Presentation Library/Preference and Source Register]] for what was directly requested, what is found in project source files, and the limits of the chat search.
+
+Design is a first-class part of this notebook. This index connects current contracts, research proposals, previous designs, diagrams, and presentations without creating a second maintained copy of the product architecture.
+
+## Current implementation design
+
+| Area | Start here |
+|---|---|
+| Full M1 architecture | [Maintained design package](../../jiuwenswarm/docs/architecture/design-package/README.md) |
+| CC responsibilities | [Capability capsules](../../jiuwenswarm/docs/architecture/design-package/2-capability-capsules.md) |
+| Build order and acceptance | [Build plan](../../jiuwenswarm/docs/architecture/design-package/3-build-plan.md) |
+| Design rationale and changes | [Recorded decisions](../../jiuwenswarm/docs/architecture/design-package/method/decisions.md) |
+| M1 sidecar and RSI design | [Sidecar](../../jiuwenswarm/docs/architecture/design-package/development-tools/sidecar/README.md) and [RSI workbench](../../jiuwenswarm/docs/architecture/design-package/side-systems/rsi-workbench.md) |
+
+## Standalone benchmark implementation prompt
+
+[[Resources/Coder Prompts/benchmark-runner]] is the current sequential, human-judged control/data runner handoff, implemented as development tooling in our AI4Research branch of JiuwenSwarm. Its runtime uses owned targets/directories and never overwrites user files. This supersedes the separate-repository interpretation; existing M1 client contracts guide integration and M2 VM/factory work is not a prerequisite.
+
+## Optional Spark deployment prompt
+
+[[Resources/Coder Prompts/spark-benchmark-setup]] sets up the existing app and runner directly on the Spark using Compose. It owns host preparation, storage controls and deployment connectivity. Benchmark scheduling/results remain in [[Resources/Coder Prompts/benchmark-runner]], which can run on another host. M2 VM/factory architecture below remains separate.
+
+## Your new design work
+
+- [[Designs/cc-containerization-and-lab-isolation|Lab boundaries and CC containerization]] separates the infrastructure prototype from the CC packaging decision.
+- [[Designs/skills-to-cc-mapping|Skills to CC mapping]] defines conversion and evaluation work, including Spec Kit as a capability hypothesis.
+- [[Workstreams/Workload Characterization]] retains the open hardware-design question.
+
+Use [[Templates/Design]] for new proposals. Promote accepted product/interface changes into the maintained package through the project process.
+
+## Historical design and presentation lineage
+
+| Collection | Why retain it | How to read it |
+|---|---|---|
+| [Capsule scratch/build repository](../../capsule-openjiuwen/INDEX.md) | CC schema derivation, reports, reviews, and early architecture | Historical research lineage; not current runtime authority |
+| [RSI v0.2 designs](<../../RSI Design Docs>) | Previous RSI interfaces and workbench assumptions | Compare against current workbench contracts |
+| [October planning](../../AI4Research_private_planning/2026-10-13-meeting-decisions.md) | Meeting rationale and scope evolution | Personal planning source |
+| [Dated review outputs](../../outputs/m1-core-review-2026-10-14) | Frozen package comparisons and review deliverables | Compact package was retired; retain as a dated artifact |
+| [Old Obsidian notes](../../tundle/obby/README.md) | Decisions, handoffs, and evolving intent | Historical context; some pointers are stale |
+| [Slide exports](../../slides-png/README.md) | Visual history and source-deck mapping | Derived rasters, not editable design authority |
+| [Earlier native Paper2Agent briefing](../../jiuwenswarm/docs/research/paper2agent/presentation/README.md) | Separate earlier research briefing and source lineage | Historical collection; the user-confirmed final talk is [[Designs/Paper2Agent Briefing/presentation/README\|revision 8]] |
+
+Full file-level navigation, archived snapshots, and original locations are in [[Resources/Source Collections]]. [[Resources/review-batches/personal-collections-and-readiness|The source review]] records the exact files sampled and conflicts found; indexing a design does not validate all its claims.
+
+## Paper2Agent and system capability growth
+
+[[Designs/AI4Research Capability Growth]] is the proposed architecture synthesis. [[Designs/Paper2Agent Capability Factory]] maps the reference into reusable stages and candidate products. [[Designs/Agent Reading and Freshness]] defines focused reading routes, source ownership, and drift handling. These notes do not replace maintained M1 contracts.
+
+**Factory feature route:** [[Designs/Capability Capsule Factory Feature]] is the one-page proposed feature definition; [[Designs/Paper2Agent Capability Factory]] is its detailed stage/source note. Factory-stage CCs, generated product CCs and versioned resources have different identities. Generation never grants admission. Our modified `jiuwenswarm` branch is distinct from original upstream JiuwenSwarm.
+
+**Short presentation pack:** [[Designs/Paper2Agent Briefing/1 Decision brief]] and [[Designs/Paper2Agent Briefing/2 Agent architecture]]. These separate existing conceptual fit from unmeasured integration value, and our modified AI4Research branch from original upstream JiuwenSwarm.
+
+## AI4R lab and CC images
+
+[[Designs/AI4R Lab and CC Images]] records the idea of every CC as a container image, a central image library vendoring to many lab VMs, and lab changes returning as reviewed candidates. It extends [[Designs/cc-containerization-and-lab-isolation]] and leaves the one-CC [[Amendments/Container CC Pilot/README|pilot]] unchanged.
+
+[[Designs/CC as Universal Component]] proposes the CC declaration as the single contract for skills, tools, MCP tools and A2A agents (import and export adapters), and compares the lab loop with the self-improvement goal.
+
+**The talk:** [[Designs/Paper2Agent Briefing/presentation/README|Paper2Agent decision talk]] (deck, script in speaker notes, three figures, claim ledger).
+
+## M2 infrastructure reading route
+
+| Question | Owning note |
+|---|---|
+| What should be developed, and in what order? | [[Designs/Lab Capsule and Factory Design Plan]] |
+| How do storage, models, inference and retention fit the Spark? | [[Designs/Spark Shared Services and Storage]] |
+| How is a lab VM provisioned and recovered? | [[Designs/VM Lab Infrastructure Design]] |
+| How are CC images identified, invoked and checked? | [[Designs/Container Capability Capsule Design]] |
+| How does each lab build and contribute candidates? | [[Designs/Per Lab Capability Factory Design]] |
+| What changed after checking actual Docker mechanics? | [[Designs/Docker Architecture Review and Feasibility]] |
+
+M2 notes are proposed designs, with shared Spark host resources and independent lab histories. Earlier M1 carrier-pilot and generic-host ideas remain history; they do not redefine this milestone or establish runtime evidence.
+
+## Durable project labs
+
+[[Designs/Durable Project Labs]] owns long-lived lab identity, model changes, persisted knowledge/data, recovery, bounded project-level improvement and presentation checkpoints. Read it before VM lifecycle and storage implementation. Existing M2 topology and host resource policies remain linked owners.
+
+## Nuwa briefing
+
+[[Designs/Nuwa Briefing/presentation/README|Nuwa rev3]] uses an orange person-to-skill narrative to assess value to AI4R: what to imitate in evidence-based procedure extraction, what pitfalls to avoid, a proposed M2 CC-factory branch, and a generic-checklist comparison. Nine main slides and two hidden backups, planned 7:20. The latest version adds method/criteria tables and three CC-factory inputs: runtime gap, paper/repo/data and person-plus-trait. Luna adversarially reviewed and spot-checked the revisions. No integration or task gain is claimed.
+
+
+## M2 lab capsules and factory proposal
+
+[[Designs/M2 Lab Capsules and Factory Proposal]] records October 26 ownership and local-adoption decisions, multi-operation packages, simulator service/data placement, factory profiles and a proposed adaptive-planning interface. Whole-system RSI remains with its owner. It is a discussion proposal beneath the high-level lab purpose, not a runtime result or an amendment to M1.

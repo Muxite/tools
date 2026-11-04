@@ -1,0 +1,18 @@
+---
+id: decision-register
+status: active
+source: Sources/Planning Choices
+last_reviewed: 2026-10-20
+next_action: Develop the requested container design and record implementation qualification separately
+---
+# Decisions
+
+| Decision | State | Evidence |
+|---|---|---|
+| VM per lab, selective JiuwenBox reuse, OpenJiuwen compatibility and contribution target | Selected by user October 27; runtime qualification pending | [[Sources/Prompts/2026-10-27-select-vm-jiuwenbox-upstream.txt]] · [[Designs/Sandbox Lab Design]] |
+| [[Decisions/Notebook and Stage Choices\|Notebook and stage scope]] | Accepted by user | [[Sources/Planning Choices]] |
+| Per-CC containerization | User-directed design target, 2026-10-21; implementation qualification pending | [[Designs/cc-containerization-and-lab-isolation\|Experiment design]] · [[Designs/AI4R Lab and CC Images]] |
+| Future hardware workload unit | Open research problem | [[Workstreams/Workload Characterization]] |
+| Automatic skill admission and activation | Outside initial prototype | [[Workstreams/Skills to CCs]] |
+
+The latest [[Sources/Prompts/2026-10-21-vm-capsule-factory-design-plan.txt|request]] establishes direction, not runtime acceptance or maintained-M1 adoption. [[Designs/Lab Capsule and Factory Design Plan]] records staged work.

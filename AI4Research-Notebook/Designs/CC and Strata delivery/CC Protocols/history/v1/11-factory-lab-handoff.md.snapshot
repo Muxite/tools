@@ -1,0 +1,104 @@
+---
+id: cc-factory-lab-handoff
+status: proposed-runtime-unverified
+source: November 4 request and Strata c62d5e3a15b40ea51c96aae9e8d36928965f53ab packaging design
+last_reviewed: 2026-11-04
+next_action: Exercise one native engine candidate delivery and actual loaded-revision verification
+---
+# Moving the Factory product into the Lab
+
+## 1. What travels
+
+The Factory's engine product is the **car**. A profiler, builder or benchmark CC is a reusable tool used to produce or assess that car. CC calls can carry the product handoff as typed artifacts. The product can contain zero reusable CCs.
+
+The Lab receives a product manifest plus access to immutable bytes. The manifest identifies the candidate, delivery representation, build/source lineage, compatibility requirements and available evidence. It refers to the actual binary or source payload; a human narrative is insufficient.
+
+| Delivery representation | Sufficient identity | Lab action |
+|---|---|---|
+| Native engine component | Component manifest and payload digest, entrypoint, ABI/platform, required runtime and libraries. | Verify and stage the native package; select it explicitly at restart. |
+| OCI engine image | Platform-specific image digest, startup/configuration contract and external input references. | Pull/import verified bytes and start the pinned image. |
+| Source snapshot | Immutable tree/archive, submodule/LFS/blob materials, build recipe, toolchain and dependency lock. | Execute an authorized build stage, freeze its product, then measure it. |
+| Git change set | Exact base plus complete patch/blob set and expected resulting tree digest. | Apply in an isolated worktree; verify the resulting tree; build and freeze. |
+
+A Git diff is sufficient only as a reconstruction recipe with a known base and all required material. Ordinary text diffs can omit untracked files, binaries, file modes, submodules and LFS objects. Unanchored diffs must not identify a measurement candidate.
+
+## 2. Preserve Strata's native package
+
+Strata's `engine-component.json` schema 2 describes immutable native engine directories, file hashes/sizes, entrypoint, platform/backend, architecture targets and runtime/driver requirements. Use that existing manifest as the engine format; reference it from the product rather than duplicating its fields. Its component hash manifest excludes the manifest itself; the outer artifact reference can identify the whole delivered archive separately.
+
+Reviewed local Strata revision: `c62d5e3a15b40ea51c96aae9e8d36928965f53ab`, `packaging/ENGINE-COMPONENT.md`, `packaging/package_engine.py` and `strata_control/engine_component.py`. Native local packages can be unsigned; release-feed signatures are a different policy. Lab admission must apply its own trust policy. A loader's compatible fallback must not silently replace the candidate selected for comparison.
+
+The existing Spark build path targets Linux ARM64/SM121 and a particular CUDA/driver baseline. Those requirements belong to the pinned engine/build and qualified environment. They are not mandatory fields for every CC. Normalize platform vocabulary explicitly: native `linux-aarch64` and OCI `linux/arm64` describe corresponding targets through a defined mapping.
+
+## 3. End-to-end handoff
+
+```mermaid
+sequenceDiagram
+    participant R as Requester
+    participant F as Factory coding agent
+    participant S as Artifact store
+    participant L as Lab agent
+    participant H as Qualified Spark host
+    participant E as Evaluator
+    R->>F: Product brief and optional CC requests
+    F->>F: Implement, pin source, build and self-test
+    F->>S: Product, materials and build provenance
+    F-->>L: Product reference and Factory receipt
+    L->>S: Fetch and verify required bytes
+    L->>H: Admit, stage, restart exact candidate
+    H-->>L: Loaded binary/configuration and generation
+    L->>H: Invoke pinned measurement CC
+    H->>S: Raw evidence and attempt receipt
+    L->>E: Evidence, candidate identity and frozen policy
+    E-->>R: Pass, fail or inconclusive comparison
+```
+
+The payloads use ordinary CC typed input/output ports. A Factory operation takes a brief/request artifact and returns a product reference plus an optional list of CC release references. A Lab preparation operation takes the product and environment requirements and returns an instance handle. A measurement operation takes that handle, model and workload. Each operation has its own prerequisites and effects; the Factory's grants do not carry into the Lab.
+
+## 4. Minimum product-to-measurement joins
+
+These are required meanings for the handoff profile, not duplicate top-level fields on every capsule. Native manifests and existing provenance records remain authoritative.
+
+| Owner | Fact recorded once | Referenced by |
+|---|---|---|
+| Factory | Source revision/tree and all local changes, recipe, build inputs and produced artifact. | Product manifest and build record. |
+| Product | Delivery representation, payload Ref and native manifest/schema Ref. | Lab preparation call. |
+| Lab admission | Policy version, eligible host/provider, requested candidate and resource reservation. | Bound preparation/measurement calls. |
+| Lab host | Actual loaded binary/component, effective configuration, instance generation and restart event. | Measurement subject and receipt. |
+| Measurement CC | Actual measurement window, workload evidence, output coverage and sensor gaps. | Receipt and evaluation. |
+| Evaluator | Frozen criteria, baseline, evidence references and verdict. | Promotion decision. |
+
+Before measuring a locally adjusted Muse instance, link parent image/component → patch or configuration delta → resulting tree/configuration → rebuilt binary or snapshot → restart → process generation → measured window. Model shards, tokenizer, quantization, workload, cache policy and environment are independently pinned inputs. A parent image or PID alone is insufficient.
+
+## 5. Edge cases with defined outcomes
+
+| Case | Outcome and owner |
+|---|---|
+| Source provided but no compiler/toolchain available | Lab preparation blocks `MISSING_BUILD_ENVIRONMENT`; it does not treat source delivery as runnable. |
+| Patch base differs or untracked dependency is absent | Factory/Lab reconstruction rejects `SOURCE_MISMATCH` or `MISSING_MATERIAL`. No fuzzy apply for scored candidates. |
+| ARM64 engine sent to wrong host; CUDA or ABI mismatch | Admission blocks `INCOMPATIBLE_ABI` before launch. |
+| Loader falls back to a previous engine | Loaded identity check rejects `CANDIDATE_MISMATCH`; do not label the result with the requested candidate. |
+| Local configuration changed but endpoint not restarted | Preparation reports `STALE_INSTANCE`; either restart with authority or keep the attempt ineligible. |
+| PID reused, engine hot-reloaded or endpoint rerouted mid-capture | Verify generation/deployment throughout capture. Split evidence by generation or mark identity coverage inconclusive. |
+| Tensor-parallel engine has several workers | Bind the worker set and rank-to-binary/configuration map. Replacement workers create a changed subject. |
+| JIT kernels or runtime-selected backend change executable behavior | Record JIT/toolchain/cache key and resolved backend; retain generated binary digest where available. Incomplete identity limits reproducibility claims. |
+| External weights unavailable or access revoked | Block model binding; never silently substitute a smaller model. |
+| GPU shared with another workload | Record isolation/contamination evidence. Enforce comparison policy; a completed run can be unsuitable for performance claims. |
+| Warm cache differs between arms | Apply frozen warm/cold policy and record cache preparation. Do not explain away a regression after seeing results. |
+| Profiler cannot attach in a container | Select an authorized host provider or block `PREREQUISITE_UNAVAILABLE`. No implicit privileged fallback. |
+| Profiler perturbs timing | Declare the effect; separate instrumented diagnostics from uninstrumented scoring where the policy requires it. |
+| Crash after restart but before acknowledgment | Reconcile actual process and effect journal. Do not retry restart blindly. |
+| A2A disconnects while a build continues | Reattach to the durable task/call; do not create a second build by default. |
+| Cancellation races with product publication | Keep the immutable product and actual completion history; reconcile publication/stop order. Cancellation cannot erase effects. |
+| Metrics are valid but candidate misses its target | Execution succeeds; independent evaluation fails. Preserve useful negative evidence for RSI. |
+| Consumer cannot retrieve evidence | Return explicit unavailable evidence/assessment, preserving references. A producer's summary is not equivalent evidence. |
+
+## 6. Why this helps RSI
+
+Each iteration has a reconstructible change, actual executed subject and comparable evidence. The next coding agent can distinguish a bad change from a failed build, wrong binary, contaminated benchmark or inadequate trace. A successful modification can become a reusable CC; an improved engine can remain a software product. Neither automatically changes the evaluator or promotion policy.
+
+Keep the mandatory floor small: identity, typed ports, explicit effects, bounded execution, durable result and lineage. Add stronger checks through consumer policy and relevant profiles. The default must reveal absent evidence rather than fabricate assurance.
+
+## 7. Delivery status
+
+This is a proposed handoff profile grounded in source inspection. The core declaration fixtures still use image-backed CC tools. Native engine packaging is a product format, not a newly implemented CC execution provider. A real Factory→Spark→Muse restart and measurement trial remains required.

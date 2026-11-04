@@ -1,0 +1,27 @@
+# Team design docs: M1 and M2 on openJiuwen
+
+Shared with the whole team, and edited by everyone through pull requests. Muk, the architect, keeps them consistent
+and merges.
+
+**The schema specs, component pages, traces and issue template have moved** to their own Obsidian vault,
+`huawei/ai4research-design/` (to become its own repository). Schema sign-off happens there. These two files stay
+until they are folded into it.
+
+| File | What it is |
+|---|---|
+| [M1-DESIGN.md](M1-DESIGN.md) | **The overall design for M1 and M2**: what done means, the M1 run as a diagram, each module with its interface, owner and agent-core plug-in point, the records, the review rules, the failure and blue-team table, and the decisions still open |
+| [SCHEMA-EXPLAINED.md](SCHEMA-EXPLAINED.md) | **Every part of the Capability Capsule schema explained**: what each field is, why it exists, who writes and reads it, and from which milestone; a diagram of where each section plugs in; a whole example; known mismatches |
+| [examples/count_spaces.json](examples/count_spaces.json) | The M1 seed Declaration. It passes the M1 gate; its hashes are placeholders |
+| `render_mermaid.py` | Renders every Mermaid block to `rendered/*.png` for slides (Edge headless, Mermaid 11.4.1 from jsDelivr) |
+
+**How to edit:**
+
+- Change the text directly, or put a question under the part it is about as `> Q (name): ...`.
+- Add a line to the file's changelog.
+- The diagrams are Mermaid text, so edit them like code. They render on GitHub and Gitee.
+
+**What is normative:**
+
+- The schema's shape is `../merged/capsule.schema.json`. What M1 requires is `../merged/policy-m1.json`.
+- The full reasoning is in `../merged/SCHEMA.md`.
+- The requirements, meaning what we must demonstrate and why, are in Ramika's PRD, not here.

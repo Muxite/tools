@@ -1,0 +1,33 @@
+flowchart TB
+    BRIEF["Approved brief and limits"]
+    EVENT["Results, new CCs, failures<br/>or human direction"]
+    PLAN["Revise future agenda<br/>Planner owner"]
+    BIND["Validate and bind next work<br/>Pins, grants and checks"]
+    RUN["Execute operation or observe job<br/>Fixed invocation record"]
+    IMPORT["Capture outputs and observations<br/>Separate host custody"]
+    CHECK["Host checks and<br/>output-only review"]
+    GATE["Protected acceptance decision"]
+    RESULT["Accepted result<br/>Retain stated uncertainty"]
+    FAILURE["Failed attempt<br/>Retain observations"]
+    BRIEF --> PLAN
+    EVENT --> PLAN
+    PLAN --> BIND
+    BIND -->|"valid"| RUN
+    BIND -->|"invalid or unavailable"| FAILURE
+    RUN --> IMPORT
+    IMPORT --> CHECK
+    CHECK --> GATE
+    GATE -->|"accepted"| RESULT
+    GATE -->|"rejected or infrastructure failure"| FAILURE
+    RESULT --> EVENT
+    FAILURE --> EVENT
+    class BRIEF,BIND,GATE control
+    class PLAN,RUN work
+    class CHECK qualify
+    class EVENT,IMPORT,RESULT,FAILURE data
+
+    classDef work fill:#e8f1ff,stroke:#3568a8,color:#142d4e,stroke-width:1.5px
+    classDef control fill:#fff1d7,stroke:#a66d16,color:#513406,stroke-width:1.5px
+    classDef qualify fill:#eee8fa,stroke:#7854a0,color:#35204d,stroke-width:1.5px
+    classDef data fill:#e5f3eb,stroke:#3c8160,color:#163e2a,stroke-width:1.5px
+    classDef external fill:#f0f2f5,stroke:#65758a,color:#273547,stroke-width:1.5px

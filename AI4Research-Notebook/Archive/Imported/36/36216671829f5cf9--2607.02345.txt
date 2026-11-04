@@ -1,0 +1,1246 @@
+
+
+===== page 1 =====
+SkillFuzz: Fuzzing Skill Composition for Implicit
+Intents Discovery in Open Skill Marketplaces
+Jinwei Hu1, Yi Dong1, Youcheng Sun2, Xiaowei Huang1
+1School of Computer Science and Informatics, University of Liverpool, Liverpool, United Kingdom
+2Mohamed bin Zayed University of Artificial Intelligence, Abu Dhabi, United Arab Emirates
+Abstract—Large Language Model (LLM)-based agents in-
+creasingly automate software engineering tasks through reusable
+skills, natural-language instruction documents that guide plan-
+ning and execution. Open skill marketplaces enable users to
+assemble agents by co-activating community-contributed skills,
+but marketplace operators typically audit skills in isolation.
+As a result, individually benign skills may interact to redirect
+an agent toward unintended objectives, which we term implicit
+intents. Detecting such intents is challenging because the effect
+emerges only through skill composition, execution environments
+are often unavailable at admission time, and the space of possible
+co-activations grows exponentially with marketplace size. In
+this paper, we formulate implicit-intent discovery as a fuzzing
+problem over skill compositions, where skill compositions are
+the unit under test, planning artifacts expose agent intent before
+execution, and deviations from a skill-free baseline serve as a
+differential oracle. Based on this formulation, we propose SKILL-
+FUZZ, the first execution-free testing approach that extracts
+structured skill contracts and uses contract-guided Monte Carlo
+Tree Search to prioritize potentially conflicting compositions.
+Across representative skill-marketplace workloads, SKILLFUZZ
+discovers over 1,000 distinct implicit intents under a fixed query
+budget, confirms more than 80% of the highest-risk flagged
+compositions during execution-time validation, and identifies
+substantially more high-severity implicit intents than alternative
+search strategies while exploring only a fraction of the pairwise
+interaction space they require.
+Index Terms—Agentic Software Engineering, Skill Market-
+places, Compositional Intent Testing, Directed Fuzzing
+I. INTRODUCTION
+Traditional software engineering (SE) delivers complex be-
+haviors through carefully authored code, where capabilities
+are explicitly programmed, tested, and maintained by human
+developers [1]. Yet the rise of Large Language Model (LLM)
+based agents is reshaping this paradigm into a more automated
+agentic SE [2]. Agents can now plan, reason, and act across
+diverse tasks at inference time, increasingly replacing human-
+written logic with flexible, language-driven behavior [3]–
+[5]. Rather than extending an agent by writing new code,
+developers and users now contribute and utilize skills, natural-
+language instruction documents co-activated at inference time
+to direct how the agent reasons and plans [6]. Open skill
+marketplaces such as ClawHub [7] have emerged to host and
+distribute these skills at scale, and a user can assemble an
+agent simply by selecting a bundle of skills and co-activating
+them, whereupon the agent can reason over their combined
+instruction context and implement corresponding tasks [8].
+Fig. 1: Compositional implicit intents in an LLM skill mar-
+ketplace. Individually audited skills are safe in isolation, but
+their joint activation reshapes the planning agent’s belief state,
+producing a plan drift toward implicit intents.
+However, this convenience introduces a safety problem that
+per-skill content audits cannot address [9]. Marketplace opera-
+tors aggregate contributions from many independent develop-
+ers and admit them for publication, a process that operates at
+a scale where joint review of every co-activation is infeasible.
+They generally verify only that each instruction document
+contains no obvious malicious injection before listing [8],
+resting on the structurally false assumption that composing
+individually safe skills produces a reliable agent. When multi-
+ple skills are co-activated, the LLM processes their documents
+as a unified context, jointly shaping the agent’s belief state,
+its internal representation of what the task requires and what
+actions to take. This joint reasoning can redirects the agent
+toward unintended objectives, and unlike adversarial prompt
+injection, no single skill need carry a malicious payload for
+arXiv:2607.02345v1  [cs.SE]  2 Jul 2026
+
+
+===== page 2 =====
+this redirection to occur. For example, consider a contribution-
+analysis skill that summarizes financial contributions and a
+csv-processing skill that handles structured data, each raising
+no audit flag in isolation, yet their co-activation instructs the
+agent try to modify the original dataset files beyond its read-
+only authorization, a emergent side-effect that appears in nei-
+ther document alone. We refer to such unintended objectives
+as implicit intents, as illustrated in Figure 1.
+Implicit intents constitute a new category of compositional
+defect, arising from the interaction between skills. This is the
+similar failure mode that software engineering has long studied
+as component-interaction faults in integration testing [10]–
+[12]. It now recurs in natural-language instruction composition
+rather than in code. Nevertheless, detecting them faces three
+distinct challenges. First, operators lack a deployment environ-
+ment in which to execute agent workflows, and even where
+the environment can be installed, executing every candidate
+co-activation in real workflows at scale is costly. Second,
+compositional effects emerge inside the LLM’s belief state
+and are invisible to any static file analysis. Third, the co-
+activation space grows exponentially with library size, making
+exhaustive search intractable. The first two obstacles share a
+common root, the absence of an observable surface for testing
+compositional effects without deployment. We resolve both by
+exploiting the plan-then-act paradigm that LLM-based agents
+nearly universally follow [13], [14]. Many agentic systems
+normally expose, or can be configured to expose, a pre-
+execution decision artifact, such as a plan, reasoning trace,
+todo list, or proposed tool call sequence, that captures the
+agent’s intended course of action before some or all tool
+executions occur [15]–[18]. This plan-level artifact captures
+the agent’s intended course of action before some or all tool
+executions occur, externalizing the agent’s belief state before
+execution and rendering implicit intents already visible in its
+text. Therefore, we use plan drift from a skill-free baseline as
+a differential oracle on this planning surface [19]. The third
+obstacle is not solved by the oracle alone, since knowing how
+to score a candidate activation does not say which activations
+to generate under a fixed budget. Closing this gap requires a
+search strategy guided by the oracle’s own feedback.
+Building on this insight, we propose SKILLFUZZ, an
+execution-free fuzzing framework that operationalizes plan
+drift as a differential oracle and searches the co-activation
+space under a fixed query budget. To make the search tractable,
+SKILLFUZZ first extracts a skill contract from each instruction
+document, a structured representation of properties such as
+its preconditions, postconditions, and declared state modifica-
+tions, and embeds each skill in a semantic space that supports
+principled searching about which combinations are likely to
+produce implicit behaviors. The search then seeds its candidate
+set with the most semantically conflicting contract pairs and
+steers each subsequent step toward the embedding region of
+the most recently discovered high-drift intent, concentrating
+the budget on combinations most likely to extend known com-
+positional risks. Together, these two steps turn the planning-
+level insight into a concrete, budget-aware testing procedure
+and this paper makes three main contributions as summarized
+below:
+• We formulate compositional intent testing, a new testing
+problem that seeks to identify implicit intents arising from
+the interaction of individually benign skills.
+• We present SKILLFUZZ, an execution-free fuzzing tech-
+nique that extracts structured skill contracts and uses
+contract-guided search to efficiently discover implicit
+intents in the exponentially large skill co-activation space.
+• We conduct extensive experiments across diverse plan-
+ning agents and representative tasks, establishing SKILL-
+FUZZ as a practical and reliable mechanism for compo-
+sitional skill screening.
+II. BACKGROUND AND RELATED WORK
+This section establishes the background and motivation for
+our approach. We first discuss how agentic AI has given rise to
+skill marketplaces and the safety gap this creates, then clarify
+how our proposed method differs from the traditional fuzzing-
+based software testing.
+A. Agentic AI as a New Software Paradigm.
+LLM-based agents have rapidly transformed how com-
+plex software tasks are automated, moving beyond the con-
+straints of handwritten procedural logic to cover roles that
+once required explicit code, including software development,
+repository-level bug fixing, multi-step workflow automation,
+and domain-specific decision making [20]–[25]. Central to this
+shift is a shared architectural pattern, the plan-then-act loop,
+in which the agent first reasons a structured natural-language
+plan that decomposes the goal into actionable steps, then
+executes each step by invoking tools or external services [5],
+[15], [16], [18]. Open skill marketplaces have further extended
+agent capability by letting users assemble agents through
+community-contributed instruction documents, dramatically
+expanding what agents can do across diverse domains [6], [8].
+However, this flexibility introduces an unexpected risk gap. In-
+dividually benign skills can jointly produce unintended objec-
+tives during planning that neither encodes alone, and operators
+cannot detect this risk without executing agent workflows, as
+they lack access to a concrete deployment environment [26].
+Existing safety evaluations of LLM agents do not cover this
+gap. Prompt injection and agent red-teaming presuppose a
+malicious artifact carrying the adversarial objective and a
+sandboxed environment in which to execute the agent [27]–
+[30], whereas the risk introduced by skill marketplaces carries
+no explicit malicious carrier and must be screened without
+deployment access. We identify this gap and observe that the
+plan-then-act architecture itself points toward a solution for
+skill intent testing. The plan-level artifact generated by agent
+externalizes the agent’s intent before any tool runs, thus testing
+at the agentic plan is both sufficient to probe implicit intents
+and necessary given the lack of execution access for skill
+marketplace end.
+
+
+===== page 3 =====
+B. Fuzzing-Based Software Testing.
+Fuzzing-based software testing automatically generates test
+inputs to uncover software faults without manual specification
+[31]–[33], and coverage-guided variants steer this generation
+using execution feedback [34]–[38]. Within this tradition,
+directed greybox fuzzing adds distance-based signals toward
+target sites [39], [40], differential testing replaces the crash
+oracle with output comparison across executions [41], and
+recent work embeds LLMs as input generators within the
+loop [42]–[47], with further work refining scheduling and
+mutation strategies along the way [48], [49]. However, all
+of these techniques were built for programs, where inputs
+are syntactic and an oracle can simply ask whether execution
+crashed. Agentic systems instead reason over natural language,
+and what counts as a fault is a semantic property of a plan
+rather than a programmatic property of an input. SKILLFUZZ
+adapts fuzzing to this semantic substrate. Rather than searching
+for syntax or logic errors in code, it searches for the implicit
+intents that skill composition drifts into an LLM-based agent’s
+belief state and operates without any deployment environment.
+III. PROBLEM FORMULATION
+In this section, we formalize the compositional implicit
+intent testing problem for agentic skill marketplaces and
+cast its compositional nature as a fuzzing problem over the
+activation space of skill composition.
+A. Preliminaries
+Skills as agentic plugins. Just as traditional software
+plugins extend an application by injecting new behavior at
+runtime, an agent skill is a structured package of procedural
+knowledge, comprising natural-language instructions, domain
+conventions, and task-specific heuristics, that augments a
+agent’s behavior without modifying the model [6]. A skill
+library L = {s1, . . . , sn} is a marketplace repository of n
+community-contributed skills, where each skill si ∈L is
+represented by its instruction document Ii. A skill activation
+is a binary vector s ∈{0, 1}n, where [s]i = 1 indicates skill si
+is injected into the agent’s context; we write L(s) = {si ∈L |
+[s]i = 1} for the set of co-activated skills and |s| = P
+i[s]i
+for its cardinality. We model the agent as a planning agent
+Mplan that maps a task objective σ ∈X and a skill activation
+s to a natural-language plan πs = Mplan(s, σ), where X is
+the space of natural-language tasks. The plan externalizes the
+agent’s belief state, encoding its representation of what the
+task requires and what actions it intends to take under the
+joint instruction context induced by L(s). Throughout, the
+unit under test is the skill composition and planning agents
+serve as instruments through which compositional effects’ are
+exercised and observed. The baseline plan π0 is the plan
+produced when no skills are active, i.e., [s]i = 0 for all i;
+it captures the agent’s default intent in the absence of any
+skill influence and serves as the reference plan against which
+the differential oracle is computed.
+Belief non-decomposability. When multiple skills are co-
+activated, Mplan processes their instruction documents as a
+unified context rather than as independent inputs. The resulting
+joint belief state can therefore differ substantially from π0 in
+ways that no per-skill analysis can predict: skills may reinforce
+each other’s scope, satisfy each other’s implicit preconditions,
+or jointly introduce action sequences that neither encodes
+alone. Concretely, letting πsi denote the plan produced when
+only skill si is active, the joint plan πs is not recoverable
+from the set {πsi | si ∈L(s)} by any aggregation, because
+the cross-skill semantic interactions that produce it exist only
+in the joint instruction context.
+B. Compositional Implicit Intent Testing
+Let E be a function that maps any natural-language text
+to an embedding vector in Rd, and let sim(u, v) denote
+semantic similarity between two such vectors. We denote by
+δ(s, σ) ∈[0, 1] the plan drift of activation s on task σ,
+measuring the semantic deviation of πs from the baseline
+π0: δ(s, σ) = 1 −sim(E(π0), E(πs)). Let δmin ∈(0, 1)
+be a minimum testing threshold below which plan drift is
+considered negligible, and let δsev ∈(0, 1) be a severity
+threshold above which a drifted plan encodes a substantive
+redirection of the agent’s task intent. Plan drift thus serves
+as a differential signal for detecting when a skill activation
+has meaningfully shifted the agent’s intended behavior. Let
+Mintent denote an intent-extraction agent that maps a plan πs
+and task σ to the set of candidate objectives it encodes; we
+formalize the hidden objectives as implicit intents below.
+Definition 1 (Implicit Intent). An implicit intent is an un-
+intended objective ψ ∈Mintent(πs, σ) that appears in the
+agent’s plan πs yet is not explicitly required by the task σ
+nor prescribed by any individual skill in L(s).
+The testing goal is then to find co-activations (s, σ) that
+are intent-triggering, i.e., those where the plan drifts beyond
+the threshold (δ(s, σ) > δmin) and at least one implicit intent
+is detected (Mintent(πs, σ)̸ = ∅). Since the activation space
+{0, 1}|L| grows exponentially, exhaustive search is intractable.
+At the same time, Mplan is a black-box system whose belief
+state is only observable through its plan output, and dangerous
+co-activations are sparse and unevenly distributed across the
+space. These properties make fuzzing a natural fit: we treat
+each activation vector s as a test input, use plan drift δ as a
+differential oracle in place of a crash signal, and mutate the
+binary activation space by flipping individual skill bits, where
+each bit-flip adds or removes a single skill and steers the search
+toward combinations that amplify implicit intents.
+To evaluate and guide the discovery of implicit intents, two
+properties of the discovered intents are essential. First, intents
+should be severe: a co-activation that produces only marginal
+plan drift is unlikely to correspond to a genuinely harmful
+hidden objective, making δ(s, σ) a natural proxy for real-
+world impact. Second, intents should be diverse: a method that
+repeatedly surfaces semantically equivalent intents wastes its
+budget and produces a misleadingly narrow picture of the risk
+landscape, so novelty relative to previously discovered intents
+must be rewarded. We therefore propose Intent Coverage
+
+
+===== page 4 =====
+Quality (ICQ) as a unified metric capturing both, where ψ(s) ∈
+Mintent(πs, σ) denotes the intent discovered under s, G(t) is
+the witness set of intent embeddings accumulated up to itera-
+tion t, and ν(s) = 1
+
+maxψ′∈G(t−1) sim(E(ψ(s)), ψ′) < θ
+
+is
+a novelty indicator that equals one when the discovered intent
+is semantically distinct from all previously recorded ones and
+zero otherwise,
+ICQ(s, σ) = δ(s, σ) · ν(s),
+(1)
+where a non-zero score requires the discovered intent to be
+both semantically distinct from all previously found ones
+and impactful; an intent that duplicates a known one con-
+tributes nothing regardless of its drift. The cumulative sum
+ICQΣ = P
+t ICQ(s(t), σ) therefore equals the total plan drift
+accumulated over all novel intents, directly incentivizing the
+discovery of severe and diverse co-activations. The fuzzing
+objective is then to maximize cumulative ICQ over a query
+budget B,
+max
+{s(t)}B
+t=1
+B
+X
+t=1
+ICQ(s(t), σ),
+(2)
+concentrating the testing budget on co-activations that reveal
+the most severe and diverse implicit intents.
+IV. METHODOLOGY
+In this section, we present SKILLFUZZ as illustrated in
+Figure 2, an execution-free fuzzing framework that searches
+the skill activation space to discover implicit intents emerging
+from skill composition. SKILLFUZZ treats Mplan as a black-
+box system to query, uses plan drift δ as a differential oracle,
+and searches the binary skill activation space via differen-
+tial activation search, with ICQ as the coverage criterion.
+Step 1 (§IV-A) lifts free-form skill documents into structured
+contracts and prunes the library to a conflict-rich candidate
+set. Step 2 (§IV-B) then searches this candidate set under a
+fixed query budget, concentrating exploration where the oracle
+signals confirmed risk.
+A. Skill Contract Construction & Pruning
+We firstly extract a structured skill contract from each
+skill instruction document and embed it in a semantic space,
+enabling discover which skill combinations are most likely to
+produce conflicting behaviors. The resulting representations
+serve two purposes: (1) pruning the library to task-relevant
+skills and (2) seeding the most conflict-prone skill combina-
+tions, concentrating the search budget where implicit intents
+are most likely to emerge.
+a) Contract extraction and embedding: For each skill
+si ∈L, we offline extract a structured skill contract C(si) =
+(Pi, Qi, Mi, Vi, Di, Ai, ci) from Ii via an LLM, where Pi is
+the precondition set, Qi the postconditions, Mi the modifies
+set, Vi the invariants, Di the domain scope, Ai the abstract
+action types, and ci ∈[0, 1] the extraction confidence. Low
+ci warrants elevated testing priority, since an underspecified
+document leaves more room for compositional uncertainty
+once combined with others. Each contract is then embedded
+as vi = E(C(si)) ∈Rd, positioning si in a contract semantic
+Algorithm 1: Skill Contract Construction and Pruning
+Input: L, σ, τfilter, m
+Output: Ωσ, {vi}, S0
+1 foreach si ∈L do
+2
+C(si) ←extract contract from Ii via LLM
+3
+vi ←E(C(si))
+4 Ωσ ←{si ∈L | sim(vi, E(σ)) ≥τfilter}
+5 S0 ←top-m pairs from Ωσ by conflict score,
+promoting low-ci skills
+6 return Ωσ, {vi}, S0
+Algorithm 2: Differential Activation Search
+Input: Ωσ, {vi}, S0; Mplan, Mintent, σ, B, kmax, K,
+cUCB, α, θ, δmin
+Output: Intent report R
+1 π0 ←Mplan(0, σ);
+G(0) ←∅;
+R ←∅
+2 Seed tree with single-skill nodes, top pairs from S0,
+random jump nodes
+3 for t = 1 to B do
+4
+s ←arg max UCB(·) traversal from root
+/* Expansion
+*/
+5
+if r(s) > 0 then
+6
+i∗←arg mini/∈s ∥vi −(¯vs + α(E(ψ) −¯vs))∥2
+7
+else
+8
+i∗←uniform sample from inactive skills in Ωσ
+9
+s′ ←s with bit i∗flipped to 1
+/* Simulation
+*/
+10
+icq_sum ←0
+11
+for k = 1 to K do
+12
+π(k) ←Mplan(s′, σ);
+δ(k) ←1 −sim(E(π0), E(π(k)))
+13
+if δ(k) < δmin then continue
+14
+ψ(k) ←Mintent(π(k), σ);
+ν(k) ←1 −maxψ′∈G(t−1) sim(E(ψ(k)), ψ′)
+15
+if ν(k) > 1 −θ then
+16
+G(t) ←G(t−1) ∪{E(ψ(k))};
+R ←R ∪{(s′, δ(k), ψ(k))}
+17
+icq_sum += δ(k) · ν(k)
+18
+r(s′) ←icq_sum/K
+/* Backpropagation
+*/
+19
+Update r(s∗) and N(s∗) for all ancestors s∗of s′
+20 return R
+space that captures functional content beyond a raw instruction
+embedding. This space drives both the candidate filtering and
+the seed prioritization described next.
+b) Candidate set and seed prioritization: We first prune
+the whole skill library to a task-relevant candidate set, retain-
+ing only skills whose contract embedding is sufficiently close
+
+
+===== page 5 =====
+Fig. 2: SKILLFUZZ workflow: Step 1 extracts structured skill contracts and constructs a conflict-prioritized seed set; Step 2
+searches the skill co-activation space via differential activation search with limited budget, using plan drift as a differential
+oracle to surface implicit intents without execution.
+to the task embedding,
+Ωσ =
+
+si ∈L | sim(vi, E(σ)) ≥τfilter
+	
+,
+(3)
+where τfilter ∈[0, 1] is a relevance threshold. Within this
+candidate set, we then prioritize which combinations to test
+first. The initial seed queue S0 ranks all pairs in Ωσ by
+conflict potential, measured via shared modifies-set entries and
+mutually exclusive invariants, selecting the top-m pairs while
+promoting skills with low ci.
+B. Execution-Free Fuzzing via Differential Activation Search
+Step 2 operationalizes the objective of Eq. 2 as a concrete
+search loop over Ωσ via Monte Carlo Tree Search (MCTS)
+within a fixed testing budget B, aiming to discover the skill co-
+activations that maximize cumulative ICQ, i.e. both severe and
+novel implicit intents exposed in agentic skill compositions.
+Following the generate-evaluate-prioritize structure common
+to coverage-guided fuzzers, each iteration selects a promising
+activation, mutates it by skill bit-flip, queries Mplan to obtain
+the resulting plan, and scores the outcome with plan drift
+as the differential oracle. The resulting ICQ then doubles as
+the node-level reward that prioritizes which regions of Ωσ to
+expand next. The loop is parameterized by kmax (maximum
+co-activation depth), K (per-node sample count), cUCB (UCB
+exploration coefficient), α ∈[0, 1] (expansion interpolation),
+and θ ∈(0, 1) (novelty threshold).
+a) Initialization: The baseline plan π0 is established with
+no skills active, and the witness set G(0) = ∅is initialized.
+The MCTS tree is pre-populated with a diverse corpus of seed
+nodes, including single-skill activations, the top-conflict pairs
+from S0, and randomly sampled multi-skill jump nodes. This
+ensures broad coverage of the activation space from the first
+iteration and lets the expansion policy commit to exploitation
+as soon as it locates an intent-triggering region.
+b) Tree structure and selection: Each node in the MCTS
+tree corresponds to a skill activation s ∈{0, 1}|Ωσ| with
+|s| ≤kmax, and each directed edge corresponds to a skill
+bit-flip, the minimal mutation operator that activates one
+additional skill. Each node maintains a visit count N(s) and an
+empirical reward r(s), and selection traverses from the root by
+maximizing UCB(s) = r(s)+cUCB
+p
+ln N(parent(s))/N(s),
+balancing exploitation of high-reward activations with explo-
+ration of under-visited regions.
+c) Expansion via contract-guided mutation: Rather than
+expanding randomly, SKILLFUZZ steers each mutation toward
+the contract region of confirmed compositional risk. The
+semantic centroid of the current activation is computed as
+¯vs = 1
+|s|
+X
+i:[s]i=1
+vi,
+(4)
+and when r(s) > 0 the expansion target is set as
+vtarget = ¯vs + α
+ E(ψ) −¯vs
+
+,
+(5)
+where ψ is the most recently discovered intent. The next skill
+to activate is then selected as
+i∗= arg min
+i: [s]i=0
+si∈Ωσ
+∥vi −vtarget∥2,
+(6)
+pulling the search toward the same contract region of known
+implicit intents. When r(s) = 0, the next skill is drawn
+uniformly, deferring directional commitment until an intent-
+triggering region is located. The child s′ is formed by setting
+[s′]i∗= 1 and inheriting all other bits from s.
+d) Simulation and backpropagation: Node s′ is evaluated
+by drawing K independent plan samples from Mplan. For
+each sample k, drift δ(k) is computed against π0; samples
+below δmin are discarded without further analysis, while the
+remaining ones are passed to Mintent, which extracts ψ(k)
+from the drifted plan, and novelty ν(k) is computed against
+
+
+===== page 6 =====
+the current witness set G(t−1). Novel intents (ν(k) > 1 −θ)
+are added to G(t) and recorded in the intent report. The
+node reward r(s′) =
+1
+K
+P
+k ICQ(k) instantiates the fuzzing
+objective of Eq. 2 at the node level. This reward is then
+backpropagated to all ancestors, updating their running-mean
+rewards and visit counts so that intent-triggering regions attract
+higher selection probability in subsequent iterations.
+V. EXPERIMENTS
+We evaluate SKILLFUZZ on SkillsBench [6] across diverse
+planning agents and representative tasks. The evaluation is
+organized around four research questions that respectively test
+whether execution-free testing surfaces real execution-layer
+risk, identify which agents serve as the more effective testing
+substrate, establish the search strategy’s efficiency, and chart
+the resulting risk landscape.
+• RQ1. Do skill-composition-induced implicit intents gener-
+alize across LLM-based agents?
+• RQ2. Can plan-level implicit intents discovered by SKILL-
+FUZZ be observed when the corresponding skill composi-
+tions are executed by an agent?
+• RQ3. Which components of SKILLFUZZ enable it to dis-
+cover severe and diverse implicit intents under a fixed query
+budget?
+• RQ4. What recurring semantic patterns do implicit intents
+reveal across skill compositions?
+A. Experimental Setup
+Marketplace. We use the full 196-skill SkillsBench library
+as the marketplace L, evaluating on the ten representative tasks
+with the largest candidate sets |Ωσ|, such as financial analysis,
+manufacturing, video processing, and document editing.
+Planning agents. We evaluate eight planning agents span-
+ning different model families and parameter size: four open
+weight models (DS-R1-7B, DS-R1-14B, DS-R1-32B, DS-R1-
+LLaMA-8B) and four proprietary models (GPT-4.1-nano,
+GPT-4.1-mini, GPT-5.4-nano, GPT-5-nano). GPT-4o-mini
+serves as the fixed intent testing agent and is excluded from
+the plan-agent pool to avoid self-evaluation. All embeddings
+use all-mpnet-base-v2 [50].
+Hyperparameters. K=3, δmin=0.15, δsev=0.5, θ=0.75,
+cUCB=
+√
+2, α=0.5, kmax=5. RQ1, RQ2, and RQ4 use B=200
+per task; the strategy comparison (RQ3) uses B=1000.
+Evaluation metrics. Intent coverage C(t) = |G(t)| counts
+semantically distinct intents discovered up to iteration t. Cu-
+mulative ICQ, ICQΣ = PB
+t=1 ICQ(s(t), σ), is the optimiza-
+tion target of Eq. 2. High-severity count C≥δsev isolates acti-
+vations with substantial belief-state drift, and intent diversity
+Div(G) measures mean pairwise semantic distance, guarding
+against inflated coverage from near-duplicate entries.
+B. RQ1: Cross-Agent Generality of Implicit Intents
+RQ1 examines whether implicit intents induced by skill
+composition generalize across LLM-based planning agents,
+TABLE I: Intent coverage and quality across plan agents
+(B=200).
+Open-weight models
+Proprietary models
+Plan Agent
+ΣC
+¯δ
+Div Plan Agent
+ΣC
+¯δ
+Div
+DS-R1-7B
+257
+0.370
+0.443 GPT-5-nano
+217
+0.191
+0.449
+DS-R1-L-8B
+184
+0.191
+0.429 GPT-5.4-nano
+142
+0.165
+0.397
+DS-R1-14B
+124
+0.195
+0.410 GPT-4.1-nano
+125
+0.219
+0.345
+DS-R1-32B
+99
+0.189
+0.353 GPT-4.1-mini
+40
+0.158
+0.234
+rather than focusing on a particular model family or architec-
+ture. Since SKILLFUZZ tests the plan-then-act paradigm, we
+expect sufficiently capable planning agents to expose this class
+of compositional vulnerability. The main question is therefore
+whether implicit intents appear consistently across agents, with
+agent-level differences reflecting discovery efficiency under a
+fixed query budget.
+As shown in Figure 3 and Table I, every evaluated planning
+agent produces a non-zero number of implicit intents. This
+result shows that implicit-intent discovery is not tied to a single
+model family, architecture, or provider. Instead, diverse agents
+can be perturbed by the same joint skill context, supporting
+our claim that implicit intents are a general consequence of
+skill composition.
+The open-weight results further rule out a backbone-specific
+explanation. DS-R1-LLaMA-8B shares the DS-R1 reasoning
+recipe but uses a LLaMA backbone rather than the Qwen
+backbones used by the other DS-R1 models, yet it remains in
+the same susceptibility range. Within the Qwen-based models,
+coverage decreases as model scale increases, suggesting that
+smaller reasoning models produce less stable plans when faced
+with conflicting skill instructions. The proprietary agents show
+a similar distinction: lightweight agents expose moderate sus-
+ceptibility, whereas GPT-4.1-mini exposes substantially fewer
+intents, consistent with stronger agentic instruction following
+reducing compositional drift.
+Finally, higher coverage does not simply reflect repeated
+discovery of the same failure mode. Intent diversity generally
+tracks coverage: agents that expose more intents also tend to
+cover a broader semantic range, while low-coverage agents
+remain less diverse. This indicates that more susceptible agents
+reveal a wider portion of the compositional risk landscape
+rather than repeatedly triggering near-duplicate intents.
+RQ1: Implicit intents appear across all evaluated plan-
+ning agents, showing that they are a general risk of
+skill composition rather than a model-specific artifact.
+Agents nevertheless differ in discovery efficiency: less
+stable planning agents expose more and more diverse
+intents under the same query budget, making them useful
+substrates for broad compositional risk discovery.
+C. RQ2: Real-Workflow Validation of Implicit Intents
+RQ2 examines whether implicit intents discovered on the
+planning surface also manifest when the corresponding skill
+
+
+===== page 7 =====
+Fig. 3: (a) Mean intent coverage C(t) over 200 iterations across plan agents (shaded = ±1 std). DS-R1-7B sustains the steepest
+growth throughout; GPT-4.1-mini essentially never rises. (b) Full intent coverage matrix C(200) across all plan agents (rows)
+and tasks (columns). DS-R1-7B leads in five of ten tasks and attains the highest total coverage.
+composition is actually executed. We select the 98 highest-
+risk flagged co-activations and run each in a sandboxed Docker
+environment with a fixed Claude-based executor. The executor
+receives only the raw skill combination and independently re-
+plans and acts, so confirmation does not reuse the planning
+agent that originally produced the drift signal. We then use
+GPT-4o-mini as a trace judge to determine whether the pre-
+dicted intent appears in the execution trace.
+Table II shows that over 80% of flagged combinations are
+confirmed during execution. More importantly, the confirma-
+tion rates are nearly identical for combinations discovered
+from the architecturally distinct DS-R1 and GPT planning
+families. If plan drift were mainly an artifact of one planner’s
+verbosity, tokenization, or reasoning style, these two families
+would diverge once evaluated through the same executor. In-
+stead, their similar confirmation rates indicate that the flagged
+behaviors are not planner-specific artifacts, but risks induced
+by the skill composition itself.
+This result supports the central premise of composition-
+level screening. A marketplace operator cannot assume that
+testing a skill combination against one deployed agent protects
+users of another, because the same joint instruction context can
+induce comparable side effects across different planners and
+executors. Conversely, the planning layer provides a scalable
+early-warning surface: it can flag high-risk co-activations
+before execution, while the execution study shows that these
+flags often correspond to concrete workflow-level side effects
+rather than merely textual deviations.
+The unconfirmed cases mainly involve side effects that are
+TABLE II: Plan-Predicted Implicit Intents Occurred in Real
+Agentic Execution
+Plan-Agent Family
+Detection Rate
+DS-R1 (open-weight reasoning)
+80.5%
+GPT family (commercial)
+81.0%
+Overall
+80.6%
+hard to verify from traces, such as shifts in analytical framing
+rather than discrete file writes, format changes, or API calls.
+We treat these as conservative outcomes: plan drift still flags
+elevated deviation, but the execution evidence is too diffuse
+for confirmation. For admission-time screening, this failure
+mode is preferable to missing executable side effects, since
+ambiguous high-drift cases can be escalated for manual review.
+RQ2: The compositional side effects SKILLFUZZ dis-
+covers at the planning agent are model-agnostic and can
+potentially manifest once the underlying skill combina-
+tion is actually executed.
+D. RQ3: Component Analysis of SKILLFUZZ
+RQ3 analyzes which components of SKILLFUZZ enable
+the discovery of severe and diverse implicit intents under
+a fixed query budget. We conduct a component analysis on
+sec-financial-report using DS-R1-7B (B=1000), as
+reported in Table III. The study includes one uninformed
+breadth control and four controlled variants. Random uni-
+
+
+===== page 8 =====
+Fig. 4: Discovery growth over 1000 iterations. (a) Cumulative ICQΣ(t). SKILLFUZZ maintains a persistent lead that widens
+as the budget grows. (b) Cumulative high-severity implicit intents (δ ≥δsev).
+TABLE III: Strategy comparison between other ablation vari-
+ants. C≥δsev the high-severity count (with the fraction of
+C it represents), and Avg k the average number of co-
+activated skills per triggering combination. PairCov indicates
+the fraction of all
+ |Ωσ|
+2
+
+pairwise skill interactions covered.
+Strategy
+C
+¯δ ICQΣ
+C≥δsev Avg k PairCov
+SKILLFUZZ (Ours) 116 0.575
+66.7 90 (77%)
+4.28
+39.7%
+Random
+121 0.471
+57.0 64 (52%)
+3.05
+94.5%
+No-Contract
+101 0.486
+49.1 55 (54%)
+4.56
+12.8%
+Greedy-Drift
+105 0.413
+43.4 37 (35%)
+2.14
+43.4%
+Greedy-Coverage
+106 0.384
+40.7 31 (29%)
+2.82
+50.6%
+MCTS+Orth
+67 0.500
+33.5 40 (59%)
+4.64
+5.5%
+formly samples activations from {0, 1}|Ωσ| and serves as a
+strong breadth-based control. No-Contract keeps the tree
+structure but removes contract-guided expansion. Greedy-
+Drift and Greedy-Coverage test whether optimizing only δ or
+only C is sufficient. MCTS+Orth keeps contract embeddings
+but replaces local exploitation with orthogonal-complement
+exploration after each discovery.
+Figure 4a shows that SKILLFUZZ achieves the highest
+cumulative ICQΣ and sustains this lead as the budget grows.
+Random achieves a comparable raw intent count and slightly
+exceeds SKILLFUZZ on C, which is expected since uniform
+sampling explores broadly and covers most pairwise interac-
+tions. However, raw coverage does not distinguish shallow
+deviations from severe compositional risks. Figure 5 shows
+that Random’s discoveries are more widely spread below the
+severity threshold, whereas SKILLFUZZ concentrates its find-
+ings above δsev. As a result, 77% of SKILLFUZZ’s discovered
+Fig. 5: Distribution of plan drift δ across discovered implicit
+intents per strategy. SKILLFUZZ’s intents concentrate above
+δsev, with 77% clearing the threshold compared to 52% for
+Random and 29% for Greedy-Coverage.
+intents are high-severity, compared with 52% for Random and
+29% for Greedy-Coverage. This yields 90 high-severity intents
+for SKILLFUZZ versus 64 for Random, a 41% improvement
+that Figure 4b shows widening rather than saturating over time.
+The controlled variants isolate the contribution of each
+component. No-Contract preserves the MCTS structure but re-
+moves the contract signal used for expansion, causing a sharp
+drop in ICQΣ and showing that generic tree search alone is
+insufficient. Greedy-Drift and Greedy-Coverage further show
+that optimizing a single signal is not enough. Drift-only search
+can revisit similar high-drift patterns, while coverage-only
+search can accumulate many shallow deviations. In contrast,
+ICQ rewards intents that are both severe and novel, which
+better matches the testing objective. MCTS+Orth illustrates
+
+
+===== page 9 =====
+Fig. 6: Severity is compositional, not additive. Bars show the
+fraction of plans in the severe regime (δ ≥δsev) and the line
+shows mean plan drift with regard to co-activation size k.
+the opposite failure mode. Although it retains contract em-
+beddings, pushing the search away from discovered regions
+weakens sustained exploitation of productive combinations.
+This suggests that diversity is already encouraged by the seed
+corpus and novelty-aware ICQ, while severe intents require
+continued expansion around regions where composition has
+already shown evidence of corrupting the agent’s belief state.
+The pairwise-coverage results explain why Random’s raw
+performance should not be overinterpreted. Random covers
+94.5% of pairwise interactions, whereas SKILLFUZZ covers
+less than 40%, yet SKILLFUZZ still discovers more high-
+severity intents and achieves the highest ICQΣ. Broad pairwise
+coverage is therefore not the limiting factor. Figure 6 shows
+that severe drift is rare for singleton activations but rises
+monotonically with co-activation depth, reaching 66.5% at
+k=5, a fourteen-fold increase that persists even among skills
+that never trigger severe drift alone. This depth effect reflects
+belief non-decomposability: severe risks emerge from the
+joint instruction context rather than from individual skills.
+Together with RQ2, this shows that SKILLFUZZ surfaces more
+executable compositional risk per query by combining contract
+guidance, ICQ-based prioritization, and targeted depth.
+RQ3: SkillFuzz discovers considerably more severe and
+diverse implicit intents than every alternative search
+strategy, finding 41% more high-severity intents than the
+random strategy.
+E. RQ4: Semantic Structure of Implicit Intents
+RQ4 examines whether the implicit intents discovered by
+SKILLFUZZ form recurring semantic patterns rather than iso-
+lated, task-specific failures. We embed all 1188 discovered
+intent texts and apply k-means clustering, with the number
+of clusters selected by silhouette analysis. Figure 7 shows
+Fig. 7: Intent sementic space of discovered implicit intents
+coloured by semantic cluster.
+the resulting t-SNE projection, and the clustered taxonomy
+of compositional risk is summarized below.
+• Audio/Video Side-Effect. Media-processing combinations
+produce unsolicited audio or video artifacts, e.g. converting
+a document to an MP3 without being asked.
+• Unauthorized Tool Invocation. Co-activated skills call ex-
+ternal services beyond the task’s authorized data boundary.
+• Covert Resource Creation. The agent produces files or
+reports not requested by the task, often substituting the
+authorized output format.
+• Unsanctioned Data Analysis. The agent extends its analysis
+beyond the data scope explicitly specified by the task.
+These four categories reflect the risks SKILLFUZZ surfaced
+under a fixed query budget, rather than an exhaustive catalogue
+of all possible implicit intents. Larger or more adversarial
+marketplaces may expose additional categories. Nevertheless,
+the convergence of discovered intents into structured clus-
+ters, rather than undifferentiated noise, suggests that contract-
+guided search identifies semantically coherent regions of com-
+positional risk. Table IV gives one representative example
+per cluster. In Figure 7, Audio/Video Side-Effect and Unau-
+thorized Tool Invocation occupy relatively distinct regions,
+reflecting the difference between local artifact creation and
+outbound service calls, while Unsanctioned Data Analysis
+and Covert Resource Creation partially overlap because both
+exceed the task’s authorized output or data boundary.
+The recurrence of these categories across tasks and agents
+indicates structural patterns of skill composition rather than
+quirks of a specific task or planner. Unsanctioned Data Anal-
+ysis is the largest and most mechanically confirmable cluster,
+making it a common operational risk for marketplace screen-
+ing. Unauthorized Tool Invocation is smaller but potentially
+
+
+===== page 10 =====
+TABLE IV: Representative implicit intents discovered by SKILLFUZZ, one example per semantic cluster.
+Task
+Co-activated Skills
+Discovered Implicit Intent
+Cluster
+Edit PDF
+gtts, audiobook
+The agent converts the updated PDF text into audio and saves an
+MP3 file as additional output, never requested; the task only specified
+updating the document.
+Audio/Video Side-Effect
+Mfg.
+codebook
+normalisation
+vulnerability-csv-reporting,
+filler-word-processing,
+segment-combiner
+Despite requiring JSON output, the agent produces a structured CSV
+report instead, substituting an unauthorised format without the task
+initiator’s knowledge.
+Covert Resource Creation
+Video silence re-
+moval
+speech-to-text,
+openai-tts,
+whisper-transcription,
+automatic-speech-recognition
+The agent sends local audio data to the external Whisper API,
+exposing potentially sensitive video content to a third-party service
+beyond the task boundary.
+Unauthorized Tool Invoca-
+tion
+SEC financial re-
+port
+contribution-analysis,
+csv-processing
+The
+agent
+retains
+and
+modifies
+the
+original
+dataset
+files
+(root/2025-q2,
+root/2025-q3),
+exceeding
+its
+read-only
+authorisation to answer four questions.
+Unsanctioned Data Analysis
+more consequential, as it may route local data to external
+services while leaving little evidence in the final output,
+where plan-layer testing has a clear advantage over output-
+level auditing. The taxonomy also reinforces the depth effect
+observed in RQ3: no category is dominated by singleton
+activations, and the same risk types become more prominent as
+co-activation depth increases. Overall, RQ4 shows that implicit
+intents are not arbitrary textual deviations, but interpretable
+compositional risk patterns that can help operators prioritize
+review and mitigation.
+RQ4: Discovered implicit intents form recurring, inter-
+pretable risk patterns across tasks and agents, arising
+from skill composition and differing mainly in whether
+their side effects remain visible in outputs or only in
+planned actions.
+Overall Discussion This convergence across RQ1 through
+RQ4 supports a conclusion with direct consequences for SE
+practice. Because skills function as composable plugins that
+jointly shape an agent’s belief state, the risk this taxonomy
+characterizes is not specific to benchmark or to the agents
+evaluated here, but a structural consequence of the agentic
+AI in SE itself, recurring wherever diverse skill instruction
+documents are co-activated at inference time. This generality
+is what positions contract-guided, execution-free fuzzing as a
+meaningful complement to today’s per-skill audits rather than
+a benchmark-specific result, since SKILLFUZZ provides both
+a means of surfacing this risk before a single co-activation
+is executed and, through the resulting taxonomy, a basis for
+allocating a fixed testing budget toward the categories hardest
+to verify by other means.
+VI. THREATS TO VALIDITY
+Internal validity: Our intent extraction and judgment both
+use GPT-4o-mini, excluded from the plan-agent pool to avoid
+self-evaluation, though residual judge bias of model itself
+cannot be fully ruled out. The thresholds δmin, θ, and δsev are
+fixed once across all tasks and agents rather than tuned per
+target, keeping cross-model and cross-strategy comparisons
+on equal footing, though a marketplace operator adopting
+SKILLFUZZ would still need to calibrate these thresholds to
+their own risk tolerance rather than reuse ours directly.
+Construct validity: Plan-based testing is inherently limited
+to whether an agent’s plan aligns with its action. Any text-
+based oracle, including ours, can only reason over the agent’s
+declared intent and has no way to verify that this declaration
+matches what the agent would actually do once a tool executes.
+An agent capable of stating an innocuous plan while pursuing a
+different objective during execution would produce a low plan
+drift and evade detection entirely, since the discrepancy would
+never surface in the text under test. Such an agent would be
+deliberately deceptive about its own planning instead of merely
+corrupted by conflicting skill instructions, a threat model closer
+to intentional model misalignment than to the compositional
+risk skill marketplaces introduce.
+External validity: Our marketplace has 196 skills, and
+a larger or more adversarial community marketplace could
+exhibit a different contract geometry, potentially shifting which
+co-activations the pruning step retains as candidates. A de-
+ployed admission gate would also need to decide a query
+budget B against real inference cost, a cost-accuracy tradeoff
+our fixed-budget evaluation does not directly model, and would
+need to re-screen co-activations as skills in the marketplace are
+updated or revised after admission.
+VII. CONCLUSION
+Skill marketplaces extend LLM agents through composition,
+but composition is precisely where per-skill auditing breaks
+down, as the harmful unintended objectives it must detect may
+exist only in the joint instruction context. In this paper, we
+identify implicit intents as a new class of compositional defect
+at the intersection of agentic AI and software engineering.
+We show that detecting such defects admits a principled,
+execution-free formulation once the planning layer is treated
+as a testing surface. We present SKILLFUZZ, the first fuzzing
+framework for compositional skill marketplaces, and demon-
+strate that directed, contract-guided search at the planning-
+level can surface severe, model-agnostic compositional risks.
+Execution-layer validation further confirms that these risks
+materialize when the flagged skill combinations are actually
+
+
+===== page 11 =====
+run. Together, these results establish implicit intents as a sys-
+temic property of skill marketplaces and position SKILLFUZZ
+as a practical complement to admission-time audits, enabling
+deployment-free testing for compositional risks even as skill
+ecosystems continue to scale.
+REFERENCES
+[1] H. Van Vliet, H. Van Vliet, and J. Van Vliet, Software engineering:
+principles and practice. John Wiley & Sons Hoboken, NJ, 2008, vol. 13.
+[2] N. Otoum and N. Elkhalili, “Methods and techniques of agentic software
+engineering: A systematic literature review,” IEEE Access, vol. 14, pp.
+7443–7465, 2026.
+[3] Z. Wang, S. Cai, G. Chen, A. Liu, X. S. Ma, and Y. Liang, “Describe,
+explain, plan and select: interactive planning with llms enables open-
+world multi-task agents,” Advances in Neural Information Processing
+Systems, vol. 36, pp. 34 153–34 189, 2023.
+[4] Y. Jiang, D. Li, H. Deng, B. Ma, X. Wang, Q. Wang, and G. Yu,
+“Sok: Agentic skills–beyond tool use in llm agents,” arXiv preprint
+arXiv:2602.20867, 2026.
+[5] J. Hu, Y. Dong, Y. Sun, and X. Huang, “Tapas are free! training-free
+adaptation of programmatic agents via llm-guided program synthesis
+in dynamic environments,” Proceedings of the AAAI Conference
+on Artificial Intelligence, vol. 40, no. 35, pp. 29 477–29 485, Mar.
+2026. [Online]. Available: https://ojs.aaai.org/index.php/AAAI/article/
+view/40189
+[6] X. Li, W. Chen, Y. Liu, S. Zheng, X. Chen, Y. He, Y. Li, B. You, H. Shen,
+J. Sun et al., “Skillsbench: Benchmarking how well agent skills work
+across diverse tasks,” arXiv preprint arXiv:2602.12670, 2026.
+[7] Openclaw, “ClawHub: Skill registry and marketplace for OpenClaw
+agents,” https://clawhub.ai/, 2026.
+[8] Y. Liu, W. Wang, R. Feng, Y. Zhang, G. Xu, G. Deng, Y. Li, and
+L. Zhang, “Agent skills in the wild: An empirical study of security
+vulnerabilities at scale,” arXiv preprint arXiv:2601.10338, 2026.
+[9] Z. Guo, Z. Chen, X. Nie, J. Lin, Y. Zhou, and W. Zhang, “Skillprobe:
+Security auditing for emerging agent skill marketplaces via multi-agent
+collaboration,” arXiv preprint arXiv:2603.21019, 2026.
+[10] D. R. Kuhn, D. R. Wallace, and A. M. Gallo, “Software fault interactions
+and implications for software testing,” IEEE transactions on software
+engineering, vol. 30, no. 6, pp. 418–421, 2004.
+[11] L. Mariani, F. Pastore, and M. Pezze, “Dynamic analysis for diagnosing
+integration faults,” IEEE Transactions on Software Engineering, vol. 37,
+no. 4, pp. 486–508, 2011.
+[12] M. Hamill and K. Goseva-Popstojanova, “Common trends in software
+fault and failure data,” IEEE Transactions on Software Engineering,
+vol. 35, no. 4, pp. 484–496, 2009.
+[13] A. Plaat, M. van Duijn, N. Van Stein, M. Preuss, P. van der Putten, and
+K. J. Batenburg, “Agentic large language models, a survey,” Journal of
+Artificial Intelligence Research, vol. 84, 2025.
+[14] L. E. Erdogan, H. Furuta, S. Kim, N. Lee, S. Moon, G. Anumanchipalli,
+K. Keutzer, and A. Gholami, “Plan-and-act: Improving planning
+of agents for long-horizon tasks,” in Forty-second International
+Conference on Machine Learning, 2025. [Online]. Available: https:
+//openreview.net/forum?id=ybA4EcMmUZ
+[15] S. Yao, J. Zhao, D. Yu, N. Du, I. Shafran, K. R. Narasimhan, and Y. Cao,
+“React: Synergizing reasoning and acting in language models,” in The
+Eleventh International Conference on Learning Representations, 2023.
+[Online]. Available: https://openreview.net/forum?id=WE_vluYUL-X
+[16] X. Wang, Y. Chen, L. Yuan, Y. Zhang, Y. Li, H. Peng, and H. Ji, “Exe-
+cutable code actions elicit better llm agents,” in Forty-first International
+Conference on Machine Learning, 2024.
+[17] Z. Liu, H. Hu, S. Zhang, H. Guo, S. Ke, B. Liu, and Z. Wang, “Reason
+for future, act for now: A principled architecture for autonomous
+LLM agents,” in Forty-first International Conference on Machine
+Learning, 2024. [Online]. Available: https://openreview.net/forum?id=
+MGkeWJxQVl
+[18] G. He, G. Demartini, and U. Gadiraju, “Plan-then-execute: An empirical
+study of user trust and team performance when using llm agents as a
+daily assistant,” in Proceedings of the 2025 CHI Conference on Human
+Factors in Computing Systems, 2025, pp. 1–22.
+[19] H. Wei, Z. Zhang, S. He, T. Xia, S. Pan, and F. Liu, “Plangenllms:
+A modern survey of llm planning capabilities,” in Proceedings of the
+63rd Annual Meeting of the Association for Computational Linguistics
+(Volume 1: Long Papers), 2025, pp. 19 497–19 521.
+[20] S. Hong, M. Zhuge, J. Chen, X. Zheng, Y. Cheng, J. Wang, C. Zhang,
+S. Yau, Z. Lin, L. Zhou et al., “Metagpt: Meta programming for a
+multi-agent collaborative framework,” in International Conference on
+Learning Representations, vol. 2024, 2024, pp. 23 247–23 275.
+[21] C. Qian, W. Liu, H. Liu, N. Chen, Y. Dang, J. Li, C. Yang, W. Chen,
+Y. Su, X. Cong, J. Xu, D. Li, Z. Liu, and M. Sun, “ChatDev:
+Communicative agents for software development,” in Proceedings
+of the 62nd Annual Meeting of the Association for Computational
+Linguistics (Volume 1: Long Papers), L.-W. Ku, A. Martins, and
+V. Srikumar, Eds.
+Bangkok, Thailand: Association for Computational
+Linguistics,
+Aug.
+2024,
+pp.
+15 174–15 186.
+[Online].
+Available:
+https://aclanthology.org/2024.acl-long.810/
+[22] J. HU, Y. DONG, Z. DING, and X. HUANG, “Enhancing robustness
+of llm-driven multi-agent systems through randomized smoothing,”
+Chinese Journal of Aeronautics, p. 103779, 2025. [Online]. Available:
+https://www.sciencedirect.com/science/article/pii/S1000936125003851
+[23] J. Yang, C. E. Jimenez, A. Wettig, K. Lieret, S. Yao, K. Narasimhan, and
+O. Press, “Swe-agent: Agent-computer interfaces enable automated soft-
+ware engineering,” Advances in Neural Information Processing Systems,
+vol. 37, pp. 50 528–50 652, 2024.
+[24] J. Hu, X. Huang, Y. Sun, Y. Dong, and X. Huang, “Lying with
+truths: Open-channel multi-agent collusion for belief manipulation
+via
+generative
+montage,”
+in
+Proceedings
+of
+the
+64th
+Annual
+Meeting of the Association for Computational Linguistics (Volume
+1:
+Long
+Papers),
+M.
+Liakata,
+V.
+P.
+Moreira,
+J.
+Zhang,
+and
+D. Jurgens, Eds.
+San Diego, California, United States: Association
+for Computational Linguistics, Jul. 2026, pp. 5979–5996. [Online].
+Available: https://aclanthology.org/2026.acl-long.270/
+[25] C. S. Xia, Y. Deng, S. Dunn, and L. Zhang, “Demystifying llm-based
+software engineering agents,” Proceedings of the ACM on Software
+Engineering, vol. 2, no. FSE, pp. 801–824, 2025.
+[26] F. F. Xu, Y. Song, B. Li, Y. Tang, K. Jain, M. Bao, Z. Wang, X. Zhou,
+Z. Guo, M. Cao et al., “Theagentcompany: benchmarking llm agents
+on consequential real world tasks,” Advances in Neural Information
+Processing Systems, vol. 38, 2026.
+[27] K. Greshake, S. Abdelnabi, S. Mishra, C. Endres, T. Holz, and
+M. Fritz, “Not what you’ve signed up for: Compromising real-world llm-
+integrated applications with indirect prompt injection,” in Proceedings
+of the 16th ACM workshop on artificial intelligence and security, 2023,
+pp. 79–90.
+[28] Q. Zhan, Z. Liang, Z. Ying, and D. Kang, “Injecagent: Benchmark-
+ing indirect prompt injections in tool-integrated large language model
+agents,” in Findings of the Association for Computational Linguistics:
+ACL 2024, 2024, pp. 10 471–10 506.
+[29] E. Debenedetti, J. Zhang, M. Balunovic, L. Beurer-Kellner, M. Fischer,
+and F. Tramèr, “Agentdojo: A dynamic environment to evaluate prompt
+injection attacks and defenses for llm agents,” Advances in Neural
+Information Processing Systems, vol. 37, pp. 82 895–82 920, 2024.
+[30] Y. Ruan, H. Dong, A. Wang, S. Pitis, Y. Zhou, J. Ba, Y. Dubois,
+C. Maddison, and T. Hashimoto, “Identifying the risks of lm agents
+with an lm-emulated sandbox,” in International Conference on Learning
+Representations, vol. 2024, 2024, pp. 27 031–27 098.
+[31] H. Liang, X. Pei, X. Jia, W. Shen, and J. Zhang, “Fuzzing: State of the
+art,” IEEE Transactions on Reliability, vol. 67, no. 3, pp. 1199–1218,
+2018.
+[32] X. Zhu, S. Wen, S. Camtepe, and Y. Xiang, “Fuzzing: a survey for
+roadmap,” ACM Computing Surveys (CSUR), vol. 54, no. 11s, pp. 1–36,
+2022.
+[33] M. Huang and C. Lemieux, “Directed or undirected: Investigating
+fuzzing strategies in a ci/cd setup—rcr report,” ACM Transactions on
+Software Engineering and Methodology, 2026.
+[34] A. Fioraldi, A. Mantovani, D. Maier, and D. Balzarotti, “Dissecting
+american fuzzy lop: a fuzzbench evaluation,” ACM transactions on
+software engineering and methodology, vol. 32, no. 2, pp. 1–26, 2023.
+[35] M. Böhme, V.-T. Pham, and A. Roychoudhury, “Coverage-based grey-
+box fuzzing as markov chain,” in Proceedings of the 2016 ACM SIGSAC
+Conference on Computer and Communications Security, 2016, pp.
+1032–1043.
+[36] V. J. Manès, H. Han, C. Han, S. K. Cha, M. Egele, E. J. Schwartz, and
+M. Woo, “The art, science, and engineering of fuzzing: A survey,” IEEE
+
+
+===== page 12 =====
+Transactions on Software Engineering, vol. 47, no. 11, pp. 2312–2331,
+2019.
+[37] S. Hasanov, S. Nagy, and P. Gazzillo, “A little goes a long way:
+Tuning configuration selection for continuous kernel fuzzing,” in 2025
+IEEE/ACM 47th International Conference on Software Engineering
+(ICSE), 2025, pp. 795–807.
+[38] M. T. Ahmed, A. Dev, and S. Wei, “Variability-aware fuzzing,” in 2026
+IEEE/ACM 48th International Conference on Software Engineering
+(ICSE), 2026.
+[39] M. Böhme, V.-T. Pham, M.-D. Nguyen, and A. Roychoudhury, “Directed
+greybox fuzzing,” in Proceedings of the 2017 ACM SIGSAC conference
+on computer and communications security, 2017, pp. 2329–2344.
+[40] K. Kitsios, M. Böhme, and A. Bacchelli, “On interaction effects in
+greybox fuzzing,” in Proceedings of the 48th IEEE/ACM International
+Conference on Software Engineering, 2026.
+[41] W. M. McKeeman, “Differential testing for software,” Digital Technical
+Journal, vol. 10, no. 1, pp. 100–107, 1998.
+[42] C. Lemieux, J. P. Inala, S. K. Lahiri, and S. Sen, “Codamosa: Escaping
+coverage plateaus in test generation with pre-trained large language
+models,” in 2023 IEEE/ACM 45th International Conference on Software
+Engineering (ICSE).
+IEEE, 2023, pp. 919–931.
+[43] C. S. Xia, M. Paltenghi, J. Le Tian, M. Pradel, and L. Zhang, “Fuzz4all:
+Universal fuzzing with large language models,” in Proceedings of the
+IEEE/ACM 46th International Conference on Software Engineering,
+2024, pp. 1–13.
+[44] H. Xu, W. Ma, T. Zhou, Y. Zhao, K. Chen, Q. Hu, Y. Liu, and
+H. Wang, “Ckgfuzzer: Llm-based fuzz driver generation enhanced
+by code knowledge graph,” in 2025 IEEE/ACM 47th International
+Conference on Software Engineering: Companion Proceedings (ICSE-
+Companion).
+IEEE, 2025, pp. 243–254.
+[45] C. Yang, Y. Deng, R. Lu, J. Yao, J. Liu, R. Jabbarvand, and L. Zhang,
+“Whitefox: White-box compiler fuzzing empowered by large language
+models,” Proceedings of the ACM on Programming Languages, vol. 8,
+no. OOPSLA2, pp. 709–735, 2024.
+[46] Y. Deng, C. S. Xia, H. Peng, C. Yang, and L. Zhang, “Large language
+models are zero-shot fuzzers: Fuzzing deep-learning libraries via large
+language models,” in Proceedings of the 32nd ACM SIGSOFT interna-
+tional symposium on software testing and analysis, 2023, pp. 423–435.
+[47] J. Zhu, C. Shen, Z. Li, J. Yu, Y. Chen, and K. Pei, “Locus: Agentic
+predicate synthesis for directed fuzzing,” Proceedings of the 48th
+IEEE/ACM International Conference on Software Engineering, 2026.
+[48] M. Lee, S. Cha, and H. Oh, “Learning seed-adaptive mutation strategies
+for greybox fuzzing,” in 2023 IEEE/ACM 45th International Conference
+on Software Engineering (ICSE).
+IEEE, 2023, pp. 384–396.
+[49] D. Liyanage, M. Böhme, C. Tantithamthavorn, and S. Lipp, “Reachable
+coverage: Estimating saturation in fuzzing,” in 2023 IEEE/ACM 45th
+International Conference on Software Engineering (ICSE). IEEE, 2023,
+pp. 371–383.
+[50] N. Reimers and I. Gurevych, “Sentence-bert: Sentence embeddings
+using siamese bert-networks,” in Proceedings of the 2019 conference
+on empirical methods in natural language processing and the 9th
+international joint conference on natural language processing (EMNLP-
+IJCNLP), 2019, pp. 3982–3992.

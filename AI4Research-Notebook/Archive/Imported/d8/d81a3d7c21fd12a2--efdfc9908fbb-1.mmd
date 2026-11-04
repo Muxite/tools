@@ -1,0 +1,10 @@
+flowchart TB
+    C[Compiler, work or verifier CC] --> R[Governed runtime invocation]
+    P[Offline RSI proposer] --> R
+    Config[Protected effective role/profile and allowed endpoint] --> R
+    R --> Route[Model routing adapter]
+    Route --> Bridge[Audited native bridge]
+    Bridge --> Endpoint[Configured model endpoint]
+    Bridge --> Observe[Actual call, effective model and unavailable telemetry]
+    Observe --> Product[Product attempt evidence and gate]
+    Observe --> Offline[RSI session evidence; separate referee custody]

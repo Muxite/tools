@@ -1,0 +1,12 @@
+TIME 1:15
+SAY: Main points:
+- MuxFlow has an online class for latency-critical inference and an offline class for best-effort jobs, and shares each GPU between them with NVIDIA MPS
+- Protection has two levels: xCUDA caps offline memory and delays offline kernel launches, and SysMonitor evicts offline jobs if the GPU state threatens online ones
+- For scheduling it profiles each offline job alone for a few iterations, a small neural network predicts shared speed from solo features, and a matching algorithm picks pairs
+- That is the same idea as profiling alone and predicting shared behavior, so it is the closest precedent for the idea explored here
+- Production numbers are for sharing plus protection only, the predictor and matching were evaluated on a testbed and in simulation
+Supplemental points:
+- Testbed: 125 machines, 1,000 T4 GPUs; claims up to 90% of GPU resources oversold to offline work and 4.0x utilization, 4.7x SM activity, 1.5x memory
+- Production: more than 20,000 GPUs, four weeks, online latency up by under 10 ms, daily error devices 0.9% against 0.7% for online-only
+- 99% of propagated MPS errors came from SIGINT and SIGTERM, handled by a graceful exit
+- The paper does not name the company, it says CompanyX

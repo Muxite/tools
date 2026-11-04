@@ -1,0 +1,345 @@
+---
+id: cc-protocol-08-coding-capsule
+status: proposed-runtime-unverified
+source: November 3 workshop and November 4 protocol revisions
+last_reviewed: 2026-11-04
+next_action: Qualify the binding and evidence policy before production use
+---
+# A coding capsule
+
+## Capabilities and ports
+
+| Capability | Inputs | Outputs | External effects |
+|---|---|---|---|
+| `propose` | Immutable source snapshot and task | Patch artifact | Send allowed context to an admitted model |
+| `test` | Snapshot, patch and pinned test suite | Structured test report | None outside the isolated attempt |
+| `apply` | Workspace handle and validated patch | New source snapshot | Mutate only granted workspace paths |
+
+These are three operations in one capsule. They share types and implementation materials. They have separate calls, inputs, outputs and grants. Installing the capsule does not grant workspace write access. A caller can use propose and test without permission to apply.
+
+Publishing a commit, opening a pull request, pushing a branch or deploying would require an additional explicitly declared operation/effect. Generating a patch artifact uses the standard output channel.
+
+## Declaration
+
+The following is a complete structural fixture. Image, rule and artifact locators are synthetic. Actual provider, checker and policy definitions must be resolved before dispatch.
+
+```yaml
+cc: '1'
+id: coding.workspace
+version: 1.0.0
+carrier: fixture.invalid/coding@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+defs:
+  snapshot:
+    artifact: application/vnd.ai4r.source-snapshot+tar
+  patch:
+    artifact: application/vnd.ai4r.patch+json
+  report:
+    type: object
+    required:
+    - tests_passed
+    - executed
+    - failed
+    properties:
+      tests_passed:
+        type: boolean
+      executed:
+        type: integer
+        minimum: 0
+      failed:
+        type: integer
+        minimum: 0
+    additionalProperties: false
+rules:
+  model:
+    kind: need
+    meaning: Admitted model provider for the allowed source-data audience.
+    definition:
+      uri: fixture:coding.model
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  infer:
+    kind: effect
+    meaning: Send the selected source context and task to the admitted model endpoint.
+    definition:
+      uri: fixture:coding.infer
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  workspace:
+    kind: need
+    meaning: Resolve a caller-owned workspace handle to a leased generation.
+    definition:
+      uri: fixture:coding.workspace
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  write:
+    kind: effect
+    meaning: Apply edits only within the paths granted for the leased workspace.
+    definition:
+      uri: fixture:coding.write
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  patch-valid:
+    kind: check
+    meaning: Validate the patch format, base digest and safe relative edit paths.
+    definition:
+      uri: fixture:coding.patch-valid
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  base-matches:
+    kind: check
+    meaning: Confirm the patch base matches the current locked workspace before mutation.
+    definition:
+      uri: fixture:coding.base-matches
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+operations:
+  propose:
+    does: Propose a patch against the immutable snapshot using the admitted model. Return a
+      patch without changing the live workspace.
+    run: /tools/propose
+    takes:
+      snapshot: $snapshot
+      task: string
+    gives:
+      patch: $patch
+    needs:
+    - model
+    changes:
+    - infer
+    guarantees:
+    - patch-valid
+  test:
+    does: Apply the patch to a disposable copy and run the test suite pinned by the caller.
+      Report observed test results.
+    run: /tools/test
+    takes:
+      snapshot: $snapshot
+      patch: $patch
+      suite:
+        artifact: application/vnd.ai4r.test-suite+tar
+    gives:
+      report: $report
+  apply:
+    does: Apply a validated patch to the leased workspace when its base still matches. Return
+      the new immutable source snapshot.
+    run: /tools/apply
+    takes:
+      workspace: string
+      patch: $patch
+    gives:
+      snapshot: $snapshot
+    needs:
+    - workspace
+    changes:
+    - write
+    guarantees:
+    - patch-valid
+    - base-matches
+```
+
+```json
+[
+  {
+    "request": {
+      "key": "coding-propose",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "propose",
+      "inputs": {
+        "snapshot": {
+          "ref": {
+            "uri": "fixture:source",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "task": {
+          "value": "Handle an empty input without raising an exception."
+        }
+      }
+    },
+    "receipt": {
+      "call": "coding.propose",
+      "attempt": 1,
+      "state": "succeeded",
+      "completeness": "complete",
+      "reason": "COMPLETED",
+      "outputs": {
+        "patch": {
+          "ref": {
+            "uri": "fixture:patch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      },
+      "assessment": {
+        "verdict": "passed",
+        "checks": [
+          {
+            "id": "patch-valid",
+            "verdict": "PASS",
+            "evidence": [
+              {
+                "uri": "fixture:evidence-patch-valid",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "key": "coding-test",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "test",
+      "inputs": {
+        "snapshot": {
+          "ref": {
+            "uri": "fixture:source",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "patch": {
+          "ref": {
+            "uri": "fixture:patch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "suite": {
+          "ref": {
+            "uri": "fixture:test-suite",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      }
+    },
+    "receipt": {
+      "call": "coding.test",
+      "attempt": 1,
+      "state": "succeeded",
+      "completeness": "complete",
+      "reason": "COMPLETED",
+      "outputs": {
+        "report": {
+          "value": {
+            "tests_passed": false,
+            "executed": 14,
+            "failed": 1
+          }
+        }
+      },
+      "assessment": {
+        "verdict": "not_requested",
+        "checks": []
+      }
+    }
+  },
+  {
+    "request": {
+      "key": "coding-apply",
+      "release": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "op": "apply",
+      "inputs": {
+        "workspace": {
+          "value": "workspace-42"
+        },
+        "patch": {
+          "ref": {
+            "uri": "fixture:independently-approved-patch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      }
+    },
+    "receipt": {
+      "call": "coding.apply",
+      "attempt": 1,
+      "state": "succeeded",
+      "completeness": "complete",
+      "reason": "COMPLETED",
+      "outputs": {
+        "snapshot": {
+          "ref": {
+            "uri": "fixture:new-source",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      },
+      "assessment": {
+        "verdict": "passed",
+        "checks": [
+          {
+            "id": "patch-valid",
+            "verdict": "PASS",
+            "evidence": [
+              {
+                "uri": "fixture:evidence-patch-valid",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          },
+          {
+            "id": "base-matches",
+            "verdict": "PASS",
+            "evidence": [
+              {
+                "uri": "fixture:evidence-base-matches",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+]
+```
+
+## Interpretation of the exchanges
+
+1. **Propose.** The host stages the immutable snapshot, grants only the model endpoint and allowed data audience, and checks the returned patch.
+2. **Test.** The isolated process completes and returns a report with one failed test. Execution succeeded. No independent semantic assessment was requested in this fixture. The report itself says the candidate failed the selected suite.
+3. **Apply.** This is a separate scenario with an independently approved patch. The caller's workspace policy must admit that patch. The failed candidate from the previous exchange is not eligible under a tests-must-pass policy.
+
+A model-generated test report cannot grant apply authority. If independent testing is required, the policy binds a protected test evaluator to the original source, exact patch, pinned suite and resulting report. It records its own assessment. Candidate code must not modify that suite or its thresholds.
+
+## Artifact contents
+
+| Artifact | Required interpretation |
+|---|---|
+| Source snapshot | Safe archive of regular source files and a host-generated manifest. Relative paths, digests and executable modes define its tree identity. |
+| Patch | JSON object `{base,edits}`. Base is a Ref to the exact source snapshot. Each edit is `{path,action}` plus `content` for create/replace. Action is create, replace or delete. Paths are unique relative paths inside the snapshot. |
+| Test suite | Independently pinned test archive and invocation configuration. The host defines allowed execution and resources. |
+| Test report | `tests_passed`, `executed`, `failed` plus separately retained raw logs in the attempt ledger. Counts must be consistent and compared with the expected suite scope. |
+
+This example patch format supports UTF-8 text files. Reject binary edits and unsupported file operations explicitly. A binary-capable profile requires its own pinned interpretation. Generic archive/JSON media types alone do not establish artifact semantics; the referenced checks validate these structures.
+
+## Data flow
+
+```mermaid
+flowchart LR
+    source["Pinned source snapshot"] --> propose["propose"]
+    task["Task"] --> propose
+    propose --> patch["Patch artifact"]
+    source --> test["test in disposable workspace"]
+    patch --> test
+    suite["Protected test suite"] --> test
+    test --> report["Report and raw evidence"]
+    report --> evaluator["Independent policy evaluation"]
+    patch --> evaluator
+    evaluator -->|eligible patch| apply["apply with scoped grant"]
+    workspace["Leased workspace at expected base"] --> apply
+    apply --> result["New snapshot and receipt"]
+```
+
+The host explicitly binds output artifacts to subsequent input ports. It verifies media types, required schema semantics and byte identities before the next call. Shared port definitions make compatibility reusable. They do not schedule or execute a pipeline automatically.
+
+## Applying changes safely
+
+- Resolve the workspace handle to the caller's resource, lease, base tree and generation.
+- Under the workspace lock, verify patch structure, allowed paths and exact base immediately before mutation. Check definitions identify this stage as pre-effect.
+- Stage edits in a private candidate tree, validate them, then publish the new tree atomically when the workspace provider supports it.
+- Otherwise use a provider transaction/journal with recovery. Do not offer apply if the provider cannot preserve or reconcile partial application.
+- On stale base, fail before mutation with `BASE_MISMATCH`. Replanning requires a new snapshot and patch.
+- On an uncertain commit, reconcile the same transaction identity. A lost response must never apply the patch twice.
+- Record the observed before/after tree identities and actual changed paths. Detect undeclared effects and retain the incident.
+
+The allowed effect is a rule-bound action on a specific resource and path set. Its grant does not authorize unrelated files, repository publication, credentials, network use or child calls.
+
+## RSI use
+
+The coding capsule can propose a change to another CC's implementation, tests under development, or build recipe. Each target is a separate immutable candidate. Evaluation uses a protected acceptance suite and independent policy. The Factory builds a new CC release only after the source changes are fixed. Promotion follows the separate decision described in [Quality and improvement](07-quality-and-improvement.md).

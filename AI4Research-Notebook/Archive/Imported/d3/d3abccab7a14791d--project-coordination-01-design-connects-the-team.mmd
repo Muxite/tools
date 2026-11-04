@@ -1,0 +1,19 @@
+flowchart LR
+    P[/Product requirements/] --> D[/Design and shared contracts/]
+    M[/Component constraints/] --> D
+    D --> I[Implementation work]
+    I --> V[Verification work]
+    V --> E[/Observed behavior and checks/]
+    E --> H{Team diagnoses mismatch}
+    H -->|code mismatch| I
+    H -->|design gap| D
+    H -->|verification problem| V
+    H -->|unclear cause| U[Investigate with evidence]
+    classDef record fill:#e8f1fe,stroke:#1d4f91,color:#123d70
+    classDef tool fill:#e0f5ef,stroke:#1b7f72,color:#12554a
+    classDef human fill:#fff4d8,stroke:#b58100,color:#694b00
+    classDef unresolved fill:#ffe9e9,stroke:#b63636,color:#7f2020
+    class P,D,M,E record
+    class I,V tool
+    class H human
+    class U unresolved

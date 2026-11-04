@@ -1,0 +1,8 @@
+flowchart TB
+    PLAN[Frozen eligible capsule and accepted refs] --> BROKER[Broker stages scoped files]
+    BROKER --> IMAGE[Exact image invocation]
+    IMAGE --> OUT[Untrusted result files]
+    OUT --> SEAL[Host validates and seals bytes]
+    SEAL --> CHECK[Independent checks and verifier]
+    CHECK --> GATE[Protected gate]
+    GATE -->|advance only| NEXT[Committed outputs for successors]

@@ -1,0 +1,1905 @@
+
+
+===== page 1 =====
+RunAgent: Interpreting Natural-Language Plans with Constraint-Guided
+Execution
+Arunabh Srivastava1, Mohammad A. (Amir) Khojastepour2, Srimat Chakradhar2, Sennur Ulukus1
+1University of Maryland, College Park, MD
+2NEC Laboratories America, Inc.
+Abstract— Humans solve problems by executing targeted
+plans, yet large language models (LLMs) remain unreliable
+for structured workflow execution. We propose RunAgent, a
+multi-agent plan execution platform that interprets natural-
+language plans while enforcing stepwise execution through
+constraints and rubrics. RunAgent bridges the expressiveness of
+natural language with the determinism of programming via an
+agentic language with explicit control constructs (e.g., IF, GOTO,
+FORALL). Beyond verifying syntactic and semantic verification
+of the step output, which is performed based on the specific
+instruction of each step, RunAgent autonomously derives and
+validates constraints based on the description of the task and its
+instance at each step. RunAgent also dynamically selects among
+LLM-based reasoning, tool usage, and code generation and
+execution (e.g., in Python), and incorporates error correction
+mechanisms to ensure correctness. Finally, RunAgent filters the
+context history by retaining only relevant information during
+the execution of each step. Evaluations on Natural-plan and
+SciBench Datasets demonstrate that RunAgent outperforms
+baseline LLMs and state-of-the-art PlanGEN methods.
+I. INTRODUCTION
+Problem solving or task completion fundamentally rely
+on devising and executing a targeted plan. Significant ad-
+vancements in artificial intelligence (AI) and particularly in
+Large Language Models (LLMs) have enabled machines to
+emulate sophisticated human cognitive processes, such as
+identification and reasoning, that are collectively referred to
+as human cognitive processes. With the advent of LLMs, the
+development of AI agents to perform specialized tasks has
+become one of the primary research frontiers. However, as
+LLMs transition from conversational chatbots to autonomous
+multi-agent systems which execute complex multi-step tasks,
+the need for a structured framework becomes critical to nav-
+igate these challenges. We define the planning and execution
+of workflows as a structured process to answer questions,
+solve problems or facilitate the design of AI agents. To
+this end, we introduce the execution platform RunAgent
+which extends the body of works on planning, generation,
+and execution of workflows [1]–[4]. RunAgent performs the
+step-by-step execution of a workflow, rigorously checks the
+output of each step for validity with respect to rubrics and
+constraints, and verifies the output.
+The RunAgent platform comprises key architectural fea-
+tures. First, RunAgent allows for human-in-the-loop (HITL)
+operations: (a) User-specification: This feature allows the
+user to furnish desired workflows, constraints, facts or spec-
+ifications, and rubrics; and (b) User-feedback: The HITL
+feature also allows the user to provide feedback on an
+operation, enabling users to audit the log and provide feed-
+back on steps of the workflow, the final output or other
+particular parts of the log. Second, RunAgent performs
+autonomous generation of relevant constraints and verifies
+each step of the workflow. This means that RunAgent does
+not rely solely on user-specification or user-feedback to
+recognize constraints. Third, RunAgent employs a flexible
+language that seamlessly reconciles the formal determinism
+of programming languages and the expressivity of natural
+language. The language for AI agent development should be
+capable of performing adaptive reasoning, which means that
+it can significantly benefit from using the expressive freedom
+of natural language. This implies that rigid code cannot
+handle context-specific exceptions, diminishing the adaptive
+intelligence required for effective AI agent operations. For
+example, when context-specific circumstances arise, new ex-
+ceptions are given, or priorities shift, a rigid-language cannot
+handle these cases. Conversely, using the expressivity of
+natural language in defining a workflow also has limitations.
+A workflow may not always be a series of sequential steps
+and may have non-linear control flow. Hence, while the
+flexibility of interpreting natural plan directives must be
+maintained, there is a need for the ability to execute a series
+of steps or perform branch operations in a principled and
+deterministic manner with formal execution guarantees.
+The remainder of the paper is organized as follows.
+Related works are presented in Section II. We then describe
+our agentic language and its core constructs in Section III.
+The design and architecture of the RunAgent platform is
+discussed in Section IV. In Section V, we evaluate RunA-
+gent against baseline LLMs and state-of-the-art algorithms.
+Finally, we provide supplementary details and additional
+experimental results in the Appendix.
+II. RELATED WORK
+To support reliable plan execution, several tool-augmented
+LLM agent frameworks have been proposed. Systems such as
+AutoGen [5], Voyager [6], and LLM-generated plan heuris-
+tics [7] demonstrate that delegating sub-tasks to program-
+matic or symbolic executors improves the accuracy of multi-
+step plan execution. Building on this paradigm, RunAgent
+introduces LLM-driven control flow constructs, including
+loops, conditionals, action modules, and Python execution,
+to robustly execute LLM-generated plans. More recent work,
+arXiv:2605.00798v1  [cs.LG]  1 May 2026
+
+
+===== page 2 =====
+such as Magentic UI [8], explores plan generation with HITL
+interaction via multi-agent orchestration, co-planning, co-
+execution, action guards, and memory, but relies heavily on
+human feedback for verification. XPF [9] presents an agentic
+AI system for business workflow automation that integrates
+planning, execution, and verification with HITL plan editing.
+In contrast, RunAgent performs constraint generation and
+constraint checking based on grounded facts, in addition to
+performing syntactic and semantic verification at each step.
+RunAgent further determines the most appropriate execu-
+tion strategy for each step, selecting between tool usage,
+code generation and execution, or direct LLM reasoning.
+Moreover, RunAgent is capable of reasoning and generating
+code across single or multiple steps or sub-steps. Another
+feature of RunAgent is the filtering of context history prior
+to providing it to the LLM for step execution.
+III. AGENTIC LANGUAGE
+AI agents are designed to augment or automate expert
+functions, enabling domain specialists to develop the AI
+agents themselves without traditional programming exper-
+tise. Ideally, defining an agent should be as simple as writing
+a natural-language specification, referred to as a task, without
+extensive algorithmic thinking. During execution, the agent
+receives data and natural-language directives, collectively
+forming a task instance. These directives are interpreted by
+the agent and may alter its operation by introducing new
+circumstances, priorities, or exceptions, distinguishing them
+from data or signals processed by the agent. Together, the
+task and instance govern how the workflow implementer
+translates expert intent into reliable execution.
+However, while this natural language description provides
+inherent adaptability, it lacks the formal guarantees required
+for robust and reliable automation. Specifically, unrestricted
+workflows fail to capture structured control flow such as
+branching and iteration. RunAgent addresses these limita-
+tions by employing a flexible agentic language that bridges
+the rigidity of programming languages and the expressivity
+of natural language. Through a small set of reserved key-
+words, RunAgent preserves natural-language flexibility while
+enabling deterministic execution. Next, we introduce these
+keywords and motivate their design.
+To ensure robust execution, a workflow must be decom-
+posed into a series of ordered steps that account for both
+linear and conditional logic. While simple workflows follow
+a single path, more complex workflows involve judgments
+that induce branching or loops, yielding a directed graph
+structure. In this model, each node executes an action, and
+outgoing edges are selected based on the step outcome, mo-
+tivating the introduction of conditional (IF) and branching
+(GOTO) instructions in the flowgraph.
+In addition, our observation shows that LLMs struggle
+with the for all operation (e.g., do this task for all items in
+a set). In most cases, the LLM only performs the operation
+on a partial subset instead of all items in the set. Hence,
+we introduce the (FORALL) instruction to overcome this
+shortcoming and ensure iterative steps are implemented
+comprehensively.
+LLMs are generally more reliable at performing algorith-
+mic or computational operations by generating code than
+by directly producing results. Accordingly, RunAgent selects
+between code-based and LLM-based execution for each step.
+In order to facilitate deterministic execution, (PYTHON) and
+(LLM) instructions explicitly direct RunAgent to execute a
+step via generated Python code or direct LLM invocation,
+respectively. RunAgent also determines whether an existing
+tool should be used to execute a step; this decision can
+be overridden with the (TOOL) instruction, which forces
+RunAgent to select and invoke an appropriate tool. By pro-
+viding these keywords, RunAgent empowers domain experts
+to decide the execution modality at each step, ensuring that
+each step of the workflow is executed using the most reliable
+implementation method.
+RunAgent explicitly detects keyword instructions at each
+step to ensure deterministic execution, rather than leaving
+their interpretation to the LLM. In summary, by using the
+introduced keyword instructions, the workflow has a hybrid
+structure, enforcing the algorithmic structure of program-
+ming languages while maintaining human-like and open-
+vocabulary descriptions for the steps.
+Our vision of an agentic language differs from the formal
+definition of programming languages and may arguably not
+be perceived as a computer language, as it does not follow
+a rigid syntax. In our proposed language, there is a series of
+steps (and sub-steps) written in free-form natural language,
+and it is the role of an interpreter to detect keywords. We
+aim to minimize the use of keywords; however, there is
+the possibility of extending them as it becomes evident that
+they are essential. We recognize that such a language places
+the burden of detecting keywords, as well as interpreting
+them and potentially generating multiple sub-steps (e.g., for
+(FORALL)), on the execution platform; however, it enables
+flexible and simple natural language statements for each step.
+This differs from agentic languages such as V¨ol [10], in
+which a strict syntax is enforced and any deviation from
+it results in an error.
+IV. RUNAGENT DESIGN
+RunAgent is a multi-agent LLM system that takes a task,
+an instance of the task, and a step-by-step plan to solve
+the task-instance pair as input, and performs a step-by-
+step implementation of the plan. RunAgent employs several
+specialized LLM blocks to execute essential cognitive ac-
+tions such as identification, judgment, and reasoning, where
+human-like nuance is required. Each LLM block is designed
+to perform a particular task that is specialized through
+targeted prompting and is provided with a selected subset of
+the conversation history and relevant contextual information.
+At the start of plan implementation, RunAgent employs an
+LLM reasoner block that uses the task–instance pair to derive
+constraints that must hold for the plan execution to be correct.
+At a fundamental level, RunAgent implements the plan
+step-by-step in a sequential fashion by utilizing previously
+
+
+===== page 3 =====
+Initialization and Staging
+Compiler
+Executor
+Overview of the RunAgent
+Fig. 1.
+An overview of RunAgent, highlighting its three main modules.
+Tool Registry
+Initialization and Staging
+Constraint 
+Generator
+Task
+Tool Codes
+Tool Database 
+Tool Headers
+Instance
+Constraints
+Tools
+Fig. 2.
+A description of the Initialization and Staging module. This is
+described in Sec. IV-B.
+implemented steps, the task, the instance, and tool details
+to solve the next step. At each step, LLM judge blocks
+in RunAgent decide whether (i) the LLM, (ii) the Python
+code generator and then code executor, or (iii) a tool from
+the tool database should be used for execution of this step.
+The execution selection method may also be overridden,
+and the execution method can be directly specified with
+instructions LLM:, PYTHON: or TOOL: written as a prefix
+to the step description. Once a step is implemented, it is
+validated against a subset of relevant constraints, as well as
+rubrics. These relevant constraints are extracted from the set
+of constraints which are generated at the start. Additional
+constraints or rubrics can also be specified at the beginning
+or as user feedback. If verification fails, RunAgent makes
+more attempts to execute the step by providing the log of
+the previous actions and associated errors.
+As discussed earlier, predefined keywords IF, GOTO and
+FORALL can also be used to initiate branches, jumps and
+iterative procedures at any step. In addition, RunAgent
+performs error correction at each step. In order to move to
+the next step, the output of the current step must not have
+any programming errors and all constraints relevant to the
+step must be satisfied. If the step execution fails more than
+a set number of times, then RunAgent falls back to an LLM
+response, so that the plan can be implemented completely.
+We also maintain detailed logs of the plan implementation,
+which list all the step outputs, errors and intermediate gener-
+ation steps. In the following, we discuss the implementation
+details and different features of RunAgent.
+A. RunAgent Structure
+At a high level, RunAgent comprises three main blocks as
+shown in Fig. 1: (i) Initialization and Staging, (ii) Compiler,
+and (iii) Executor blocks.
+The Initialization and Staging block depicted in Fig. 2
+is responsible for setting of parameters, tool registration in
+the form of code or binary with the descriptions, and other
+structural methods, including extraction of embeddings that
+are used in retrieving the relevant tools for the execution
+of a task. When RunAgent is invoked to perform a task
+for a specialized instance using a plan, the staging also
+comprises of setting up the facts and constraints. The facts
+and constraints may be given as input as a part of the
+instance. In addition, the set of constraints is derived by the
+Staging module of RunAgent from the task and instance to
+ensure comprehensive coverage of all constraints.
+The next main block is the Compiler, depicted in Fig. 3.
+This block takes the plan as input and generates the compiled
+plan as output by first parsing the plan into a Python dictio-
+nary structure, identifying the agentic language keywords and
+appropriately generating the sub-steps, for operations like
+“FORALL”, and finally generating an internal representation
+of the steps that are used for execution by the Executor block.
+Finally, the Executor block depicted in Fig. 4 takes the
+compiled plan and performs the operation directed by each
+step by sequentially interpreting the step, implementing the
+step, logging the results of the execution of the step and
+filtering the relevant part of the execution context to be used
+in the execution of the next step, carrying on until the plan
+is completely executed.
+B. Initialization and Staging Module
+The initialization and staging module performs two main
+tasks: Tool Registry Setup and Constraint Generation. All
+tools are stored as Python functions, which can be im-
+plemented via subroutines during execution. The tools are
+
+
+===== page 4 =====
+Compiler
+Plan
+Plan Parser
+Internal Representation
+Agentic Language 
+Keyword Detection
+and Sub-step Generation
+Compiled plan
+Fig. 3.
+A description of the Compiler module. This is described in Sec. IV-
+C.
+stored in a registry and a description is generated for each
+tool so that the LLM-based tool-calling module can utilize
+these function descriptions to determine which tool to use
+to execute a step. Each tool is stored as source code,
+e.g., Python functions, and the required description and
+information for its execution is also provided and is available
+to RunAgent. Moreover, a set of constraints is generated at
+this stage using the task and instance. In order to facilitate
+easy constraint checking, atomic constraints, i.e., constraint
+which represents a single, irreducible logical condition, are
+generated. These constraints are later filtered depending on
+the step, and the selected ones are verified during the step’s
+execution to ensure correct plan execution.
+C. Compiler Module
+The compiler module takes the natural language plan as
+input, parses the plan, detects the agentic language keywords,
+generates corresponding sub-steps, and stores the plan in an
+internal structure.
+1) Plan Parsing: Before a plan is implemented in RunA-
+gent, it is parsed appropriately into a machine-readable
+format. This format is a list of Python dictionaries, where
+each dictionary contains the step number, the text of the step,
+and the reasoner hint, which could be (LLM), (PYTHON),
+(TOOL) or None. The parser also incorporates the inclusion
+of sub-steps of the form 1.1,2.3.1, etc. A final step is then
+appended to indicate that the plan has been completed.
+2) Agentic Language Interpreter: This module detects
+agentic-language keywords such as IF, GOTO, and FORALL,
+and generates the required sub-steps accordingly. It governs
+how steps are implemented based on these keywords, in-
+cluding how step outputs are routed, how the running state
+summary is constructed, and how the execution context is
+managed for intermediate processes. The resulting informa-
+tion is stored in an internal compiled plan structure.
+In the following we describe the way in which keywords
+are interpreted and prepared by the Compiler module and
+later processed by the Executor module.
+1) GOTO: In RunAgent, the GOTO keyword is an un-
+conditional jump, and it is internally stored with the
+current step number, the keyword GOTO and the step
+number to which the jump must be initiated. Whenever
+a GOTO keyword is encountered by the Executor
+module, it adds the target step to the execution context
+and moves to targeted step number.
+2) IF: Conditional steps are encoded as natural language
+IF statements. RunAgent utilizes an LLM identifi-
+cation block to parse the step that contains the IF
+keyword into an internal structure comprised of the
+current step number, the keyword IF, the condition,
+and the instruction that must be carried out if the
+condition is satisfied. When the Executor Module
+encounters IF step, an LLM Judge block is used to
+check the condition based on the execution context.
+If the condition is satisfied, then the instruction from
+the IF statement is appended to the execution con-
+text and sent for step implementation. Otherwise, the
+Executor moves to the next step. Notably, the GOTO
+keyword can be a part of the instruction in an IF step.
+This facilitates implementation of conditional jumps or
+conditional loops.
+3) FORALL: The FORALL keyword is used to specify
+that a step instruction should be executed for all items
+in an iterative list. Its implementation is similar to
+IF, where an LLM identifier block is used to obtain
+and update the internal step representation with the
+list of iterates or the hint that is required to pull the
+list of iterates based on the execution context. This
+makes it possible for the FORALL statement to refer
+to iterates based on previously executed steps and their
+outputs. The LLM identifier block is also used to
+strip the associated instruction from the step definition
+that has to be performed for each iterate and update
+the internal representation of this step. The Executor
+module performs the instruction for each iterate as
+a sub-step by temporarily augmenting the execution
+context and storing the resulting sub-step output. Once
+the outputs for all iterates are obtained, the individual
+outputs from the sub-steps are aggregated to form the
+output of the current FORALL step instruction that is
+then permanently appended to the execution context.
+3) Plan Implementation Representation:
+In order to
+ensure the correct implementation of each step based
+on the known information and outputs of the previously
+successfully implemented steps, all the information is
+logged in a special format, which we call the execution
+context. The task, instance, incoming step formats and
+implementation instructions to the LLM are given first.
+Then, a JSON structure consisting of the tool names,
+their
+inputs
+and
+outputs
+and
+their
+natural
+language
+descriptions are given as well. Then, the step instructions
+and outputs are added in an XML format. Each step
+instruction including the previous steps and the current
+steps is written in the format: <step><number>number
+of
+the
+step</number><instruction>Step
+instruction
+</instruction></step>. Similarly each step output is written
+in the following format: <step><number>number of the
+
+
+===== page 5 =====
+step</number><output>Step Output </output></step>.
+The Executor module uses this internal representation,
+which comprises the step representation as described above,
+along with the plan state; while the constraints and the facts
+that are relevant to the step are extracted and cached until the
+step is executed successfully. In addition, a state summary
+of the execution output of the plan and relevant facts is
+also maintained in the internal representation and updated
+whenever a step is executed successfully.
+D. Executor Module
+The Executor Module takes the compiled plan as input,
+and interprets, implements, and logs the output of each
+step until the plan is finished. The Interpret Step module
+realizes the correct implementation of different keywords and
+directives, checks for preference in using tools, programming
+(generating and executing code), or direct LLM execution of
+the instructions. The Implement Step module executes the
+step, performs a sanity check and semantic verification of
+the output, and performs additional constraints and rubric
+checking for each step instruction. The Executor module
+moves to the next step once the current step is successfully
+performed and all the issues with the current step have been
+resolved or a maximum number of trials has been reached.
+During execution, the executor maintains the execution
+context, implemented as an ordered message history, con-
+taining (i) the system specification and all previously ac-
+cepted step instruction–output pairs which are described in
+Section IV-C.3, and (ii) a result log which stores the details
+about each step in a readable format. In addition, the executor
+also maintains a running state summary which stores short
+summaries of the output for each step. This running summary
+is used for constraint validation at each step.
+1) Interpret Step Module: The block diagram of Interpret
+Step module is shown in Fig. 5. The module first checks if
+the step has an implementation prefix (LLM), (PYTHON)
+or (TOOL), or has no prefix at all. This module provides
+the Implement Step module with a “call prompt”, if the step
+needs to be implemented, or a <“skip this step”> prompt so
+that the Implement Step module can skip this step. We now
+discuss how the call prompt is generated for different types
+of steps.
+If the step has no prefix, then an LLM tool-judge block
+is given the execution context and decides if a tool can be
+used to implement this step. If a tool from the tool registry
+can be used to implement the step, then the subroutine is
+called locally to produce the output of the step. Otherwise,
+an LLM Python-judge block is invoked to determine whether
+the step should be executed in Python or by the LLM,
+based on the execution context and the nature of the task:
+Python is preferred for algorithmic steps, whereas the LLM is
+better suited for tasks requiring creativity or natural language
+processing. If the step has a prefix, then the Python-judge is
+not called, and the step is implemented strictly using the
+prefix method.
+If the step has the (TOOL) prefix, or it is determined that
+a tool is the best option to implement the step, tool selection
+uses standard algorithms such as similarity matching, direct
+LLM calls with the tool registry database, or more advanced
+methods such as TacTool [11]. Next, the interpreter uses
+the execution context to generate the call prompt, and the
+module’s output consists of the call prompt, which specifies
+how the tool should be invoked, along with the corresponding
+tool in the form of code or a binary.
+When either the step has the (PYTHON) prefix or the
+LLM Python-judge block decides that the step should be
+implemented using Python code, the Code Generator block
+(Fig. 7) and Code Executor block are called successively.
+The Code Generator block generates (Python is the preferred
+language in our implementation) and validates the code.
+After confirming that the code has a valid output generation
+instruction (i.e., it contains an instruction which provides the
+output required by the step), the block gives the <Success>
+directive with the corresponding programming code in the
+call prompt. However, if this block fails to generate a valid
+output, it produces the <Fail> directive as the call prompt.
+This output is then used by the Implement Step module
+to execute the step accordingly. Specifically, the code is
+generated using the GenerateCode function, which takes the
+task, instance and execution context as input and generates
+Python code to execute the step. However, we note that
+LLMs may fail to generate correct code. This includes syntax
+issues and runtime issues. To mitigate this issue, we use the
+CheckCode block, which utilizes an LLM to decide if the
+generated code is valid. This loop of code generation and
+verification continues until the code is deemed valid or the
+maximum number of iterations is exceeded. Even when the
+code is deemed correct, it still might not print the output of
+the code, which will later be captured by the subroutine. This
+is added using the CheckandAddPrint function. Finally, this
+code is used by Implement Step module and run by using
+the PythonCodeExecutor function. The step output obtained
+is finally added to the execution context. This is described
+in Algorithm 1.
+Algorithm 1 Python Code Generator and Executor
+Inputs: Task T, Instance I, Execution Context E
+Initialize MAX ITERATIONS, i = 0
+Initialize is code valid = ”NO”
+while is code valid==”NO” and i < MAX ITERATIONS do
+code ←GenerateCode(T, I, E)
+is code valid ←CheckCode(code)
+i ←i + 1
+end while
+code ←CheckandAddPrint(code)
+step output ←PythonCodeExecutor(T, I, E, code)
+E ←E + step output
+If a step is conditional, the condition is checked by
+the Interpret Step module and if the condition is met, the
+instruction (possibly having a prefix (LLM), (PYTHON)
+or (TOOL)) is implemented accordingly. Otherwise, if the
+condition is not met the Interpret Step module gives the
+<“skip this step”> directive to the Implement Step module.
+Finally, if the instruction of the step has the prefix (LLM)
+or it is decided that a direct LLM call should be performed,
+
+
+===== page 6 =====
+Executor
+Compiled Plan
+Implement Step
+Interpret Step
+Logger  
+Filter History 
+Plan
+Finished 
+?
+Yes
+No
+FIN
+Fig. 4.
+A description of the Executor module. It is described further in Sec.IV-D.
+Condi-
+tional?
+Yes
+No
+Perform
+Accordingly
+Calling Syntax 
+Generator
+Pre-
+amble?
+Code 
+Generator
+Condi-
+tion 
+met?
+No
+Tool 
+exists?
+Yes
+No
+Interpret Step
+Yes
+Code  
+Judge
+LLM
+Code
+Yes
+No
+<skip this step>
+<call prompt>
+Code/Binary
+Calling Syntax 
+Generator
+<call prompt>
+Code/Binary
+<call prompt>
+<call prompt>
+(Code/Binary)
+Compiled Plan
+LLM Call
+Pass
+Fail
+Fig. 5.
+A description of the Interpret Step module, which is a part of the Executor module. It is described further in Sec. IV-D.1.
+the Interpret Step module produces the correct call prompt
+using the execution context, which is later used by the
+Implement Step Module.
+2) Implement Step Module: This module takes the call
+prompt of the Interpret Step module as input, and executes
+the step accordingly, i.e., by either (i) inputting the call
+prompt directly into an LLM, (ii) using the call prompt
+produced to call a tool to execute the code locally, or (iii)
+using the call prompt to call the generated code/binary locally
+and produce the output, or (iv) skipping the step.
+Next, the module checks the output in terms of its for-
+mat, and also performs a semantic check with respect to
+the execution context. If this verification fails, the step is
+attempted again with the corresponding error rationale and
+the step implementation details from the execution context
+for a maximum number of attempts. If the step output passes
+verification, the step output is validated against constraints
+and rubrics (please see Section IV-D.3). If the constraints and
+rubrics checks fail, the step is executed again with the failed
+step’s output and reason as feedback based on the context
+history until it passes, or a maximum number of trials is
+reached. If the maximum number of trials in the verification
+step or the constraints and rubrics checking steps is reached,
+we use a fall-back approach utilizing a Fall-Back LLM to
+perform the step by using the context history and move on
+without further verifications or checks. This fallback ensures
+
+
+===== page 7 =====
+that the step is implemented without syntax errors.
+During execution, the executor maintains the execution
+context, implemented as an ordered message history, contain-
+ing (i) the system specification and all previously accepted
+step instruction–output pairs which are also described in
+Section IV-C.3, and (ii) a result log which stores the details
+about each step in a readable format. In addition, the executor
+also maintains a running state summary which stores short
+summaries of the output for each step. This running summary
+is used for constraint validation at each step.
+The running state summary consists of short and factual
+descriptions of each accepted step’s output. This summary
+is updated only when the new step’s output is permanently
+appended to the execution context. This ensures that the
+running state summary contains only verified facts. The
+running state summary captures the current state of the plan
+while minimizing token usage and preventing unintended
+reasoning by downstream modules.
+These features enable the executor to implement the plan
+as an interpretable program while supporting the constraint
+validation and error correction mechanisms described in
+Section IV-D.3 and Section IV-D.4.
+3) Constraints and Rubrics: In Section IV-B, we ex-
+plained that in addition to the user-specified constraints and
+rubrics a set of constraints is also automatically generated
+based on the task and instance. All constraints and rubrics are
+aggregated and stored as strings containing a numbered list.
+We use these constraints to validate the output obtained from
+every step’s implementation, if there is no implementation
+error. Before any validation is performed, the constraint list
+is parsed into a Python list for ease of use.
+Once we have the step output of the current step, we first
+check whether there is a need to check constraints for the step
+using the ShouldCheckConstraintsForStep function. This is
+because many plan steps summarize information from the
+task, instance, and previous steps, and in these cases, the
+solution space is not modified by the step output. Therefore,
+there is no need to check if constraints are valid in this
+scenario. In such cases, we move directly to the next step’s
+implementation.
+If the function determines that the constraints should be
+checked for this step, then a subset of relevant constraints is
+first extracted by the FilterRelevantConstraints function. The
+purpose of this extraction is to filter out constraints which are
+not related to the current step, since checking them would
+inevitably lead to errors. The relevant constraints are then
+cached until the step output contains no errors and satisfies
+all relevant constraints, or the maximum number of retries
+for the step has been exhausted.
+In RunAgent, each relevant constraint is checked against
+the step and the output of the step by a series of LLM
+calls. First, an LLM reasoner block is provided with the
+running state summary, the step output, and the relevant
+constraints to determine whether any constraint has been
+violated, along with a justification for its decision. Then,
+an LLM judge block reviews this reasoning to determine
+whether the constraint has been violated. This two-step
+process is used to avoid ambiguous responses from a single
+LLM call, which may sometimes indicate that a constraint
+is violated while providing reasoning that suggests other-
+wise. This two-step procedure is also employed because
+providing the task, instance, or execution context directly
+for validation can prompt the LLM to attempt solving the
+problem rather than strictly validating the current constraint.
+The neutral information-based nature of the running state
+summary forces the LLM to validate the current constraint.
+This is summarized in Algorithm 2.
+Algorithm 2 Constraint Validation
+Inputs: Running State Summary S, Constraints C, Step instruction s,
+Step output y
+if ShouldCheckConstraintsForStep(S,s,y)==”No” then
+return
+end if
+Clist ←ParseConstraints(C)
+Relevant CList = FilterRelevantConstraints(CList)
+violated constraint list = []
+for constraint in Relevant CList do
+reason = GiveReason(constraint, S, s, y)
+decision = ConstraintValid(reason)
+if decision == ”NO” then
+violated constraint list += [constraint, reason]
+end if
+end for
+return violated constraint list
+4) Error Correction: Whenever a step is implemented,
+there may be an error during implementation, which may
+arise from issues with LLM calls or during the implementa-
+tion of Python code or tools. It is also possible that the step
+may be implemented without any such errors but the output
+does not satisfy the relevant constraints. In these cases, the
+step is implemented repeatedly until the output is valid and
+satisfies all the relevant constraints.
+To prevent RunAgent from repeating previously encoun-
+tered errors, the cause of an error is temporarily appended
+to the execution context using the XML tags <error> and
+</error> when the error occurs during Python code, tool,
+or LLM execution. If a subset of constraints is violated, the
+violated constraints, the rationale for the violations, and the
+corresponding output are appended as a structured error mes-
+sage. Moreover, the LLM prompts in the execution context
+are modified to explicitly inform the model of previously
+encountered errors, thereby conditioning subsequent attempts
+on a clear description of earlier failures.
+Once all errors and constraint violations are resolved,
+the temporarily appended error and violation information is
+removed from the execution context, and only the step output
+is appended in the manner specified in Section IV-C.3.
+If errors or constraint violations persist after the maximum
+number of retries, RunAgent falls back to direct Fall-Back
+LLM-based step execution using the execution context to
+ensure continued execution. This is described in Algorithm 3.
+5) Facts Utilization: Facts represent a mechanism for
+users to interact with RunAgent by providing immutable
+facts or suggestions as auxiliary information which might
+be implicit or not mentioned in the task-instance pair or the
+
+
+===== page 8 =====
+Max 
+reached
+?
+Yes
+No
+Step Executor
+Step Verifier
+Constraint and 
+Rubric Checker
+Is 
+Correct
+?
+Fall-back LLM
+Is 
+Correct
+?
+No
+Max 
+reached
+?
+Yes
+No
+No
+Implement Step
+Yes
+Yes
+<call prompt>
+(Code/Binary)
+Fig. 6.
+A description of the Implement Step module, which is a part of the Executor module. It is further described in Sec. IV-D.2.
+Max 
+reached
+?
+Yes
+No
+LLM call to 
+generate code
+Code 
+Verifier
+Is 
+Correct
+?
+No
+Code Generation
+Yes
+Output Generation 
+Enforcer
+<pass>
+Code/binary
+<fail>
+Fig. 7.
+A description of the code generation algorithm. This is further discussed in Sec. IV-D.1.
+plan. A user may provide such facts either prior to execu-
+tion or as feedback for subsequent attempts when the plan
+implementation does not meet expectations. By reviewing
+the plan execution or logs, the user can specify corrective
+information, enabling RunAgent to adjust its behavior and
+implement the plan correctly in the next iteration.
+In some cases, the facts may provide a particular inter-
+pretation of the meaning or clarification of a concept. For
+example, a “day” may sometimes refer to a full day including
+the daytime and nighttime, while in some other context, it
+may only refer to daytime. In some cases, a day could mean
+a full 24-hour day, and in some other contexts, a partial
+day may constitute a day. RunAgent mainly utilizes the
+facts in the Constraints and Rubrics Checking mechanism
+to ensure that the facts in the view of the context are
+followed. In particular, (i) the facts are used to determine
+whether constraints should be evaluated in the first place,
+and (ii) the facts are used during constraint checking to
+determine whether the current step’s output satisfies the
+relevant constraints. It is important to note that these facts
+do not directly influence RunAgent’s execution, but instead
+serve solely to assist in constraint validation. Some examples
+of Facts are given in the Appendix.
+
+
+===== page 9 =====
+Algorithm 3 Error Correction Implementation
+1: Inputs: Plan step s, execution context E, MAX RETRIES
+2: i ←0
+3: while i ≤MAX RETRIES do
+4:
+y ←ImplementStep(s, E)
+5:
+if Error(y) then
+6:
+err ←MakeImplementationErrorMessage(s, y, E)
+7:
+E ←E + ⟨error⟩err⟨/error⟩
+8:
+i ←i + 1
+9:
+continue
+10:
+end if
+11:
+if ViolatesConstraints(s, y) then
+12:
+err ←MakeConstraintErrorMessage(s, y, E)
+13:
+E ←E + ⟨error⟩err⟨/error⟩
+14:
+i ←i + 1
+15:
+continue
+16:
+end if
+17:
+E ←RemoveTemporaryErrors(E)
+18:
+E ←AppendStepOutput(E, s, y)
+19: end while
+20: if i > MAX RETRIES then
+21:
+y ←FallbackLLM(s, E)
+22:
+E ←AppendStepOutput(E, s, y)
+23: end if
+24: return E
+V. EVALUATION
+A. Experimental Setup
+To evaluate the quality of plan implementation with RunA-
+gent, we utilize two datasets from Natural-plan, i.e., Calen-
+dar Scheduling and Trip Planning datasets [12], and three
+datasets from SciBench, i.e, Stat, Calc, and Diff datasets
+[13]. All LLM calls and LLM blocks in RunAgent in this
+paper utilize GPT-4o [14]. We compare our results with
+the vanilla GPT-4o as a baseline to either directly solve
+the problem or implement a plan. We do not evaluate the
+Meeting Scheduling dataset from Natural-plan due to the
+existence of many correct answers for each question in the
+dataset. We use the SciBench Math subset in our evaluation
+since the subset does not contain images with the exception
+of one question from the Calc dataset that is not included in
+the evaluation. We also compare our results for the Natural-
+plan Calendar Scheduling and Natural-plan Trip Planning
+datasets with the state-of-the-art PlanGEN algorithms [1]. All
+results for Gemini-1.5-Pro and Gemini-2.0-Flash are taken
+from [1].
+We use accuracy as a measure of performance for the
+SciBench Math dataset and the Exact Match (EM) accuracy
+as a measure of performance for the Natural-plan Calendar
+Scheduling and Natural-plan Trip Planning datasets where
+multiple correct answers may be viable in some cases. We
+use an LLM-as-a-judge to check if the produced answer is
+equivalent to the Gold Answer from the dataset. Finally,
+because RunAgent implements plans, we use a custom
+algorithm (which uses GPT-4o internally to generate plans)
+to generate feasible plans which are then implemented by
+RunAgent. In order to have a fair comparison, we also
+implement the custom plans we generate using GPT-4o, and
+report the accuracies under ‘GPT-4o Plan Implementation’.
+Since plan generation is not the focus of this paper, the details
+are omitted.
+Method
+EM Acc. (%)
+GPT-4o Plan Implementation
+46.9
+Gemini-1.5-Pro
+48.9
+GPT-4o
+58.3
+PlanGEN, Best of N, Gemini-1.5-Pro
+60.7
+Gemini-2.0-Flash
+61.1
+PlanGEN, Best of N, Gemini-2.0-Flash
+68.9
+RunAgent without Constraint Checking
+75.4
+RunAgent
+81.1
+TABLE I
+RESULTS FOR NATURAL-PLAN CALENDAR SCHEDULING DATASET
+B. Main Results
+Performance on Natural-plan Datasets: The evaluation
+results for the Calendar Scheduling dataset are summarized
+in Table I. PlanGEN BoN (best-of-N) [1] as a State-of-the-
+art planner and executor achieves significant improvement
+over the respective baselines of Gemini-Flash. RunAgent
+considerably improves the accuracy beyond PlanGEN BoN
+despite internally using GPT-4o whose baseline performance
+is situated between Gemini-1.5-flash and Gemini-2.0-flash.
+We also perform an ablation study by deactivating run-time
+constraint checking by RunAgent and we observe that the
+performance drops from 81.1% to 75.4% and yet achieving
+superior performance over PlanGEN BoN.
+Finally, we analyze RunAgent performance for different
+levels of problem difficulty, which is described in Fig. 8.
+The Calendar Scheduling dataset is partitioned into 10 bins
+of increasing difficulty, each containing 100 problems with
+fixed numbers of people and days. We observe that RunAgent
+consistently performs well in all bins with overall slight
+degradation in performance as the difficulty of the problems
+increases. Aside from minor performance fluctuations, we
+observe a notable drop in the first bin (two people, one
+day), which we attribute to the presence of multiple valid
+solutions in this setting. As a result, although RunAgent
+often produces correct solutions, they may not exactly match
+the Gold Answers. Upon manual inspection of the 188
+mismatched cases in all bins, we find that 51 are verified
+as correct, yielding an adjusted accuracy of 86.2% instead
+of 81.1%. The evaluation results for the Trip Planning dataset
+are presented in Table II which show a similar trend as
+Calendar Scheduling dataset.
+Performance on SciBench Math Dataset: The evaluation
+results for Calc, Stat, and Diff datasets can be seen in
+Table III. It is observed that RunAgent considerably improves
+the accuracy over its baseline LLM, i.e., GPT-4o. However,
+planning is not enough without an effective execution plat-
+form. Indeed, the performance slightly drops from that of the
+baseline GPT-4o, when GPT-4o itself is instructed to solve
+a task and instance by implementing the same plan used
+by RunAgent. A similar trend is observed for the Calendar
+Scheduling dataset.
+Discussion: We observe that GPT-4o performs better when
+solving the problem directly than when guided by a feasible
+plan. This occurs because plan-based prompting shifts the
+model’s focus from internal problem-solving to plan execu-
+
+
+===== page 10 =====
+Method
+EM Acc. (%)
+GPT-4o
+3.07
+GPT-4o Plan Implementation
+6.69
+RunAgent
+14.73
+Gemini-1.5-Pro
+34.75
+PlanGEN, Best of N, Gemini-1.5-Pro
+41.63
+TABLE II
+RESULTS FOR NATURAL-PLAN TRIP PLANNING DATASET
+Method
+Stat
+Calc
+Diff
+GPT-4o
+72.22
+70.73
+50
+GPT-4o Plan Implementation
+70.83
+65.85
+42
+RunAgent
+80.56
+78.05
+62
+TABLE III
+ACCURACY PERCENTAGE FOR THE SCIBENCH DATASET
+tion, which can hinder its reasoning process, since it does not
+guarantee step-by-step execution, as GPT-4o may interpret
+plans holistically. In contrast, RunAgent enforces stepwise
+execution with integrated verification, constraint checking,
+and reasoning, enabling superior performance.
+VI. CONCLUSION
+While strategic planning is central to problem-solving and
+AI agent development, its effectiveness critically depends on
+both an appropriate language for plan representation, and
+robust plan execution. RunAgent provides an initial solution
+that highlights the importance of these two factors.
+REFERENCES
+[1] M. Parmar, X. Liu, P. Goyal, Y. Chen, L. Le, S. Mishra, H. Mobahi,
+J. Gu, Z. Wang, H. Nakhost, et al. Plangen: A multi-agent frame-
+work for generating planning and reasoning trajectories for complex
+problem solving. CoRR, 2025.
+[2] M. Rawat, A. Gupta, R. Goomer, A. Di Bari, N. Gupta, and R. Pier-
+accini. Pre-act: Multi-step planning and reasoning improves acting in
+llm agents, 2025.
+[3] H. Wei, Z. Zhang, S. He, T. Xia, S. Pan, and F. Liu. Plangenllms:
+A modern survey of llm planning capabilities.
+Proceedings of the
+63rd Annual Meeting of the Association for Computational Linguistics,
+2025.
+[4] L.P. Kaelbling, M.L. Littman, and A.R. Cassandra. Planning and acting
+in partially observable stochastic domains.
+Artificial Intelligence,
+101(1–2):99–134, 1998.
+[5] Q. Wu, G. Bansal, J. Zhang, Y. Wu, B. Li, E. Zhu, L. Jiang, X. Zhang,
+S. Zhang, J. Liu, et al. Autogen: Enabling next-gen llm applications via
+multi-agent conversations. In First Conference on Language Modeling,
+2024.
+[6] G. Wang, Y. Xie, Y. Jiang, A. Mandlekar, C. Xiao, Y. Zhu, L. Fan,
+and A. Anandkumar. Voyager: An open-ended embodied agent with
+large language models. Transactions on Machine Learning Research,
+2023.
+[7] A.B. Corrˆea, A.G. Pereira, and J. Seipp. Classical planning with llm-
+generated heuristics: Challenging the state of the art with python code.
+arXiv preprint arXiv:2503.18809, 2025.
+[8] H. Mozannar, G. Bansal, C. Tan, A. Fourney, V. Dibia, J. Chen,
+J. Gerrits, T. Payne, M.K. Maldaner, M. Grunde-McLaughlin, et al.
+Magentic-ui: Towards human-in-the-loop agentic systems.
+arXiv
+preprint arXiv:2507.22358, 2025.
+[9] K. Rao, G. Coviello, G. Mellone, C.G. De Vita, and S. Chakradhar.
+XPF: Agentic ai system for business workflow automation. In Pro-
+ceedings of the 34th International Symposium on High-Performance
+Parallel and Distributed Computing, HPDC ’25. Association for
+Computing Machinery, 2025.
+[10] G. Coviello and S. Chakradhar.
+V¨ol: A human-centric instruction
+language for AI-native automation.
+Technical Report 2026-TR011,
+NEC Laboratories America, Inc., 2026.
+[11] M. Singh, K. Rao, G. Coviello, and S. Chakradhar. Tactool: Tactical
+tool usage in agentic AI systems.
+In 2025 IEEE International
+Conference on Agentic AI (ICA), pages 32–35, 2025.
+[12] H.S. Zheng, S. Mishra, H. Zhang, X. Chen, M. Chen, A. Nova, L. Hou,
+H. Cheng, Q.V. Le, E.H. Chi, et al. Natural plan: Benchmarking llms
+on natural language planning. CoRR, 2024.
+[13] X. Wang, Z. Hu, P. Lu, Y. Zhu, J. Zhang, S. Subramaniam, A.R.
+Loomba, S. Zhang, Y. Sun, and W. Wang.
+Scibench: evaluating
+college-level scientific problem-solving abilities of large language
+models.
+In Proceedings of the 41st International Conference on
+Machine Learning, pages 50622–50649, 2024.
+[14] A. Hurst, A. Lerer, A.P. Goucher, A. Perelman, A. Ramesh, A. Clark,
+AJ Ostrow, A. Welihinda, A. Hayes, A. Radford, et al. Gpt-4o system
+card. arXiv preprint arXiv:2410.21276, 2024.
+APPENDIX
+A. Prompts
+1) Initialization
+Prompts:
+Constraint Generation Prompt
+messages=[ {”role”: ”system”, ”content”: ”””You are an expert at
+extracting constraints that MUST NOT be violated when solving
+a task instance.
+You will be given:
+- A task description
+- A specific instance of the task
+Your job:
+- Output a comprehensive list of constraints that should not be
+violated while solving the instance.
+- Include all explicit hard requirements from the task/instance.
+- Include any implicit but necessary constraints/assumptions
+needed to correctly interpret the instance.
+- Do not include any solution, schedule, or plan, ONLY constraints.
+Critical constraint quality requirements:
+- Make constraints ATOMIC: each numbered item must contain
+exactly ONE requirement.
+- If a requirement contains ”and”, ”or”, multiple clauses, or
+multiple checks, split it into multiple numbered constraints.
+- Avoid compound / multi-part constraints, even if the original
+text is compound, decompose it.
+- Avoid solver goals and optimization goals (e.g., ”find the best”,
+”maximize”, ”minimize”). Only hard validity/legality constraints.
+Output format requirements (critical): - Output ONLY a numbered
+list of constraints as plain text (e.g., ’1....
+n2. ...’).
+- No headers, no explanations, no JSON, no code fences, no
+extra text. ”””},
+{”role”: ”user”, ”content”: ”””Task:{task}
+Instance: {instance} ”””}, ]
+2) Python
+Code
+Execution
+Prompts:
+Python Code Add Print System Prompt
+You are an expert at recognizing and adding print statements to
+Python code. You are given a Python code {code generated}. If the
+code prints an output, output ”No” without any other text. If the
+code does not print an output, add an appropriate print statement
+to the code to print an output and return the modified code. Do
+not add any other text to the output.
+
+
+===== page 11 =====
+Fig. 8.
+Accuracy for different problem complexities (Calendar Scheduling)
+Python Code Generation System Prompt
+Let’s think step by step. You are given a prompt, which contains
+context and a step that needs to be carried out at the end.
+Write a detailed code in Python that will carry out the step. The
+code should use the standard libraries of Python.
+Use of sympy, scipy or numpy is also allowed.
+The result of the code implementation should be printed using the
+Python print function.
+Do NOT catch exceptions in your code; let any errors be unhan-
+dled.
+The output should contain only a string of Python code, and the
+arguments required for the code. The input text is: {instance}
+Python Code Checker System Prompt
+You are an expert at recognizing Python code. You are given an
+input {code generated}. If the input is valid Python code, output
+”Yes”. Else output ”No”. Do not add any other text to the output.
+3) Constraint
+Validation
+Prompts:
+Python Code Execution System Prompt
+You are given a conversation, where at the end of the conversation
+a step is supposed to be carried out.
+The Python code to implement the last step is also given. Execute
+the Python code.
+If you reply with a Function Call, you must carefully provide
+the arguments required to run the Python code by considering the
+input types for the input in the function description.
+The arguments you provide must not contain any forward slashes.
+Restriction Decision Prompt
+messages=[ {”role”: ”system”, ”content”: ”””You are an expert at
+classifying whether a single step in plan execution is restricting
+the solution space.
+You will be given:
+- Task description
+- Instance of the task
+- The CURRENT step (instruction and output)
+Definitions:
+-
+”Restricting”
+means
+the
+step
+output
+makes
+a
+commitment/decision that narrows possibilities (e.g., assigning
+values, choosing an option, fixing an allocation, ruling out
+options, etc.).
+- ”Not restricting” means the step output only records facts,
+extracts information from the input or lists candidates/options.
+Output format (CRITICAL):
+Output ONLY ’Yes’ or ’No’. Do not output anything else. Facts:
+{facts} ””” },
+{”role”: ”user”, ”content”: ”””Task: {task}
+Instance: {instance}
+CURRENT STEP (instruction + output):{step text} ”””}, ]
+
+
+===== page 12 =====
+Constraint Relevance Prompt
+messages = [{ ”role”: ”system”, ”content”: f”””You are an expert
+in checking if a given constraint is necessary and relevant for
+a specific step in plan execution. You are given a step in an
+ongoing plan execution, along with a constraint that needs to be
+checked. Your job is to determine if this constraint is necessary
+and relevant and should be verified for this specific step. This
+means that the constraint should be included if the step output
+can violate it.
+Task description: {task}
+Instance of the task: {instance}
+Current step number: {step number}
+Current step instruction: {step instruction}
+Constraint to evaluate: {constraint}
+Consider:
+- Does this constraint apply to the output or behavior expected
+from this specific step?
+- Is it meaningful to check this constraint after this step
+completes?
+- Is it necessary to check this constraint for this step?
+- Would checking this constraint help ensure the step was
+executed correctly?
+Only output ’Yes’ if the constraint should be necessarily checked
+for this step, or ’No’ if it is not relevant or necessary to check
+for this step. Do not output anything else.””” },
+{”role”: ”user”, ”content”: f”Should the constraint ’{constraint}’
+be necessarily checked for this step? Answer only ’Yes’ or ’No’.
+If the constraint is not relevant or necessary to check for this step,
+answer ’No’.”}]
+Constraint Checker Reason Generation Prompt
+messages=[ {”role”: ”system”, ”content”: ”””You are an expert
+in checking if a given constraint is violated by the given step’s
+output during plan execution. You are not a solver, and you do
+not care if the plan succeeds or fails. You only care if it violates
+the constraints.
+Given the conversation so far and a constraint, your job is to check
+if the given last executed step’s output violates the constraint from
+a human’s perspective.
+It is critical that you apply human intuition and common sense to
+check if the constraint is violated. Think of the constraint being
+set in the real world and the step’s output being the action taken
+by a human.
+In doing so, you will look for the following:
+- Does the step involve inspection of the problem or does it
+perform an action which makes a decision that needs to be
+verified?
+- If the step inspects the problem, such as gathering information,
+listing options, checking status etc., then the constraint is not
+violated and you should output ”No”, followed by this reason.
+- If the step performs an action which restricts the solution space,
+then compare the output of the step with the constraint and output
+”Yes” if the constraint is violated and ”No” if the constraint is
+not violated followed by the reason. DO NOT TRY TO SOLVE
+THE PROBLEM, ONLY CHECK IF THE STEP OUTPUT IS
+LEGAL UNDER THE GIVEN CONSTRAINT. Ignore any special
+characters in the last executed step’s output.
+{facts}{current state}
+Output ONLY a detailed sentence/paragraph explaining whether
+the constraint is violated or not, and why.
+Do NOT output JSON. Do NOT output ’Yes’ or ’No’ labels. Print
+ONLY the explanation paragraph.”””},
+{”role”: ”user”, ”content”: ”””Check if the following constraint is
+violated by the last executed step’s output: {constraint} ”””}, ]
+Constraint Checker Decision Prompt
+messages=[ {”role”: ”system”, ”content”: ”””You are a strict
+judge. You will be given:
+- A constraint
+- A detailed reason describing whether the constraint is violated
+or not
+Your job is to output ONLY:
+Yes (if the constraint is violated)
+No (if the constraint is not violated)
+Do not output anything else.”””},
+{”role”: ”user”, ”content”: ”””Constraint:{constraint}
+Reason:{reason} ”””}, ]
+State Summarizer Prompt
+messages=[ {”role”: ”system”, ”content”: ”””You are a state
+summarizer used ONLY for constraint verification.
+You will be given:
+- The instruction for the most recent step
+- The output produced by that step
+Your job:
+- Summarize ONLY the key factual results from this (instruction,
+output) pair.
+- Do NOT propose next actions, alternatives, improvements, or
+any solution.
+- Do NOT infer facts that are not explicitly present in the output.
+- If the output is empty/unclear, say so.
+Output requirements:
+- Output plain text only.
+- No JSON, no code fences, no headers.
+”””},
+{”role”: ”user”, ”content”: ”””STEP INSTRUCTION:{step in-
+struction}
+STEP OUTPUT:{step output} ”””}, ]
+4) Executor
+Prompts:
+Executor System Prompt
+You will execute a series of steps on a given input.
+Task: {task}
+Instance: {instance}.
+You may be provided a preamble before the steps. Each step may
+have constraints.
+Every
+time
+I
+ask
+you
+to
+execute
+a
+step,
+you
+will
+generate
+just
+the
+exact
+output
+for
+the
+step
+without
+any
+further
+explanation.
+The
+message
+with
+the
+step
+will
+be
+in
+the
+following
+format:
+¡step¿¡number¿number
+of
+the
+step</number><instruction>instruction
+for
+the
+step</instruction></step>
+The
+output
+of
+the
+previous
+steps
+will
+be
+in
+the
+following
+format:
+<step><number>number
+of
+the
+step</number><output>output for the step</output></step>
+Every time you output a step, you will output the entire step in
+the above format.
+You will never output the next step instructions as an output of a
+step.
+If a step requires you to take an input from a previous step, you
+will locate that previous step’s output using the number of the
+step and output identifier and use it as the input for the current step.
+{function descriptions}
+
+
+===== page 13 =====
+5) Compiler
+Prompts:
+Python Judge System Prompt
+You are asked to judge whether a step at the end of a conversation
+can be implemented better as a Python code or by LLM API call.
+You know that LLMs are good at problems where natural
+language processing and creativity are required. You know that
+LLMs are not good at problems where algorithmic thinking
+and mathematical reasoning are required. You know that Python
+codes are good at problems where algorithmic thinking and
+mathematical reasoning are required. You know that Python codes
+are not good at problems where natural language processing and
+creativity are required. You are given a conversation in which a
+plan is being implemented. The final step of the input from the
+user is to be implemented.
+You will reply with strictly one word ’Yes’ or ’No’ answer to the
+question: Should the final step be implemented in Python?
+If the answer is ’Yes’, output ’Yes’.
+If the answer is ’No’, output ’No’.
+Do not output anything else.
+6) Keyword
+Prompts:
+FORALL Prompt
+messages = [{”role”: ”system”, ”content”: ”””You are given a
+FORALL statement from the user. Below you are given the
+associated task, an instance and a chat history.
+The task is: {task}.
+The instance is: {instance}.
+The chat history is: {chat history}.
+Your job is to use the task, instance and chat history to find all
+items that the FORALL statement iterates over and the task that
+needs to be executed for each item.
+The output should be as a dictionary in Python: {{”items”: [item1,
+item2, item3, ...], ”task”: ”task that needs to be executed for each
+item”}}”””},
+{”role”: ”user”, ”content”: {step instruction}}]
+IF Prompt
+messages = [{”role”: ”system”, ”content”: ”””You are given an
+if statement. Your task is to separate the if statement into the
+condition and the then statement.
+If the statement tells you to go to a step, the statement should be
+in the following format: goto step <step number>.
+The output should be in the following dictionary format:
+{”if condition”: ”condition”,”then statement”: ”statement”}”””},
+{”role”: ”user”, ”content”: {step instruction}}]
+B. Examples of Keyword Outputs
+1) Example for FORALL:
+a) Task: Write short creative stories about New York
+monuments. Execute the numbered plan exactly. Every story
+should be about 100 words and focused on the monument
+named in the iteration.
+b) Input:
+New York monuments and landmarks to feature:
+Statue of Liberty, Brooklyn Bridge, Empire State
+Building.
+c) Plan and Observed Output:
+Plan: 1. FORALL New York monuments or land-
+marks listed in the input text: LLM: Write a vivid
+story of about 100 words centered on that monu-
+ment.
+Observed output for Statue of Liberty: “At dawn,
+the Statue of Liberty stands silent, her torch cutting
+through the gentle mist like a lighthouse guiding
+weary souls. Once a welcoming beacon for immi-
+grants arriving by sea, her green copper face reflects
+the dreams of those seeking freedom. Emma, a
+young artist, sketches the statue, feeling the weight
+of history in every stroke. The air hums with stories
+of hope and resilience, whispered by the harbor
+breeze. As the sun rises, Lady Liberty’s torch
+gleams brightly, a timeless emblem of courage and
+liberty shining over New York, inspiring all who
+behold her to embrace new beginnings.”
+Observed output for Brooklyn Bridge: “As
+dawn breaks over Manhattan, the Brooklyn Bridge
+stands majestic, its cables woven like a giant harp
+strummed by the city’s heartbeat. Emma, clutching
+her grandfather’s old camera, steps onto the wooden
+walkway, the mist curling around steel towers like
+whispered legends. Each footstep echoes stories
+of dreamers, engineers, and workers who defied
+odds to build this marvel. Below, the East River
+glistens, ferrying hopes and histories. Emma raises
+her camera, capturing the sun’s golden kiss on the
+Gothic arches. In this moment, the bridge connects
+past and present, her memories intertwining with
+the city’s timeless song.”
+Observed output for Empire State Building:
+“In the heart of New York City, the Empire State
+Building stands as a sentinel of dreams and de-
+termination. As twilight paints the sky in hues of
+orange and pink, the skyscraper’s lights flicker to
+life, a beacon for dreamers worldwide. Long ago,
+ambitious architects and workers toiled through
+freezing winters and scorching summers, crafting
+this marvel from steel and stone. Beneath its tow-
+ering spire, lovers meet, tourists gaze in awe, and
+New Yorkers find a moment of solace amid the
+city’s chaos. The Empire State Building is more
+than concrete; it’s the spirit of ambition etched into
+the skyline, forever inspiring.”
+2) Example for IF (True):
+a) Task: Demonstrate conditional execution with sim-
+ple mathematical statements. Execute the numbered plan
+exactly, and when a step asks for exact text, reproduce it
+verbatim with no extra words.
+b) Input:
+Math note: 12 is greater than 7, 3 is less than 10,
+and no arithmetic errors are present.
+c) Plan and Observed Output:
+Step 1 IF 12 is greater than 7 according to the input text,
+then LLM: Output exactly “Math branch activated
+because 12 > 7.”
+Observed output: “Math branch activated because
+12 > 7.”
+Step 2 LLM: Output exactly “Continue with the verified
+
+
+===== page 14 =====
+arithmetic storyline.”
+Observed output: “Continue with the verified
+arithmetic storyline.”
+Step 3 LLM: Output exactly “Mathematical IF demonstra-
+tion complete.”
+Observed output: “Mathematical IF demonstration
+complete.”
+3) Example for IF (False):
+a) Task: Demonstrate conditional execution with sim-
+ple mathematical statements. Execute the numbered plan
+exactly, and when a step asks for exact text, reproduce it
+verbatim with no extra words.
+b) Input:
+Math note: 5 is less than 9, 2 plus 2 equals 4, and
+10 is not less than 3.
+c) Plan and Observed Output:
+Step 1 IF 10 is less than 3 according to the input text,
+then LLM: Output exactly “False math branch
+activated.”
+Observed output: no step output was produced;
+the branch was skipped.
+Step 2 LLM: Output exactly “Continue after the false
+mathematical IF.”
+Observed output: “Continue after the false math-
+ematical IF.”
+Step 3 LLM: Output exactly “False mathematical IF
+demonstration complete.”
+Observed output: “False mathematical IF demon-
+stration complete.”
+4) Example for GOTO:
+a) Task: Demonstrate direct control-flow jumps. Exe-
+cute the numbered plan exactly, and when a step asks for
+exact text, reproduce it verbatim with no extra words.
+b) Input:
+Routing note: jump directly to the emergency
+branch and skip the descriptive intermediate steps.
+c) Plan and Observed Output:
+Step 1 goto step 4
+Observed output: no step output was recorded.
+Step 2 LLM:
+Output
+exactly
+“This
+step
+should
+be
+skipped.”
+Observed output: no step output was recorded.
+Step 3 LLM: Output exactly “This step should also be
+skipped.”
+Observed output: no step output was recorded.
+Step 4 LLM: Output exactly “Reached the later step
+through direct GOTO.”
+Observed output: “Reached the later step through
+direct GOTO.”.
+Step 5 LLM: Output exactly “Direct GOTO demonstration
+complete.”
+Observed output: “Direct GOTO demonstration
+complete.”.
+C. Example Outputs of Executed Plans
+1) Example for Natural Plan Calendar Scheduling:
+Executor System Prompt
+Task: Your task is to find a feasible schedule for calendar events,
+taking into account time slots, durations, constraints, and conflicts.
+You will analyze the calendar requirements and available time slots
+to determine the optimal event schedule. Output the final calendar
+schedule outlining the day and time of the meeting, without any
+other text.
+Instance: You need to schedule a meeting for Michelle, Steven
+and Jerry for one hour between the work hours of 9:00 to 17:00
+on Monday.
+Here are the existing schedules for everyone during the day:
+Michelle has meetings on Monday during 11:00 to 12:00; Steven
+has blocked their calendar on Monday during 9:00 to 9:30, 11:30
+to 12:00, 13:30 to 14:00, 15:30 to 16:00; Jerry has blocked their
+calendar on Monday during 9:00 to 9:30, 10:00 to 11:00, 11:30
+to 12:30, 13:00 to 14:30, 15:30 to 16:00, 16:30 to 17:00;
+Find a time that works for everyone’s schedule and constraints.
+SOLUTION:
+Plan Implementation: [ {
+”step number”: ”1”,
+”step”: ”Determine the available times for each participant
+by examining the end times of busy slots, as participants are
+considered free at those times.”,
+”reasoner”: ”Tools: Python Executor”,
+”output”: ”Michelle is available at the following times: [9, 12,
+17]
+Steven is available at the following times: [9, 9.5, 12, 14, 16, 17]
+Jerry is available at the following times: [9, 9.5, 11, 12.5, 14.5,
+16, 17, 17]”,
+”error”: null
+},
+{
+”step number”: ”2”,
+”step”: ”Cross-check all calendar events that need to be scheduled,
+taking note of their durations and any constraints or conflicts, to
+identify overlapping free time slots for all participants.”,
+”reasoner”: ”LLM”,
+”output”:
+”<step><number>2</number><output>Available
+common time slots for all participants: [12:30 - 13:00], [14:30 -
+15:30]</output></step>”,
+”error”: null
+},
+{
+”step number”: ”3”,
+”step”:
+”Evaluate
+each
+event
+to
+determine
+its
+scheduling
+requirements, such as specific time constraints, dependencies on
+other events, and match them to the common free time slot that
+satisfies the constraints.”,
+”reasoner”: ”LLM”,
+”output”:
+”<step><number>3</number><output>The
+meeting can be scheduled from 14:30 to 15:30, as it fits the
+one-hour duration requirement and maintains alignment with all
+participants’ availability.</output></step>”,
+”error”: null
+},
+{
+”step number”: ”4”,
+”step”: ”Prioritize the common time slots based on urgency or
+strategic importance, ensuring that finding a shared time slot for
+key events is prioritized.”,
+”reasoner”: ”LLM”,
+”output”:
+”<step><number>4</number><output>The
+meeting is prioritized to be scheduled from 14:30 to 15:30
+due to the one-hour requirement and aligned schedules with
+all participants, with no further urgency or strategic importance
+evaluations needed.</output></step>”,
+”error”: null
+},
+
+
+===== page 15 =====
+{
+”step number”: ”5”,
+”step”: ”Select a suitable one-hour time slot shared by all
+participants, matching the duration and constraints of the highest
+priority event first.”,
+”reasoner”: ”Tools: Python Executor”,
+”output”: ”14:30 to 15:30”,
+”error”: null
+},
+{
+”step number”: ”6”,
+”step”: ”Adjust the selected time slot, utilizing free slots
+identified, to resolve any conflicts or unmet constraints among
+participants.”,
+”reasoner”: ”LLM”,
+”output”: ”<step><number>6</number><output>No further
+adjustments are needed for the selected time slot of 14:30 to
+15:30, as it meets all constraints and does not conflict with any
+participants’ schedules.</output></step>”,
+”error”: null
+},
+{ ”step number”: ”7”,
+”step”: ”Review the proposed time slot to ensure that it satisfies
+all participant availability and event constraints.”,
+”reasoner”: ”LLM”,
+”output”:
+”<step><number>7</number><output>The
+proposed time slot of 14:30 to 15:30 satisfies all participant
+availability and event constraints, ensuring a conflict-free schedule
+for the meeting.</output></step>”,
+”error”: null
+},
+{ ”step number”: ”8”,
+”step”: ”Output the finalized schedule, detailing the day and
+time of the event according to the requirements, ensuring all
+participants share the chosen slot.”,
+”reasoner”: ”LLM”,
+”output”:
+”<step><number>8</number><output>Monday,
+14:30 to 15:30</output></step>”,
+”error”: null
+},
+{
+”step number”: ”9”,
+”step”: ”FIN”,
+”output”: ”FINISHED”,
+”error”: null
+}
+]
+2) Example
+for
+Scibench
+Stat:
+Task: Your task is to solve statistics and probability problems by
+analyzing the problem statement, applying appropriate statistical
+methods, and calculating the required values. Output the final
+answer in the required format, without any other text.
+Instance: If the distribution of Y is b(n, 0.25), give a lower
+bound for P(|Y/n −0.25| < 0.05) when n = 100.
+Plan Implementation: [
+{
+”step number”: ”1”,
+”step”: ”Carefully read and analyze the given problem statement
+to understand the key elements involved, such as the binomial
+distribution and the specified condition |Y/n −0.25| < 0.05.”,
+”reasoner”: ”LLM”,
+”output”:
+”<step><number>1</number><output>We
+are given that the random variable Y
+follows a binomial
+distribution
+b(n, 0.25),
+where
+n
+is
+the
+number
+of
+trials
+and 0.25 is the probability of success in each trial. The
+problem requires us to find a lower bound for the probability
+P(|Y/n −0.25| < 0.05) when n = 100. This condition
+can be rewritten as 0.2 < Y/n < 0.3, which is equivalent to
+20 < Y < 30. Therefore, we need to calculate P(20 < Y < 30)
+for Y ∼Binomial(100, 0.25).</output></step>”,
+”error”: null
+},
+{
+”step number”: ”2”,
+”step”: ”Identify whether Chebyshev’s inequality should be
+applied, considering the need to find a lower bound for the
+probability P(−5 < Y −25 < 5).”,
+”reasoner”: ”LLM”,
+”output”: ”<step><number>2</number><output>Chebyshev’s
+inequality is suitable for finding a lower bound on probabilities
+related to the deviation of a random variable from its mean. Given
+the need to determine a lower bound for P(−5 < Y −25 < 5),
+where Y = 25 is the expected value of the binomial distribution
+Y ∼b(100, 0.25), Chebyshev’s inequality can be applied. The
+inequality states that for any k > 0, P(|Y −25| < 5) ≥1−σ2
+k2 ,
+where σ2 is the variance of the distribution.</output></step>”,
+”error”: null
+},
+{
+”step number”: ”3”,
+”step”: ”Calculate the mean µY and variance σ2
+Y of the binomial
+distribution Y to gather necessary parameters.”,
+”reasoner”: ”LLM”,
+”output”: ”<step><number>3</number><output>The mean
+µY and variance σ2
+Y of a binomial distribution Y ∼b(n, p) are
+calculated as follows:
+- Mean µY = n · p = 100 · 0.25 = 25.
+- Variance σ2
+Y
+= n · p · (1 −p) = 100 · 0.25 · 0.75 =
+18.75.</output></step>”,
+”error”: null
+},
+{
+”step number”: ”4”,
+”step”: ”Translate the condition |Y/n −0.25| < 0.05 using
+variance-based analysis to align with the problem’s requirements.”,
+”reasoner”: ”LLM”,
+”output”:
+”<step><number>4</number><output>The
+condition |Y/n −0.25| < 0.05 translates to 0.2 < Y/n < 0.3.
+Multiplying through by n = 100, we have 20 < Y < 30, which
+aligns with the requirement to apply Chebyshev’s inequality.
+In terms of deviation from the mean, this is equivalent to
+P(−5 < Y −µY
+< 5), where µY
+= 25 is the mean
+we calculated earlier. This allows us to apply variance-based
+methods
+like
+Chebyshev’s
+inequality
+to
+find
+a
+probability
+bound.</output></step>”,
+”error”: null
+},
+
+
+===== page 16 =====
+{
+”step number”: ”5”,
+”step”: ”Calculate the standard deviation σY from the variance
+σ2
+Y .”,
+”reasoner”: ”LLM”,
+”output”: ”<step><number>5</number><output>The stan-
+dard deviation σY is the square root of the variance σ2
+Y . Therefore,
+σY =
+√
+18.75 ≈4.33.</output></step>”,
+”error”: null
+},
+{
+”step number”: ”6”,
+”step”: ”Determine the value of k using the relation kσY = 5 as
+part of the variance-based form.”,
+”reasoner”: ”LLM”,
+”output”: ”<step><number>6</number><output>The value
+of k is determined by the equation k·σY = 5, where σY ≈4.33.
+Thus, k =
+5
+4.33 ≈1.1557.</output></step>”,
+”error”: null
+},
+{
+”step number”: ”7”,
+”step”: ”Apply Chebyshev’s inequality using the parameters cal-
+culated to find the lower bound for the specified probability.”,
+”reasoner”: ”Tools: Python Executor”,
+”output”: ”0.25”,
+”error”: null
+},
+{
+”step number”: ”8”,
+”step”: ”Compute the numerical lower bound to obtain the final
+answer, ensuring precision in calculations.”,
+”reasoner”: ”Tools: Python Executor”,
+”output”: ”0.25”,
+”error”: null
+},
+{
+”step number”: ”9”,
+”step”: ”Revisit the problem statement to ensure all aspects are
+addressed with the results.”,
+”reasoner”: ”LLM”,
+”output”: ”<step><number>9</number><output>The prob-
+lem asked for a lower bound for P(|Y/n −0.25| < 0.05)
+with Y ∼b(100, 0.25). We translated this to P(20 < Y <
+30), equivalent to P(−5 < Y −25 < 5) Using Cheby-
+shev’s inequality, we calculated that this probability is at least
+0.25. All aspects of the problem statement have been addressed
+and calculated accurately, ensuring the lower bound provided is
+precise.</output></step>”,
+”error”: null
+},
+{
+”step number”: ”10”,
+”step”: ”Format and output the final answer according to specified
+output requirements.”,
+”reasoner”: ”Tools: Python Executor”,
+”output”: ”0.25”,
+”error”: null
+},
+{
+”step number”: ”11”,
+”step”: ”FIN”,
+”output”: ”FINISHED”,
+”error”: null
+}
+]
+D. Error Analysis
+In this section, we analyze the performance of RunAgent
+plan implementation and GPT-4o plan implementation on the
+Natural Plan Calendar Scheduling Dataset using bootstrap-
+ping and the McNemar statistical test.
+Fig. 9.
+95% Confidence intervals for Natural Plan Calendar Scheduling.
+GPT-4o Corr.
+GPT-4o Incorr.
+Total
+RunAgent Corr.
+409
+402
+811
+RunAgent Incorr.
+60
+129
+189
+Total
+469
+531
+1000
+TABLE IV
+MCNEMAR TEST CONTINGENCY TABLE
+In Fig. 9, we plot the 95% confidence intervals for both
+plan implementation methods after using bootstrapping. We
+observe that RunAgent performs significantly better than
+GPT-4o when implementing the same plan.
+In Table IV, we have the contingency table for the McNe-
+mar test. The null hypothesis in this case is that both methods
+are expected to exhibit the same performance on a randomly
+chosen instance. The alternative hypothesis is that RunAgent
+is systematically better than GPT-4o in plan implementation.
+Using this test, we can calculate that the chi-square value
+is 253.17 and the corresponding p-value is 5.29 × 10−56,
+demonstrating that RunAgent performs better than GPT-4o
+for plan implementation with very high certainty.
+E. Examples of Facts
+1) Example for Natural Plan Calendar Scheduling:
+a) If a busy slot ends at time t, then the person is
+considered free at time t. For example, if the person
+is busy from 10:00 AM to 12:00 PM, then the person
+is considered free at 12:00 PM, and a meeting can be
+scheduled at 12:00 PM for this person.
+b) There is no need to have breaks between work for any
+person.
+c) A solution always exists.
+d) Each time interval is considered as half open with the
+open part being the end of the interval.
+2) Example for Natural Plan Trip Planning:
+a) If you spend any time of the day in a city, count it as
+a full day spent in that city.
+b) If you spend a day in two cities, count the day for both
+cities.
+
+
+===== page 17 =====
+c) The day you arrive in a city is counted as a full day
+spent in the city, and the trip starts on the day you
+arrive.
+d) The day you leave a city is counted as a full day spent
+in the city, and the trip ends on the day you leave.
+e) If you spend days x to y in a city, then you spent y-x+1
+days in that city. So if you spend days 3-6 in the city,
+you spent 4 days in that city.
+f) First find the order in which you visit the cities in the
+trip, then find the days you spend in each city.
+3) Example for Scibench Stat:
+a) Chebyshev’s inequality should be used when applica-
+ble.

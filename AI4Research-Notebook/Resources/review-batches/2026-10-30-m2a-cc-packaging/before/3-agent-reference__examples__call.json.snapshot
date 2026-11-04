@@ -1,0 +1,54 @@
+{
+  "schema_version": "2.0.0-m2a.1",
+  "id": "call.example.1",
+  "project_id": "example.study",
+  "contract_ref": {
+    "uri": "fixture:contract",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "package_id": "cc.calculation",
+  "release_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "capability_id": "calculation.calculate",
+  "input_refs": [
+    {
+      "uri": "fixture:input",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "environment_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "provider_bindings": [
+    {
+      "id": "artifacts",
+      "digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "scope": [
+        "example-output-root"
+      ]
+    }
+  ],
+  "admission_ref": {
+    "uri": "fixture:admission",
+    "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "policy_ref": {
+    "uri": "fixture:policy",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "required_check_ids": [
+    "calculation.input.v1",
+    "calculation.output.v1"
+  ],
+  "authorized_effects": [
+    "artifact.write"
+  ],
+  "limits": {
+    "max_attempts": 2,
+    "max_wall_seconds": 120,
+    "max_cost_units": 10,
+    "cost_unit": "declared_provider_credit",
+    "max_child_depth": 0
+  },
+  "idempotency_key": "example-sum-1",
+  "budget_reservation_id": "reservation-1",
+  "deadline": "2026-10-29T23:59:00Z",
+  "mode": "standalone"
+}

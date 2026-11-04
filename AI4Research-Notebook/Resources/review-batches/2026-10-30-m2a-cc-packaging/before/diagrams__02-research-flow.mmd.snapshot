@@ -1,0 +1,12 @@
+flowchart LR
+ Q[Question and bound criteria] --> S[Find sources and baseline]
+ S --> X[Run pinned experiment]
+ X --> O[Check observed evidence]
+ O --> N{New finding?}
+ N -->|Revise method| A[Update agenda and protocol revision]
+ A --> X
+ N -->|Evidence sufficient| D[Release report and reproduction bundle]
+ U[New software arrives] --> K[Qualify a new release]
+ K --> A
+ X -. retain every trial .-> L[Durable experiment ledger]
+ O --> L

@@ -1,0 +1,139 @@
+---
+id: ai4r-delivery-and-verification-status-20261023
+status: historical-checkpoint-with-later-source-update
+source: Sources/Prompts/2026-10-23-document-delivery-and-extent.txt; Resources/review-batches/2026-10-23-delivery-documentation/implementation-source-receipt.json
+last_reviewed: 2026-10-23
+next_action: Use the later integration status; retain this earlier delivery record as history
+---
+# AI4R delivery and verification status
+
+**Later dated source update:** previously observed remote `ai4r_M1` at `809351f8` contains the required Planner and optional capsule source. Statements below about unmerged local features describe the earlier checkpoint and are superseded for that remote baseline. Source merge is not qualification, activation, deployment or runtime acceptance. Use [[Resources/Current Baseline]] for reconciled inspected/local identities and [[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] for that proposal's source receipts.
+
+
+**Historical delivery checkpoint (superseded source status; retained evidence):** shared M1 later reverted deployment at `1fd17ab`. [[Activities/2026-10-23 Supervised M1 Integration]] records the next historical integration step; [[Resources/Current Baseline]] owns the reconciled source route. Runbook/status links below now point to the preserved candidate because those files were removed from shared M1.
+
+**Deployment tooling is implemented, committed and pushed. Full local/Spark
+benchmark execution has not been demonstrated here.** This is a status note,
+not an M1 acceptance report or a research result. Git refs were rechecked for
+this update; earlier test outputs retain their original feature/run scope.
+
+## What is delivered
+
+| Work | Implementation identity | Extent |
+|---|---|---|
+| Repository-owned build/stage/start/inspect/fetch/expiry workflow | `deployment-usability`, `e296d2b` | Merged and pushed to `ai4r_M1` |
+| Simple existing-image launch without host elevation | `deployment/no-sudo-quickstart`, `6a703050b8ea56e953c308298af37bf9fe6b1423` | Merged and pushed; this was the implementation checkpoint before later integration |
+| Required core typed Planner | `m1/required-typed-planner`, `9d8f21b140119ccec05f1a4f3cd5fa302cc01df5` | Committed locally and bundled; **not yet merged at this historical checkpoint** |
+| Generalist, table normalization, calculation and Markdown report capsules | Separate `capsules/*-m1` branches | Optional candidates; not auto-admitted, activated or deployed |
+| Capsule development and factory guide | `capsules/development-guide` | Separate documentation branch; factory automation remains future work |
+
+The separate [repository status](../../AI4Research-Development/jiuwenswarm-m1-reviewed-integration/deploy/m1/IMPLEMENTATION-STATUS.md)
+lists exact optional branch commits. The [preserved candidate runbook](../../AI4Research-Development/jiuwenswarm-m1-reviewed-integration/deploy/m1/OPERATIONS.md)
+is the operating reference. These are our modified AI4Research implementation,
+not pristine upstream JiuwenSwarm. The maintained PRD/design owner is unchanged.
+
+## What a user can do now
+
+With the matching `ai4r:local` and `benchmark-runner:local` images built or loaded:
+
+```sh
+python deploy/m1/ai4r.py up --cases ./cases.json --inputs ./inputs --output ./results
+```
+
+This creates owned deployment state, pins actual image IDs/platforms, stages only
+selected data and starts the app. It does not build/pull implicitly, run sudo,
+prepare host cgroups, force WSL root, install a host service, add a privileged
+container or mount the Docker socket. Read the private login URL from `logs`,
+complete model authentication, then:
+
+```sh
+python deploy/m1/ai4r.py start --refresh-credential
+python deploy/m1/ai4r.py runner doctor --json
+python deploy/m1/ai4r.py runner run --campaign-id trial-001
+```
+
+The runner is the existing sequential control/data plane in its own container.
+It collects observability and artifacts; humans judge task quality. Inputs and
+outputs are user-selected; repeated setup preserves app state and user files.
+Results persist on the execution host and `fetch` retrieves a verified snapshot
+without deleting the remote copy. Generated Compose paths support ordinary
+Docker inspection commands. Existing installations are not silently upgraded.
+
+Spark uses the same CLI with an SSH profile and ARM64 images built elsewhere.
+Images, selected inputs and repository-owned helper code are transferred; no
+registry, Spark source checkout, private scripts or Spark build is required.
+That remote delivery path is implemented, but not exercised against actual
+SSH/Docker infrastructure or Spark during this work.
+
+**The no-sudo change simplifies startup; it does not implement a portable
+no-admin code executor.** The existing read-only task path can work without
+executor delegation. Scientific/code-execution tasks retain their real sandbox
+prerequisites and can be blocked when these are unavailable. No guard was
+bypassed, and no claim that arbitrary tasks run on a restricted Spark is made.
+
+## Earlier checkpoint: Planner and capsule work remained separate
+
+[[Activities/2026-10-23 Required M1 Planner]] records the required-core correction:
+all selectable admitted declarations inform typed DAG assembly; compatible
+generic workflows are allowed; one invalid candidate can receive one bounded
+correction; attempts/diagnostics are retained. Independent host checks, the
+pinned semantic verifier, protected gates and Binder freeze still decide
+acceptance. Scientific release obligations remain. Controlled tests are not
+proof of model intelligence, optimal planning or verified research outcomes.
+
+The [Planner handoff](../../AI4Research-Development/ai4r-m1-typed-planner-handoff-20261023/README.md)
+contains a verified Git bundle. It is based on `e296d2b`, before the no-sudo
+revision. Combining it with `6a70305` still needs merge review and regression
+checks. Do not assume planned-case selection from that branch is in pushed M1.
+
+[[Activities/2026-10-23 Capsule Branches and Factory Direction]] preserves the
+optional capsule development history and branch handoff. Its optional-Planner
+framing was superseded: the Planner belongs in M1. The Generalist candidate is
+low trust and has deliberately narrow executable-expression support; it is not
+an arbitrary OS agent. Optional capsules need normal checking-asset qualification,
+admission and activation. No factory was built and no capsule was auto-promoted.
+
+## Evidence and limits
+
+| Evidence | Actual extent |
+|---|---|
+| Final deployment tests | 31 Windows passes; 30 Linux/WSL passes and one Compose-availability skip. Covers transfers, recovery, ownership, expiry, capacity, source/image selection, repeat launch, sentinel preservation and no host preparation. Windows rendered real Compose configuration without a daemon. |
+| Planner feature tests | 109 selected Windows passes and 39 Linux passes, including controlled compiler/runner/gate/freeze and rejection/repair scenarios. Different feature/run scope from deployment; totals are not a single integrated-system test. |
+| Profile capture | Fresh/repeated Linux development-profile capture preserved state. No production eligibility implied. |
+| Initial broader failures | Obsolete eager-copy trace test corrected to actual v2 deferred export semantics; production capture unchanged. Finite-run test could not pass with pinned OpenJiuwen absent from isolated environments. |
+| Host at that checkpoint | That direct probe could not connect to `dockerDesktopLinuxEngine`. The user's ingest-socket error is recorded, but its cause was not independently diagnosed. This superseded the October 21 engine observation at that checkpoint; no host probe was performed during cleanup. |
+| Unverified | Live image builds/containers, actual SSH target deployment, authenticated campaigns/model planning quality, native ARM64, Spark and full scientific execution. |
+| Research/product acceptance | No measured CC benefit, benchmark score/outcome, completed scientific investigation or integrated M1 acceptance established. |
+
+M2 durable VM labs, capsule containerization, factory automation and shared local
+inference are not implemented by this delivery. Nuwa-skill work is also outside
+it. The simple launch supersedes automatic host preparation, not the broader
+sandbox design. Source captures, prior notes and previous bundles remain intact.
+
+## Next checks
+
+1. Enable the local Docker engine; build/load the two matching images and run `up`.
+2. Authenticate, run one small supplied campaign, inspect observations/artifacts,
+   stop/start and fetch actual results. Keep task failures distinct from tooling failures.
+3. Review and merge the Planner and selected capsule branches independently;
+   qualify production checking assets and repeat affected checks.
+4. Address no-admin code-executor portability separately, then qualify the actual
+   ARM64/Spark host. No VM/factory prerequisite is introduced for benchmarking.
+
+[[Activities/2026-10-23 No-sudo Benchmark Launch]] provides the focused deployment
+record. The [documentation receipt](../Resources/review-batches/2026-10-23-delivery-documentation/implementation-source-receipt.json)
+records exact Git refs inspected for this note. No live test was rerun merely to
+write the documentation. Vault validation's two pre-existing missing presentation
+links remain separately visible; they do not establish runtime readiness.
+
+Repository status/runbook documentation was committed and pushed as `14a69a0`.
+That documentation-only follow-up does not change the `6a70305` implementation
+checkpoint or add runtime verification.
+
+## Later supervised integration
+
+[[Activities/2026-10-23 Supervised M1 Integration]] supersedes the separate-branches description above for the new local integration candidate only. The earlier push and test claims remain historical evidence at their named refs; see [[Resources/Current Baseline]] for the reconciled inspected/local identities.
+
+## Final merge after the pause
+
+[[Activities/2026-10-23 Final M1 Merge]] records the later authorized source integration with the newly supplied AI4R. Its results belong to that merge checkpoint; [[Resources/Current Baseline]] records the later inspected source identity; older pushed, reverted and separate-candidate statements above remain dated checkpoints.

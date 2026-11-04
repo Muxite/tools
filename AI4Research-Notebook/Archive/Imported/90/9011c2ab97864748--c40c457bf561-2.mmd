@@ -1,0 +1,23 @@
+flowchart TB
+    Library[(Admitted parent version)] --> Copy[Eligible target copy and visible development fixtures]
+    Copy --> Proposer[Fixed offline improver]
+    Proposer --> Candidate[Inactive candidate and lineage]
+    Candidate --> Referee[Protected independent referee]
+    Hidden[(Hidden loop and final fixtures)] --> Referee
+    Referee --> Evidence[(Bounded results and audit evidence)]
+    Evidence --> Proposer
+    Candidate --> Admission[Admission and compatibility checks]
+    Evidence --> Admission
+    Admission --> Human[Human activation or refusal]
+    Human --> Library
+    subgraph Legend[Legend]
+        Key[Blue: improvement work; purple: verification; amber: infrastructure; green: data]
+    end
+    classDef work fill:#E8F0FE,stroke:#2563EB,color:#172554
+    classDef verify fill:#F3E8FF,stroke:#7E22CE,color:#3B0764
+    classDef control fill:#FEF3C7,stroke:#B45309,color:#451A03
+    classDef data fill:#DCFCE7,stroke:#15803D,color:#052E16
+    class Proposer,Candidate work
+    class Referee verify
+    class Copy,Admission,Human control
+    class Library,Hidden,Evidence data

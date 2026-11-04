@@ -1,0 +1,8 @@
+TIME 1:00
+SAY: Main points:
+- Each decode token reads every weight once, so bytes per token is about the model file size
+- On this card decode bandwidth rises from 294 GB/s for 0.5B to 737 GB/s for 7B and then stops, because it reached the card's ceiling
+- The DGX Spark is listed at 273 GB/s, about a third of what this card sustained
+- So bigger local models there would decode more slowly, which matters for how many and how large models stay resident
+Supplemental points:
+- This uses the documented spec, a GB10 measurement may differ

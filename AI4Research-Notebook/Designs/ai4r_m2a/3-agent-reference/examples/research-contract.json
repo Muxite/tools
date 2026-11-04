@@ -1,0 +1,42 @@
+{
+  "schema_version": "2.0.0-m2a.2",
+  "project_id": "example.study",
+  "revision": 1,
+  "objective": "Compute and report a checked sum from supplied fixture values.",
+  "assumptions": [
+    "Fixture values are supplied by caller."
+  ],
+  "unresolved_questions": [],
+  "constraints": [
+    "No network."
+  ],
+  "allowed_effects": [
+    "artifact.write"
+  ],
+  "acceptance_obligations": [
+    {
+      "id": "sum.correct",
+      "criterion": "Exact sum independently recomputed with matching units.",
+      "required_check_ids": [
+        "calculation.input.v1",
+        "calculation.output.v1"
+      ],
+      "required_reproduction": "exact_replay"
+    }
+  ],
+  "deliverables": [
+    "report.md",
+    "reproduce/README.txt",
+    "result.json"
+  ],
+  "limits": {
+    "max_attempts": 2,
+    "max_wall_seconds": 120,
+    "max_cost_units": 10,
+    "cost_unit": "declared_provider_credit",
+    "max_child_depth": 0
+  },
+  "headless_missing_input": "block",
+  "authorized_by": "example-caller",
+  "supersedes": null
+}

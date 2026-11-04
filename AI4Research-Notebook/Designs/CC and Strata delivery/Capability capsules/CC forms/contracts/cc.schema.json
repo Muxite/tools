@@ -1,0 +1,1520 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai4r:cc:interchange:0.2",
+  "title": "CC interchange family 0.2 proposal",
+  "description": "A versioned request, implementation, evaluation or existing capability bundle. A document is immutable after publication; dispatch authority and receipts remain external.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.2.0-proposal"
+    },
+    "form": {
+      "enum": [
+        "change-request",
+        "implementation",
+        "evaluation",
+        "capability-bundle"
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "issuer": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "issuer"
+      ]
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9.-]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "predicate": {
+            "enum": [
+              "implements",
+              "evaluates",
+              "derived-from",
+              "supersedes",
+              "uses"
+            ]
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "uri": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "media_type": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "uri",
+              "sha256",
+              "media_type"
+            ]
+          }
+        },
+        "required": [
+          "predicate",
+          "target"
+        ]
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "uri": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "media_type": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "uri",
+              "sha256",
+              "media_type"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "requires_tools": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9.-]*$"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "data": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "schema",
+          "required",
+          "requires_tools",
+          "data"
+        ]
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "payload": {}
+  },
+  "required": [
+    "schema_version",
+    "form",
+    "identity",
+    "purpose",
+    "tags",
+    "relations",
+    "profiles",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "form": {
+            "const": "change-request"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "subject": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "repository": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "commit": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{40}$"
+                  },
+                  "submodules_lock": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "uri": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "media_type": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "uri",
+                      "sha256",
+                      "media_type"
+                    ]
+                  }
+                },
+                "required": [
+                  "repository",
+                  "commit"
+                ]
+              },
+              "objective": {
+                "type": "string",
+                "minLength": 1
+              },
+              "goals": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9.-]*$"
+                    },
+                    "statement": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "acceptance": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9.-]*$"
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "statement",
+                    "acceptance"
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "constraints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9.-]*$"
+                    },
+                    "statement": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "verification": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "statement",
+                    "verification"
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "editable_scope": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "components": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  },
+                  "protected_assets": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  },
+                  "interface_policy": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "components",
+                  "protected_assets",
+                  "interface_policy"
+                ]
+              },
+              "change_intents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9.-]*$"
+                    },
+                    "mode": {
+                      "enum": [
+                        "outcome-directed",
+                        "specified-transformation"
+                      ]
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "profile_id": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "mode",
+                    "description",
+                    "profile_id"
+                  ]
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              },
+              "acceptance": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9.-]*$"
+                    },
+                    "metric": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9.-]*$"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "baseline": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "operator": {
+                      "enum": [
+                        "ratio-at-most",
+                        "ratio-at-least",
+                        "difference-at-least",
+                        "equals"
+                      ]
+                    },
+                    "threshold": {
+                      "type": [
+                        "number",
+                        "string",
+                        "boolean"
+                      ]
+                    },
+                    "evaluator": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "uri": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "media_type": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "uri",
+                        "sha256",
+                        "media_type"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "metric",
+                    "unit",
+                    "baseline",
+                    "operator",
+                    "threshold",
+                    "evaluator"
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "evidence_policy": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              },
+              "target_profiles": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "uri": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "media_type": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "uri",
+                    "sha256",
+                    "media_type"
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "uri": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "media_type": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "uri",
+                    "sha256",
+                    "media_type"
+                  ]
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              },
+              "available_capability_catalog": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              },
+              "expected_outputs": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "source-change",
+                    "build-recipe",
+                    "builder-checks",
+                    "image",
+                    "migration-notes"
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "build_budget": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "wall_seconds": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "max_attempts": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "wall_seconds",
+                  "max_attempts"
+                ]
+              },
+              "open_questions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9.-]*$"
+                    },
+                    "question": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "blocks": {
+                      "enum": [
+                        "implementation",
+                        "lab-dispatch",
+                        "promotion",
+                        "none"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "question",
+                    "blocks"
+                  ]
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "subject",
+              "objective",
+              "goals",
+              "constraints",
+              "editable_scope",
+              "change_intents",
+              "acceptance",
+              "evidence_policy",
+              "target_profiles",
+              "inputs",
+              "available_capability_catalog",
+              "expected_outputs",
+              "build_budget",
+              "open_questions"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "form": {
+            "const": "implementation"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "deliveries": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "format": {
+                          "const": "oci-image"
+                        },
+                        "image": {
+                          "type": "string",
+                          "pattern": "^[^\\s@]+@sha256:[a-f0-9]{64}$"
+                        },
+                        "platform": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "format",
+                        "image",
+                        "platform"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "format": {
+                          "const": "git-commit"
+                        },
+                        "source": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "repository": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "commit": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{40}$"
+                            },
+                            "submodules_lock": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "uri": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "sha256": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                },
+                                "media_type": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "uri",
+                                "sha256",
+                                "media_type"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "repository",
+                            "commit"
+                          ]
+                        },
+                        "tree": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{40}$"
+                        }
+                      },
+                      "required": [
+                        "format",
+                        "source",
+                        "tree"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "format": {
+                          "const": "git-bundle"
+                        },
+                        "base": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "repository": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "commit": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{40}$"
+                            },
+                            "submodules_lock": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "uri": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "sha256": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                },
+                                "media_type": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "uri",
+                                "sha256",
+                                "media_type"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "repository",
+                            "commit"
+                          ]
+                        },
+                        "bundle": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "uri": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "sha256": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "media_type": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "uri",
+                            "sha256",
+                            "media_type"
+                          ]
+                        },
+                        "result_commit": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{40}$"
+                        },
+                        "result_tree": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{40}$"
+                        }
+                      },
+                      "required": [
+                        "format",
+                        "base",
+                        "bundle",
+                        "result_commit",
+                        "result_tree"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "format": {
+                          "const": "git-patch"
+                        },
+                        "base": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "repository": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "commit": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{40}$"
+                            },
+                            "submodules_lock": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "uri": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "sha256": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                },
+                                "media_type": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "uri",
+                                "sha256",
+                                "media_type"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "repository",
+                            "commit"
+                          ]
+                        },
+                        "patch": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "uri": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "sha256": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "media_type": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "uri",
+                            "sha256",
+                            "media_type"
+                          ]
+                        },
+                        "apply_mode": {
+                          "const": "git-apply-index-exact-base"
+                        },
+                        "result_tree": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{40}$"
+                        }
+                      },
+                      "required": [
+                        "format",
+                        "base",
+                        "patch",
+                        "apply_mode",
+                        "result_tree"
+                      ]
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "build": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "recipe": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "uri": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "media_type": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "uri",
+                      "sha256",
+                      "media_type"
+                    ]
+                  },
+                  "builder_image": {
+                    "type": "string",
+                    "pattern": "^[^\\s@]+@sha256:[a-f0-9]{64}$"
+                  },
+                  "target_profile": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "uri": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "media_type": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "uri",
+                      "sha256",
+                      "media_type"
+                    ]
+                  },
+                  "dependency_lock": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "uri": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "media_type": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "uri",
+                      "sha256",
+                      "media_type"
+                    ]
+                  }
+                },
+                "required": [
+                  "recipe",
+                  "builder_image",
+                  "target_profile",
+                  "dependency_lock"
+                ]
+              },
+              "source_snapshot": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "repository": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "commit": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{40}$"
+                  },
+                  "submodules_lock": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "uri": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "media_type": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "uri",
+                      "sha256",
+                      "media_type"
+                    ]
+                  }
+                },
+                "required": [
+                  "repository",
+                  "commit"
+                ]
+              },
+              "builder_checks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9.-]*$"
+                    },
+                    "status": {
+                      "enum": [
+                        "passed",
+                        "failed",
+                        "skipped",
+                        "not-run"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "uri": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "media_type": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "uri",
+                        "sha256",
+                        "media_type"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "status",
+                    "evidence"
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "compatibility": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "changed_interfaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 0,
+                    "uniqueItems": true
+                  },
+                  "migration_notes": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reader_requirements": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 0,
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "changed_interfaces",
+                  "migration_notes",
+                  "reader_requirements"
+                ]
+              },
+              "limitations": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              },
+              "provenance": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              }
+            },
+            "required": [
+              "summary",
+              "deliveries",
+              "build",
+              "source_snapshot",
+              "builder_checks",
+              "compatibility",
+              "limitations",
+              "provenance"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "form": {
+            "const": "evaluation"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "baseline": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              },
+              "candidate": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              },
+              "request": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              },
+              "workload": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              },
+              "request_tape": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              },
+              "target_profile": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              },
+              "gates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9.-]*$"
+                    },
+                    "metric": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9.-]*$"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "baseline": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "operator": {
+                      "enum": [
+                        "ratio-at-most",
+                        "ratio-at-least",
+                        "difference-at-least",
+                        "equals"
+                      ]
+                    },
+                    "threshold": {
+                      "type": [
+                        "number",
+                        "string",
+                        "boolean"
+                      ]
+                    },
+                    "evaluator": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "uri": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "media_type": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "uri",
+                        "sha256",
+                        "media_type"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "metric",
+                    "unit",
+                    "baseline",
+                    "operator",
+                    "threshold",
+                    "evaluator"
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "evidence_policy": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              },
+              "missing_evidence": {
+                "const": "inconclusive"
+              },
+              "execution_requirements": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "requires_resolved_product_lock": {
+                    "const": true
+                  },
+                  "exclusive_host": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "requires_resolved_product_lock",
+                  "exclusive_host"
+                ]
+              }
+            },
+            "required": [
+              "baseline",
+              "candidate",
+              "request",
+              "workload",
+              "request_tape",
+              "target_profile",
+              "gates",
+              "evidence_policy",
+              "missing_evidence",
+              "execution_requirements"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "form": {
+            "const": "capability-bundle"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "legacy_template": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              },
+              "qualification_evidence": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "uri",
+                  "sha256",
+                  "media_type"
+                ]
+              }
+            },
+            "required": [
+              "legacy_template",
+              "qualification_evidence"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

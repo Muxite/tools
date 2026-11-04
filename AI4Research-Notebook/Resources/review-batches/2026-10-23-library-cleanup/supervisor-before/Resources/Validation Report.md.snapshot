@@ -1,0 +1,49 @@
+---
+id: resource-validation
+status: active
+source: Resources/migration/validation.json
+last_reviewed: 2026-10-21
+next_action: Obtain target-host approval and signed held-out custody before any M1 runtime or CC accuracy study
+---
+# Validation report
+
+This report separates notebook integrity, software tests, and target-host research validation. Software tests exercise the new notebook tools and prototype; they are not M1 acceptance evidence or a CC effectiveness result.
+
+## Local checks
+
+| Check | Result |
+|---|---|
+| Lab manager unit tests | 15 passed; 1 symlink test skipped because this Windows account cannot create symlinks |
+| Accuracy-ledger tests | 22 passed |
+| Notebook tool and registry tests | 7 passed |
+| Notebook navigation, metadata, archive hashes, migration accounting | Current [receipt](migration/validation.json) reports 557 authored Markdown notes, 1,696 wiki links, 77,417 inventory rows and 14,290 copied/duplicate archive mappings verified; zero errors |
+| Prompt captures | Source messages retained with hashes in [capture manifest](../Sources/capture-manifest.json) |
+
+Commands are run from the workspace root:
+
+```powershell
+python -m unittest discover -s AI4Research-Notebook/Resources/lab -v
+python -m unittest discover -s AI4Research-Notebook/Experiments/tools -v
+python -m unittest discover -s AI4Research-Notebook/Resources/tools -v
+python AI4Research-Notebook/Resources/tools/validate_vault.py
+```
+
+The combined [verification runner](tools/verify_all.py) writes exact command/output receipts to [checks.json](verification/checks.json). Its outputs describe only this notebook's tools. The symlink rejection path still needs execution on a host that permits creating test symlinks.
+
+## Migration evidence
+
+The current inventory contains 77,417 entries: 3,406 copied sources, 10,884 duplicate source mappings, 62,866 links, and 261 excluded items or directory boundaries. Archived content occupies 328,109,848 bytes. Directory-boundary exclusions and reference collections are explicit; descendants within those boundaries are not individually inventoried.
+
+The [[Resources/review-batches/personal-collections-and-readiness|source review]] was bounded to listed entrypoints and candidate paths. Rule-based classification across the rest of the manifest does not imply human review of every document or research claim.
+
+Byte verification detected line-ending conversion in 1,054 unique archive files. Those copies were restored from originals matching the original SHA-256 receipts; [the initial summary](migration/initial-byte-restoration-summary.json) preserves the observed count and explains the receipt limitation. Archive and prompt paths are excluded from Git text normalization. Validation rechecks all 14,292 copied/duplicate source mappings.
+
+## Target-host and project checks
+
+- Real Docker synthetic smoke: passed on Docker Engine 29.8.0, Linux x86_64 with 16 CPUs and 8.18 GB reported memory. The [receipt](verification/lab-host/host-0d43064b32.json) shows two simultaneous isolated and capped containers, exclusive scheduling, export integrity, no default route or Docker socket, interrupted-worker reconciliation, simulated provision-recovery without replay, complete cleanup, and surviving exports. This is lab-manager validation on a synthetic fixture only: it does not prove security against kernel/runtime exploits, M1 compatibility, or research accuracy.
+- M1 production image build at captured `d3d7f565`: [build log](verification/m1-build-d3d7f56.txt). The command was started but no completed image/exit receipt was captured; treat build readiness as unverified.
+- GB10: device access, target software stack, and host-specific measurements. GPU configuration is not implemented by the initial CLI.
+- M1 candidate: reconciliation and runtime checks against current contracts.
+- CC research: no model runs, independent scoring, held-out evaluation, or measured improvement/regression findings have been performed.
+- Obsidian UI: on-screen rendering has not been inspected. Essential navigation is statically checked; the vault uses only built-in features.
+- Backup: the mechanism is locally tested; no off-device backup has been created.

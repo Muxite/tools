@@ -1,0 +1,189 @@
+---
+id: sandbox-lab-design-m2
+status: m2-proposal-for-discussion
+source: Sources/Prompts/2026-10-26-m2-lab-cc-factory-direction.txt; Sources/Prompts/2026-10-26-sandbox-design-refresh.txt; Resources/review-batches/2026-10-26-sandbox-design-refresh/receipt.json
+last_reviewed: 2026-10-26
+next_action: Review the shared lab and CC contracts for the October 27 proposal, then register the first workload lab slice with the owning repository
+---
+# Sandbox Lab Design
+
+A lab is a durable, field-specific research project with an independent AI4Research instance, selected capability capsules, domain applications and retained knowledge. Its sandbox bounds execution mistakes, runaway experiments and faulty harness changes. Labs can explore different ideas and evolve independently while selected packages, data and findings return to master AI4R through separate qualification.
+
+This is the current M2 sandbox proposal for Tuesday, October 27, 2026. It defines the shared lab and CC boundaries; workload profiling is the first validation case. Robotics illustrates a stateful application and is a non-blocking integration. A simulator, API or repository has not been selected. The design must support additional labs without making their authors understand the entire AI4R system.
+
+Read the [diagram set](Sandbox%20Lab%20Diagrams/README.md) for the visual walkthrough, then the ownership, execution and storage sections below. [[Designs/M2 Lab Capsules and Factory Proposal]] expands the CC proposal. [[Designs/Durable Project Labs]] retains detailed durability scenarios. M1 product contracts remain in their owning repository; this is an M2 proposal, not a claim that the design is implemented or agreed by every component owner.
+
+## Design decisions and scope
+
+The user has set the following direction: containment targets faults and runaway work, rather than deliberately malicious imported code; labs provisionally adopt qualified CC versions automatically; the CC factory produces CCs; whole-system RSI and harness changes belong to the RSI owner. A CC may contain several related capabilities qualified together. Long-running research should be able to reconsider future work during execution. Preliminary robotics guidance can change and must not block the main team.
+
+The proposed mechanisms are a per-lab runtime, operation-based CC packages, a small infrastructure controller, versioned application bindings, durable job records and independent qualification. Deployment profiles, rolling planning, service migration and activation interfaces need implementation agreements with their owners. The prototype is intended to discover useful behavior and failure cases that a larger engineering team could develop further.
+
+## 1 Lab context and ownership
+
+![Lab context and ownership](Sandbox%20Lab%20Diagrams/01-lab-context.png)
+
+Each lab has its own goals, source changes, catalog selection, factory attempts, application state and evidence. Master supplies a tested starting release and approved library entries. A local update does not update master or another lab. Read-only image/data sharing is possible, but writable project state and credentials remain separately scoped.
+
+| Component or role | Owns | Boundary |
+|---|---|---|
+| Human project owner | Brief, research direction, budgets and interventions | Approves project intent; does not have to approve each working plan or qualified local CC update |
+| Lab infrastructure | Lab identity, deployment, resource control, application lifecycle, persistent storage and recovery | Runs outside mutable research code; enforces supplied policy through typed operations |
+| AI4R and Planner owner | Research agenda, work selection, progress, continuation and replanning | Requests operations within the brief and policy; does not grant its own host access |
+| CC owner and factory | Package/operation contracts, adapters, candidate construction, provenance and factory interfaces | Produces CC candidates; does not own whole-harness RSI |
+| Qualification and admission mechanism | Fixed checks, evidence assessment, eligibility and local activation policy | Candidate authors cannot change the criteria used to admit that candidate |
+| RSI owner | Overall improvement search/workflow and harness evolution | Can request CC work from the factory; harness changes follow the separate platform path |
+| Domain application author | Profiler/simulator behavior and ordinary interfaces | Supplies setup, inputs/outputs and reset/checkpoint semantics; can integrate later |
+| Central qualification | Shared-base releases and selected contributions | Export is submission, not central adoption |
+
+These are logical responsibilities. A small team may implement several in one codebase. Independence means that the candidate cannot decide or rewrite its own admission outcome; it does not require a new employee or distributed service for each box.
+
+## 2 Sandbox deployment and containment
+
+![Reference deployment and control boundary](Sandbox%20Lab%20Diagrams/02-runtime-boundary.png)
+
+Use a permitted Linux execution environment with Docker Engine as the first concrete runtime. A lab-scoped Compose project runs persistent AI4R and any managed application services. A narrow host controller/broker launches bounded CC jobs and reconciles persistent service definitions. The factory initially remains a module/worker of the lab app; a separate factory service is unnecessary for the first slice.
+
+The previous VM-per-lab design remains an optional outer deployment profile and longer-term isolation option. The first operation and storage contracts work on a qualified Docker host or inside an already provisioned lab VM. This changes the earlier assumption that a new VM is mandatory for every first delivery. A container project is not a VM or proof of equivalent isolation.
+
+The controller alone receives Docker/provider authority. AI4R, factory agents and CC operations receive typed request interfaces and scoped application endpoints. They do not receive the Docker socket, arbitrary bind paths or controller policy writes. Controller policy resolves logical resource IDs into allowlisted mounts, images, devices, networks and limits. Required configuration or credentials missing at startup leaves the dependent capability unavailable.
+
+| Fault | Proposed control | Expected outcome |
+|---|---|---|
+| Runaway loop or process tree | Per-invocation deadline, CPU/memory/PID limits and cumulative journey budget | Controller terminates owned work and retains failure observations |
+| Unbounded output, logs or build growth | Filesystem quota where supported, bounded staging/logs, measured reservations and headroom | Refuse growth or stop the job; do not delete unique project data to make space |
+| Wrong file or cross-lab path | Lab-scoped resource mapping, read-only inputs, separate writable workspaces | Refuse the operation before execution |
+| Faulty generated harness | Candidate source/release and separate trial deployment; controller outside its write scope | Stop/replace the candidate runtime; retained stable release remains available |
+| Competing experiment commands | Session leases and exclusive grants for mutable resources | Serialize conflicting operations or report resource busy |
+| Crash during an external effect | Persist intent and operation identity; reconcile observed state | Resume observation or mark outcome unknown, without blind effect replay |
+| Unauthorized egress | Explicit profile and controller-enforced routes; network-off batch profile first | Deny undeclared destinations; required service access is scoped |
+
+Compose project names, accounting records and model instructions alone do not enforce these controls. Qualify effective mount permissions, network routes, process limits and disk behavior on the chosen host. Keep an operator stop path outside AI4R. Isolation protects against mistakes within the measured profile; malicious dependency screening is not the promised containment property.
+
+Spark remains optional execution/benchmark hardware, with preparation/builds elsewhere where practical. Neither Spark, guest GPU passthrough, a registry, local inference nor fleet orchestration is required to demonstrate the first lab. GPU needs use a separately qualified host/device route. An unavailable accelerator blocks that profile without blocking CPU and fixture-based core work.
+
+## 3 CC packages and application bindings
+
+![Package, operation and application identities](Sandbox%20Lab%20Diagrams/03-cc-package.png)
+
+A CC package is the reusable version and qualification unit. An operation is a selectable action within that package. An invocation is one attempt at one operation with exact inputs, grants, checks and resource bindings. An application binding identifies the actual library, batch runtime, managed service or attached service used by that invocation. These identities must not collapse into a mutable image tag.
+
+| Contract | Produced and consumed by | Minimum meaning |
+|---|---|---|
+| Lab manifest | Controller → runtime/recovery | Lab ID, current deployment, owner/policy, release/catalog/configuration refs, storage and backup refs |
+| CC package | Factory → qualification/library | Declaration, named operations, source/implementation pins, dependency set, resource profiles, evidence and lineage |
+| Operation contract | CC author → Planner/binder/checks | Purpose, typed ports, effects, preconditions, limits, required services and operation-specific checks |
+| Application binding | Controller → binder/runner | Instance/profile, implementation identity, API/state schema, endpoint or mount handles, ownership and lease scope |
+| Invocation record | Binder → controller/carrier | Lab/run/attempt, selected operation/package, accepted input refs, binding, effective grants, deadline and check pins |
+| Result and observations | Carrier/controller → host checks/store | Output files or job handle, actual implementation, exit/cancel/unknown state, logs, usage and imported artifact refs |
+
+One package can contain multiple images or member packages under one compatibility manifest. It may expose shared utility and domain-specific operations. Operation-level least privilege still applies: `read_metrics` does not inherit `reset_simulator` authority merely because both are in one package. Small independent functions remain valid single-operation packages when that is the useful unit.
+
+Joint qualification tests shared dependencies, operation conformance and representative cross-operation journeys. It does not establish every possible plan as correct. Required preconditions and accepted artifact types constrain valid sequences. Composite recipes name pinned member operations and retain constituent evidence; fusion creates a newly qualified implementation. Both are optional extensions to the package model, rather than reasons to postpone exposing several operations.
+
+Three packaging profiles are supported in the design: **embedded/batch**, where implementation and adapter run within a bounded invocation; **managed service**, where the controller runs a pinned application with lifecycle/storage declarations; and **attached service**, where the lab binds an already managed endpoint. Attached service access does not imply authority to upgrade, reset or delete it. A remote binding must record its location and authorized data transfer; it is not automatically covered by the local sandbox.
+
+The factory proposes a profile from actual source/docs/API observations and an operator-authored template. Qualification verifies its setup, interfaces and state assumptions. The controller chooses actual storage, credentials, devices and placement. Unknown setup or migration requirements create a blocked candidate. No robotics-specific transport, image or simulator is selected by this design.
+
+## 4 Adaptive work with fixed invocation records
+
+![Research work and checking loop](Sandbox%20Lab%20Diagrams/04-adaptive-work.png)
+
+The proposed M2 research agenda is mutable. Results, failures, new eligible capabilities, human direction or a requested planning turn may change unstarted work. Only the next operation or small coherent batch needs a concrete binding. The binder verifies the selected operation, required inputs, causal prerequisites, grants, budgets, service readiness and mandatory check assignment before dispatch.
+
+Already dispatched work retains its version and resource bindings. Changing it requires an explicit cancellation/new attempt; completed evidence is never rewritten. A plan revision records what changed and why, which prior work is reused or superseded, and any invalidated future bindings. Active independent work can finish while planning continues. Shared mutable service sessions use exclusive leases, preventing a revised agenda from issuing contradictory commands.
+
+This is an integration proposal for the Planner/runtime owner. It changes the M1 whole-run frozen DAG and terminal node-failure behavior, so it requires an explicit M2 contract rather than silently modifying M1. The CC owner supplies operation contracts, availability/version events, preconditions and evidence. A temporary driver can demonstrate those interfaces before a full Planner integration exists, but is not evidence that autonomous replanning is implemented.
+
+The runner stages scoped accepted inputs and imports completed output bytes into separate custody. Host checks can inspect accepted inputs, runtime evidence and service identity. Semantic verifier CCs receive the pinned selected-operation declaration and exact output, retaining the current output-only review boundary. The protected gate alone marks an invocation accepted. Process exit zero, factory self-tests and a producer's success field are insufficient.
+
+A valid scientific negative or inconclusive conclusion can be an accepted result when evidence and contract requirements are met. A crashed process, missing output or rejected gate remains a failed attempt. The research loop can inspect that failure and propose further bounded work; it cannot relabel it as a verified finding. Replanning and repair consume cumulative limits as well as per-attempt limits. Declared no-progress and budget exits pause or block unattended work with a visible reason.
+
+Long operations can submit a durable job and return a handle, then expose inspect/cancel/result operations. Submission acceptance means the job was accepted, not that its scientific outcome is accepted. The job retains its originating version/binding across planning turns. Restart reconciles the handle and actual process before deciding whether a new attempt is safe.
+
+## 5 Storage, lifecycle and recovery
+
+![Durable storage and replacement](Sandbox%20Lab%20Diagrams/05-storage-recovery.png)
+
+Persist lab identity separately from deployment, research-run, operation-attempt, service-instance and session identities. Restore keeps the lab and historical runs but creates a new deployment identity. A deliberate fork gets a new lab ID, parent checkpoint and fresh credentials.
+
+| Data class | Proposed storage | Rules |
+|---|---|---|
+| Source, adapters and deployment recipes | Version-controlled source plus captured candidate trees | Preserve uncommitted work before replacement; executable releases record exact source/image identities |
+| Images and locked executables | Engine/artifact store, optionally verified archives/registry | Retain references needed by active work, admitted versions and chosen rollback sets |
+| Lab control metadata | Existing transactional app store; controller lifecycle ledger outside mutable runtime | Record desired/observed state, job IDs, bindings, activation and ownership before effects |
+| Brief, knowledge, hypotheses and decisions | Durable project records with evidence references | Accepted findings distinguish evidence from hypotheses, failures and model summaries |
+| Datasets, scenes, robot assets and model artifacts | Versioned lab resource store | Pin input versions; copy/share immutable artifacts explicitly; use scratch copies for experiments that modify them |
+| Mutable application state | Lab-owned service volume, instance/session scoped | Declare schema, reset, checkpoint, consistency and migration behavior |
+| Logs, videos, traces, metrics and reports | Bounded staging, then retained artifact storage | Validate/import outputs; metadata carries hashes and refs rather than large byte payloads |
+| Secrets | Separately protected runtime enrollment | Keep out of images, candidate contexts, ordinary exports and forks |
+| Cache, scratch and partial downloads | Owned temporary storage | Reclaim only known inactive resources after required evidence is retained |
+
+Illustrative host layout: `labs/<lab-id>/source`, `state`, `resources`, `services/<instance-id>`, `jobs/<attempt-id>` and `evidence`. The controller's policy, ownership ledger and credentials reside outside directories writable by the mutable AI4R runtime. Logical IDs, rather than arbitrary caller paths, select these resources.
+
+The lifecycle is create → ready → active → quiescing → stopped, with explicit blocked/degraded states. Create prepares storage and a pinned release; resume acquires ownership, validates compatibility and reconciles jobs before admitting work. Stop rejects new work, drains or records interrupted attempts and retains data. Archive verifies a selected export before releasing compute. Delete is an explicit separate data-disposition operation.
+
+Checkpoint quiesces affected writers or uses an application-supported consistent snapshot procedure, captures database/resources/artifact/source manifests and records outstanding jobs. Copy the required bytes to an independent device/service and verify hashes. Restore fences the old writer, imports into a replacement deployment, checks data and version compatibility, reconciles jobs and proves readiness. A heartbeat expiry alone is not a fence. If ownership is uncertain, block writes.
+
+Process memory is replaceable. A simulator volume does not preserve live physics, and a provider/model session is not the knowledge store. Applications declare either checkpoint/resume or reset/restart semantics. An interrupted profiler may retain valid partial observations without a complete benchmark result. Historical runs record whether dependencies remain replayable, externally recoverable or provenance-only.
+
+Budgets cover peak staging/import/export overlap, image copies, retained state, build cache and active/paused labs. Retain the existing 20 percent filesystem headroom policy as an initial planning bound, then measure actual needs. Reservations need a real enforcement mechanism or explicitly weaker observed-only status. Disk pressure pauses new growth; age or compute expiry does not authorize deleting unique data, uncertain jobs, active pins or unexported evidence. Independent backup destination and retention/recovery objectives are deployment inputs before unattended operation.
+
+## 6 Factory qualification and automatic local adoption
+
+![Factory lifecycle and adoption boundaries](Sandbox%20Lab%20Diagrams/06-factory-adoption.png)
+
+The lab loop or RSI submits a capability request with target behavior, sources, interfaces, allowed CC changes, fixtures and budget. The factory captures sources, prepares a bounded build context, uses an approved packaging profile, builds/loads an exact artifact and returns a candidate plus lineage and evidence. Build jobs can run on a permitted workstation/CI backend; each lab retains its own job history and package identities.
+
+Qualification freezes the criteria before evaluating that candidate. It checks operation conformance, representative package interactions, application compatibility, effect/resource declarations, persistence and negative behavior relevant to the profile. Candidate self-tests are evidence inputs; independent checks decide eligibility. Generated test code cannot silently replace protected incumbent criteria. A changed declaration, implementation or service dependency creates a new candidate identity.
+
+Passing versions automatically become locally active for compatible future work under the user's provisional policy. Activation records the old/new selection and emits a capability event. The binder resolves an exact eligible version for each new invocation. Existing sessions/jobs retain their version; an operation on an old session either uses its compatible package or starts a separately qualified new session.
+
+A package-only update can activate without changing application state. A service update uses a parallel new instance when resources permit, or drains/checkpoints/migrates under a supported recipe. Missing migration, failed readiness or insufficient coexistence capacity leaves the update eligible but activation pending. Restore the prior compatible package/service/state set on failed activation. Existing failures and new candidate evidence remain retained. Revoke a known-bad version for new work and have the controller explicitly cancel or contain affected active work according to severity; do not silently rewrite its pin.
+
+The factory does not edit, qualify or activate the harness. RSI-owned harness candidates use a separate trial/release path and infrastructure-controlled activation. Local CC exports and selected findings may be submitted centrally; central qualification and other labs' adoption are separate. Automatic local activation grants no central write authority.
+
+## 7 Workload profiling and robotics examples
+
+![Domain profiles using the same lab contracts](Sandbox%20Lab%20Diagrams/07-domain-profiles.png)
+
+| Shared interface | Workload profiling first | Robotics integration later |
+|---|---|---|
+| Candidate package | `workload_analysis` | `robotics_experiments` |
+| Example operations | Inspect dataset, profile workload, extract features, fit predictor, evaluate transfer | Inspect scene, configure episode, run episode, read observations, compare controllers |
+| Application profile | Bounded profiler job; optional persistent telemetry collector | Library, batch or service according to actual simulator API |
+| Durable resources | Workload definitions, historical traces, machine descriptions and held-out cases | Scenes, robot assets, controllers, trajectories and checkpoints |
+| Mutable work | Per-attempt measurement workspace and job handle | Session/episode state with declared reset/checkpoint behavior |
+| Important check | Units, hardware provenance, split leakage, instrumentation and comparison conditions | Units, scene/controller identity, reset consistency and expected observations |
+| Scheduling concern | Measurement interference and permitted hardware inspection | GPU allocation and conflicting session commands |
+
+The profiler receives a declared instrumentation profile or controller-provisioned measurement endpoint, rather than unrestricted host mounts. Record hardware/software identity, measurement settings and co-running load. For a controlled benchmark, request an exclusive measurement slot on the actual measured host; if the controller cannot control other workloads, label the observation accordingly. A remote benchmark job is an explicitly authorized execution binding with input staging and verified result return, not a claim that the remote host is inside the local sandbox.
+
+Prediction on another machine is evaluated against independent observations where available, with held-out machines/workloads and uncertainty. Successful sandbox operation does not demonstrate prediction accuracy. Robotics conformance can be tested with a small stateful fixture before the real simulator exists; fixture results establish protocol/lifecycle behavior only. Its author later supplies the native interface and setup requirements without blocking the shared infrastructure.
+
+## 8 First delivery and evidence
+
+| Slice | Reviewable exit |
+|---|---|
+| Shared boundary examples | One lab manifest, multi-operation package, application binding, invocation, artifact result and activation record agree on identity/ownership |
+| Durable lab | One lab runs the workload example, survives app replacement and restores into a fresh deployment with old-writer exclusion |
+| Operation execution | A manually packaged CC exposes several operations, records exact bindings, rejects invalid preconditions and handles timeout/cancel/unknown outcome |
+| Factory update | One compatible candidate passes independent checks and is automatically selected for new work; rejected candidate and active old session remain correctly handled |
+| Adaptive work interface | A result or capability event changes future work while dispatched records remain fixed; report driver versus actual Planner integration separately |
+| Second profile | A small stateful application exercises service lifecycle, session leases and persistent data; robotics can attach later |
+
+Required failure scenarios include runaway work, full output storage, controller/app interruption, stale writer, corrupt backup, missing dependency, incompatible service state, duplicate effect submission, bad candidate rejection and failed activation rollback. The owner records intended/observed behavior and retained evidence. A scientific negative, infrastructure failure and acceptance refusal remain distinct outcomes.
+
+Compare fixed recipes and adaptive operation selection on matched tasks using actual success, verification failures/false rejections, runtime/cost and useful changes of direction. Measure factory packaging effort and successful integration across supported profiles. The prototype can be useful with one local host, directories, a transactional store, Compose and existing checking machinery. Fleet scheduling, arbitrary automatic migration, adversarial-code containment and generalized whole-system RSI are outside this delivery.
+
+## Proposal gaps and tradeoffs
+
+The main open agreements are the Planner's incremental dispatch/revision interface, the RSI-to-factory request/result interface, multi-operation declaration evolution, the admission/activation owner implementation and supported service migration rules. None depends on a selected simulator. Actual host capacity, quota enforcement, permitted instrumentation/device access and external backup destination need environment qualification.
+
+The strength is one reusable set of contracts across batch tools and stateful applications. The cost is additional package/session/version bookkeeping and a privileged controller that needs careful bounded implementation. The opportunity is to measure whether selectable operations and automatic compatible updates help useful research. The main risks are invalid state reuse, self-certified updates, measurement interference and storage growth; leases, independent admission, explicit bindings and retained evidence make these testable.
+
+## Source patterns and previous designs
+
+This proposal adapts the already researched [MCP multi-tool interface](https://modelcontextprotocol.io/specification/2025-11-25/server/tools), [Compose services and persistent data](https://docs.docker.com/compose/intro/compose-application-model/), [ROS managed lifecycle](https://design.ros2.org/articles/node_lifecycle.html), [Kubernetes controller/operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/), [Magentic-One planning ledgers](https://microsoft.github.io/autogen/dev/user-guide/agentchat-user-guide/magentic-one.html), [Temporal message passing](https://docs.temporal.io/encyclopedia/workflow-message-passing) and [AWS artifact-reference guidance](https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html). These sources establish their own mechanisms; the application to AI4R is this proposal. No new dependency installation is required by referencing a pattern.
+
+[[Designs/VM Lab Infrastructure Design]], [[Designs/Container Capability Capsule Design]], [[Designs/Per Lab Capability Factory Design]] and the October 23 handoffs retain earlier implementation proposals. Where they mandate one VM, one image/operation, frozen whole-run plans, manual future activation or factory-owned platform changes, the current M2 proposal here takes precedence for discussion. The older source bytes and diagrams are preserved in the [refresh receipt](../Resources/review-batches/2026-10-26-sandbox-design-refresh/receipt.json); maintained M1 contracts are not amended by this notebook update.

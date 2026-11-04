@@ -1,0 +1,42 @@
+---
+id: ai4r-m2a-1-human-required-02-capsules
+status: proposed-runtime-unverified
+source: ai4r_m2a/3-agent-reference/source-manifest.json
+last_reviewed: 2026-10-30
+next_action: Implement against the acceptance matrix and attach measured evidence
+---
+# 2. Capabilities do work; capsules make them reusable and dependable
+
+[Package home](../README.md) · [Next: reliability](03-reliability.md)
+
+**A capability is an operation. A CC is a portable category package containing one or more related operations and their supporting contracts.** Calculation is a CC; calculate and normalize-table are capabilities. Literature is a CC; search, screen and summarize-paper are capabilities. A capability may wrap a tool, skill, MCP operation, agent, workflow or data access operation. Type alone says little about suitability.
+
+![Capsule anatomy and selection](../diagrams/03-capsules.svg)
+
+Each CC carries identity and immutable release pins, capability declarations, dependency/provider requirements, scope/effect ceilings, executable checks, qualification fixtures and usage guidance. Each capability declares its actual inputs, outputs, constraints, effects, costs, invocation entrypoint and required checks. Capsule-wide checks and member-specific checks compose; the stricter applicable rule wins.
+
+Checks are the floatie's handles: part of using it, not optional advice the agent must remember to request. Input and permission checks run before effects; output checks run before acceptance. Independent task-level assessment is bound separately when necessary. The capsule producer supplies useful tests but does not control the protected release verdict.
+
+## Filter, then rank, then validate the actual call
+
+For a video input, a text-only capability is excluded unless a separately declared and qualified conversion is selected. Search only the remaining candidates by relevance. Color in the pool is shorthand for this current compatibility, never “green means skill.” The same skill category can contain compatible and incompatible members. Near/far means relevance now, not permanent quality.
+
+Use exact contract identifiers or explicit adapters initially; do not claim arbitrary schema equivalence. Filter on input/output modality, schema and semantic requirements, provider availability, permissions, qualification scope and release status. Then rank declarations and documented experience. Recheck the selected release and actual payload at dispatch because the pool may have changed.
+
+## Every CC works outside AI4R
+
+The same package must be usable through Python, a command line and MCP, with the same mandatory check path. An external caller supplies explicit providers and a small call context; it does not construct a fake research pipeline or import AI4R's internal research store. AI4R adds richer discovery, research history and independent project checks to that same package.
+
+A model-based capsule still needs a model provider; a benchmark capsule needs an execution provider. Portability means explicit, replaceable dependencies with working standalone adapters and examples, not magically eliminating dependencies. Missing providers return a named pre-dispatch failure. A skill consisting only of instructions may be useful guidance, but cannot count as a completed verified capability conversion.
+
+**Acceptance:** every initial category has a successful standalone example, all its members are covered by contract/check tests, and negative cases cannot bypass checks through Python, CLI, MCP or native agent tooling. See M2A-02, 03, 05 and 11. [Provider details](../2-human-relevant/portability-and-providers.md).
+
+## Containerized, vetted and evidence-bearing
+
+The agent lives in a sandbox and performs a broad range of research activities; CCs keep its available capability space usable and qualified. Every CC supplies a digest-pinned container image and dependency lock, declared effects, guards, gates, dedicated per-capability verifiers and traceable execution records. This is a required packaging contract, not a claim that ordinary tools cannot be well tested.
+
+Historical performance is attributed to the capability, release, environment and workload. Independent policy sets quality thresholds and derives a scoped trust level; insufficient evidence prevents unrestricted admission. Trust never removes required checks or grants new permissions. The immutable package identifies its history; mutable evidence remains in the durable store.
+
+Clean install, disable, removal and dependency cleanup are near-term requirements. Keep shared resources, running-job references and reproduction evidence intact. Broader spatiotemporal composability is deferred. Packages also declare RSI change permissions and optimization objectives; history informs proposals, while independent policy controls changes and promotion.
+
+The cost is more upfront packaging, verification and maintenance. The intended benefits are dependable reuse and repeatable setup, with actual accuracy/performance gains still to be measured. See [packaging, trust and evolution](../2-human-relevant/capsule-packaging-and-trust.md) and the [recommended communication angle](../2-human-relevant/capability-capsule-positioning.md).

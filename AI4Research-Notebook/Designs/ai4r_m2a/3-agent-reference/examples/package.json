@@ -1,0 +1,68 @@
+{
+  "schema_version": "2.0.0-m2a.2",
+  "id": "cc.calculation",
+  "category": "calculation",
+  "version": "0.1.0",
+  "release_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "members": [
+    "calculation.calculate",
+    "calculation.normalize_table"
+  ],
+  "required_providers": [
+    "artifacts"
+  ],
+  "effect_ceiling": [
+    "artifact.write"
+  ],
+  "shared_check_ids": [
+    "calculation.input.v1"
+  ],
+  "qualification_scope": [
+    "finite numeric inputs; local fixture environment only"
+  ],
+  "file_manifest": {
+    "uri": "fixture:files",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "license": "example-only",
+  "execution": {
+    "format": "oci",
+    "image": "example.invalid/calculation@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "platform": "linux/amd64",
+    "host_requirements": [
+      "compatible OCI runtime"
+    ],
+    "dependency_lock_ref": {
+      "uri": "fixture:dependency-lock",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "resource_ownership_ref": {
+      "uri": "fixture:owned-resources",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "quality_policy_ref": {
+    "uri": "fixture:quality-policy",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "history_key": "cc.calculation",
+  "evolution_policy": {
+    "policy_ref": {
+      "uri": "fixture:evolution-policy",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "allowed_targets": [
+      "worker"
+    ],
+    "objectives": [
+      "reduce latency subject to unchanged correctness floor"
+    ],
+    "protected_targets": [
+      "verifiers",
+      "heldout-fixtures",
+      "permissions",
+      "quality-thresholds"
+    ],
+    "promotion_requires_independent_admission": true
+  }
+}

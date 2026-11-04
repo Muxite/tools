@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai4r:design:0.3:brief",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "record_type": {
+      "const": "factory-brief"
+    },
+    "schema_version": {
+      "const": "0.3.0-proposal"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "instruction": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseline": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/source"
+    },
+    "available_ccs": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "requested_ccs": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "allowed_changes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "must_preserve": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "output_expectations": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "reviewable-source",
+          "reproducible-candidate",
+          "optional-cc"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hardware": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_gpu_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "hardware",
+        "max_gpu_count",
+        "max_seconds"
+      ]
+    },
+    "evaluation_policy": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:ai4r:design:0.3:common#/$defs/profile"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "record_type",
+    "schema_version",
+    "id",
+    "instruction",
+    "baseline",
+    "available_ccs",
+    "requested_ccs",
+    "allowed_changes",
+    "must_preserve",
+    "output_expectations",
+    "budget",
+    "evaluation_policy",
+    "profiles"
+  ]
+}

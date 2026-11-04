@@ -1,0 +1,91 @@
+{
+  "record_type": "factory-brief",
+  "schema_version": "0.3.0-proposal",
+  "id": "spark-iq3s-storage",
+  "instruction": "Make this Strata revision serve the pinned IQ3_S model from less storage on one DGX Spark. Preserve the inference API, routing behavior and agreed quality and speed floors. You may change the packer, loader, kernels or packaging. Return reviewable source and a reproducible candidate.",
+  "baseline": {
+    "repository": "https://github.com/Niko1221/Strata.git",
+    "commit": "c62d5e3a15b40ea51c96aae9e8d36928965f53ab",
+    "tree": "a3854dce81fa28c0823620c05ba1c69b287a59ce"
+  },
+  "available_ccs": [
+    {
+      "uri": "cc-qualified.json",
+      "sha256": "ed30d0a467c2c691528b5f341bdc7bb1a42bb0d922f2c3c303d85526c58a9ffc"
+    }
+  ],
+  "requested_ccs": [
+    {
+      "uri": "cc-draft.json",
+      "sha256": "578fbc1c6e3449617d2675b840fbe910cb96cee057a47715b9190b4e488e4203"
+    }
+  ],
+  "allowed_changes": [
+    "packer",
+    "loader",
+    "kernels",
+    "packaging"
+  ],
+  "must_preserve": [
+    "inference API",
+    "routing behavior",
+    "held-out quality floor",
+    "prefill and decode floors"
+  ],
+  "output_expectations": [
+    "reviewable-source",
+    "reproducible-candidate",
+    "optional-cc"
+  ],
+  "budget": {
+    "hardware": "one DGX Spark GB10",
+    "max_gpu_count": 1,
+    "max_seconds": 7200
+  },
+  "evaluation_policy": {
+    "uri": "evaluation-policy.json",
+    "sha256": "f54dc4af94f7f08f1210c7da6e32c717e844f8b6f9f1072a79b919282179b7bb"
+  },
+  "profiles": [
+    {
+      "namespace": "urn:ai4r:profile:moe",
+      "version": 1,
+      "must_understand": true,
+      "schema": {
+        "uri": "../contracts/profiles/moe.schema.json",
+        "sha256": "eb09c0187bc4598cfcbff9f89327358c2a43d837f5612f0bf9d01f3cf107a451"
+      },
+      "data": {
+        "goal": "reduce-storage",
+        "model": {
+          "repository": "https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF",
+          "revision": "ed59f92082b1e93c0e96d60a8b11aab089b52f09",
+          "shards": [
+            {
+              "path": "IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf",
+              "bytes": 54817524224,
+              "sha256": "4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3"
+            },
+            {
+              "path": "IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf",
+              "bytes": 28800138432,
+              "sha256": "316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113"
+            }
+          ],
+          "native_index": {
+            "name": "native_experts.txt",
+            "producer": {
+              "uri": "https://raw.githubusercontent.com/Niko1221/Strata/c62d5e3a15b40ea51c96aae9e8d36928965f53ab/tools/iq_pack.py",
+              "sha256": "6588cba726b74b70ebbe17f8972afecda4cd1e3160f82c15ec15214a8bc55be6"
+            }
+          }
+        },
+        "preserve": [
+          "API",
+          "routing behavior",
+          "quality and speed floors"
+        ]
+      }
+    }
+  ]
+}

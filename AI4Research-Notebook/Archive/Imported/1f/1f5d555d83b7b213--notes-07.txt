@@ -1,0 +1,7 @@
+TIME 1:10
+SAY: The freeze is 8 steps of code, with no model. First it turns the checking budget into a test policy, so the grading rules exist before anything is sealed. Then each piece of the plan is hashed and linked, and the thick boxes are the grading rules: the test policy and each step's gate. If those sat outside the hash, a run could be graded by rules chosen after its outputs were seen. This is tested: change 1 number in a frozen plan and verification fails, even though the stored verdict still says pass. A hash detects an edit after the fact; it doesn't prevent one, and it doesn't say who made it. If any of the 8 steps fails there's no re-plan: the user resubmits. And once the plan runs it can't change, so a plan that turns out wrong runs to the end.
+IF ASKED:
+- Verification recomputes 3 stages and hash-compares the rest
+- If a capsule definition changes during planning, the freeze aborts with CAPSULE_CHANGED_DURING_PLANNING
+- Nearest work: CaMeL (arXiv 2503.18813) fixes control flow, PlanCompiler a typed graph, Rel(AI)Build (arXiv 2606.26924) hashes its specification; a search on 2026-09-13 found no reviewed system that seals its own evaluation criteria in the run hash
+- Arbor and Kosmos re-plan every cycle; this design trades that away for grading rules fixed in advance

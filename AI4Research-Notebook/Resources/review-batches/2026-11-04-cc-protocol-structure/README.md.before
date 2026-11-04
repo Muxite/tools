@@ -1,0 +1,58 @@
+---
+id: cc-protocol-readme
+status: proposed-runtime-unverified
+source: November 3 single-CC workshop, M2a contracts and reviewed Muse addendum
+last_reviewed: 2026-11-03
+next_action: Replay against a qualified carrier before deployment
+---
+# Capability Capsule protocols
+
+A **Capability Capsule (CC)** is a versioned, installable package that exposes one or more related operations. The declaration tells a caller what it can ask the tool to do. The immutable release identifies the implementation that answers. A receipt records what happened on one call.
+
+```text
+Author → YAML declaration → Software Factory → immutable CC release
+                                 │                    │
+                                 ▼                    ▼
+                            build record       qualified catalog
+                                 ▲                    │ discover operation
+                                 │                    ▼
+                                 │                Lab agent
+                                 │                    │ request + inputs
+                                 │                    ▼
+                                 └── release pin ── bound call → runner
+                                                      ▲            │
+                                                      │            ├── outputs
+                                                      └── receipt ─┘      │
+                                                             │            │
+                                                             └─────┬──────┘
+                                                                   ▼
+                                                         independent evaluation
+```
+
+A Factory brief can also produce a candidate engine image with zero CCs. In the Muse workflow, the candidate engine is the **subject** being measured. The profiler or benchmark CC is the **instrument**. The Lab binds the two at call time and records both identities.
+
+## The small case
+
+```yaml
+cc: "1"
+id: text.trim
+version: 1.0.0
+carrier: fixture.invalid/text@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+does: Remove leading and trailing ASCII spaces. An all-space input returns an empty string.
+run: /tools/trim
+takes: {text: string}
+gives: {trimmed: string}
+```
+
+**Caller view · `text.trim/run`.** Supply one string named `text`. Read the returned string from `trimmed`, including when it is empty. No provider or external mutation is declared. The runner checks the output type. A number fails input validation before launch. A process crash yields a failed receipt. The image pin above is a design fixture.
+
+| If you are… | Start here |
+|---|---|
+| Writing or reviewing a tool | [Declaration and field dictionary](01-declaration.md) |
+| Implementing the Software Factory or catalog | [Build and release](02-compiler-and-release.md) |
+| Implementing a Lab agent, wrapper, or runner | [Calls, effects, and receipts](03-calls-and-receipts.md) |
+| Tracing a measurement to its inputs | [Provenance](04-provenance.md) |
+| Checking an implementation or migrating a tool | [Worked examples and conformance](05-examples-and-conformance.md) |
+
+**Status.** Protocol generation 1 is a proposal. Normative rules use **must**. Example identities under `fixture:` and `fixture.invalid` are synthetic. Existing 0.3 and M2a artifacts retain their native version identifiers.
+

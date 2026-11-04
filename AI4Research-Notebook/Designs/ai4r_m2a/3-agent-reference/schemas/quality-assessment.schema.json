@@ -1,0 +1,138 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "2.0.0-m2a.2"
+    },
+    "capability_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "release_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "image_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "environment_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "workload_scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_ref": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "uri": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "uri",
+          "sha256"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "evidence_origin": {
+      "enum": [
+        "qualification",
+        "live",
+        "mixed"
+      ]
+    },
+    "sample_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "minimum_samples": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "thresholds_satisfied": {
+      "type": "boolean"
+    },
+    "freshness_satisfied": {
+      "type": "boolean"
+    },
+    "trust_level": {
+      "enum": [
+        "evaluation_only",
+        "qualified_for_scope",
+        "restricted",
+        "blocked"
+      ]
+    },
+    "assessed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schema_version",
+    "capability_id",
+    "release_digest",
+    "image_digest",
+    "environment_digest",
+    "workload_scope",
+    "policy_ref",
+    "evidence_refs",
+    "evidence_origin",
+    "sample_count",
+    "minimum_samples",
+    "thresholds_satisfied",
+    "freshness_satisfied",
+    "trust_level",
+    "assessed_at",
+    "expires_at",
+    "limitations"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai4r.local/schemas/m2a/quality-assessment",
+  "title": "AI4R M2a scoped quality assessment"
+}

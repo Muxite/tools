@@ -1,0 +1,69 @@
+---
+id: vm-cc-factory-design-plan
+status: proposed
+source: Sources/Prompts/2026-10-21-vm-capsule-factory-design-plan.txt
+last_reviewed: 2026-10-21
+next_action: Draft shared contracts and topology, then complete the three connected designs against the same worked journey
+---
+# Next work: VM labs, container capsules, and local factories
+
+Treat this as one infrastructure program with three connected designs. Each lab is a VM with its own evolving AI4Research instance, project resources, capability factory, local Docker images and run history. Labs start from a tested AI4R base and can contribute selected CCs and platform changes back. The worktree analogy describes independent development histories; VM runtime state, resources and images also require manifests and backups beyond Git.
+
+**Direction:** full CC containerization is the design target. The first conversion proves the implementation route. Expected small overhead relative to capsule runtime is the user's working assumption, not a measured result; measurements guide capacity and implementation choices.
+
+**Status:** roadmap and initial architecture briefs, with no committed dates. The maintained M1 architecture remains authoritative for current implementation; proposed departures need native reconciliation. No VM/factory deployment or new performance result is claimed.
+
+## Three connected design deliverables
+
+| Design | Responsibility | Concrete design exit |
+|---|---|---|
+| [[Designs/VM Lab Infrastructure Design|VM lab infrastructure]] | VM lifecycle, identity, project resources, local images, model/compute access, recovery and exchange | Topology, lab manifest, resource/permission matrix, backup/restore and central contribution boundaries |
+| [[Designs/Container Capability Capsule Design|Container CCs]] | Executable package, invocation, checks, pinned dependencies and evidence | Package/invocation examples, binder-runner-check ownership, failure behavior and conversion path |
+| [[Designs/Per Lab Capability Factory Design|Per-lab factory]] | Independent authoring/build/qualification inside every AI4R | Source-to-image journey, job recovery, local eligibility and separate central adoption |
+
+## Work order
+
+| Order | Work | Exit |
+|---|---|---|
+| 1 | Establish shared terms and one worked journey | Define lab, tested base, CC version, image, invocation, factory attempt and promotion; assign each boundary an owner |
+| 2 | Draft VM topology and CC contract together | Locate AI4R, factory, builder, runner, checks, images and durable data; walk one invocation across boundaries |
+| 3 | Complete factory and contribution design | Specify build inputs, candidate package, local admission, central rebuild/requalification, conflicts and rollback |
+| 4 | Reconcile with maintained M1 | Map dispatch, prepared-source policy, research-plan shape, composition and manual admission to explicit proposed changes; preserve native TASK/AC/IF identities |
+| 5 | Prove one vertical slice | Two real VMs from one base; independent factories/images; a CC built in A and independently qualified in B; interruption, export and restore evidence |
+| 6 | Expand conversion and contribution | Convert remaining CC classes; demonstrate separate CC and platform promotions, compatible new release pins and rollback |
+
+Steps 1–3 are the next design work. Detailed drafting can overlap once shared terms are fixed. CC accuracy work continues alongside this program; infrastructure acceptance does not prove an accuracy gain. Detailed schemas and implementation tasks belong in the native specification process.
+
+## Shared identity model
+
+A **tested base release** records AI4R source, deployment definition, compatible CC/declaration/check pins, factory version, state migrations and qualification evidence. Master means this well-tested role; no branch name or floating image tag is assumed. Git holds source history; image storage holds executable artifacts; admission records hold eligibility; artifact storage holds resources and evidence.
+
+A **lab manifest** records lab/project identity, parent base release, current AI4R/factory revisions and local deltas, VM/runtime platform, catalog/image pins, resource allocations and durable state/evidence locations. Evolution creates a new revision. Each invocation records what it actually used.
+
+A **candidate** records parent lineage, exact source tree including uncommitted deltas, build inputs, image digest/platform, declaration/check pins and evaluation evidence. Image identity captures packaged software; external data, models, services and hardware remain explicit dependencies.
+
+## The worked journey for all three designs
+
+1. Provision A and B from base R0 with factory F0 and a pinned CC catalog. A works on project P; B works on Q.
+2. A's factory consumes an authorized prepared source snapshot and builds candidate C1 locally, recording source, recipe, environment and image pins.
+3. Independent local qualification may make C1 eligible for a new plan in A. Already-frozen runs retain their pins. B continues independently.
+4. A also changes its planner. Record platform candidate P1 separately, with any compatibility dependency on C1.
+5. Export C1 source/build inputs and evidence. Central qualification rebuilds and tests the exact artifact proposed for release. A different rebuild digest is a distinct artifact requiring its own qualification and provenance link.
+6. Adopt compatible sources, images and admission records as tested base R1. P1 has its own release path; if C1 depends on it, qualify their compatibility set explicitly.
+7. B can retain R0, selectively import a compatible C1, or explicitly rebase to R1. Requalify affected behavior, resolve conflicts and record state migrations. Rollback restores a compatible release/state pair and retains failure evidence.
+
+## Direction changes and current contracts
+
+The earlier optional/selective carrier experiment is superseded by full containerization as the requested target. A one-CC pilot still bounds the first implementation. A lab is a VM; the existing single-host container manager is bounded evidence and possible reusable tooling. The factory is local to each AI4R with independent state/versions/images; shared registries support exchange rather than providing a mandatory central factory.
+
+AI4R itself may evolve locally. Ordinary platform code need not become a CC. Local eligibility and selected central adoption remain distinct. Current M1 protected gates, output-only semantic verifier, frozen runs and manual activation are preserved until their owning contracts change. Earlier single-host Docker smoke evidence remains valid within its synthetic scope.
+
+## Design readiness
+
+- [ ] All three designs share identities and the worked journey.
+- [ ] Provision, build, run, check, locally admit, export, centrally qualify, update and restore have explicit owners.
+- [ ] Missing image, incompatible platform/GPU, unavailable model, cancellation, storage failure and interrupted build/run have outcomes.
+- [ ] M1 departures and affected task/interface owners are recorded without invented approvals or PASS claims.
+- [ ] The trial defines evidence for two VMs, factory independence, traceability, recovery and selective promotion.
+
+Deployment backend, resource sizing, catalog serialization, model route, release custodian and first representative capsule remain design choices. They do not block shared-contract drafting. The batch source receipt records the bounded owner reading; this is not a full PRD/code audit.

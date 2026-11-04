@@ -1,0 +1,19 @@
+flowchart TB
+    Work[Work CC invocation] --> Capture[Capture exact result and runtime evidence]
+    Capture --> T1{Deterministic checks pass?}
+    T1 -->|No: assessment not run| Gate
+    T1 -->|Yes| Verifier[Read-only verifier CC]
+    Verifier -->|Assessment verdict| Validate[Validate assessment and evidence references]
+    Validate --> Gate{Protected gate interprets checks and assessment}
+    Gate -->|Authoritative blocking decision| Halt[Record blocking outcome; stop new dispatch]
+    Gate -->|All mandatory obligations pass| Commit[Commit decision and accepted artifact identity]
+    Commit --> Next[Release result to dependent work]
+    subgraph Legend[Legend]
+        Key[Blue: CC work; purple: verification; amber: infrastructure]
+    end
+    classDef work fill:#E8F0FE,stroke:#2563EB,color:#172554
+    classDef verify fill:#F3E8FF,stroke:#7E22CE,color:#3B0764
+    classDef control fill:#FEF3C7,stroke:#B45309,color:#451A03
+    class Work work
+    class Verifier verify
+    class Capture,T1,Halt,Validate,Gate,Commit,Next control

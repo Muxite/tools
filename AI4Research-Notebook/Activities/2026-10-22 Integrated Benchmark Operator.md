@@ -1,0 +1,38 @@
+---
+id: integrated-benchmark-operator-implementation
+status: implemented-local-checks
+source: Sources/Prompts/2026-10-22-integrated-benchmark-operator-approved-plan.txt; Activities/2026-10-22 Spark Benchmark Host Direction
+last_reviewed: 2026-10-23
+next_action: Restore a working Docker engine, then validate the two-container campaign and SSH/ARM64 delivery on available hosts
+---
+# Integrated benchmark operator
+
+Implemented the approved repository-owned build → stage → start → run/inspect → fetch workflow in our AI4R implementation branch. Code is in `AI4Research-Development/jiuwenswarm-m1-deployment`, isolated branch `deployment-usability`, based on remote `ai4r_M1` commit `bfc30ba291c762d09f464c3e6a6c25f011826a33`. The October 22 implementation was committed October 23 as `e296d2b` on `deployment-usability` and remains unpushed; other development checkouts and AI4R research internals were left intact.
+
+## What changed
+
+The public entry point is `python deploy/m1/ai4r.py`. All required helper source ships in AI4R; generated profiles contain target, paths, ownership, platform and image/credential references rather than private executable dependencies. Old launch/runner commands forward to the integrated operator. Lifecycle preflight also inspects actual app run/claim/lease metadata read-only, so ordinary active research blocks stop/recreation. The workstation-specific automatic migration was retired: existing installations are refused instead of silently adopted.
+
+The same commands control local Docker, an explicitly selected WSL distribution, or an SSH-connected Linux host. Images are built on the development machine for AMD64/ARM64, with frozen public source manifests, image IDs and bounded dedicated BuildKit caching. Staging verifies images and selected input files; fetch creates a locked snapshot, verifies actual bytes, resumes interrupted copies and retains source results. Localhost remains 5175. The two runtime images remain `ai4r` and `benchmark-runner`.
+
+Linux runner identity follows the non-root host operator where possible, retaining UID11001 for root/Windows targets. Scoped credentials use a separate private Docker volume with mode0600, avoiding Windows bind-permission problems. Model sign-in remains human-owned; no research verification gates were relaxed.
+
+## Expiry and durability
+
+The chosen default is **seven-day temporary-only expiry**. Completed owned transfer/snapshot/build staging and unreferenced owned image candidates are eligible. Results, inputs, credentials, models, app/account volumes and rollback pins are protected. Unknown execution and incomplete transfers are retained until reconciled. No global pruning or data-volume deletion is used.
+
+Expiry runs with setup/start/allocation and supports an explicit daily schedule through Linux systemd or Windows Task Scheduler. Installed Linux helper copies are immutable, hashed copies of repository source in the standard user program location, not handwritten private runtime scripts. Missing user-manager/scheduler access is reported. Docker Desktop's separate virtual-disk capacity and Linux executor delegation still need host qualification.
+
+This implements the practical [[Activities/2026-10-22 Spark Benchmark Host Direction|Spark benchmark-host lifecycle]]. The already-sent [[Resources/Coder Prompts/benchmark-runner|benchmark prompt]] is preserved. M2 durable labs, VM/factory design and broader sandbox planning remain separate.
+
+## Evidence and limits
+
+- New host tests: 26 passed on Windows; 25 passed on Linux/WSL with one Compose-plugin check skipped there. Actual Compose rendering passed on Windows without a daemon.
+- Existing sequential-runner, human-report and archive-collection tests: 22 passed in an isolated dependency environment.
+- Source compilation and focused lint/checks are recorded with this implementation session.
+- Docker Desktop failed to start: its ingest socket could not be renamed because the file was inaccessible. No reset or deletion of Docker data was attempted.
+- Live image builds, real two-container campaigns, actual SSH/Docker execution, scheduler activation, ARM64 builds and native Spark runs remain **NOT RUN**. Process/transport fixtures do not establish these outcomes.
+
+Start with [the operational design and runbook](../../AI4Research-Development/jiuwenswarm-m1-deployment/deploy/m1/OPERATIONS.md), which includes the Mermaid flow and exact commands.
+
+October 23: [[Activities/2026-10-23 Capsule Branches and Factory Direction]] records the separate capsule branches and combined fresh-checkout verification. Connected Docker/Spark checks remain unrun.

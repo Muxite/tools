@@ -1,0 +1,56 @@
+---
+id: no-sudo-benchmark-launch
+status: implemented-local-checks
+source: Sources/Prompts/2026-10-23-no-sudo-benchmark-launch.txt
+last_reviewed: 2026-10-23
+next_action: Qualify current app/runner images with actual credentials and Docker on the selected target
+---
+# No-sudo benchmark launch
+
+**Later integration status:** the observed remote M1 source at `809351f8` now includes the required Planner and optional capsule source. Earlier separate-branch statements below are historical. Source integration is not qualification, activation or runtime acceptance. See [[Resources/Handoffs/m2-labs/implementation-status]] and [[Activities/2026-10-23 M2 Component Handoffs]].
+
+
+The user selected a simple temporary deployment workflow: ordinary Docker images
+and data, simple commands, no sudo, and no new Spark host setup requirement.
+This supersedes automatic host executor/cgroup preparation in the first pushed
+deployment helper. The old preparation script remains historical/manual tooling;
+normal `up` and `start` never execute it. WSL uses the selected distribution's
+default user rather than forcing root. App identities inside images are unchanged.
+
+The new `python deploy/m1/ai4r.py up --cases ./cases.json --inputs ./inputs
+--output ./results` reuses ordinary Docker-built or Docker-loaded `ai4r:local`
+and `benchmark-runner:local` images. It sets up owned state, pins actual image
+IDs/platform, stages cases and inputs, and starts the app. Image names can be
+explicit. No implicit image build or pull, registry, privileged container,
+Docker socket mount or host service installation is added. Human model login
+and the existing scoped runner grant step remain explicit.
+
+An SSH profile uses the same workflow, transferring missing ARM64 images and
+selected data from the workstation. Spark receives repository-owned helper code
+over SSH stdin; a source checkout or private script installation is unnecessary.
+Outputs persist on the selected volume and `fetch` copies verified results back.
+`up` exposes the generated Compose path for ordinary Docker inspection commands.
+Relative output paths are supported locally; remote paths stay host-resolved.
+
+The app already supports the admitted read-only path without an executor cgroup.
+Code-execution/scientific tasks still require their actual executor prerequisites;
+missing prerequisites produce a blocked result. No insecure execution fallback
+or false broad benchmark readiness is claimed. Full no-admin code-executor
+portability remains a separate app/runtime task, not solved by removing sudo.
+
+Host/CLI tests: 31 pass on Windows; 30 pass and one Docker-Compose availability
+skip on Linux/WSL. Checks include repeated launch, preserved sentinel inputs,
+existing-image selection/platform identity, build receipt selection, SSH command
+construction, default-user WSL and start without any host preparation command.
+Docker's Linux daemon is unavailable on this machine, so live containers,
+authenticated model campaigns and Spark execution remain unverified.
+
+Implementation runbook: `AI4Research-Development/jiuwenswarm-m1-current/deploy/m1/OPERATIONS.md`.
+Planner work remains separately committed as recorded in
+[[Activities/2026-10-23 Required M1 Planner]].
+
+Committed as `6a703050b8ea56e953c308298af37bf9fe6b1423` on
+`deployment/no-sudo-quickstart`, fast-forwarded into local `ai4r_M1` and pushed
+to remote `ai4r_M1`; remote identity verified. The Planner remains on its
+separate feature branch. Vault validation retains only the two previously
+missing presentation links, with no newly introduced errors.

@@ -1,0 +1,1008 @@
+
+
+===== page 1 =====
+When Self-Evolution Backfires: Pre-Commit Gating against Skill Contamination
+in LLM Agents
+Linfang Shang∗, Ming Xu†, Yiding Sun, Tianle Xia, Lingxiang Hu,
+Lan Xu, Ning Zheng
+Tencent
+{faelynshang, flemingxu, emanuelsun, tianlexia, lingxianghu,
+lanxu, yodazheng}@tencent.com
+Abstract
+Self-evolving agents accumulate capability by distilling
+reusable skills from their execution trajectories, but we find
+this process is not monotonic: past a critical pool size, newly
+added skills degrade performance instead of improving it.
+We formalize this capability–contamination phase transition
+and trace it to a structural cause—once a defective skill
+enters the decision context, it becomes reference material
+for distilling later skills, forming cross-round contamination
+chains. We further show the contamination is structurally ir-
+reversible: removing a source skill after the fact cannot erase
+the flawed reasoning its descendants have already inherited,
+so post-hoc rollback recovers only a small fraction of the
+lost performance. This makes skill admission a pre-commit
+necessity rather than a post-hoc fix, and motivates Verifier-as-
+Gatekeeper (VaG): a progressive trust hierarchy whose three
+heterogeneous critics—structural validity, behavioral harm-
+lessness, and semantic consistency—filter each skill individ-
+ually, coupled with a marginal-gain subset selection that re-
+moves combinatorial contamination at the top tier before skills
+reach the runtime context. On Terminal-Bench 2, uncondi-
+tional accumulation rises to a peak and then degrades, giving
+back most of its gains as the pool keeps growing, and post-
+hoc removal of the culprit skills recovers only a small part
+of the drop—the empirical signature of irreversibility. In con-
+trast, VaG improves every round, reaching 72% pass@1 with
+a pool roughly 5× smaller, and its frozen skill pool transfers
+positively to four other backbones and a second benchmark
+without re-evolution. Ablations confirm the three critics are
+complementary and mutually non-substitutable, each inter-
+cepting a largely disjoint class of harmful skills.
+Introduction
+A self-evolving agent improves by writing down what it
+learns. After each round of task solving, its trajectories are
+distilled into short natural-language skills, appended to a per-
+sistent pool, and injected into the decision context of every
+later round (Tao et al. 2024; Yao et al. 2022; Park et al. 2023;
+Wang et al. 2024a; Zhang et al. 2022; Schick et al. 2023).
+Capability is supposed to compound without touching model
+weights: more rounds, more skills, a better agent.
+Existing systems share one step in this loop that has es-
+caped scrutiny: whatever the distiller emits is admitted. Be-
+∗These authors contributed equally.
+†Corresponding author.
+Figure 1: Unconditional skill admission makes evolution
+non-monotone. As skills accumulate, an ungated agent im-
+proves, peaks at a critical pool size, and then degrades, giving
+back most of its gains, because defective skills both mislead
+the agent directly and become reference context for later
+distillation. Removing the identified culprits afterwards re-
+covers only part of the loss, since their descendants remain.
+VaG verifies each skill before it can enter the runtime context.
+It gives up a little while the pool is small, since gating also
+rejects some benign skills, but it improves monotonically and
+ends above what ungated evolution reaches at its best—with
+a smaller, cleaner pool.
+yond deduplication, no skill has to justify its place in the
+pool before it starts steering behavior. Admission looks like
+bookkeeping, and bookkeeping looks reversible—a bad en-
+try can always be deleted later. We find that neither part of
+this intuition holds.
+Skill accumulation is not monotone.
+Tracking an agent
+over five evolution rounds on Terminal-Bench 2 (Merrill et al.
+2026), pass@1 rises while the pool is small, peaks at a critical
+size k∗, and then falls back to roughly its first-round level—
+even though every added skill was distilled from a trajectory
+the agent itself had completed (Figure 1). We call this peak
+the capability–contamination tipping point and trace it to
+three mechanisms: individual contamination, where a single
+skill lowers the success rate on its own; combinatorial con-
+tamination, where skills that are each harmless conflict once
+injected together; and systemic contamination, the macro-
+arXiv:2608.05810v2  [cs.AI]  17 Sep 2026
+
+
+===== page 2 =====
+scopic non-monotonicity the first two produce.
+Deleting a bad skill afterwards does not undo it.
+Skills
+are distilled conditioned on the pool that was live at the time,
+so a defective skill admitted in round r belongs to the refer-
+ence context of everything distilled after r. Its flawed reason-
+ing survives in descendants that never name it. Removing the
+source alone is therefore strictly weaker than removing the
+source together with its entire lineage—and lineage cleanup
+is out of reach in practice, because existing skill libraries do
+not record which skills were in context when a given skill
+was written. Post-hoc curation carries a recovery gap that
+better detection alone cannot close.
+Taken together, these two observations change what skill
+admission is. It is not an optimization to reach for once the
+pool gets messy; it is the last point in the loop at which
+contamination can still be stopped. Verification must happen
+before a skill enters the runtime context.
+Verifier-as-Gatekeeper.
+We therefore treat admission as
+an explicit promotion decision rather than a write. Every dis-
+tilled skill starts Cold: recorded, but invisible to the agent.
+Reaching the runtime context requires clearing two gates of
+increasing cost. The first asks whether a skill is harmless on
+its own, and answers it with three deliberately heterogeneous
+critics: a deterministic schema check, a single-skill A-B re-
+play on held-out tasks, and one LLM review for fabricated
+or self-contradictory advice. Because the three inspect dis-
+joint properties (format, behavior, meaning), a harmful skill
+has to fool all of them to slip through, and the two cheap
+checks reject most candidates before any LLM is called. The
+second gate asks whether a skill is harmless in company:
+promotion to the runtime tier is a greedy subset selection
+against measured joint performance, which is the only way
+to catch skills that are individually fine and jointly harmful.
+Because skill utility is not globally monotone—a skill can
+lower joint performance—we use a marginal-gain greedy
+that adds a candidate only when it improves measured joint
+performance, directly targeting the combinatorial conflicts
+that per-skill checks cannot detect.
+Findings.
+On Terminal-Bench 2, ungated evolution repro-
+duces the predicted tipping point, peaking at round 3 and then
+losing most of that gain, ending at R5 only 2 points above its
+own R1, whereas VaG improves across all five rounds and
+ends 10 points above ungated evolution’s best round with a
+pool roughly 5× smaller—so gating beats even oracle early
+stopping, not just unchecked accumulation. Component abla-
+tions show that the three verification dimensions are comple-
+mentary rather than redundant: removing any one—and es-
+pecially the behavioral replay check—degrades performance
+and inflates the pool, because each critic intercepts a largely
+disjoint class of harmful skills. Source-only rollback recov-
+ers only 17% of the degradation, matching the irreversibility
+argument. A frozen VaG pool finally transfers to other back-
+bones without re-evolution, indicating that gated evolution
+distills model-agnostic engineering experience rather than
+backbone-specific artifacts.
+Contributions.
+• Phenomenon. We identify and formalize the capability–
+contamination tipping point in self-evolving agents, with a
+three-level taxonomy spanning individual, combinatorial,
+and systemic effects.
+• Irreversibility. We show that contamination propagates
+through derived-skill lineages and is structurally irre-
+versible: source-only rollback is dominated by full lin-
+eage cleanup, establishing a recovery gap that applies to
+every post-hoc remediation strategy.
+• Method. From this necessity we derive VaG, a pre-
+commit gating mechanism combining a progressive trust
+hierarchy of three heterogeneous critics with a marginal-
+gain greedy selection that removes combinatorial con-
+tamination at the top tier.
+• Evidence. On Terminal-Bench 2 we demonstrate the tip-
+ping point, measure the rollback recovery gap, show
+monotone improvement under gating, and verify cross-
+backbone transfer of the evolved pool.
+Related Work
+Self-Evolving Agents and Skill Distillation.
+Recent work
+lets agents accumulate capability by distilling reusable skills
+from execution traces for later reuse (Wang et al. 2023; Lin
+et al. 2026; Zhang et al. 2025; Mei et al. 2026; Wu et al. 2025;
+Wang et al. 2026). Experiential agents such as ExpeL (Zhao
+et al. 2024) and Agent Workflow Memory (Wang et al.
+2024b) follow the same recipe, distilling past experience into
+natural-language insights or reusable workflows appended to
+the agent’s context (Packer et al. 2023; Huang et al. 2023; Ze-
+likman et al. 2022; Gulcehre et al. 2023). One design choice
+is shared but rarely questioned: a distilled skill is written into
+persistent storage unconditionally and takes effect at the next
+step. Voyager (Wang et al. 2023) verifies only that a skill
+completes its target task before storing it, but never checks
+whether that skill degrades performance on other tasks—
+precisely the failure mode we study. MetaClaw (Xia et al.
+2026) uses dual-timescale meta-learning with reinforcement
+fine-tuning, which requires access to model weights (infea-
+sible for closed-source APIs) and still applies no gate at ad-
+mission time. AHE (Lin et al. 2026) evolves the full harness
+at scale, but its evaluation is deferred and operates at the har-
+ness level: each round scores only the aggregate harness and
+cannot attribute a change to any individual skill. ACE (Zhang
+et al. 2025) scales context-level evolution further, yet inher-
+its the same unconditional-admission assumption. Our work
+departs on two axes: verification granularity moves from the
+harness to the individual skill, and verification timing moves
+from deferred post-evaluation to a pre-commit gate applied
+before a skill can enter the agent’s runtime context.
+Submodular
+Selection
+and
+Verification
+in
+Agent
+Pipelines.
+Submodular optimization offers classical ap-
+proximation guarantees for combinatorial subset selec-
+tion (Nemhauser, Wolsey, and Fisher 1978; Feige, Mir-
+rokni, and Vondrák 2011), later extended to weak sub-
+modularity (Das and Kempe 2011) and to noisy ora-
+cles (Mirzasoleiman et al. 2014). Within agent systems, ex-
+isting verification tends to be coarse-grained: self-refinement
+
+
+===== page 3 =====
+loops (Madaan et al. 2023; Shinn et al. 2023; Pu, Song, and
+Zhao 2026; Xiao et al. 2026) critique a whole trajectory after
+execution, while Voyager-style libraries (Wang et al. 2023)
+apply at most heuristic deduplication when storing skills.
+None of these address the combinatorial interaction we high-
+light: skills that are each individually harmless can still de-
+grade performance when injected together through conflict-
+ing advice. We bring marginal-gain subset selection into skill
+admission, using held-out estimates to guide greedy con-
+struction of the admitted set—a combinatorial safety check
+that prior agent-verification pipelines, which judge skills only
+in isolation, do not offer.
+Methodology
+We first formalize skill contamination in self-evolving agents
+as a taxonomy spanning three levels: individual, combinato-
+rial, and systemic. We then show that once contamination
+is admitted, it becomes structurally irreversible: the lineage
+of derived skills makes post-hoc rollback unable to recover
+the full performance loss. Grounded in this irreversibility, we
+construct Verifier-as-Gatekeeper (VaG), a pre-commit gating
+mechanism that intercepts contamination before skills enter
+the agent’s runtime context, organized as a progressive trust
+hierarchy with increasing verification stringency. Figure 2
+illustrates the overall framework.
+Problem Formalization and Contamination Taxonomy.
+Consider a self-evolving agent that distills reusable skills
+from its execution trajectories to accumulate capability. Let S
+be the skill space; each skill s ∈S is a structured experience
+unit written in natural language, carrying a short frontmatter
+(name, trigger condition, and body) followed by free-form
+guidance. At evolution round r, the agent solves tasks us-
+ing all previously accumulated skills Mr−1 as its decision
+context, then distills a set of new skills Sr from that round’s
+trajectories. Existing self-evolution methods (Xia et al. 2026;
+Wang et al. 2023; Lin et al. 2026) share an implicit lifecy-
+cle assumption—every distilled skill is written to persistent
+storage and takes effect immediately—so the pool grows as
+Mr = Mr−1 ∪G(Sr),
+Sr ∼π(· | Mr−1),
+(1)
+where π is the distillation process conditioned on Mr−1
+and G is an admission operator applied before new skills
+enter the pool. Ungated evolution is the special case G =
+identity, under which all of Sr enters the decision context
+unconditionally. Equation (1) exposes the vulnerability of
+this default: since Sr is generated conditioned on Mr−1, any
+defective skill in Mr−1 can pass its flawed logic into Sr,
+propagating contamination across rounds.
+To make this precise, let Dholdout be a held-out task set
+disjoint from the tasks used for distillation, and let R(A, τ)
+denote the agent’s success on task τ when injected with skill
+set A ⊆S. We write R(A) = Eτ∼Dholdout[R(A, τ)] for the
+aggregate success rate over Dholdout, and define the injection
+gain of A over the current pool M as
+g(A, τ) = R(M ∪A, τ) −R(M, τ).
+(2)
+Contamination then admits a three-level taxonomy.
+Individual contamination. A single skill s is individually
+contaminating on τ when its singleton gain is negative,
+g({s}, τ) < 0: injecting s alone lowers the success rate.
+Combinatorial contamination. Individual harmlessness
+does not compose. There can exist skills sa, sb with
+g({sa}, τ) ≥0 and g({sb}, τ) ≥0, yet
+g({sa, sb}, τ) < 0.
+(3)
+Detecting this requires joint evaluation of candidate sets;
+independent per-skill judgment cannot see the interaction.
+Systemic contamination. The two effects surface macro-
+scopically as a non-monotone capability curve. Writing
+P(k) = R(Mr) for the aggregate success rate when the
+pool has grown to k = |Mr| skills, unconstrained evolution
+without admission control exhibits a critical size
+k∗= arg max
+k
+P(k),
+(4)
+with P(k) increasing for k < k∗and decreasing for k > k∗.
+This k∗is the capability–contamination phase transition: the
+point where the marginal value of adding skills turns from
+positive to negative.
+Irreversibility of Contamination.
+A natural response to
+the tipping point is post-hoc remediation: identify the con-
+taminating source skills and remove them from Mr. Equa-
+tion (1), however, exposes a structural obstacle. Because
+Sr ∼π(· | Mr−1), skills distilled in later rounds are written
+with earlier skills as reference context. Let desc(s) be the set
+of skills derived from s in subsequent rounds—those whose
+distillation context contained s. Removing only the source s
+leaves its descendants behind, so
+R(Mr \ {s}) < R
+ Mr \ ({s} ∪desc(s))
+
+.
+(5)
+The left side is the recovery from removing the identified
+source alone; the right side is the best achievable by remov-
+ing s together with its entire lineage. Inequality (5) holds
+whenever desc(s) contains at least one skill that inherited
+s’s flawed reasoning; in that regime source-only rollback is
+strictly dominated by full-lineage cleanup, and erasing the
+origin does not erase its consequences.
+The design implication is direct: contamination must be
+intercepted before skills enter the agent’s runtime con-
+text. Pre-commit gating is not one option among several—
+it follows as a structural necessity from the irreversibility
+above. We now construct such a mechanism.
+Pre-commit Gating with a Progressive Trust Hierarchy.
+Guided by the irreversibility result, we organize skill admis-
+sion as a progressive trust hierarchy L = {Cold, Warm, Hot}
+with the partial order Cold ≺Warm ≺Hot. Each newly
+distilled skill enters the Cold tier by default and does not par-
+ticipate in the agent’s decision context. Promotion between
+tiers is governed by gate predicates: skill s is promoted from
+tier ℓto ℓ′ if and only if
+Gℓ→ℓ′(s) = ⊤.
+(6)
+The stringency of gate predicates increases with each tier,
+implementing the principle of progressively intensifying ver-
+ification.
+
+
+===== page 4 =====
+Figure 2: The Verifier-as-Gatekeeper pipeline. (1) Skills distilled from execution traces enter the Cold tier, invisible to the
+agent. (2) Gate 1 asks whether a skill is harmless on its own: it must pass all three heterogeneous critics—schema validity,
+single-skill A-B replay on held-out tasks, and one LLM semantic review—or it never enters the context. (3) Gate 2 asks whether
+the survivors are harmless together: greedy selection on measured joint held-out performance promotes a skill to the Hot tier
+only if it improves the set, otherwise it stays Warm. (4) At runtime, only Hot skills are injected into the agent’s system prompt.
+Rejected skills never cross the pre-commit boundary, so they cannot re-enter the next round’s distillation context—i.e., G is the
+last filter before defects propagate, and setting G = identity recovers ungated evolution.
+Gate 1 (Cold →Warm): individual harmlessness. This
+gate asks whether a skill degrades performance when injected
+alone, and applies three complementary checks that a skill
+must all pass.
+(i) Structural validity. SchemaCritic verifies that s satisfies
+a predefined frontmatter schema (all required fields are
+present and correctly typed). This is a deterministic judg-
+ment independent of model reasoning: νstruct(s) ∈{0, 1}.
+(ii) Behavioral harmlessness. ExecCritic runs a single-skill
+A-B replay on Dholdout, comparing an agent with M ∪{s}
+against one with M alone. The skill passes when it does
+not degrade the aggregate rate, R(M ∪{s}) ≥R(M),
+giving νexec(s) ∈{0, 1}. We admit a skill that merely
+matches M (rather than requiring strict improvement) be-
+cause the estimate is noisy: a skill that is neutral here may
+still contribute in combination, and Gate 2 later prunes
+any that fail to help the set.
+(iii) Semantic consistency. AgentCritic evaluates via a single
+LLM call whether s contains fabricated facts, logically
+contradicts existing skills in M, or recommends unsafe
+operations, outputting νsem(s) ∈{0, 1}.
+The Cold →Warm gate enforces conjunction: GC→W(s) =
+νstruct ∧νexec ∧νsem. The three critics inspect different
+failure surfaces—format, observed behavior, and semantic
+content—and a skill is admitted only if it clears all three. Be-
+cause a harmful skill must evade every critic simultaneously
+to slip through, the conjunction is empirically far stricter
+than any single dimension: our ablations (Table 2) show each
+critic intercepts a largely disjoint class of harmful skills, so
+none substitutes for another. This gate is also computation-
+ally economical: structural validation and behavioral replay
+require no LLM calls, only semantic review consumes one
+inference, and the first two filters eliminate the vast majority
+of candidates.
+Gate 2 (Warm →Hot): combinatorial safety via
+marginal-gain selection. The Cold →Warm gate certifies
+each skill in isolation, but not in company: two skills that
+each pass may still conflict once injected together. The Warm
+→Hot transition is therefore a subset-selection problem—
+choose H ⊆W from the Warm pool W to maximize joint
+held-out success. Define the set utility function
+f(H) = Eτ∼Dholdout
+
+R(agent ⊕H, τ)
+
+,
+(7)
+where agent⊕H denotes injecting skill set H into the agent’s
+system prompt. A direct solution requires enumerating 2|W |
+
+
+===== page 5 =====
+subsets with separate replay, which is computationally pro-
+hibitive. However, f exhibits bounded submodularity over
+skill sets: when H already contains several skills targeting the
+same functional domain (e.g., git operations), the marginal
+gain of adding another skill from that domain diminishes—
+prior skills already cover most scenarios in that domain.
+Because skill injection can be contaminating (Eq. (2) may
+be negative), f is not globally monotone: adding a skill can
+lower it. We therefore use marginal-gain greedy selection:
+starting from the empty set, we repeatedly add the Warm can-
+didate with the largest estimated joint gain and keep it only if
+it strictly improves measured held-out performance, stopping
+when no remaining candidate helps. This is a heuristic rather
+than an algorithm with a worst-case optimality guarantee—
+the utility surface over skill sets is neither known to be sub-
+modular nor monotone—but it directly targets the combina-
+torial effect that per-skill checks cannot see, and it is cheap
+at our scale. Each joint utility f(H) is estimated as the mean
+of k = 3 held-out replays. Because Cold →Warm filtering
+leaves |W| ≤15 candidates per round, a single greedy pass
+costs at most |W| −1 joint replays, so we run it exactly
+without further approximation.
+Experiments
+Benchmarks.
+Our primary evaluation is on Terminal-
+Bench 2 (TB2) (Merrill et al. 2026), a suite of hard, verifier-
+checked terminal tasks in which an agent operates a real
+shell inside a sandboxed container and its solution is graded
+by a deterministic checker. Stratifying by TB2’s official diffi-
+culty under a fixed seed, we split the tasks into three disjoint
+subsets: Event (50 tasks) drives skill distillation and rolling
+evolution; Holdout (14 tasks) serves only the A-B replays
+and marginal-gain estimates inside the gates; and Test (25
+tasks) is reserved for final evaluation, never touched by dis-
+tillation or gating. Because Event is the distillation split,
+its numbers are an optimistic upper bound, whereas Test
+is the honest held-out estimate. To probe cross-benchmark
+transfer, we additionally evaluate on the full set of 200 Inter-
+Code NL2Bash (Yang et al. 2023) tasks, which map natural-
+language instructions to single bash commands and share the
+shell ecosystem with TB2 while differing in task structure.
+Agent and backbones.
+Each trial runs inside the Harbor
+TB2 runtime, which handles task dispatch, Docker orches-
+tration, and deterministic scoring. On top of it, the agent
+executes a hand-rolled ReAct loop: at each turn the lan-
+guage model emits either a shell command, which is run
+inside the per-trial container, or a termination action, and
+the observed output is appended to the context for the next
+turn. The primary backbone driving distillation and gating is
+Hy3. To test whether the evolved skills are tied to this back-
+bone, the cross-model study freezes the skill pool and runs
+inference only on four further models spanning open- and
+closed-source families—DeepSeek-V4-Pro (Xu et al. 2026),
+GPT-5.4, Claude Sonnet 4.5, and Qwen3.6-35B-A3B (Qwen
+Team 2026)—with no re-evolution or gating on them.
+Configurations.
+We
+compare
+four
+configurations
+under
+one
+agent
+implementation
+(Xu
+2026).
+Seed
+injects
+three
+hand-written,
+general-purpose
+skills
+(bash-essentials,
+file-ops,
+grep-find)
+with no evolution, a static lower bound. Ungated admits
+every distilled skill unconditionally, matching the default
+assumption of Voyager and AHE. Post-hoc Rollback, applied
+after Ungated collapses at R5, removes only the harmful
+source skills while keeping their descendants, testing
+whether cleanup can undo the irreversibility of Eq. (5). VaG
+(ours) runs the full Cold →Warm →Hot pipeline.
+Implementation details.
+Evolution runs five rounds (R1–
+R5) on Event, with k=3 rollouts per task. We report pass@1,
+and pass/fail is decided by TB2’s built-in deterministic ver-
+ifier without any LLM grader. Remaining details are in the
+Supplementary Material.
+Main Results.
+We report pass@1 over five evolution
+rounds on Event-50 (Table 1, Figure 3), then verify the
+learned skills do not overfit this split through cross-model
+and cross-bench transfer on Test-25 (Tables 3–4).
+The phase transition is real and sharp. Seed holds constant
+at 46%. Ungated rises while its pool is small—48% (R1, 35
+skills) to 60% (R2, 68 skills)—peaks at 62% (R3, 105 skills),
+then loses most of that gain: 52% (R4, 141 skills), 50% (R5,
+179 skills), ending at R5 only 2pp above its own R1 despite
+growing from 35 to 179 skills. This R3 peak instantiates
+the critical skill count k∗of Eq. (4): beyond it, cumulative
+contamination outweighs the benefit of new skills.
+Gating converts the inverted-U into monotone improve-
+ment. VaG rises every round—52% (R1) →72% (R5)—
+always above Seed, with a Hot pool of 37 skills, one-fifth
+of Ungated’s. At R5, VaG exceeds Ungated by 22pp and its
+best round (R3, 62%) by 10pp: gating beats both unchecked
+accumulation and oracle early-stopping.
+Contamination targets exactly the hard tasks. Ungated’s
+Hard-tier pass@1 peaks early (53% at R2) and erodes to 35%
+at R5, while Medium falls from 65% to 55%. VaG instead
+lifts Hard to 59% at R5—a 24pp margin over Ungated—
+showing admission control protects precisely the multi-step
+tasks where contamination chains are longest.
+Trajectory shape, not single-round significance, is the evi-
+dence. The 95% Wilson CI bands in Figure 3 (width ≈30pp,
+n=50, k=3) overlap at intermediate rounds, so per-round
+point tests are underpowered. The claim rests on the qual-
+itative divergence of trajectories: Ungated is single-peaked
+about R3, VaG is monotone non-decreasing across all five
+rounds—a direction-of-trend difference 50 tasks cannot pro-
+duce by chance.
+Scale context. Recent self-evolution systems reach 68.9
+(ACE (Zhang et al. 2025)) to 77.0 (AHE (Lin et al. 2026))
+on the full TB2-89 suite with a stronger backbone and ten
+rounds. Our goal differs: we isolate the contamination phe-
+nomenon, which calls for a small, controlled setup. These are
+not head-to-head baselines: backbone, task suite, and round
+budget all differ.
+Post-hoc cleanup cannot undo the damage. Removing the
+8 harmful source skills from the collapsed R5 pool recovers
+only 2pp (50%→52%); the residual 10pp gap to the R3 peak
+is locked in by descendants that inherited the contamination
+logic—the empirical signature of the irreversibility in Eq. (5)
+
+
+===== page 6 =====
+Round
+Pass@1
+∆Seed (pp)
+Easy
+Med
+Hard
+Pool
+Tok/Trial (M)
+Seed — static baseline, no evolution
+—
+46%
+—
+50%
+52%
+35%
+3
+0.35
+Ungated — no admission control
+R1
+48%
++2
+100%
+48%
+41%
+35
+1.07
+R2
+60%
++14
+100%
+65%
+53%
+68
+1.20
+R3
+62%
++16
+100%
+65%
+47%
+105
+1.30
+R4
+52%
++6
+100%
+52%
+47%
+141
+1.24
+R5
+50%
++4
+100%
+55%
+35%
+179
+1.19
++ Post-hoc Rollback
+52%
++6
+100%
+58%
+35%
+171
+1.15
+VaG — pre-commit gated evolution (ours)
+R1
+52%
++6
+100%
+55%
+41%
+5
+0.77
+R2
+58%
++12
+100%
+61%
+47%
+15
+0.82
+R3
+62%
++16
+100%
+68%
+47%
+25
+0.87
+R4
+68%
++22
+100%
+74%
+53%
+30
+0.90
+R5
+72%
++26
+100%
+77%
+59%
+37
+0.94
+Table 1: Main results on Terminal-Bench 2 (Event split, 50 tasks). Pass@1 over five evolution rounds by TB2 difficulty tier
+(Easy: 2, Medium: 31, Hard: 17). Pool is the number of skills in context; ∆Seed is the gain over Seed, in points; Tok/Trial is
+mean tokens per trial. Bold: best pass@1 per block.
+Seed
+R1
+R2
+R3
+R4
+R5
+30
+40
+50
+60
+70
+80
+Pass@1 (%)
+Seed (46%)
+Ungated
+VaG (ours)
+Figure 3: Pass@1 across five evolution rounds (Event-50,
+k=3). Red: Ungated; blue: VaG; dashed line: Seed baseline.
+Shaded bands are 95% Wilson confidence intervals.
+(detailed below, Figure 4). Admission control instead yields
+a compact pool whose capability grows every round, whereas
+unconditional accumulation buys a brief early gain and pays
+it back with interest.
+Gating is cheap relative to what it prevents. Gate 1’s first
+two checks use no LLM calls, so only the semantic critic costs
+one inference per candidate; Gate 2 reuses the Gate-1 replays,
+adding at most |W|−1 ≤14 joint replays per round. This
+cost is paid once at admission, whereas a contaminant is paid
+for on every later trial and, through its descendants, in every
+later round. Accordingly, VaG’s per-trial token cost stays low
+(0.77–0.94M) while Ungated’s grows with its bloated pool
+(up to 1.30M) for worse accuracy—the gate buys accuracy
+Configuration
+Pass@1
+Pool
+∆VaG (pp)
+VaG (full)
+72%
+37
+—
+−Schema validation
+70%
+37
+−2
+−Holdout replay
+62%
+45
+−10
+−Semantic check
+68%
+40
+−4
+−Marginal-gain gate
+64%
+58
+−8
+Table 2: Component ablation on Event-50 (R5). −Marginal-
+gain gate admits every Gate-1 survivor to Hot without joint
+selection. ∆VaG is the change from full VaG, in points. Bold:
+two largest drops.
+and efficiency together.
+Ablation Studies.
+We disable one VaG component at a
+time, keeping the rest fixed (Table 2).
+Schema validation costs little (−2pp): malformed skills
+reach Warm but the backbone mostly ignores or repairs them,
+so format errors rarely translate into behavioral harm. Hold-
+out replay matters most (−10pp)—it is the only check that
+empirically tests behavior rather than surface form, so with-
+out it a skill that reads well but silently lowers the success rate
+passes Gate 1 undetected and directly raises the pool’s con-
+tamination rate. The semantic check costs −4pp, admitting
+fabricated or self-contradictory advice that executes without
+error yet misleads the agent. Crucially, the three checks fail
+on different skills—schema on malformed entries, replay on
+silently harmful ones, semantics on plausible-but-fabricated
+advice—so no single check substitutes for another, which
+is why Gate 1 requires all three rather than the strongest
+one alone. Removing the marginal-gain gate is the clearest
+evidence of combinatorial contamination (Eq. (3)): with ev-
+ery Gate-1 survivor admitted, the Hot pool balloons from
+
+
+===== page 7 =====
+Ungated
+Peak
+Ungated
+R5
+Source-
+only
+Oracle
+Cleanup
+VaG
+(ours)
+0
+10
+20
+30
+40
+50
+60
+70
+80
+Pass@1 (%)
+62.3%
+50.0%
+51.7%
+56.7%
+72.0%
+Figure 4: Residual contamination after post-hoc rollback
+(Event-50, k=3). Bars: pass@1 for the Ungated peak (R3),
+the collapsed R5 pool, source-only rollback, oracle full-
+lineage cleanup, and VaG (R5). Of the 12.3pp peak-to-R5
+drop, source removal recovers only 1.7pp and oracle cleanup
+6.7pp.
+37 to 58 skills yet pass@1 drops −8pp, showing that skills
+which each clear the individual checks can still conflict once
+injected together—exactly the interaction that per-skill judg-
+ment cannot detect.
+Post-hoc Rollback Analysis.
+To test how much damage
+post-hoc removal can undo, we compare removing only the
+harmful source skills from the collapsed Ungated R5 pool
+against an oracle that also removes their entire lineage—
+which requires provenance a real system lacks.
+Figure 4 decomposes the 12.3pp drop from the Ungated
+peak (62.3%) to R5 (50.0%): source removal recovers only
+1.7pp (individual contamination), full lineage cleanup a fur-
+ther 5.0pp (combinatorial contamination via descendants),
+and the remaining 5.6pp is irrecoverable even under Or-
+acle cleanup—no post-hoc operation can restore the pre-
+degradation state. That even the oracle, with perfect prove-
+nance, leaves nearly half the drop unrecovered confirms that
+the loss is baked into the pool’s state rather than carried by
+a few removable entries. VaG (72.0%) exceeds Oracle by
+15.3pp, far beyond any recoverable gap, showing that pre-
+venting admission is decisively better than any cleanup after
+the fact. As a concrete case, a git-conflict skill distilled at
+R3 seeded two derived skills at R4 (merge and rebase work-
+flows); after source-only rollback both remained and kept
+failing 4 of 7 git-related Test-25 tasks (full chain in the Sup-
+plementary Material). Gating must therefore act before skills
+enter the runtime context.
+Cross-Model Generalization.
+To show the skills are not
+fitted to Event-50 or to Hy3, we freeze the R5 Hot pool
+and evaluate it on Test-25 with other backbones, without
+re-evolution. The frozen pool gives positive lift on all five
+backbones (+8 to +16pp; Table 3). GPT-5.4 and Claude
+Sonnet 4.5 reach 56%, above Hy3’s own 44%, indicating
+the gate-filtered skills encode model-agnostic engineering
+knowledge in natural language, from which stronger back-
+Backbone
+Seed
+VaG Hot
+∆(pp)
+Hy3
+32%
+44%
++12
+DeepSeek-V4-Pro
+32%
+40%
++8
+GPT-5.4
+44%
+56%
++12
+Claude Sonnet 4.5
+48%
+56%
++8
+Qwen3.6-35B-A3B
+36%
+52%
++16
+Table 3: Cross-model transfer on Test-25. The Hy3-evolved
+Hot pool (R5) is frozen and evaluated on other backbones
+without re-evolution.
+Configuration
+Pool
+Pass@1
+∆Seed (pp)
+Seed
+3
+57.5%
+—
+Ungated (R5)
+179
+65.5%
++8.0
+VaG (R5)
+37
+69.0%
++11.5
+Table 4: Cross-benchmark transfer to InterCode NL2Bash.
+Frozen R5 pools, no re-evolution. Bold: best.
+bones extract more.
+Cross-Benchmark Generalization.
+To confirm the skills
+capture general shell knowledge rather than TB2-specific
+patterns, we evaluate the frozen R5 pools on InterCode
+NL2Bash (Yang et al. 2023), which maps natural-language
+instructions to bash commands. It shares the shell ecosystem
+with TB2 but tests single-step mapping rather than multi-step
+operations, giving a domain-overlapping yet format-distinct
+test.
+The comparison direction is preserved: VaG’s 37 Hot
+skills reach 69.0%, above Ungated’s 179 skills at 65.5% and
+Seed at 57.5%. Ungated stays net-positive over Seed here
+(+8.0pp): on these short tasks each trial invokes few skills
+and contamination chains stay shallow, so new skills still
+help—consistent with contamination biting hardest on long,
+multi-step tasks. Gate-filtered skills thus carry reusable shell-
+engineering knowledge across benchmarks, not TB2-specific
+heuristics.
+Conclusion
+We identified a non-monotonic capability trajectory in self-
+evolving agents—accumulated skills first help, then con-
+taminate the decision context—and showed this contami-
+nation is structurally irreversible, since post-hoc removal of
+a source skill cannot undo the flawed reasoning its descen-
+dants inherit. This makes skill admission a pre-commit ne-
+cessity, which we address with Verifier-as-Gatekeeper (VaG):
+three complementary critics filter each skill, and a marginal-
+gain selection removes combinatorial conflicts. On Terminal-
+Bench 2, VaG improves every round to 72% pass@1 with a
+5× smaller pool, while ungated evolution peaks and col-
+lapses; the frozen pool also transfers across five backbones
+and to a second benchmark. Pre-commit verification is thus
+a structural requirement, not an optional refinement, for reli-
+able self-evolving systems.
+
+
+===== page 8 =====
+References
+Das, A.; and Kempe, D. 2011. Submodular meets spectral:
+Greedy algorithms for subset selection, sparse approximation
+and dictionary selection. arXiv preprint arXiv:1102.3975.
+Feige, U.; Mirrokni, V. S.; and Vondrák, J. 2011. Maximiz-
+ing non-monotone submodular functions. SIAM Journal on
+Computing, 40(4): 1133–1153.
+Gulcehre, C.; Paine, T. L.; Srinivasan, S.; Konyushkova, K.;
+Weerts, L.; Sharma, A.; Siddhant, A.; Ahern, A.; Wang,
+M.; Gu, C.; et al. 2023. Reinforced self-training (rest) for
+language modeling. arXiv preprint arXiv:2308.08998.
+Huang, J.; Gu, S.; Hou, L.; Wu, Y.; Wang, X.; Yu, H.; and
+Han, J. 2023. Large language models can self-improve. In
+Proceedings of the 2023 conference on empirical methods in
+natural language processing, 1051–1068.
+Lin, J.; Liu, S.; Pan, C.; Lin, L.; Dou, S.; Xi, Z.; Huang,
+X.; Yan, H.; Han, Z.; Gui, T.; et al. 2026.
+Agentic har-
+ness engineering: Observability-driven automatic evolution
+of coding-agent harnesses. arXiv preprint arXiv:2604.25850.
+Madaan, A.; Tandon, N.; Gupta, P.; Hallinan, S.; Gao, L.;
+Wiegreffe, S.; Alon, U.; Dziri, N.; Prabhumoye, S.; Yang,
+Y.; et al. 2023. Self-refine: Iterative refinement with self-
+feedback. Advances in neural information processing sys-
+tems, 36: 46534–46594.
+Mei, L.; Yu, X.; Chen, C.; Liu, L.; Chen, X.; Ma, J.; Feng,
+C.; Huang, L.; Mo, S.; Kang, S.; Xu, Y.; Yang, Z.; Xue, Z.;
+Zhang, J.; He, Q.; Huang, Y.; Jiang, H.; Ma, Z.; Pan, Z.; Sun,
+M.; Tao, Z.; Xiao, J.; Xin, G.; Zhang, H.; Zhang, W.; Zhang,
+J.; Zhu, G.; Mao, J.; and Zhang, W. 2026. SearchArt: Train-
+ing Long-Horizon Search Agent with Scalable Synthetic and
+Verified Task. arXiv:2607.24850.
+Merrill, M. A.; Shaw, A. G.; Carlini, N.; Li, B.; Raj, H.;
+Bercovich, I.; Shi, L.; Shin, J. Y.; Walshe, T.; Buchanan,
+E. K.; et al. 2026. Terminal-bench: Benchmarking agents
+on hard, realistic tasks in command line interfaces. arXiv
+preprint arXiv:2601.11868.
+Mirzasoleiman, B.; Badanidiyuru, A.; Karbasi, A.; Vondrák,
+J.; and Krause, A. 2014. Lazier than lazy greedy. arXiv
+preprint arXiv:1409.7938.
+Nemhauser, G. L.; Wolsey, L. A.; and Fisher, M. L. 1978. An
+analysis of approximations for maximizing submodular set
+functions—I. Mathematical programming, 14(1): 265–294.
+Packer, C.; Fang, V.; Patil, S.; Lin, K.; Wooders, S.; and
+Gonzalez, J. 2023. MemGPT: towards LLMs as operating
+systems.
+Park, J. S.; O’Brien, J.; Cai, C. J.; Morris, M. R.; Liang,
+P.; and Bernstein, M. S. 2023. Generative agents: Interac-
+tive simulacra of human behavior. In Proceedings of the
+36th annual acm symposium on user interface software and
+technology, 1–22.
+Pu, H.; Song, X.; and Zhao, L. 2026. SkillOps: Managing
+LLM Agent Skill Libraries as Self-Maintaining Software
+Ecosystems. CoRR, abs/2605.13716.
+Qwen Team. 2026.
+Qwen3.6-35B-A3B: Agentic Coding
+Power, Now Open to All.
+Schick, T.; Dwivedi-Yu, J.; Dessì, R.; Raileanu, R.; Lomeli,
+M.; Hambro, E.; Zettlemoyer, L.; Cancedda, N.; and Scialom,
+T. 2023. Toolformer: Language models can teach themselves
+to use tools.
+Advances in neural information processing
+systems, 36: 68539–68551.
+Shinn, N.; Cassano, F.; Gopinath, A.; Narasimhan, K.; and
+Yao, S. 2023. Reflexion: Language agents with verbal re-
+inforcement learning. Advances in neural information pro-
+cessing systems, 36: 8634–8652.
+Tao, Z.; Lin, T.-E.; Chen, X.; Li, H.; Wu, Y.; Li, Y.; Jin,
+Z.; Huang, F.; Tao, D.; and Zhou, J. 2024. A survey on
+self-evolution of large language models.
+arXiv preprint
+arXiv:2404.14387.
+Wang, G.; Xie, Y.; Jiang, Y.; Mandlekar, A.; Xiao, C.; Zhu,
+Y.; Fan, L.; and Anandkumar, A. 2023. Voyager: An open-
+ended embodied agent with large language models. arXiv
+preprint arXiv:2305.16291.
+Wang, J.; Yan, Q.; Wang, Y.; Tian, Y.; Mishra, S. S.; Xu, Z.;
+Gandhi, M.; Xu, P.; and Cheong, L. L. 2026. Reinforcement
+Learning for Self-Improving Agent with Skill Library. In
+Liakata, M.; Moreira, V. P.; Zhang, J.; and Jurgens, D., eds.,
+Proceedings of the 64th Annual Meeting of the Association
+for Computational Linguistics (Volume 1: Long Papers), ACL
+2026, San Diego, California, United States, July 2-7, 2026,
+1529–1550. Association for Computational Linguistics.
+Wang, L.; Ma, C.; Feng, X.; Zhang, Z.; Yang, H.; Zhang,
+J.; Chen, Z.; Tang, J.; Chen, X.; Lin, Y.; et al. 2024a. A
+survey on large language model based autonomous agents.
+Frontiers of Computer Science, 18(6): 186345.
+Wang, Z. Z.; Mao, J.; Fried, D.; and Neubig, G. 2024b. Agent
+workflow memory. arXiv preprint arXiv:2409.07429.
+Wu, R.; Wang, X.; Mei, J.; Cai, P.; Fu, D.; Yang, C.; Wen, L.;
+Yang, X.; Shen, Y.; Wang, Y.; and Shi, B. 2025. EvolveR:
+Self-Evolving LLM Agents through an Experience-Driven
+Lifecycle. CoRR, abs/2510.16079.
+Xia, P.; Chen, J.; Yang, X.; Tu, H.; Liu, J.; Xiong, K.; Han,
+S.; Qiu, S.; Ji, H.; Zhou, Y.; et al. 2026. MetaClaw: Just
+Talk–An Agent That Meta-Learns and Evolves in the Wild.
+arXiv preprint arXiv:2603.17187.
+Xiao, W.; Tang, X.; Zhou, B.; Hu, S.; and Han, J. 2026.
+RouteGuard: Internal-Signal Detection of Skill Poisoning in
+LLM Agents. CoRR, abs/2604.22888.
+Xu, A.; Lin, B.; Xue, B.; Wang, B.; Xu, B.; Wu, B.; Zhang,
+B.; Lin, C.; Dong, C.; Ling, C.; et al. 2026. Deepseek-v4:
+Towards highly efficient million-token context intelligence.
+arXiv preprint arXiv:2606.19348.
+Xu, M. 2026. Agentica: A Human-Centric Framework for
+Large Language Model Agent Workflows.
+Yang, J.; Prabhakar, A.; Narasimhan, K.; and Yao, S. 2023.
+Intercode: Standardizing and benchmarking interactive cod-
+ing with execution feedback. Advances in Neural Information
+Processing Systems, 36: 23826–23854.
+Yao, S.; Zhao, J.; Yu, D.; Shafran, I.; Narasimhan, K. R.; and
+Cao, Y. 2022. React: Synergizing reasoning and acting in
+language models. In NeurIPS 2022 Foundation Models for
+Decision Making Workshop.
+
+
+===== page 9 =====
+Zelikman, E.; Wu, Y.; Mu, J.; and Goodman, N. 2022. Star:
+Bootstrapping reasoning with reasoning. Advances in Neural
+Information Processing Systems, 35: 15476–15488.
+Zhang, Q.; Hu, C.; Upasani, S.; Ma, B.; Hong, F.; Kamanuru,
+V.; Rainton, J.; Wu, C.; Ji, M.; Li, H.; et al. 2025. Agentic
+context engineering: Evolving contexts for self-improving
+language models. arXiv preprint arXiv:2510.04618.
+Zhang, Z.; Zhang, A.; Li, M.; and Smola, A. 2022. Automatic
+chain of thought prompting in large language models. arXiv
+preprint arXiv:2210.03493.
+Zhao, A.; Huang, D.; Xu, Q.; Lin, M.; Liu, Y.-J.; and Huang,
+G. 2024. Expel: Llm agents are experiential learners. In Pro-
+ceedings of the AAAI Conference on Artificial Intelligence,
+volume 38, 19632–19642.

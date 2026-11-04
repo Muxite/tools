@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai4r.local/schemas/m2a/capability",
+  "title": "AI4R M2a capability",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "2.0.0-m2a.2"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "package_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "kind": {
+      "enum": [
+        "tool",
+        "skill",
+        "mcp",
+        "agent",
+        "workflow",
+        "data"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entrypoint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+          },
+          "contract_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+          },
+          "media_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "semantic_constraints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "name",
+          "contract_id",
+          "media_types",
+          "semantic_constraints"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+          },
+          "contract_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+          },
+          "media_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "semantic_constraints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "name",
+          "contract_id",
+          "media_types",
+          "semantic_constraints"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "effects": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "required_providers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "required_check_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_wall_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_cost_units": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cost_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_child_depth": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "max_attempts",
+        "max_wall_seconds",
+        "max_cost_units",
+        "cost_unit",
+        "max_child_depth"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "package_id",
+    "kind",
+    "description",
+    "entrypoint",
+    "inputs",
+    "outputs",
+    "effects",
+    "required_providers",
+    "required_check_ids",
+    "limits"
+  ],
+  "additionalProperties": false
+}

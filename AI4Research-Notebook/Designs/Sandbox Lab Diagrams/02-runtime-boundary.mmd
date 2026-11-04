@@ -1,0 +1,34 @@
+flowchart TB
+    subgraph HOST["Permitted Linux environment or provisioned lab VM"]
+        POLICY["Controller policy and ledger<br/>Outside mutable research source"]
+        CTRL["Lab controller and broker<br/>Typed API, limits and reconciliation"]
+        ENGINE["Docker Engine<br/>Controller access only"]
+        subgraph LAB["Lab runtime scope"]
+            APP["Persistent AI4R runtime<br/>Planner and CC factory module"]
+            JOB["Bounded CC operation jobs<br/>Scoped inputs, outputs and deadline"]
+            SERVICE["Managed application service<br/>Optional persistent lifetime"]
+        end
+        STORE["Persistent lab storage<br/>Separate project and service data"]
+        POLICY --> CTRL
+        APP -->|"authorized requests"| CTRL
+        CTRL --> ENGINE
+        ENGINE -->|"run persistent app"| APP
+        ENGINE -->|"start and supervise"| JOB
+        ENGINE --> SERVICE
+        JOB -->|"scoped application API"| SERVICE
+        APP --> STORE
+        SERVICE --> STORE
+        JOB -->|"validated output import"| CTRL
+        CTRL --> STORE
+    end
+    BUILD["Optional workstation or CI builder"] -.->|"verified artifacts"| CTRL
+    class POLICY,CTRL,ENGINE control
+    class APP,JOB,SERVICE work
+    class STORE data
+    class BUILD external
+
+    classDef work fill:#e8f1ff,stroke:#3568a8,color:#142d4e,stroke-width:1.5px
+    classDef control fill:#fff1d7,stroke:#a66d16,color:#513406,stroke-width:1.5px
+    classDef qualify fill:#eee8fa,stroke:#7854a0,color:#35204d,stroke-width:1.5px
+    classDef data fill:#e5f3eb,stroke:#3c8160,color:#163e2a,stroke-width:1.5px
+    classDef external fill:#f0f2f5,stroke:#65758a,color:#273547,stroke-width:1.5px

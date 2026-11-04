@@ -1,0 +1,9 @@
+TIME 1:40
+SAY: Here's my recommendation for Capability Capsule. When planning can't find a suitable capsule for a step, it uses the generalist capsule instead. The generalist is judged by the same frozen gates as any other step, gets the lowest trust, and is capped per plan. On that first run we don't build anything, but we store a gap record: what the step cost and how often it happened. When the same gap keeps coming back across sprints, a separate build-decision agent looks at those costs and counts and decides whether to build a new capsule, version an existing one, or wait. If it builds, it writes the manifest, and a suite author writes the tests from that manifest alone, so the gate is fixed before any implementation starts. Then the implementation agent takes over. It can start from the generalist's scripts and logs, never sees the tests, and gets a limited number of tries at the gate, hearing only admit or reject with a reason. A capsule that passes becomes a new version, used from the next sprint. The black badges are the 6 rules: R1 on the cold path, R4 and R6 on the build-decision agent, R3 on the suite author, R5 on the gate, and R2 on the sprint plan.
+IF ASKED:
+- Why cap the tries: unlimited retries let the builder learn the tests
+- Why tests never use generalist outputs: they would pass anything that repeats its mistakes
+- Out of tries or time, the gap goes back to the build-decision agent
+- Why not build and use a capsule in the same sprint: it would change what the freeze already sealed
+- The generalist runs on the frozen task graph from the workflow talk wherever nothing in the library fits; 2 switches in the frozen run contract turn the fallback and the authoring on or off
+- 1 admission costs 3 model sessions, an effect check, and a suite re-run for as long as the capsule lives

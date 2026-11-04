@@ -1,0 +1,73 @@
+PLEASE IMPLEMENT THIS PLAN:
+# Agentic Builder upgrade and independently benchmarked π build
+
+## Summary
+
+Continue on `builder/bounded-build-test-20261023`. Replace the scripted three-candidate controller with a real agent loop using Jiuwenswarm’s native agent framework. Demonstrate it building and testing a working Python π program, then submit the immutable program to a separate Benchmark invocation.
+
+The first demonstration exercises Builder, independent checking, verification and Benchmark directly using a prepared frozen task. It does not require Search or the entire research journey to generate the test assignment.
+
+## 1. Agent runtime and tools
+
+- Use the native DeepAgent/ReAct runtime underlying Jiuwenswarm’s code harness, at the existing pinned OpenJiuwen revision `9e339019…`. Register a Builder-specific tool provider instead of loading the full chat adapter.
+- Give each invocation a persistent project workspace and conversation history. The agent chooses when to inspect, edit, test, investigate failures, revise tests, submit or report blocked.
+- Expose scoped tools for listing/searching/reading files, writing and applying patches, running registered development checks, inspecting execution logs, and submitting a candidate.
+- Development checks support compilation, unittest selection and protocol smoke runs. Commands are host-owned recipes executed through the protected executor; no unrestricted host shell or filesystem tools.
+- Disable automatic subagents, background continuation, external memory, MCP discovery and hidden model/tool retries for this first release. Explicitly prevent fallback to SDK-local execution.
+- Enforce ceilings of **600 seconds, 20 model calls, 40 tool operations and 12 development execution jobs**. Each generated-code job retains the existing 30-second, memory, process, network and output limits. These constrain resources, not action order.
+- An invalid action returns a diagnostic and consumes its allowance. Cancellation, infrastructure failure or exhausted budgets terminate the invocation with retained evidence.
+
+### Codex integration
+
+Implement a registered native model-client adapter that calls the existing governed Codex subscription bridge. Serialize the agent’s messages and available tool definitions into a bounded text request; validate the returned action envelope and translate it into native tool-call messages.
+
+No API key, fake credential or separate credential-bearing coding process is introduced. Preserve protected call identity, observed model identity, budgets and cancellation. Register invocation-scoped callbacks and remove them on completion.
+
+## 2. Candidate custody and independent acceptance
+
+- Retain the existing three-file POC delivery for this demonstration: `requirements.txt`, `poc_patch.py`, and `run_benchmark.py`. Development tests remain separate evidence.
+- The agent may make targeted edits and run tests repeatedly. Successful tests apply to an exact workspace snapshot; subsequent edits invalidate that snapshot’s passing status.
+- Submission requires compilation, a nonempty development test suite and protocol smoke checks to pass on the final snapshot. Premature submission returns diagnostics to the agent rather than accepting the package.
+- Replace the existing “final model response contains every file” check with a protected edit journal: model action → authorized tool effect → file revision → tested snapshot → submitted archive.
+- Independent checks replay those identities, verify archive contents and test evidence, and reject substituted files, stale results or producer-authored success claims.
+- Keep separate per-output verifier calls and protected acceptance gates. Benchmark receives only the accepted immutable artifact. Benchmark failures never trigger automatic post-submission Builder repair.
+- Author a new build-receipt version covering agent actions, snapshots and development tests. Update necessary scheduler, recovery and consumer readers while retaining historical receipt support.
+
+## 3. π task and independent Benchmark protocol
+
+### Frozen task
+
+Build a Python standard-library program exposing `approximate_pi(digits)` and a runnable harness. It must compute π for the requested precision and return `3.` followed by exactly that many decimal places, **truncated rather than rounded**.
+
+The model chooses the algorithm. Supply interface requirements, public development cases and a correct captured baseline; do not supply the candidate implementation.
+
+### Correctness and anti-hardcoding checks
+
+- Test small boundary cases, 10,000 places and 100,000 places.
+- After submission, test three additional host-selected precisions between 20,000 and 100,000. Freeze their selection before execution and retain it in protected evidence.
+- Check the entire returned prefix against an independently produced reference. Prepare that reference outside the measured jobs using two independently implemented methods that must agree; pin their sources and reference bytes.
+- Keep reference answers outside the Builder workspace and candidate sandbox.
+- Reject float-only precision, malformed/truncated output, embedded-answer-only implementations, ignored precision arguments and altered test inputs. High precision and unseen requests strengthen the check; they do not alone prove genuine computation.
+
+### Measurement
+
+- Add an explicitly registered π protocol alongside the existing classification protocol. Selection comes from the frozen host profile, not a model-authored executable or scoring plugin.
+- Preserve the seven Benchmark input roles. For π, validation resources contain precision cases instead of classification rows.
+- Measure 10,000 and 100,000 places separately, with five fresh-process repetitions per baseline and candidate, baseline first for each case.
+- Use the same captured CPU environment and fixed resource limits. Record effective CPU affinity and hardware.
+- Score elapsed time using the protected executor’s clock, including process startup and output emission but excluding provisioning and reference generation. Ignore candidate-reported timing.
+- Record case identity, correctness, raw times, median, spread and execution references. The primary comparison is median elapsed time at 100,000 places; 10,000-place performance is diagnostic.
+- A correct build can produce a negative performance result. Report slower or failed candidates honestly.
+
+## 4. Verification, release and completion criteria
+
+- Exercise the **real native agent runtime** with controlled model responses to verify different action sequences, failure investigation, targeted repair, stale-test invalidation, premature submission and budget termination.
+- Test tool isolation, path escapes, changed/replayed actions, missing containment proof, cancellation and attempts to access credentials or reference answers.
+- Test π checking with wrong digits, plausible prefixes, hardcoded single-precision answers, forged timing and failed processes.
+- Run existing classification, receipt, scheduler/recovery, release-pin and verifier-reservation regressions.
+- Perform one authenticated Codex-backed build and independent π benchmark on a qualified Linux executor. Retain the actual action trace, edits, tests, submitted package, checks, verifier assessments and measurements.
+- If the executor remains unavailable, report that live acceptance as blocked; fixture tests must not substitute for it.
+- Publish new immutable Builder/Benchmark releases and affected compatibility pins through explicit authoring. Preserve frozen runs and keep classification as the existing default.
+- Update branch documentation and the library with exact source/commit identities, the design amendment, results and remaining limitations. Keep the upgrade separate from M1 until reviewed for integration.
+
+**Completion:** the Builder autonomously chooses and executes development actions, produces a correct runnable π candidate, submits exactly the tested bytes, and a separate Benchmark measures that accepted candidate without trusting its tests or performance claims. No RSI or model-router implementation is included.

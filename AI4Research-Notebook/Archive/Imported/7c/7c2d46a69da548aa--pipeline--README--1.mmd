@@ -1,0 +1,22 @@
+flowchart TB
+    subgraph Prep[Prepare and freeze]
+        direction LR
+        I[Qualified intake] --> C[Intent and requirements] --> B[research_brief.json] --> P[Template or Planner, then freeze run_plan]
+    end
+    subgraph Research[Evidence to registered experiment]
+        direction LR
+        S[Search] --> O[One screened opportunity] --> H[Hypothesis and frozen protocol]
+    end
+    subgraph Execution[Build and measure]
+        direction LR
+        K[Builder: build evidence only] --> M[Research Benchmark: baseline then treatment]
+    end
+    subgraph Conclusion[Interpret and deliver]
+        direction LR
+        E[Scientific evaluation] --> D[Verified Delivery]
+    end
+    Prep --> Research --> Execution --> Conclusion
+    R[(Supplied assets and validation data)] -.-> Prep
+    R -.->|Baseline and validation resources| H
+    R -.-> Execution
+    Research -.->|Registered protocol| Conclusion

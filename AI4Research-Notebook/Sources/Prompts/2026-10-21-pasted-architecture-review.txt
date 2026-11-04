@@ -1,0 +1,113 @@
+PASTED REVIEW (author not stated in the message; supplied by Muk with the instruction "read this"). Captured as pasted text, not Muk's own words.
+
+Verdict
+Recommendation: the proposed hybrid is directionally sound, but I would adjust the architecture before turning it into a workflow-policy amendment.
+
+The strongest idea is a host-controlled system that preserves a durable goal across bounded, inspectable work episodes. That gives you long-horizon progress without requiring one agent process—or one model context—to stay alive indefinitely. The main improvement is to make the design more generically composable: represent work as typed, policy-checked workflow nodes, rather than creating separate architectural modes for "one CC action," "DAG episode," and "composite CC."
+
+I'm assessing the reasoning in the text you pasted, not independently validating the claims about M1 or the pinned repositories; I don't have the cited internal source-review files here.
+
+What makes sense in the proposal
+Separate durable goals from bounded execution. Persist the goal, constraints, accepted evidence, completed episodes, and unresolved questions. Rehydrate a coordinator for a turn, let it propose next work, then discard it. This is a reasonable way to get continuity without treating an always-running agent as the source of truth.
+
+Keep execution and authority in the host. The coordinator should propose plans, not authorize them. The host should bind capabilities, enforce permissions and budgets, dispatch work, and decide what results are released.
+
+Treat generated capabilities as candidates. A wrapper that passed selected tests has evidence about those tests; it has not thereby proven scientific validity or earned permission to execute. Separating preparation, verification, admission, and release is a good governance boundary.
+
+Preserve provenance. Pinning source identity and revision, recording setup and reference results, and linking a candidate back to its source make later review and maintenance possible.
+
+The durable-session idea needs one refinement: "session memory" and "episode execution state" are different kinds of persistence. A durable goal record should be the product-level source of truth; an episode checkpoint or journal should capture resumable execution state. Workflow systems make this distinction because thread state and longer-lived application data have different scopes and uses.
+
+Where I'd change the architecture
+1. Don't make three call modes into three special architectures
+The text proposes three host-protected call modes: a single bounded CC action, a frozen DAG episode, and a composite closure. Those are useful shapes of work, but making each a separate runtime mode could create three parallel authorization, dispatch, resume, and audit paths.
+
+Instead, make them instances of one model:
+
+Goal/session
+    -> proposes a workflow graph
+    -> host validates and binds it
+    -> host executes authorized nodes
+    -> evidence and outcomes are recorded
+    -> coordinator proposes the next graph
+
+A node can be a deterministic tool, a bounded agent, a human approval, a verification step, or a nested workflow. A one-action call is a graph with one node. A composite capability is a versioned, reusable graph package. The common execution and policy path stays the same.
+
+That gives you more flexibility in composing work while avoiding hidden nested calls or special authority for composites.
+
+2. Make the graph extensible, but host-validated
+A frozen DAG is excellent for attribution and replay, but a completely fixed graph is a poor fit when the next step depends on what a long-running experiment discovers. Conversely, letting the coordinator freely mutate and execute a live graph makes recovery, approval, and audit harder.
+
+Use a staged approach:
+
+The coordinator proposes a graph or graph revision.
+
+A deterministic host validator checks schema, capability bindings, policy, budgets, dependencies, and approval requirements.
+
+The host freezes and executes the approved revision.
+
+Results and failures become evidence for the next proposal.
+
+This preserves bounded, reviewable episodes while allowing adaptive multi-episode work. If a running episode must change, model it as an explicit revision or a new episode—not an invisible change to the plan already being audited.
+
+3. Specify the capability contract, not just the carrier
+"Agent/tool CC" and "composite CC" describe how something may run, but not enough to govern reuse. Each capability should have a versioned contract that states at least:
+
+Inputs and outputs, with schemas and preconditions.
+
+Side effects and required permissions.
+
+Resource, time, and call budgets.
+
+Dependencies and execution environment.
+
+Provenance and source revision.
+
+Verification obligations and what they do not establish.
+
+Compatibility, deprecation, and revocation status.
+
+Then "tool," "agent," and "composite" can be implementation forms behind the same contract and host control plane. A capability's declaration is not authorization; each invocation still needs a current binding and grant. Narrow scopes are preferable to handing every invocation a broad catalog of permissions.
+
+4. Keep verification claim-specific
+The brief is right that an output-only semantic verifier must not silently inherit source-reading or runtime-testing duties. I would generalize that into explicit verification obligations attached to each candidate and each claim.
+
+For example:
+
+Claim | Appropriate evidence
+Wrapper corresponds to pinned source | Source inspection and traceability
+Installation and calls work | Fresh-environment setup and runtime tests
+Changed inputs behave correctly | Held-out and boundary-case tests
+Workflow is scientifically appropriate | Domain-specific review and evidence
+Result supports a causal conclusion | Independent scientific evidence, not merely matching code output
+
+The verifier should report which obligations passed, failed, or were skipped. "Verified" without a named scope invites people to overread a test pass as a general endorsement.
+
+5. Treat durability as a side-effect problem too
+Persisting a coordinator's goal and a workflow's state does not by itself make execution safe to resume. A tool may have performed a side effect and crashed before the host recorded its result; retrying could perform that side effect twice. Durable execution designs therefore need explicit retry, idempotency, and side-effect semantics, not just checkpoints.
+
+For research workflows, this matters for more than writes to external services: jobs can consume expensive GPU time, create duplicate artifacts, overwrite outputs, or partially modify a workspace. Give each operation an idempotency strategy or declare that it is non-retryable and needs reconciliation before rerun.
+
+How I'd handle the Paper2Agent pilot
+I agree with a bounded pilot, but I'd treat the proposed single-repository comparison as a thin slice that tests the factory workflow—not as validation of the general architecture.
+
+Keep the comparison, but control the obvious confounds:
+
+Use the same pinned repository, data, model access, permissions, and evaluation set for each path.
+
+Give the direct-use and wrapper paths a comparable setup and preparation budget; separately report any amortized advantage from upfront preparation.
+
+Have an evaluator define required capabilities and hidden changed-input/failure tests before candidate generation.
+
+Count missing required capabilities as failures, not just failures among tools the factory chose to expose.
+
+Track preparation effort and cost, capability coverage, test results, admission outcome, downstream task success, recovery behavior, dependency burden, and maintenance burden.
+
+Record every skipped test, source change, environment limitation, and manual intervention.
+
+A pilot can tell you whether this factory pattern adds enough value to justify developing a generic workflow profile. It cannot establish that the factory generalizes to arbitrary repositories or that its generated tools are scientifically trustworthy.
+
+Suggested decision
+Keep the proposal's core: durable goal/session state, bounded execution, untrusted coordinator proposals, host-owned authorization and release, and independently checked candidate capabilities.
+
+Change the architectural framing to a single typed workflow runtime with nested, versioned capability packages, rather than three separate call modes. Start with a flat graph profile for the pilot, but design the contract so that one-node actions, bounded agent work, and composite workflows are all governed by the same validation and dispatch path. That seems like the better route to maximum flexibility without giving up traceability, safety boundaries, or the ability to test each unit.

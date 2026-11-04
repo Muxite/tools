@@ -1,0 +1,29 @@
+flowchart TB
+    HUMAN["Human direction<br/>Brief and budgets"]
+    MASTER["Tested master AI4R<br/>and shared CC library"]
+    subgraph LABS["Independent persistent projects"]
+        A["Workload lab<br/>AI4R, CCs, profiler and state"]
+        B["Robotics lab<br/>AI4R, CCs, application and state"]
+        C["Other research labs<br/>Own goals, resources and state"]
+    end
+    INFRA["Lab infrastructure<br/>Isolation, resources and recovery"]
+    CENTRAL["Separate central qualification<br/>Selected packages, data and findings"]
+    HUMAN --> A
+    HUMAN --> B
+    MASTER -->|"seed selected versions"| A
+    MASTER --> B
+    MASTER --> C
+    INFRA -->|"manage and preserve"| LABS
+    A -.->|"candidate exports"| CENTRAL
+    B -.-> CENTRAL
+    C -.-> CENTRAL
+    CENTRAL -->|"explicit adoption"| NEXT["Next tested master release"]
+    class HUMAN,INFRA control
+    class MASTER,CENTRAL,NEXT qualify
+    class A,B,C work
+
+    classDef work fill:#e8f1ff,stroke:#3568a8,color:#142d4e,stroke-width:1.5px
+    classDef control fill:#fff1d7,stroke:#a66d16,color:#513406,stroke-width:1.5px
+    classDef qualify fill:#eee8fa,stroke:#7854a0,color:#35204d,stroke-width:1.5px
+    classDef data fill:#e5f3eb,stroke:#3c8160,color:#163e2a,stroke-width:1.5px
+    classDef external fill:#f0f2f5,stroke:#65758a,color:#273547,stroke-width:1.5px

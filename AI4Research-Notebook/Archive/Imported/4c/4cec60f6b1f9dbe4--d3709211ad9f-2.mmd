@@ -1,0 +1,10 @@
+flowchart LR
+    S[Protected scheduler] --> R[Governed CC runner]
+    R --> C[Work or verifier CC]
+    C -->|permitted model request through runner context| Route[Protected role/profile routing]
+    Route --> Bridge[Audited model bridge]
+    Bridge --> Model[Configured endpoint; static Codex fallback]
+    Bridge --> Evidence[Observed calls, effective identity and telemetry]
+    R --> X[Restricted scientific executor]
+    X --> Evidence
+    Evidence --> Check[Checking and durable run state]

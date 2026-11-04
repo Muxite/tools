@@ -1,0 +1,41 @@
+flowchart TB
+    User[User browser or CLI on the LAN or VPN]
+    subgraph Host[Server host: GB10, Docker Compose]
+        subgraph Net[One private Docker network]
+            subgraph App[App container]
+                Web[Web UI and control API]
+                Core[Runtime, model bridge, confined executor]
+                Web --> Core
+            end
+            subgraph Side[Sidecar container]
+                Jobs[Job coordinator]
+                Bench[Platform benchmark runner]
+                Test[Test runner]
+                Jobs --> Bench
+                Jobs --> Test
+            end
+            subgraph RSIC[RSI workbench container: only while a human runs RSI]
+                RSIW[RSI workbench]
+            end
+        end
+        Env[(Protected env file: credentials)]
+        Vol[(Persistent volumes: SQLite state, artifacts, records, account and profile store)]
+        Launcher[Host launcher: optional job executor]
+        Targets[Job-owned disposable targets]
+    end
+    User <-->|Server private address, session token in every request header| Web
+    Bench -->|Control API, own scoped token| Web
+    Test -->|Control API, own scoped token| Web
+    Jobs -.->|job-scoped requests| Launcher
+    Launcher -->|bounded preparation and lifecycle| Targets
+    Env -.->|Mounted into| App
+    App <--> Vol
+    Vol -.->|Record export, read only| RSIW
+    RSIW -.->|Candidates to admission inbox| Vol
+    Core -->|Audited model access| Model[Configured model endpoint]
+    classDef control fill:#FEF3C7,stroke:#B45309,color:#451A03
+    classDef data fill:#DCFCE7,stroke:#15803D,color:#052E16
+    classDef outside fill:#F1F5F9,stroke:#475569,color:#0F172A
+    class Web,Core,Bench,Test,RSIW control
+    class Env,Vol data
+    class User,Model outside

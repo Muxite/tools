@@ -1,0 +1,16 @@
+flowchart TB
+    Request[Exact qualified request] --> Compile[Intention CC: attributed interpretation]
+    Compile --> IR[Candidate Intent IR]
+    IR --> D{Protected deterministic checks}
+    D -->|schema, spans and identities valid| Context[Protected review context]
+    D -->|invalid or unavailable| Gate[Protected Intent gate: control decision]
+    Request --> Context
+    Profile[Predefined independently owned obligations] --> D
+    Profile --> Context
+    Context --> V[Intent verifier CC: judge submitted IR]
+    V --> A[Typed assessment verdict and reasons]
+    A --> Validate[Mechanical assessment and subject validation]
+    Validate --> Gate
+    Gate -->|usable and all mandatory checks pass| Commit[Commit exact accepted Intent]
+    Gate -->|not usable or failed or unclear| Halt[Visible reason and retained candidate]
+    Commit --> R[Requirements CC]

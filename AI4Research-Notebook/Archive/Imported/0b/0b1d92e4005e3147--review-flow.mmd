@@ -1,0 +1,21 @@
+flowchart TD
+    T[/Next boundary and evidence target/] --> P[Check with people working on the affected area]
+    P --> E[Review available code and evidence]
+    E --> H{What blocks the next step?}
+    H -->|design gap| D[Update affected design and links]
+    H -->|code or check mismatch| C[Record finding with reproduction and expected design]
+    H -->|missing data or dependency| U[Record gap and resequence independent work]
+    H -->|enough evidence| N[Choose next boundary and review target]
+    D --> R[Review affected results with contributors]
+    C --> R
+    U --> T
+    R --> T
+    N --> T
+    classDef record fill:#e8f1fe,stroke:#1d4f91,color:#123d70
+    classDef tool fill:#e0f5ef,stroke:#1b7f72,color:#12554a
+    classDef human fill:#fff4d8,stroke:#b58100,color:#694b00
+    classDef unresolved fill:#ffe9e9,stroke:#b63636,color:#7f2020
+    class T record
+    class P,E,D,C,R,N tool
+    class H human
+    class U unresolved

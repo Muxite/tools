@@ -1,0 +1,34 @@
+{
+  "status": "design-example-not-deployed",
+  "units": "measured filesystem bytes U",
+  "disk_pool_fraction": {
+    "host_os_services": 0.05,
+    "models_and_staging": 0.25,
+    "sources_and_data": 0.125,
+    "oci_registry": 0.05,
+    "all_vm_state": 0.25,
+    "durable_evidence": 0.075,
+    "physical_headroom": 0.2
+  },
+  "memory_pool_fraction": {
+    "host_services": 0.125,
+    "all_vms": 0.25,
+    "active_inference": 0.5,
+    "headroom": 0.125
+  },
+  "active_cpu_labs": 2,
+  "per_lab_virtual_disk_fraction": 0.1,
+  "per_lab_build_cache_target_decimal_gb": 30,
+  "heavyweight_storage_jobs": 1,
+  "pressure_used_fraction": {
+    "warn_gc": 0.7,
+    "refuse_growth": 0.8,
+    "recovery": 0.9
+  },
+  "retention": {
+    "unleased_candidates_per_cc": 3,
+    "failed_image_grace_hours": 48,
+    "temporary_vm_checkpoints_per_lab": 1
+  },
+  "admission": "physical_used + outstanding_unconsumed_reservations + new_peak <= 0.80 * U"
+}

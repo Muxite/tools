@@ -1,0 +1,17 @@
+%%{init: {"theme":"neutral","fontFamily":"Segoe UI"}}%%
+flowchart LR
+  subgraph Host[Host: our infrastructure]
+    A[AI4R client adapter in Lab Manager]
+    R[Runtime provider client in Lab Manager]
+    O[Our OpenSandbox lifecycle service]
+    D[Docker backend]
+  end
+  subgraph Lab[Lab container]
+    N[Existing AI4R native API]
+    E[Execd: optional command and file transport]
+  end
+  A <-->|direct native HTTP with AI4R bearer| N
+  A <-->|endpoint lookup and reply only| O
+  R -->|OpenSandbox lifecycle API| O
+  O -->|runtime control| D
+  D -->|owns lab container| N

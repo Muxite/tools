@@ -1,0 +1,61 @@
+---
+id: cc-protocol-03-calls-and-receipts
+status: proposed-runtime-unverified
+source: November 3 single-CC workshop, M2a contracts and reviewed Muse addendum
+last_reviewed: 2026-11-03
+next_action: Replay against a qualified carrier before deployment
+---
+# From call to receipt
+
+## Caller interface
+
+Submit one JSON object with exactly `{key, release, op, inputs}`. The authenticated project or standalone principal supplies the namespace. `key` is a nonempty caller idempotency ID, `release` is the 64-hex release manifest digest, `op` a local operation ID, and `inputs` a map with exactly the declared names. A JSON port carries `{"value": <JSON>}`. An opaque artifact port carries `{"ref":{"uri":…,"sha256":…}}`. The resolver supplies trusted media type and byte count. Validate them and the digest before staging bytes. Ref-shaped JSON inside a value stays data.
+
+Bind once before execution. Atomically reserve (principal, key), budget and a call ID. Repeating the identical logical request under the same key returns its latest receipt. Compare parsed JSON values and verified subjects, ignoring map order. Changed content returns `KEY_CONFLICT` without starting a new call. Durable dispatch uses the same call/attempt token on redelivery. If execution might already have started, reconcile the existing job. Grant only the selected operation's effects on the admitted targets. Deny dispatch if a required provider, scoped grant, lease, or enforcement mechanism is missing.
+
+**Runner interface.** Submit returns a caller receipt. Read the latest receipt or request cancellation by authenticated call ID. Cancellation races with completion: preserve a known terminal result, otherwise stop the job, reconcile effects and publish the outcome. An interrupted caller may reconnect. One active attempt at a time. A queued or long-running call returns `running` with a durable job ID. The host owns deadlines, termination, cleanup and finalization.
+
+## Process interface, binding 1
+
+Start the selected absolute executable directly in its bound image. UTF-8 stdin contains exactly one JSON object and EOF: `{call,attempt,inputs}`. Call is a runner-issued ID and attempt is an integer starting at one. JSON inputs retain their value wrappers. For an artifact, the runner adds a read-only `path` alongside `ref` under `/cc/in/<port>`. The runner exposes one fresh private output directory at `/cc/out`. Only admitted providers and scoped resources are accessible. Logging uses stderr. The child writes one JSON document to stdout on completion.
+
+| Process outcome | Exact stdout shape | Runner action |
+|---|---|---|
+| Complete | `{"outcome":"ok","outputs":{…}}` and exit 0 | Require every declared output exactly once, validate types, then run prebound checks. |
+| Incomplete observation | `{"outcome":"partial","outputs":{…},"reason":"…"}` and exit 0 | Validate the returned subset and preserve it as incomplete evidence. Withhold complete-output acceptance. |
+| Tool failure | `{"outcome":"error","code":"…","message":"…"}` and nonzero exit | Record tool diagnostics, emitting `TOOL_ERROR`. Missing or malformed error document becomes `PROCESS_FAILED`. |
+| Invalid success document | Wrong port, bad type, extra fields, invalid JSON, or multiple documents | Reject with `INVALID_OUTPUT`. Keep diagnostic bytes under the call's access policy. |
+
+Output values use `{value}` or, for an artifact, `{"path":"relative-file"}` beneath the private output directory. Reject absolute paths, traversal, links and special files. The host seals files before hashing, verifies types and persists evidence before accepting. Returning an artifact through this channel is standard output. Writing an independent external location, perturbing a running process or invoking an external service requires a declared effect as applicable.
+
+**A complete process exchange.** For the README operation, a runner writes the first document on stdin and reads the second on stdout. An empty string is a present, valid output.
+
+```json
+{"call":"trim.7","attempt":1,"inputs":{"text":{"value":"   "}}}
+```
+
+```json
+{"outcome":"ok","outputs":{"trimmed":{"value":""}}}
+```
+
+## Caller receipt and M2a bridge
+
+The small receipt is a view of the runner's durable record. Required fields are `call` (ID), `attempt` (positive integer for a bound attempt), `status`, `reason` (stable code), and `outputs` (port map, with value or immutable Ref wrappers). Include `job` for a durable job, including its terminal receipt. Resolve `(call,attempt)` to the protected bound call, effect observations, checks and evidence via the ledger. On malformed requests before binding return exactly `{error,message}` and create no attempt. A bound rejection has a receipt even if the child never started.
+
+| Status | Terminal | Reason and disposition |
+|---|---|---|
+| `running` | No | `STARTED`. Poll or cancel the same job. |
+| `accepted` | Yes | `CHECKED`. All prebound checks passed, effects reconciled, complete outputs durable. |
+| `rejected` | Yes | `INVALID_INPUT`, `INVALID_OUTPUT`, `PARTIAL_OUTPUT`, `CHECK_FAILED`, `TOOL_ERROR`, `PROCESS_FAILED`, `UNDECLARED_EFFECT`, or `DEADLINE` after a confirmed stop. Retained outputs with this status are diagnostic only. |
+| `blocked` | Yes | `DENIED`, `UNSUPPORTED_HOST`, `MISSING_PROVIDER`, `CHECK_UNAVAILABLE`, or `REVOKED`. Resolve the cause and request fresh admission. |
+| `cancelled` | Yes | `CANCELLED` after confirmed stop and effect reconciliation. |
+| `unknown` | Yes for this attempt | `EFFECT_UNKNOWN` or `EXECUTION_UNKNOWN`. Quarantine outputs and reconcile against provider/host evidence before any new dispatch. |
+
+An uncertain execution/effect takes precedence over timeout or cancellation. A confirmed unauthorized effect takes precedence over tool success. Preserve receipt history append-only. An authorized retry after a known transient failure uses the next attempt within bound limits, after reconciling effects and proving replay safe. After a final caller receipt, a new requested execution needs a fresh key and admission. Lost acknowledgments alone never justify another execution.
+
+**M2a call projection.** Emit schema version `2.0.0-m2a.2`. Map bound ID → `id`, release subject → `release_digest`, declaration ID → `package_id`, and `package/op` → `capability_id`. Pin the canonical stored input-map bytes as one `input_refs` entry even for zero inputs. Obtain `project_id,mode,contract_ref,environment_digest,provider_bindings,admission_ref,policy_ref,authorized_effects,limits,budget_reservation_id,deadline` from the binding authority. Use the request key for `idempotency_key`; freeze `required_check_ids` as the union of `core.output`, operation guarantees and independent policy obligations.
+
+**M2a receipt projection.** Emit the same schema version, unique receipt `id`, `call_id`, digest of stored call bytes in `bound_call_ref`, status and terminal flag above, frozen `required_check_ids`, actual `checks` (checker digest, verdict, evidence refs), `output_refs` (including stored inline JSON), `observed_effects,effect_state,usage,reason_code,job_id,parent_call_id`. Usage carries cost, elapsed time and attempt. Set absent job/parent IDs to null. Each published output includes port ID, URI, digest, media type, bytes, audience and reproduction class. Exact replay, controlled replication and evidence inspection are distinct claims. Preserve diagnostic-only status when exporting partial outputs. The process cannot issue an accepted receipt.
+
+
+**Effect breach and legacy export.** M2a semantic validation requires observed effects to be a subset of authorized effects. A confirmed out-of-scope effect therefore cannot round-trip as a valid M2a receipt. Preserve the native rejected receipt and observed effect in the incident ledger, block export with INCOMPATIBLE_CONTRACT and reference the incident from the admission system. Never erase an observed effect to make a legacy projection pass.

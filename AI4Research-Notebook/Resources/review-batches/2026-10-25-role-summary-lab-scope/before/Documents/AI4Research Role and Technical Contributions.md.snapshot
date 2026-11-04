@@ -1,0 +1,103 @@
+---
+id: ai4research-role-and-technical-contributions
+status: working-role-summary
+source: Resources/review-batches/2026-10-25-role-summary/source-receipt.json
+last_reviewed: 2026-10-25
+next_action: Adapt the first-person descriptions to the target application or interview; add verified outcomes as the project progresses
+---
+# AI4Research — Role and Technical Contributions
+
+## 1. Project and my role
+
+**AI4Research (AI4R) is an agent-based research platform designed to turn a research objective into a structured, executable, and reviewable workflow.** Its research stages cover intent clarification, requirements, literature search, screening, hypothesis development, proof-of-concept construction, benchmarking, scientific evaluation, and reporting. A typed planner can also assemble compatible capabilities for more general tasks.
+
+The platform coordinates LLM reasoning, software tools, code execution, research resources, and verification. A central challenge is making reusable capabilities dependable while allowing the system to acquire new capabilities and improve over time.
+
+**My primary contribution has been architecture design and the design of Capability Capsules (CCs), supported by research, evaluation methodology, technical communication, and AI-assisted development coordination.** I worked on how capabilities are described, selected, executed, checked, reused, and evolved, and how those decisions connect to the wider research system.
+
+My work included:
+
+- Translating research goals and product requirements into component responsibilities, interfaces, workflow boundaries, and implementation handoffs.
+- Developing the CC concept and its declaration, verification, admission, versioning, and reuse model.
+- Reviewing existing frameworks and research systems to identify useful patterns and integration opportunities.
+- Directing and reviewing AI-assisted implementation work, including bounded tasks, independent review, tests, and integration evidence.
+- Producing architecture documents, diagrams, presentations, research protocols, and a navigable technical knowledge library.
+
+The project builds on a modified JiuwenSwarm codebase and OpenJiuwen agent infrastructure. My contribution is the AI4Research architecture and capability-focused work around that foundation; it should not be described as independently creating the entire underlying framework.
+
+<div style="page-break-after: always;"></div>
+
+## 2. Architecture and Capability Capsule design
+
+### A common contract for reusable capabilities
+
+I designed CCs as a way to package and integrate functionality from code, bounded agents, skills, tools, MCP integrations, or existing repositories. A capsule describes its purpose, typed inputs and outputs, dependencies, required resources, permitted effects, execution budget, implementation identity, and verification expectations. The underlying capability author can focus on a local interface; the capsule supplies integration with the wider system.
+
+The design separates **building a candidate capability**, **qualifying it for the library**, and **using an admitted version in a research run**. Source availability, successful packaging, and one successful task do not automatically make a capability dependable or eligible for reuse.
+
+### Planning, execution, and independent verification
+
+The core workflow is:
+
+**Research objective → accepted brief → typed plan → validated and frozen bindings → capability execution → checks and assessment → accepted artifacts.**
+
+I defined boundaries between the planner, library, binder, runner, verifier, and protected acceptance controls. The planner proposes a directed acyclic graph; the host validates compatibility, dependencies, permissions, budgets, and required checks before execution. Runs pin exact capability and checking versions so later library changes do not silently change ongoing work.
+
+I emphasized declaration-based verification: check what a capability promises, while preserving the distinction between contract conformance and scientific truth. Output-focused semantic assessment and input-dependent deterministic checks have separate responsibilities. A producer cannot approve its own result, weaken its acceptance rules, or grant itself permissions.
+
+This also informs failure handling: invalid outputs, appropriate abstention, false rejection, operational failure, and a valid negative scientific result must remain distinguishable. A workflow finishing successfully is not sufficient evidence that a research conclusion is correct.
+
+### Labs, capability growth, and self-improvement
+
+For the broader lab design, I specified persistent projects whose sandboxes contain an independent AI4R fork, shared and domain-specific CCs, and installed applications. A robotics lab, for example, combines AI4R and a simulator: capsules let the agent configure experiments, drive application operations, collect observations, and retain findings.
+
+The longer-term design allows recursive self-improvement (RSI) to propose new or modified capsules and harness code. Independent qualification, provenance, checkpoints, and controlled adoption connect local improvements back to the shared base. Durable autonomous work, whole-harness evolution, and the complete lab/factory system remain broader design targets rather than fully demonstrated runtime capabilities.
+
+<div style="page-break-after: always;"></div>
+
+## 3. Technical stack and implementation-facing work
+
+The following stack appears in the inspected project code and associated development work. These are project technologies; the list does not imply that I personally authored every subsystem.
+
+| Area | Technologies and purpose |
+|---|---|
+| Core runtime | Python 3.11+, modified JiuwenSwarm, and pinned OpenJiuwen agent infrastructure; native agent/harness integration and bounded reasoning/tool loops. |
+| Contracts and validation | JSON, JSON Schema, Pydantic, and YAML for declarations, typed artifacts, configuration, and validation. |
+| Service interfaces | FastAPI, Uvicorn, HTTP/JSON, and WebSockets for application control, inspection, and streaming activity. |
+| State and evidence | SQLite-backed research state, filesystem artifacts, manifests, SHA-256 identities, and versioned source/dependency records. |
+| Web interface | React, TypeScript, Vite, Tailwind CSS, and Zustand in the existing frontend. |
+| Execution and deployment | Docker, Docker Compose, BuildKit/buildx, Linux, Windows/WSL, and SSH-based staging and artifact retrieval. VM-based labs are a separate design proposal. |
+| Development and testing | Git branches and reproducible checkouts, pytest/unittest, Ruff, structured test reports, and AI-assisted coding/review workflows. |
+| Capability integration | Skills, tools, MCP interfaces, existing repositories, and model-provider adapters behind explicit capability boundaries. |
+
+My implementation-facing work focused on making the architecture concrete: defining contracts and acceptance conditions, preparing bounded developer tasks, reviewing integration choices, and checking whether source and test evidence supported completion claims.
+
+Examples included typed DAG planning, small deterministic utility capsules, a constrained Generalist capability, and Builder workflows that inspect, edit, test, and repair generated code. I helped shape the separation between development feedback and independent Benchmark/Evaluation decisions, so passing author-generated tests would not become a scientific success verdict.
+
+I also worked on practical benchmark and deployment requirements: separate application and benchmark-runner containers, sequential task execution, attributable outputs, persistent result collection, safe cleanup, and consistent local/remote operation. These support inspectable prototypes and experiments; they are not claims of production deployment or completed hardware qualification.
+
+<div style="page-break-after: always;"></div>
+
+## 4. Research, evaluation, communication, and reusable role description
+
+### Other activities
+
+- **Evaluation design:** Developed a three-arm protocol: raw agent output, plain-agent output with checks, and CC output with identical checks. Matched models, tools, evidence, and budgets; distinguished correctness, abstention, acceptance/rejection, scientific findings, and operational failures.
+- **Research synthesis:** Assessed Paper2Agent, Nuwa's human-to-skill extraction, modular simulation, durable workflows, and evaluated code evolution. Adapted useful mechanisms into AI4R proposals while separating published claims from demonstrated local results.
+- **Workload characterization:** Explored mixed reasoning, inference, training, execution, and simulation/rendering workloads for future hardware research. Distinguished proposed abstractions from measurements on available hardware.
+- **Technical communication:** Prepared Capability Capsule, Paper2Agent, Nuwa, and workload-profiling presentations using diagrams, worked examples, traceable claims, and explicit limitations.
+- **Knowledge infrastructure:** Organized documents, presentations, decisions, and evidence into a working library with source/version records, historical labels, independent review, and completion checks.
+
+### Short description I can reuse
+
+> I worked on the architecture of AI4Research, an agent-based research platform built on JiuwenSwarm and OpenJiuwen. My main focus was Capability Capsules: a contract-based way to package, verify, version, and reuse tools and agent capabilities. I connected that design to typed planning, controlled execution, research verification, and longer-term autonomous lab and self-improvement workflows. I also developed evaluation methods, synthesized related research, prepared technical presentations, and coordinated AI-assisted implementation and review.
+
+### Contribution bullets I can adapt
+
+- Designed capability contracts and lifecycle boundaries spanning authoring, qualification, library admission, planning, execution, and evolution.
+- Defined typed workflow and verification boundaries to support reproducible research runs and independently assessed outputs.
+- Designed persistent lab environments combining AI4R forks, reusable capabilities, and domain applications such as robotics simulation.
+- Developed matched evaluation protocols and implementation handoffs, and reviewed AI-generated code and test evidence.
+- Communicated architecture and research findings through technical documents, diagrams, presentations, and a maintained knowledge library.
+
+**Scope:** These statements describe architecture, research, technical direction, and implementation coordination. Team and AI-assisted code contributions should be attributed accordingly. A general CC accuracy gain, full autonomous RSI loop, production readiness, and target-hardware performance have not been established by the reviewed evidence.

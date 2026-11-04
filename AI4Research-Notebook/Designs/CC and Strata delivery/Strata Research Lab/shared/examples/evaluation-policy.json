@@ -1,0 +1,46 @@
+{
+  "status": "illustrative proposed policy",
+  "gates": [
+    {
+      "metric": "total-unique-pack-bytes",
+      "unit": "By",
+      "comparison": "candidate/baseline <=",
+      "threshold": 0.85
+    },
+    {
+      "metric": "peak-shared-memory",
+      "unit": "By",
+      "comparison": "candidate/baseline <=",
+      "threshold": 1.0
+    },
+    {
+      "metric": "prefill",
+      "unit": "tokens/s",
+      "comparison": "candidate/baseline >=",
+      "threshold": 0.95
+    },
+    {
+      "metric": "decode",
+      "unit": "tokens/s",
+      "comparison": "candidate/baseline >=",
+      "threshold": 0.95
+    },
+    {
+      "metric": "quality",
+      "unit": "fraction",
+      "comparison": "candidate-baseline >=",
+      "threshold": -0.005
+    }
+  ],
+  "heldout_suite": {
+    "uri": "fixture:sealed-suite",
+    "sha256": "81301da69d57cb76d76ba310ef8cfb4887c182177793293c329f6ddc837be22c"
+  },
+  "required_checks": [
+    "inference-api",
+    "router-parity",
+    "declared-metrics"
+  ],
+  "owner": "independent-benchmark",
+  "missing_evidence": "inconclusive"
+}

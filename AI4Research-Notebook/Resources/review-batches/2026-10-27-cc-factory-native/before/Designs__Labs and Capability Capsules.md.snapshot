@@ -1,0 +1,27 @@
+---
+id: labs-and-capability-capsules-overview
+status: selected-architecture-runtime-unverified
+source: Sources/Prompts/2026-10-26-adaptive-sandbox-replacement.txt; https://chatgpt.com/share/6adf9a5b-2320-83e9-afeb-ff63c4f96671
+last_reviewed: 2026-10-27
+next_action: Review one workload journey with a late discovery and a revised next experiment
+---
+# AI4Research Labs and Capability Capsules
+
+
+AI4Research is intended to sustain long research projects across agent sessions. People set the direction; a lab investigates hypotheses, analyzes data, writes code, runs experiments and retains useful findings. Each lab VM contains its own complete AI4R version, including RSI, factory, capabilities, applications and project state. People primarily use its lab interface and may administer the VM directly. Selective JiuwenBox reuse and compatibility with OpenJiuwen are selected design directions. Selected improvements can return to central AI4R through qualification; useful generic findings and components can separately become upstream OpenJiuwen contribution candidates.
+
+The selected lab boundary is a VM with containerized CCs inside it. A stable local supervisor selectively reuses JiuwenBox for compatible execution/lifecycle functions; external host/provider control can stop the VM if AI4R hangs. Normal stop preserves data and remains separate from deletion. Shared inference and other configured services can be on another machine. These controls are designed to bound execution mistakes and preserve the project through interruption; they still need runtime qualification. The first research domain is workload profiling and proposed hardware-demand prediction from historical traces. Robotics is a later, non-blocking application. These are research goals, not measured results.
+
+The current design centers on **persistent goals, revisable strategy, and durable execution**. Research can invalidate the assumptions behind its initial plan. AI4R should plan to the next meaningful uncertainty boundary, execute a checked batch, assess the findings and revise what follows. Completed valid work remains available; changed assumptions prevent stale reuse. Permissions and completion criteria do not become editable model guesses.
+
+![Adaptive research loop](Sandbox%20Lab%20Diagrams/04-adaptive-work.png)
+
+CCs package callable tools, specialist agents and workflows with interfaces, effects, limits and checking obligations. A package can expose several related operations. Specialists may choose local methods within their assignment; the Planner selects useful work; protected binding and checks govern execution and acceptance; the lab controller owns resources and recovery. These are existing responsibilities, not a requirement for a new service per box.
+
+The CC factory supplies missing functionality when justified by research, and independent qualification controls eligibility. Compatible local updates apply to future bindings. Active work stays pinned. The RSI owner handles whole-system improvement and harness candidates. Local publication does not update another lab or central AI4R automatically.
+
+Application developers supply their ordinary interfaces, setup requirements, outputs and reset/checkpoint behavior. CC adapters connect those interfaces to research. Time-sensitive simulation or measurement stays in application code. A simulator author need not understand AI4R's entire planning system.
+
+Start with one useful lab and existing capsules. Demonstrate a discovery that changes the next experiment, reuse of unaffected findings, no-web compliance and interruption recovery. Compare fixed, frequent and selective replanning under matched total budgets and independent scoring. Sandbox operation does not prove scientific accuracy; source support for replay does not prove arbitrary live graph mutation.
+
+Read [[Designs/Sandbox Lab Design]] for the full explanation, source evidence and tradeoffs, and [[Designs/Lab Capsule and Factory Design Plan]] for the replacement delivery order. The [seven-view set](Sandbox%20Lab%20Diagrams/README.md) supports the walkthrough. M2 adaptive execution remains unimplemented by this documentation update; [[Resources/Current Baseline]] records M1 evidence separately.

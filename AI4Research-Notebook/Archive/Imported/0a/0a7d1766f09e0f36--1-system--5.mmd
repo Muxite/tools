@@ -1,0 +1,10 @@
+flowchart LR
+    BR[(research_brief)] --> SE[search] -->|candidate_set| SC[screening]
+    SC -->|opportunity_card| HY[hypothesis]
+    HY -->|hypothesis_blueprint| BU[builder]
+    HY -->|hypothesis_blueprint| BE[benchmark]
+    BU -->|poc_manifest, poc_artifact_bundle| BE
+    BE -->|benchmark_payload| EV[evaluation]
+    HY -->|hypothesis_blueprint| EV
+    EV -->|evaluation_verdict| DE[delivery]
+    SE & SC & HY & BU & BE -.->|all accepted artifacts| DE

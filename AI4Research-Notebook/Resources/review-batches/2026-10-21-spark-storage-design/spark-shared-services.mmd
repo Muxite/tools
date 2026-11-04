@@ -1,0 +1,37 @@
+flowchart TB
+    subgraph HOST[GB10 Spark - 128 GB unified memory and 2 TB SSD]
+        CAP[Host capacity controller - reservations, quotas and retention]
+        MODELS[One immutable model store]
+        INF[Host inference gateway and GPU workers]
+        SRC[Prepared repo and data store]
+        REG[OCI registry - selected base and candidate images]
+        EVID[Durable evidence and retention index]
+        MODELS -->|read-only weight mounts| INF
+        subgraph A[CPU lab VM A]
+            AI_A[AI4R and factory A]
+            RELAY_A[Scoped model relay]
+            ENG_A[Own broker, Engine and bounded build cache]
+            AI_A --> ENG_A
+            AI_A --> RELAY_A
+        end
+        subgraph B[CPU lab VM B]
+            AI_B[AI4R and factory B]
+            RELAY_B[Scoped model relay]
+            ENG_B[Own broker, Engine and bounded build cache]
+            AI_B --> ENG_B
+            AI_B --> RELAY_B
+        end
+        RELAY_A -->|authenticated requests| INF
+        RELAY_B -->|authenticated requests| INF
+        SRC -->|pinned resources on demand| AI_A
+        SRC -->|pinned resources on demand| AI_B
+        REG -->|pull only needed images| ENG_A
+        REG -->|pull only needed images| ENG_B
+        AI_A -.->|sealed export| EVID
+        AI_B -.->|sealed export| EVID
+        CAP -.-> INF
+        CAP -.-> ENG_A
+        CAP -.-> ENG_B
+        CAP -.-> SRC
+        CAP -.-> REG
+    end

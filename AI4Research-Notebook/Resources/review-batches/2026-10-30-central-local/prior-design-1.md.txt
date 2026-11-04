@@ -1,0 +1,122 @@
+# Single-host Lab Manager
+
+**Current phase: design for approval, October 30, 2026.** The user clarified that runtime implementation is not yet needed. Existing experimental code and its test evidence are retained as reference, not an approved deployment. The proposed single-host Compose design supersedes the earlier VM-per-lab selection; backend and interface approval are still pending. No further runtime work is part of this amendment.
+
+Start with [lab projects and containerized capsules](capsule-support.md), then [the communication adapter and OpenSandbox boundary](communication-adapter.md). It defines the small native AI4R client, separates research/runtime/model interfaces, records the OpenSandbox proxy authentication limitation and gives the design approval scenarios. The detail below records the earlier candidate design; implementation-specific mechanics remain provisional.
+
+## Latest capsule integration amendment
+
+The lab is a project ownership boundary: an AI4R worker, sibling CC job/service containers and persistent data. Immutable CC images can be reused across labs; mutable instances and state remain lab-scoped. M2a owns selection, checks, history and reevaluation. A scoped host execution provider launches/observes/cancels container work without giving agents a Docker socket. Fixed Compose services and dynamic CC jobs have explicit separate owners; no concrete resource has competing controllers. The support note supersedes earlier shorthand that treated all CC software as installed inside the worker. Integration remains to be qualified.
+
+## Responsibilities
+
+Mother AI4R remains the maintained Git repository. A host-side manager runs independently under systemd and owns Docker Compose operations. Each lab has an independent Git clone, mutable source, its own Compose project, state, CC selection, image recipe and model configuration. No lab mounts mother AI4R or the Docker socket. Lab Manager relays work; the lab's existing ResearchService remains authoritative for runs, scientific checking and cancellation.
+
+```mermaid
+flowchart TB
+  Human[Researcher or central AI4R] --> Manager[Host Lab Manager: API, web, CLI, SQLite]
+  Mother[Mother AI4R: selected Git revision] -->|independent clone| A[Lab A: AI4R, CCs, applications]
+  Mother -->|independent clone| B[Lab B: AI4R, CCs, private GPU work]
+  Manager <-->|native HTTP research API| A
+  Manager <-->|native HTTP research API| B
+  A --> Shared[Own shared inference API]
+  B --> Shared
+  B --> Private[Lab-owned private model and checkpoints]
+  A --- DataA[Persistent lab A directories]
+  B --- DataB[Persistent lab B directories]
+  A -.-> Review[Selected export: human review and manual merge]
+  B -.-> Review
+  Review -.-> Mother
+```
+
+## Lifecycle and persistence
+
+One Compose project `ai4r-lab-ID` contains a worker and optional operator-configured application services. SQLite records desired/observed state, source/image pins, requests and GPU ownership. A process lock prevents multiple manager processes against the same root. Per-lab thread locks serialize operations. Startup/periodic reconciliation inspects Docker, never replays research or restarts an exited worker. Start explicitly converges Compose resources. Stop asks tracked nonterminal runs to cancel, then stops every service with a grace period; force-stop uses Compose kill followed by stop. Archive retains all files. Permanent deletion and automatic adoption are excluded.
+
+Labs persist source, config, results, state, private weights and Python environments in separate directories. The lab image target uses editable Python source. OS additions belong in the saved Dockerfile recipe: ad hoc container OS installs survive stop/start but not recreation. No lab updates when mother changes. A base change uses a new lab; selected changes can be applied manually to an existing stopped checkout.
+
+## Relay contract (LAB-IF-001@r1)
+
+The host API is loopback-only by default and exposes labs, lifecycle, requests, logs, result retrieval, export and GPU operations. All clients, including the CLI, use this API. A per-lab bearer token file lives outside source/state export directories. The native relay calls existing `/api/v1/intakes`, `/api/v1/runs`, `/api/v1/runs?client_request_id=...`, run status, events, results, artifacts and cancel. It does not access the lab SQLite database.
+
+Before any native effect, record a central request ID and request content fingerprint. Repeating the ID with different content conflicts. First query native reconciliation by that ID; if absent, prepare and persist the exact submission before posting. Ambiguous delivery retains the same submission and ID. A restart queries native state before any retry. Only an authoritative 404 permits submission. No authentication/network error is interpreted as absence. The manager persists routing/status summaries, not a second scientific truth store.
+
+## Models and GPU (LAB-IF-002@r1)
+
+Shared inference is an independently configured Compose project with a drain endpoint that returns `{"drained":true}` only after new requests are refused and in-flight requests finish. Shared HTTPS endpoints use a locally trusted certificate; the manager does not invent model names or bypass the existing API abstraction. Lab-specific API model routes are a selected configuration file, mounted read-only. Private mutable weights/checkpoints remain in that lab's data; optional immutable starting weights are a read-only mount.
+
+An exclusive GPU operation is persisted before stopping shared services. Under a global lock: drain shared inference, stop its configured Compose services, inspect all configured shared GPU containers and tracked private jobs, then run the selected argv in an explicitly GPU-enabled lab service. A durable Docker exec identity is polled before release. GPU release confirms the process ended; it never trusts a timer alone. Restore shared inference before clearing ownership. Interrupted handover/restoration retains a blocking record for operator recovery. Unknown external GPU workloads are an operator responsibility: only manager-owned/configured consumers participate in admission. Container separation is not physical GPU isolation.
+
+One-GPU research proceeds in phases: model-assisted planning, exclusive script execution, shared inference restoration, model-assisted analysis. Simultaneous shared reasoning and private training is unsupported by this profile. No fallback model is selected.
+
+Version one makes these operator-directed phases explicit: complete/cancel tracked native research before GPU admission; reject active or uncertain tracked runs; defer new submissions until restoration. It does not suspend a native agent halfway through an API call. Untracked native/API clients must also respect the phase. The gateway remains running while the model service stops. The installer aligns host service UID/GID 10001 with the existing native AI4R identity so source, dependency environments and native state stay writable/readable through bind mounts. Target-host permission and native boot qualification remains required.
+
+```mermaid
+sequenceDiagram
+  participant C as Central AI4R / researcher
+  participant M as Host manager + SQLite
+  participant L as Lab native API
+  C->>M: Submit stable request ID + outcome
+  M->>M: Persist content fingerprint + routing
+  M->>L: Lookup native client_request_id
+  alt Already allocated
+    L-->>M: Existing run ID + status
+  else Authoritative 404
+    M->>L: Prepare intake
+    M->>M: Persist exact native submission
+    M->>L: Submit with same stable native ID
+    L-->>M: Run ID + status
+  end
+  M-->>C: Routing summary
+  C->>M: Status / events / results / cancellation
+  M->>L: Forward to authoritative native run
+```
+
+An interrupted submission is explicitly retried with the same ID. Read-only status checks never create a new run. Periodic status polling refreshes known allocated runs only; no research is automatically replayed.
+
+```mermaid
+sequenceDiagram
+  participant O as Operator
+  participant M as Manager admission record
+  participant S as Shared model / gateway
+  participant P as Private lab service
+  O->>M: Acquire GPU for script (research idle)
+  M->>M: Persist exclusive owner
+  M->>S: Drain calls; stop model service
+  M->>S: Confirm release
+  M->>P: Start service, persist exec ID, launch script
+  M->>P: Inspect durable exec completion
+  M->>P: Stop and confirm private service
+  M->>S: Restore model, wait, resume gateway
+  M->>M: Clear owner only after restoration
+  O->>M: Submit next analysis phase
+```
+
+## Implementation reuse inventory
+
+| Existing component | Actual reuse / boundary |
+|---|---|
+| `deploy/m1/Dockerfile.app` | Existing dependency/frontend/application stages; additive `lab-development` target only |
+| Native `research_http.py` / ResearchService | Intake, stable-ID run allocation, lookup, events, result, artifacts and cancellation remain unchanged |
+| Native M1 identity/configuration | Existing authenticated configuration and UID 10001 retained; no acceptance or readiness bypass |
+| Notebook lab CLI prototype | Ownership-label verification, bounded reconciliation and selected checksum/export patterns adapted to independent writable clones |
+| Compose CLI + Docker SDK | Grouped lifecycle and inspection; SDK used only to obtain durable exec identities |
+| JiuwenBox | Available through compatible native tooling; no new mandatory wrapper or alternative research scheduler |
+
+Host service installation, actual native startup, enabled CC/software combinations, TLS and model/GPU admission must be qualified together on the selected Linux machine. See the operator guide and LAB-001 evidence for the exact tested boundary.
+
+## Manual export (LAB-IF-003@r1)
+
+Export only a stopped lab. Record base/current Git revisions and a binary-capable patch of selected tracked paths against base, including staged/unstaged changes, plus explicitly selected new files and artifacts. Export lab image recipe and sanitized configuration, provenance and checksums. Default code selection excludes model weights and secret-like paths. Reject symlinks/path escapes; never follow an artifact path outside the lab. Credentials are external files and are never copied. A secret scan is best effort; a human still reviews the package. No operation commits or merges into mother AI4R. The documented recipe applies the patch to a separate review branch.
+
+## Reuse decisions
+
+Docker Compose owns service/network/storage lifecycle. Existing AI4R Docker stages and HTTP research contracts remain unchanged. The previous notebook CLI contributes ownership, finite reconciliation, checksum/export patterns and regression scenarios; its one-shot read-only worktree policy is intentionally replaced. JiuwenBox remains available through the native lab tooling, without another required sandbox around every CC.
+
+Borrow Kubernetes stable IDs, desired/observed state and owner labels, not a cluster. Ansible installs the manager/systemd/prerequisites, not live research commands. Lor contributes bounded campaigns, separate workers and visible tasks; ArkenOS contributes persistent goals, task inspection and event checks. Neither is a cloud dependency or code-audited runtime.
+
+References: [Compose projects](https://docs.docker.com/compose/how-tos/project-name/), [GPU configuration](https://docs.docker.com/compose/how-tos/gpu-support/), [Kubernetes controllers](https://kubernetes.io/docs/concepts/architecture/controller/), [Ansible Compose module](https://docs.ansible.com/projects/ansible/latest/collections/community/docker/docker_compose_v2_module.html), [Lor](https://mirendil.com/news/meet-lor/), [ArkenOS goals](https://docs.iaconautonomics.com/chat/goals/), [Heartbeat](https://docs.iaconautonomics.com/agents/heartbeat/).
+
+## Qualification
+
+Required: two independent labs; writable source/dependency separation; relay submit/status/result/cancel; ambiguous delivery and manager restart without replay; persisted stop/start; Docker-unavailable state; failed shared-inference handover; exclusive job ownership/restoration; binary patch/new-file export applied to a separate clone. Unit/local-HTTP tests and real Docker tests are separate evidence. GPU, ARM64/Spark and model quality require the actual configured host. Do not call mock tests a hardware demonstration. Native progress/checkpointing is limited by the underlying AI4R API; the manager cannot manufacture a checkpoint.

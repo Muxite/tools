@@ -1,0 +1,25 @@
+flowchart TB
+    Intake[Intake] --> Intent
+    subgraph Compiler[Intention Compiler node]
+        Intent[Intent work subnode]
+    Intent --> IV[Intent checks, verifier subnode and protected gate]
+    IV --> Req[Requirements work subnode]
+    Req --> RV[Requirements checks, verifier subnode and protected gate]
+    RV --> NG[Protected node finalization]
+    end
+    NG --> Tpl[Plan source chosen before the run: static template or Planner node]
+    Tpl --> Bind[Protected binder checks and binds one run_plan type]
+    Bind --> PV[Plan gate: one decision. Planned: Planner node gate plus binder checks. Static: binder checks only]
+    PV -->|rejected or infeasible| Halt0[Halt. A planned run then starts one linked new Intention Compiler attempt. A rejected static template ends with an escalation record]
+    PV -->|accepted, stored as acceptance_ref| Freeze[Binder freezes run_plan]
+    Freeze --> Run[Execute research DAG]
+    Run --> Out[Expose verified delivery]
+    subgraph Legend[Legend]
+        Key[Blue: CC work; purple: verification; amber: infrastructure]
+    end
+    classDef work fill:#E8F0FE,stroke:#2563EB,color:#172554
+    classDef verify fill:#F3E8FF,stroke:#7E22CE,color:#3B0764
+    classDef control fill:#FEF3C7,stroke:#B45309,color:#451A03
+    class Intent,Req,Tpl,Run work
+    class IV,RV,PV verify
+    class Intake,Bind,Freeze,Out,NG control

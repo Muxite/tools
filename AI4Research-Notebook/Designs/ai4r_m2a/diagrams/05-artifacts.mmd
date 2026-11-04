@@ -1,0 +1,12 @@
+flowchart LR
+ W[Scoped staging] --> S[Seal bytes and hash]
+ S --> C[Required checks]
+ C --> R[Durable terminal receipt]
+ R --> M[Atomic accepted manifest]
+ M --> D[Report, code, data and reproduction bundle]
+ C -->|Rejected| P[Provisional diagnostics]
+ J[Journal and budget reservations] --> W
+ J --> X[Restart: reconcile pending jobs]
+ X -->|Recovered output| C
+ X -->|Effect unknown| H[Hold dependent retries]
+ M --> J

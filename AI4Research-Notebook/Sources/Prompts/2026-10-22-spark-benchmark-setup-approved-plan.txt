@@ -1,0 +1,43 @@
+PLEASE IMPLEMENT THIS PLAN:
+# Split out a practical Spark setup prompt
+
+## Summary
+
+Create **`spark-benchmark-setup.md`** alongside `benchmark-runner.md`. Its purpose is to get the existing system running on the DGX Spark quickly and reliably, making benchmark campaigns easier to run.
+
+Keep the longer-term VM, capsule-container and factory architecture in the existing infrastructure designs. **Spark setup is an optional deployment path, not a requirement for benchmarking.**
+
+## Prompt contents
+
+Start with short **For human** bullets explaining what it sets up, what it provides and what requires human access. Follow with plain technical instructions for the coding agent:
+
+- Inspect the actual Spark, available storage, architecture, Docker/Compose installation, existing services and current branch before changing anything. Preserve the working NVIDIA environment and unrelated workloads.
+- Deploy directly on the host using the existing Docker/Compose structure. Do not introduce VMs, a registry, a capacity-controller service or a capsule factory for this delivery.
+- Prepare isolated AI4R and baseline containers, independent writable state, correct host-resolved mounts and collision-free networking. Reuse immutable images and dependency layers where practical.
+- Use the existing model connection first. Add shared local inference only when a selected benchmark requires it; keep model weights outside application images and avoid copies per target.
+- Apply practical storage controls: inventory actual usage, retain 20% filesystem headroom for new growth, bound build caches and logs, and clean only resources owned by this deployment. Do not perform global pruning or delete existing models/results.
+- Provide repeatable setup, readiness, start, stop and owned-resource cleanup commands. A second setup run must preserve state and avoid duplicate resources.
+- Document the actual supported Codex authentication step. Complete independent setup work while waiting for human login or remote access.
+
+## Boundaries and handoff
+
+`benchmark-runner.md` continues to own case loading, parallel scheduling, branch comparison, results and exports. The new prompt owns host preparation and deployment integration.
+
+The setup agent must reuse the runner’s configuration contract. Its handoff records target endpoints, image/commit identities, architecture, owned storage locations, credential references, resource limits and readiness results. Secrets stay outside reports.
+
+If the runner is unfinished, deploy and verify the available app components, then report the remaining integration work. Do not build a second runner or claim benchmark readiness. Fix deployment-specific problems within this task; record broader application changes under the existing implementation workflow.
+
+Update the prompt index and infrastructure reading routes to explain this split. Add a brief optional link from the benchmark prompt without making Spark setup a dependency.
+
+## Validation and completion
+
+The prompt will require evidence that:
+
+- The app starts on the actual Spark and passes its supported readiness checks.
+- Separate targets have working API connectivity and isolated writable state.
+- Container input/output mounts work without changing sentinel user files.
+- Stop/start and repeated setup preserve state and avoid collisions.
+- Storage reporting and owned cleanup work without deleting retained evidence.
+- When the runner and credentials are available, a small campaign produces real, exportable results. Otherwise, that final check remains explicitly incomplete.
+
+During the document revision, preserve the previous notes, check for contradictory prerequisites, validate links and metadata, and keep source inspection distinct from actual Spark testing.

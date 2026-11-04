@@ -1,0 +1,289 @@
+# AI4R M1: every flaw we found, and what it means for M2
+
+**Super internal. Not for the report, the director deck, or other teams.**
+Written 2026-10-28 from the M1 benchmark and POC work of 10-26 to 10-28. Every claim points to a file under `huawei/outputs/` (see the evidence index at the end).
+
+## Bottom line
+
+M1 is a plan-then-execute pipeline: a fixed graph of eight stages, each a model call that must produce a schema-perfect artifact before the next stage can start. Across 10-26 to 10-28 the pipeline **never once reached Delivery** on the POC task. Every attempt stopped at a different stage, for a different reason. On the same task, **plain JiuwenSwarm**, a reactive agent with ordinary tools, delivered a usable study with six real measurements in 13 model calls.
+
+The parts of AI4R that did show value are the **verification mechanisms**:
+- admission tests before a tool is used;
+- input integrity checks;
+- a held-out gate for self-changes;
+- an independent checker.
+
+Each one caught real failures that the plain agent let through. In M1 those checks are wired into the pipeline as halts, so catching a problem ends the run instead of fixing it.
+
+**Recommendation for M2.** Drop plan-then-nodes. Put a reactive agent at the core. Install Capability Capsules into it as **verified bundles**: the tool or skill, plus its contract, input checks, output checks, admission tests and verifier, all served together so that calling the tool means running the checks. Use detection to drive recovery, not termination.
+
+---
+
+## 1. Scorecard: the same POC task, two systems
+
+| | Plain JiuwenSwarm (reactive agent, ordinary tools) | AI4R M1 pipeline (static plan, 8 stage nodes) |
+|---|---|---|
+| Delivered a usable study | **Yes**: 13 calls, six real measurements, honest package | **No**, in every attempt from 10-26 to 10-28 |
+| Where it stopped | n/a | CC01: setup (compiler could not see the mounted resources) · CC03: Screening (contract violation) · CC04: Requirements (invented a default) · CC05: Intent (wall-time limit, no output) · r5e: Builder (masked integrity fault, 6.5 min) · r5f: runner exit 2 · r5g: Builder (scope conflict: `tests.py` required, but only 1 patch file allowed) |
+| Stages reached at best (r5e) | n/a | Intent, Search, Screening, Hypothesis completed. Builder failed. Benchmark, Evaluation and Delivery never started |
+| Silent wrong answers | Yes. On a broken team tool: wrong on 1 of 12 items in every repeat. On faulty inputs: reported PASS on 5 of 8 faulty runs | Not observed. When it stopped, it named a reason |
+
+**This table is the M2 argument in one picture.** The reactive agent finishes, but sometimes finishes wrong. The pipeline is careful but never finishes. Neither is what we want. We want the agent's ability to finish, combined with the pipeline's checks.
+
+## 2. Flaw: the plan-then-nodes pipeline
+
+### 2.1 Failure compounds with length
+
+If each node independently succeeds with probability *p*, a chain of *n* nodes finishes with probability *pⁿ*. With a 5% failure rate per node:
+
+| Nodes | Pipeline, a failure ends the run | Detection 90% + one retry | Detection 50% + one retry |
+|---|---|---|---|
+| 5 | 77% | 96% | 88% |
+| **8 (M1)** | **66%** | **94%** | **81%** |
+| 10 | 60% | 93% | 77% |
+| 20 | 36% | 87% | 59% |
+
+Per-step failure with detection *d* and one retry is *f(1-d) + f·d·f*. For *f* = 5% and *d* = 90%, that is 0.725%.
+
+Three things to take from this:
+- **Halting does not help completion.** In M1, a check that catches a bad artifact halts the run. That protects correctness, but the completion rate stays at *pⁿ*. Detection only raises completion when the system can **react**: retry, repair, or take another route.
+- **A reactive agent alone does not escape compounding.** It meets the same per-step errors. What changes the curve is detection plus recovery, and detection is exactly what CCs are for. M2 needs both halves.
+- **Our observed per-node failure rate was far above 5%.** Four different stages failed in live attempts (Intent, Requirements, Screening, Builder), plus one setup failure. The measured completion rate is 0 of 7.
+
+### 2.2 Every node is a strict model-written handoff
+
+Each stage must write a schema-valid artifact that the next stage accepts. The live failures were mostly **contract violations by the model at a handoff**, not wrong science:
+- **Screening (CC03)** put prose into `dependency_flags`, a field that only allows dependency IDs, and marked the candidate eligible despite the flags.
+- **Requirements (CC04)** turned a host retry rule into a scientific constraint and pointed its assumptions at the wrong objects.
+- **Intent (CC05)** used up its 120 s wall time with no output; a 14,056-character stream was cut off.
+
+A reactive agent would have seen these as "fix the field and try again". The pipeline treats them as terminal.
+
+### 2.3 Integration cost grows with every node
+
+Each node carries its own release, version label, template binding, catalog entry and admission association. Real examples:
+- **Builder:** release m1-18 was routed to the legacy launcher, because version checks hard-coded "m1-2 to m1-17" in **seven separate files**: `bridge.py`, `local_science.py`, `executor_bootstrap.py`, `builder_agent_host.py`, `execution_jobs.py`, `scheduler.py` and `restart_recovery.py`.
+- **Releases:** an additive release existed but was not used, because the static template, the library and the captured profile each selected different versions. Screening m1-6 could not be adopted because the template had no slot for it, and Delivery m1-6 needed an input the static run did not supply.
+- **Builder scope:** its contract required a non-empty `tests.py` while its frozen scope allowed one patch file.
+- **Error masking:** a private RPC layer masked the real Builder exception as `PLATFORM_INTEGRITY_FAULT`, so diagnosis took a separate investigation.
+
+Every new node multiplies this surface. A capability installed into an agent has one integration point: the agent can call it.
+
+### 2.4 Deploying one POC run is a project in itself
+
+A live run needs up to 9 receipted steps:
+- plan, build an image of about 3.8 GB, override, initialize (which recreates the app), doctor;
+- token refresh, install-tool, prepare, run-cc, collect.
+
+We went through at least seven image generations (r5b to r5h), and r5f needed a second build. On 10-28, a 30-minute budget was not enough for one run.
+
+### 2.5 The planner adds cost without measured value
+
+- We kept a **static plan template** (decision of 10-28), because a dynamic planner showed no gain.
+- **Plans from capsule contracts versus plans from skill summaries:**
+  - on sol: 10 vs 8 of 12 valid, but an earlier run tied 10 to 10, so this is noise;
+  - on luna: 7 vs 7 of 12, with contracts costing about 13× the prompt tokens (106k against 8k).
+- The containerized CC planner could not run at all, because codex cannot start its sandbox inside Docker. We used a "direct planner" fallback.
+- planbench was weak and noisy, and its first rerun was voided.
+- A plan made before the work starts cannot use what the work discovers. The pipeline has no path back from Builder to Hypothesis, for example.
+
+### 2.6 Stage capsules are tied to the pipeline
+
+To make the Intent, Requirements, Evaluation and Screening capsules usable outside M1, we had to port them. Several of their checks need the pipeline's run store. Outside the pipeline those checks are marked `not_applicable_outside_pipeline`. The pipeline owned the verification, not the capsule.
+
+## 3. Flaw: CC as M1 built it
+
+### 3.1 Offered is not used
+
+- **The MCP arm.** We gave a live agent the real capsules over MCP, as tools it could call. It **never called them** and answered directly: 1 wrong of 8, plus 1 transport failure.
+- **The served arm.** When the capsule instead *served* the only tool the agent could reach, a version that had passed its contract tests, the agent gave 0 wrong of 8.
+
+An agent does not reliably decide to verify. That is the strongest single argument for bundling: the checks must sit on the call path, not next to it.
+
+### 3.2 The value is in the checks, not in the wrapping
+
+Everything CC won came from a check:
+
+| Win | Check |
+|---|---|
+| 14 of 14 broken tools caught before use. A plain skill noticed 7 of 14, and each only after a wrong answer | Contract-derived admission tests |
+| 6 of 8 faulty runs stopped with the right cause. JiuwenSwarm reported PASS on 5 of 8 | Input integrity checks |
+| 0 of 400 bad self-changes accepted. With no gate, 154 bad ones were accepted | Held-out gate |
+| 10 of 10 coding tasks, against 9 of 10 for plain, told-to-verify and "write your own tests". All the gain is one task | Independent checker that does not share the model's misreading |
+| 0 wrong of 8 live, against 1 (plain) and 1 (told to check), both on a table with no correct answer | Serving only the admitted version |
+
+Where a capsule was only a declaration, it gained nothing:
+- contracts for the planner;
+- an output contract whose validator never fired;
+- an honest-stop rule that a careful prompt matched.
+
+### 3.3 Too many capsules, the wrong unit
+
+M1 drifted toward one capsule per tool. The meeting agreed that a capsule should be a **category**, such as calculation, drawing, workload profiling or paper2agent: a template whose fields take swappable tools, with its checks attached. Today we cannot answer "how many capsules do we have" under one definition. The runtime serves 13, and the meeting spoke of 11.
+
+### 3.4 Stage roles are blurred
+
+The meeting split Intent and Requirements:
+- **Intent** = who wants what, roughly how (the salesperson).
+- **Requirements** = the contract and acceptance criteria (the project manager).
+- **Planning** = a separate capability.
+
+In M1 these are welded into one "intention_compiler" stage. Its failure (CC05 timeout) blocked everything after it.
+
+### 3.5 Coverage gaps in the checks
+- **Input faults with no check:** conflicting requirements and demands beyond the data. These are the 2 of 8 faulty runs in case B that were not stopped.
+- **Same author:** one person wrote the checks and planted the faults, and no blind version exists yet.
+- **A check can disagree with ground truth.** A fixture labelled clean (`clean-7fb8e068`) has a pin that really does mismatch.
+
+## 4. Flaw: harness and infrastructure
+
+Each item below cost a run, a rerun, or a voided result.
+
+| Problem | Effect |
+|---|---|
+| One Codex account shared by all jobs | Parallel jobs hit HTTP 429. B's opponent arm failed 11 of 11. Everything must run serially |
+| Codex account check at setup (`value_host.py:account_pin`) | On 10-28 evening, every run failed with `TimeoutError` before any model call, while `codex login status` answered in 0.08 s. Not fixed. It blocked T1 rep 2, the B rerun and the POC |
+| Ledger wall budget per ledger | Rep 2 reused rep 1's ledger and failed at setup (19 attempts) |
+| Paths with spaces | The launcher's `docker run` mount breaks |
+| Windows 260-character path limit | Deep session files vanish from normal file APIs, affecting zips, exports and the CC05 evidence |
+| Literal `\n` in `ai4r-bench` | The CC arm of bench A failed |
+| planbench ignored `AI4R_CODEX_BIN` | Wrong binary; the run was voided |
+| Codex cannot start its sandbox in Docker | The containerized native planner is unusable |
+| Luna ignores the bridge's tool protocol | The developer message says "Tools are unavailable", so luna made no tool calls and every luna tool test is void. The opt-in fix breaks luna's JSON replies |
+| Codex used as a stand-in completions endpoint | RSI and the bridge approximate an API with a chat agent: no tools, one reply |
+| Native transport cap | 256 KiB was too small for real tool results (about 444 KB), so a native harness run was invalid |
+| Concurrent agents in one worktree | Builder edits landed mid-run and contaminated the E planner run. Something overwrote 43 files with old copies at 11:20. We now need separate clean worktrees |
+| Orphan processes and containers after a kill | Killed queues left `sh`, `collect.sh` and `nativetask` containers running, and the queue carried on |
+| Machine memory | Builds and runs compete; the 3.8 GB image builds under pressure |
+
+The common root: the harness grew one workaround at a time, with no single tested entry point, no health check before a run, and no isolation between jobs.
+
+## 5. Flaw: how we measured and claimed
+
+- **Claims withdrawn after review:**
+  - B "7 of 7" became 6 of 8;
+  - the planner "30 vs 25 of 36" became noise;
+  - "stopped every failure in all five cases" was removed.
+- **Small samples.** 8 tasks × 1 repeat for the live tool test, and 10 × 1 for the luna benches. The two live wins each rest on one item: `table_pad`, a table with no correct answer, and `parse_duration`.
+- **Many wins are not live.** C is deterministic, D is a scripted simulation, B is a replay on stored sessions (3 of them luna), and A's CC side is an offline route.
+- **Unequal denominators.** "3 of 36 runs" sat next to "0 of 12 items" until 10-28.
+- **The temptation to widen the gap.** 8 "spec-trap" cases were written after seeing results, then reverted (`701ce265`).
+- **Cost claims that did not hold:**
+  - fewer input tokens came with more output tokens, so one CC case cost about 45% more;
+  - "cheap failures" are not savings;
+  - contracts cost 13× the prompt tokens in planning.
+- **A strong model hides the need for checks.** Plain JiuwenSwarm on sol was right 33 of 36 times. CC's value shows on weaker or cheaper settings, and luna could not run the tool tests.
+- **No end-to-end comparison.** The POC was never run on M1plus, and AI4R vs JiuwenSwarm on a real research job has no result.
+
+## 6. Flaw: RSI and routing, as they relate to "why AI4R"
+
+- **RSI**
+  - It improved 2 utility capsules (calculate, table_normalize) by 17 to 21% in round 2. Round 1 failed or got slower.
+  - It measures speed only, not quality or research outcome.
+  - It ran without the agent harness: Codex as a completions endpoint, tools off, one reply.
+  - It does not answer "why not JiuwenSwarm".
+- **Routing**
+  - 18% fewer tokens against fixed ChatGPT inside AI4R, on 8 fixtures × 3 repeats.
+  - The meeting saw 87.5% accuracy, with c01 wrong 3 of 3 after routing to local Qwen. The report says 24 of 24. This is unreconciled.
+  - The router and verifier spend tokens themselves.
+  - It compares against ChatGPT, not JiuwenSwarm.
+- **Together.** Neither is yet tied to CC or to a completed research task. The three parts read as separate features.
+
+## 7. Flaw: how we built it
+
+From the Part A review and our own logs:
+- **Long one-shot coding sessions.** Codex made "very big flaws that have wasted time", for example the seven stale version checks in Builder.
+- **No general system test report and no list of outstanding issues** at the end of M1; benchmarking consumed the time.
+- **Stale progress notes.** Old images, runs and readiness were described as current, and readiness drifted from source.
+- **Fixes landed in many places.** The Builder fix touched 7 files; the release fix touched the template, library and profile.
+
+What worked: short, checked steps; a cheap reviewer agent keeping the main agent on task; clean worktrees per bench; one model job at a time.
+
+## 8. What survives into M2
+
+These held up under review and should carry over largely unchanged:
+- **Contract-derived admission tests** (`nativeadmit/cc_route.py`, `admission/`): they catch broken tools before use, deterministically.
+- **Input integrity checks** (`jiuwenswarm/research/checks/integrity.py`): pins, units, baselines, stale data and bounds, each with a named cause.
+- **The held-out gate** (`gatebench/`): it accepts only real improvements, on inputs the proposer never sees. This is the safety net RSI needs.
+- **Independent checkers**: written separately from the worker, so they don't share its misreadings.
+- **The portable capsule runtime** (`jiuwenswarm/capsule_runtime`): any harness can call a capsule with its pins, guards, checks and receipts, through a Python API, a CLI or MCP. This is already the seam a reactive agent needs.
+- **Named stops**: when something is wrong, say what and why. In M2 this becomes the signal the agent reacts to.
+
+## 9. M2 direction: a reactive agent with installed, verified capsules
+
+### 9.1 Shape
+- **Core:** one reactive agent loop (agent-core / JiuwenSwarm), not a fixed stage graph. It decides the next step from what it has seen so far. It can go back, retry or take another route.
+- **Capsules are installed into the agent**, like tools. Each is a **category** (calculation, table handling, literature intake, experiment run, profiling, summary, paper2agent) with swappable tools or skills inside.
+- **Each capsule is a verified bundle**, served as one unit:
+
+  | Part | Role |
+  |---|---|
+  | Contract | Inputs, outputs, side effects and reversibility, declared up front |
+  | Input checks | Run before the tool. Refuse or flag bad inputs with a named cause |
+  | Admission tests | Derived from the contract. A tool version is served only after passing them, re-run when the tool changes |
+  | Output checks | Run after the tool, before the agent sees the result |
+  | Verifier | Independent of the worker, only where the work is semantic. Deterministic capsules don't need one |
+  | Pins and receipts | So a result can be reproduced and audited |
+
+- **Calling the capsule runs the checks.** The agent cannot skip them, because they sit on the call path. This is the lesson of the MCP arm: offered checks are not used.
+- **A failed check returns a named reason to the agent**, not a run-ending halt. The agent reacts: fix the input, choose another tool in the category, ask the user, or stop with that reason.
+- **Halts are reserved for real hazards**: unpinned or faulty inputs that would damage reproducibility, and unallowed effects.
+- **RSI improves the tools inside a capsule.** Every candidate goes through the capsule's admission tests and the held-out gate before it is served. So "RSI improves capsules" and "capsules stay trustworthy" become one story.
+- **Constraints that stay:**
+  - Docker client-server deployment, as already decided;
+  - agent-core as the runtime;
+  - routing remains the capsule author's choice inside the capsule.
+
+### 9.2 Why this should beat both M1 and plain JiuwenSwarm
+- **Against M1:** no fixed chain, so no *pⁿ* collapse. A failed step costs a retry, not the run, and integration is one point per capsule instead of one per node.
+- **Against plain JiuwenSwarm:** the same ability to finish, but broken tools and faulty inputs are caught on the call path. That is exactly where plain JiuwenSwarm silently answered wrong (`table_pad`) or reported PASS on faulty inputs.
+
+### 9.3 Risks of the reactive design, and the answer to each
+
+| Risk | Answer |
+|---|---|
+| The agent wanders, loops or burns tokens | Step and token budgets per task; a cheap reviewer agent; capsule receipts show what was tried |
+| Less predictable than a fixed plan | Every capsule call leaves a receipt, so the audit trail is the call log rather than the plan |
+| The agent ignores capsules and uses raw tools | Do not install raw tools for capability categories that have a capsule; serve them only through it |
+| Checks give false refusals | Track false-refusal rates per check, as for B (0 of 3 clean runs) and C (0 of 2 good tools) |
+| Bad checks are worse than none | Checks are capsule code too: blind-defect tests, and a held-out gate for check changes |
+
+### 9.4 What M2 must prove (decide these tests before building)
+1. **Completion.** On the POC task and 2 or 3 more research tasks, M2 finishes at least as often as plain JiuwenSwarm. Plain JiuwenSwarm finished the POC; M1 never did.
+2. **Correctness.** On the verified-tools and faulty-inputs cases, M2 gives no more wrong answers than CC did (0 of 8; 6 of 8 faults stopped), while still finishing the answerable cases.
+3. **Length.** The completion rate falls more slowly with task length than *pⁿ*. Run the same tasks at increasing numbers of steps.
+4. **Recovery.** Of the failures a capsule detects, the share the agent recovers from without the user. This is the *d* in section 2.1.
+5. **Cost.** Tokens per completed correct task, against plain JiuwenSwarm.
+
+Keep the rules from this round:
+- cases fixed in advance;
+- same model, image and limits for every arm;
+- a told-to-check arm;
+- model-free scoring;
+- equal denominators;
+- no cases written after seeing results.
+
+### 9.5 Decisions needed
+- **Capsule list and definition.** Which categories exist in M2, under one definition, and what goes into each.
+- **Whether any fixed sequence survives.** For example, a mandatory intake capsule before any experiment.
+- **Where Intent and Requirements live.** As capsules the agent calls (intent compiler, contract compiler), or as the agent's own first steps.
+- **What happens to the static plan template and the Symphony work.** Planning becomes something the agent does, possibly with a planning capsule.
+- **The harness before any benchmark.** One entry point, a health check (including the codex account check), isolation per job, and support for long paths and spaces in paths.
+
+---
+
+## Evidence index
+
+| Topic | File (under `huawei/outputs/`) |
+|---|---|
+| M1 POC failures CC01 to CC05; native 13-call success; the cost and claim corrections | `cc-value-discovery-2026-10-26/PROBLEMS_AND_MISTAKES.md`, `PROBLEMS_AND_MISTAKES_TECHNICAL.md`, `timeout-investigation-01/` |
+| r5e Builder halt (stages reached, masked integrity fault) | `cc-sweep-20261026/r5/R5E-RESULT.md` |
+| Builder stale version checks in 7 files | `cc-sweep-20261026/r5/BUILDER-DIAGNOSIS.md` |
+| r5f and r5g run failures; the deploy recipe | `cc-sweep-20261026/r5/r5f-run-cc.out`, `r5g-run-cc.out`, `NOTES.md` |
+| r5h POC cancelled after build (10-28) | `poc-live-r5h-20261028/RESULT.md` |
+| CC benchmark results, recount and every run | `cc-bench-package-20261028/` (`README.md`, `CHECK.md`, `all-runs.csv`, `raw/`) |
+| Why the independent checker won on one task | `rebench-20261028/slate/HELDOUT-WIN.md` |
+| MCP arm: capsules offered, never called | `rebench-20261028/T1low-score/score-arms.md` (ccmcp row), `T1low-ccmcp*` |
+| 10-28 evening harness failures (ledger budget, account check) | `rebench-20261028/T1low-*/failed-r2-*`, `queue3.sh` to `queue5.sh` |
+| Report as delivered | Desktop zips; builder `delivery-20261028/build_cc_section.py` |
+| RSI and routing numbers | `delivery-20261028/in/.../AI4R_QA_Part_B.html` sections 02 and 03; meeting notes of 10-28 |

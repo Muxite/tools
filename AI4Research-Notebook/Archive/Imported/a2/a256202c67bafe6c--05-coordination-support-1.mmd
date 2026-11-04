@@ -1,0 +1,24 @@
+flowchart TD
+    C[/Changed revision and selected cases/] --> J[CI or authorized development agent]
+    J --> L[Host launcher: environment and finite job]
+    L --> S
+    subgraph Dev[Development tooling boundary]
+        S[Sidecar: registered tools under limits]
+        S --> R[Client-validation runner: bounded case]
+        S --> X[Diagnostic adapter]
+    end
+    R -->|scoped authenticated client| A[/AI4Research application/]
+    A -->|permitted observations and exports| E[/Retained development evidence/]
+    X --> H[Host executor: enforce target/effects]
+    H --> E
+    R --> E
+    E --> Q{Affected contributors diagnose}
+    Q --> N[/Issue or PR with next action/]
+    classDef record fill:#e8f1fe,stroke:#1d4f91,color:#123d70
+    classDef tool fill:#e0f5ef,stroke:#1b7f72,color:#12554a
+    classDef human fill:#fff4d8,stroke:#b58100,color:#694b00
+    classDef unresolved fill:#ffe9e9,stroke:#b63636,color:#7f2020
+    style Dev fill:#f5f7fa,stroke:#64748b,color:#334155
+    class C,A,E,N record
+    class J,L,S,R,X,H tool
+    class Q human

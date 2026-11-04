@@ -1,0 +1,651 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Lab protocol v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "lab.v1"
+        },
+        "type": {
+          "const": "RunRequested"
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "traceparent": {
+          "type": "string",
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "experiment": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "bindings": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "requestedBy": {
+              "type": "string",
+              "minLength": 1
+            },
+            "deadline": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "experiment",
+            "bindings",
+            "requestedBy",
+            "deadline"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "type",
+        "runId",
+        "attempt",
+        "epoch",
+        "generation",
+        "messageId",
+        "sequence",
+        "traceparent",
+        "body"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "lab.v1"
+        },
+        "type": {
+          "const": "LeaseGranted"
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "traceparent": {
+          "type": "string",
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "host": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expiresAt": {
+              "type": "string",
+              "minLength": 1
+            },
+            "resourcesDigest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "host",
+            "expiresAt",
+            "resourcesDigest"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "type",
+        "runId",
+        "attempt",
+        "epoch",
+        "generation",
+        "messageId",
+        "sequence",
+        "traceparent",
+        "body"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "lab.v1"
+        },
+        "type": {
+          "const": "StepFinished"
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "traceparent": {
+          "type": "string",
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "step": {
+              "type": "string",
+              "minLength": 1
+            },
+            "exitCode": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "outputsDigest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "step",
+            "exitCode",
+            "outputsDigest"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "type",
+        "runId",
+        "attempt",
+        "epoch",
+        "generation",
+        "messageId",
+        "sequence",
+        "traceparent",
+        "body"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "lab.v1"
+        },
+        "type": {
+          "const": "Heartbeat"
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "traceparent": {
+          "type": "string",
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "phase": {
+              "type": "string",
+              "minLength": 1
+            },
+            "observedGeneration": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "phase",
+            "observedGeneration"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "type",
+        "runId",
+        "attempt",
+        "epoch",
+        "generation",
+        "messageId",
+        "sequence",
+        "traceparent",
+        "body"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "lab.v1"
+        },
+        "type": {
+          "const": "StopRequested"
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "traceparent": {
+          "type": "string",
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "reason"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "type",
+        "runId",
+        "attempt",
+        "epoch",
+        "generation",
+        "messageId",
+        "sequence",
+        "traceparent",
+        "body"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "lab.v1"
+        },
+        "type": {
+          "const": "CheckpointSaved"
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "traceparent": {
+          "type": "string",
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "manifest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "manifest"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "type",
+        "runId",
+        "attempt",
+        "epoch",
+        "generation",
+        "messageId",
+        "sequence",
+        "traceparent",
+        "body"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "lab.v1"
+        },
+        "type": {
+          "const": "RestoreRequested"
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "traceparent": {
+          "type": "string",
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "manifest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "manifest"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "type",
+        "runId",
+        "attempt",
+        "epoch",
+        "generation",
+        "messageId",
+        "sequence",
+        "traceparent",
+        "body"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "lab.v1"
+        },
+        "type": {
+          "const": "EvidenceCommitted"
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "traceparent": {
+          "type": "string",
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "manifest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "verdict": {
+              "enum": [
+                "pass",
+                "fail",
+                "inconclusive"
+              ]
+            }
+          },
+          "required": [
+            "manifest",
+            "verdict"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "type",
+        "runId",
+        "attempt",
+        "epoch",
+        "generation",
+        "messageId",
+        "sequence",
+        "traceparent",
+        "body"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "lab.v1"
+        },
+        "type": {
+          "const": "RunFailed"
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "traceparent": {
+          "type": "string",
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lastCheckpoint": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "reason",
+            "lastCheckpoint"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "type",
+        "runId",
+        "attempt",
+        "epoch",
+        "generation",
+        "messageId",
+        "sequence",
+        "traceparent",
+        "body"
+      ]
+    }
+  ]
+}

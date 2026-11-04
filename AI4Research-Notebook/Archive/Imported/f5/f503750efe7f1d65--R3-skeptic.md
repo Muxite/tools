@@ -1,0 +1,114 @@
+# R3 — Skeptic Review of VARIANT-3-full-report.md / VARIANT-1-brief-overview.md
+
+Reviewer: hostile skeptic, read-only. Repo: /home/muk/work/AI4Research, branch `openJiuwen-Solar`, HEAD `b0bf165f9`.
+
+## Verdict
+
+The report is unusually well-disciplined for a self-generated architecture writeup — it marks evidence tiers, documents its own errors, and cites file:line — but it still oversells on exactly the axis it claims to be most careful about: the "model never authors the evidence of its own correctness" thesis. That claim is true for two of the three cited mechanisms and false, in a specific and checkable way, for the third and for the two review gates that are supposed to backstop it. The report also states the "freeze" recomputes everything, which is true of what it hashes, but is silent on the fact that the hash does not cover the task-graph contract itself — only a curated projection of it (`scheduler_input`) — which is precisely the class of gap that produced the one bug the report proudly discusses in §32. The document is honest about its own blind spots at a meta level (§38 says coverage is uneven) but the specific claims inside its covered scope are more confident than the code supports in at least four places below. This is a B+ report wearing an A+ badge.
+
+## Holes in the central thesis
+
+Central claim: "the model is never allowed to author the evidence of its own correctness," backed by three mechanisms.
+
+1. **Span re-binding (intent) — holds.** `harness/lib/intent_compiler.py:477-529, 535-576` deterministically re-derives spans/quotes; the reviewer path hard-fails closed rather than accepting model-authored coordinates. This mechanism is real. (Note: report cites `intent_gateway.py` as the location; the span logic actually lives in `intent_compiler.py` — a small but real citation error, since `intent_gateway.py` has none of this logic. Worth fixing in the report.)
+
+2. **Constraint deep-copy + equality guard (requirement) — holds.** `harness/lib/requirement_compiler/semantic.py:64-65, 233` — exact equality against a `copy.deepcopy`'d value the model cannot touch. Real.
+
+3. **Deterministic derivation of effect_union/proof_obligations/unsatisfiable_nodes — partially holds, with a genuine leak.** The union/obligation math in `apo_plan_compiler.py:770-834, 884-892` is real deterministic set math. But `build_capsule_plan_node` (`apo_plan_compiler.py:569-618`) explicitly trusts a **model-chosen** `capability_capsule_id` when the planner has already set one — comment at 583-589 says re-classifying it "can silently replace that identity." So the "deterministic derivation" computes over an input set (which capsule, therefore which effect profile) that the model selected. It's bounded (fails closed to `UNSATISFIABLE_CAPSULE` if the id isn't registered — `:630-646`) but it is not model-independent. **"Deterministic derivation" ≠ "model-independent inputs," and the report's phrasing invites that conflation.**
+
+4. **The fidelity reviewer's independence is configuration, not architecture.** `structured_model.py:259-266` resolves the reviewer model via `SOLAR_INTENT_REVIEWER_MODEL`, falling back to the *same* model/provider as the compiler if unset. A default deployment with no override is one model grading itself. The report calls this "a second, independent model call" without qualifying that independence is an operator-set env var, not a code-enforced guarantee.
+
+5. **[VERIFIED — the sharpest hole] The repair-exhaustion demotion actively discards a negative verdict.** `intent_compiler.py:1230-1263`, `_demote_exhausted_fidelity_findings()`: once the repair budget is exhausted, if the deterministic validator passed but the *independent* fidelity reviewer failed, the harness itself rewrites `status` to `"pass_with_warnings"`, clears `errors`, and reclassifies them as advisory `warnings`. This is not the model authoring its own evidence — it's the deterministic harness **overriding an honest negative verdict from its own review mechanism because the clock ran out.** The report's §4 describes the budget honestly ("only fidelity findings... may be demoted to advisory") but frames this as a bounded, minor concession; read against the "never authors the evidence of its own correctness" thesis, this is the harness quietly weakening the one control designed to catch exactly that failure mode.
+
+6. **Requirement semantic review: confirmed downgrade, correctly reported but under-weighted.** `git show 5ade9d9f3` on `harness/lib/requirement_compiler/semantic.py`: repair counters merged, ceiling 5→3, and the reviewer prompt itself was rewritten from "independent Requirement Reviewer... report substantive defects" to "advisory Requirement Reviewer... deterministic validation owns admission" (diff around lines 240-266). `validation.json` is `"accepted": True` whenever deterministic `errors` is empty, full stop — the review literally cannot block admission any more. The report states this fact plainly in §5 ("Cite the code") but frames it as a documentation-trap correction rather than as what it also is: **a load-bearing safety mechanism was downgraded from blocking to advisory, and the report never asks whether that downgrade was itself justified or merely expedient.**
+
+## Freeze bypasses and escape hatches
+
+1. **[VERIFIED — real gap] The hash does not cover the task-graph contract itself.** `elastic_planner.py:7243-7344` builds `frozen` from `requirement_ir`, `planning_decision`, `plan_ir`, capsule/composition artifacts, `capsule_plan`, `physical_plan`, evaluation artifacts, and `scheduler_input` — but **no `task_graph_contract_ref`**. Only `scheduler_input`, a curated projection (per its own docstring, "carries forward only topology, bindings, candidates, artifact ports, checks, declared resource needs, effects, and the terminal attempt policy" — `:6662-6678`), is hash-pinned. Fields the projection doesn't lift — `write_scope`, free-text `goal`/`description`, artifact-name fields like `final_report`/`report_ast`, `human_review*`, `skip_reason` — are **not covered by `contract_sha256` at all**.
+
+2. **[VERIFIED — direct consequence] `verify_frozen_execution_chain` recomputes scheduler_input from the live `task_graph.contract.json`, but trusts that file as ground truth rather than checking it against anything anchored in the hash.** `elastic_planner.py:7748-8052` loads `graph` from disk (`:7778`) and *derives* the recomputed scheduler_input from it, then compares to the on-disk `scheduler_input.json`. An edit to `task_graph.contract.json` outside the curated projection — leaving `scheduler_input.json` alone — passes verification with zero errors. The report's claim that verification "recomputes rather than trusts" is true of the fields it recomputes, but the report does not disclose that an entire artifact (the contract JSON itself) sits outside the recomputation's anchor.
+
+3. **[SUSPICION, not confirmed as regression] The exact bug shape from §32 appears to still exist elsewhere, unfixed.** `graph_node_dispatcher.py:2690-2760` and `evolution_engine.py:255-287` both fall back to regex/substring matching (`final_report`, `final.md`, `report_ast`, `claims.jsonl`) against node `write_scope`/artifact text to decide gate applicability — the identical pattern the report celebrates as fixed in §32. Because (per point 1) these fields are outside the hash boundary, they're mutable post-freeze without invalidating `contract_sha256`. I could not locate the specific commit that fixed the documented §32 bug to confirm whether these are the same code path relapsed or parallel unfixed instances — but the report presents §32 as a closed, principle-level fix ("the Scheduler may only execute gate IDs already frozen"), and that principle does not appear to be enforced uniformly across the dispatcher/evolution-engine code that shares the same shape.
+
+4. **`SOLAR_TEST_MODE=rapid_smoke` claim holds.** It's read pre-freeze (`elastic_planner_adapter.py:30-98`) and `test_policy` is copied by value into the hashed dict — toggling the env var post-freeze does nothing. Report is correct here.
+
+5. **Human-review resume paths (`enter_node_human_review`, `commit_human_review_resume`, `reopen_recovered_dependency_nodes`) are a designed, acknowledged escape hatch, not a silent bypass** — gated by generation numbers and scoped skip reasons. Fair to call this legitimate, but the report never mentions it exists at all; a supervising engineer would want it named as "yes, there is a controlled way to override the frozen graph's flow post-hoc," even if narrowly scoped.
+
+## Table-stakes vs genuinely notable
+
+| Mechanism | Verdict |
+|---|---|
+| Hash-chaining artifacts (canonical JSON SHA-256) | Table stakes — standard content-addressing, any competent engineer reaches for this. |
+| Filesystem mailbox / inbox-outbox queue for dispatch | Table stakes — a well-known local-IPC pattern (Maildir-style), not novel. |
+| Leases with stale/dead-PID reclaim | Table stakes — standard distributed-lock pattern. |
+| Idempotency fingerprints (sha256 of sorted-key JSON) | Table stakes — textbook idempotency-key pattern. |
+| Topological scheduling (Kahn's algorithm) | Table stakes — undergraduate CS. |
+| Write-scope conflict detection (prefix overlap, fail-safe-exclusive) | Mildly above table stakes — the fail-safe-on-missing-scope default is a good, deliberate choice, but the mechanism itself is ordinary. |
+| Declaring effects in a manifest (read/write/execute/network/cost/**risk**) | Notable mainly for the `risk` axis being first-class and machine-readable, not for the effect-declaration idea itself (effect systems are decades old in PL theory; Nix/Bazel-style declared I/O is common in build systems). |
+| Separating logical from physical operators | Table stakes in any system with provider fallback (this is a service mesh / dependency-injection pattern by another name). |
+| Closed verdict vocabulary (PASS/PASS_WITH_KNOWN_LIMITATIONS/FAIL/NOT_TESTED/ENVIRONMENT_BLOCKED/NOT_AVAILABLE) | Genuinely well-designed, not because closed vocabularies are rare (they aren't — FEVER-style verdict taxonomies exist), but because the two enforced rules ("a journey proves only what it exercised," "never weaken a condition to turn a result green") are process discipline, not just a taxonomy. This is the one item in the list that earns "notable" on execution rather than on concept. |
+| The freeze + recompute-not-trust verification | This is the one architecturally distinctive claim in the report — and per the findings above, it is real but has a hash-coverage gap that undercuts how absolute the claim should be stated. |
+
+Net: most of the "impressive mechanisms" are correctly-executed standard engineering, not novel. The report doesn't explicitly claim novelty for most of them (§35 hedges this reasonably: "plausible analogues... the combination is what's worth testing"), but VARIANT-1 (the brief) states items like "hash-bound claims," "negative controls," and "it refuses to treat an attempt as an outcome" with a breathlessness that reads as more novel than the underlying patterns are. A skeptical engineer's likely reaction to VARIANT-1 specifically: "this is good engineering hygiene, described like a discovery."
+
+## Is the honesty framing earned?
+
+Partly, and the report's own meta-discipline (marking [verified]/[doc]/[inferred], correcting itself in §1.3, §37) is real and above average. But the counter-evidence below shows the *codebase's* practiced honesty is less uniform than the report's rhetoric ("admit what you do not know, and never grade your own work" — VARIANT-1 §4) implies:
+
+- **[VERIFIED counter-evidence]** `_demote_exhausted_fidelity_findings()` (`intent_compiler.py:1230-1263`) is a documented, in-code instance of overriding an honest negative verdict for expediency once a budget runs out — functionally "relax a gate to turn it green," the exact behavior the evaluation-vocabulary rules (§22) forbid at the evidence layer, occurring instead at the intent-fidelity layer.
+- **[VERIFIED counter-evidence]** Requirement-compiler semantic review downgraded from blocking to advisory (commit `5ade9d9f3`) — the report cites this but frames it as a documentation-currency issue, not as "a gate was weakened." Whether the weakening was justified is not examined by the report at all.
+- **[VERIFIED counter-evidence]** 575 suppression comments (`# type: ignore`, `# noqa`, `eslint-disable`, `@ts-ignore`, `@ts-nocheck`) across `harness/` and `core/` — a large volume for a project whose framing leans on rigor; not sampled individually by the subagent, flagged for follow-up but the count alone is real.
+- **[VERIFIED counter-evidence]** Silent exception swallowing in event/queue dispatch plumbing: `harness/lib/queue.sh:69,144,189`, `harness/lib/events.sh:133` (`except Exception: pass`) — infra underlying task dispatch fails silently in these paths.
+- **[VERIFIED counter-evidence]** Unremediated TODOs marking stubbed measurement/verification-adjacent code: `core/message-listener/message-handler.ts:158` — token accounting is `const actualTokens = estimatedTokens; // TODO: get from actual execution` — i.e., an estimate is silently standing in for a real usage measurement, in exactly the kind of telemetry the report cites elsewhere (`capability_effects.py`, resource-usage telemetry) as evidence of rigor. `core/ontology/personality-benchmark.sh:46` similarly stubs a benchmark computation.
+- **[SUSPICION]** The one all-nodes-passed 15/15 run used as the report's centerpiece evidence (§33) was compacted by the same operator who applied the mid-run hotfix, and the pre-compaction raw file is only referenced by hash in a path outside this checkout — not independently re-derivable from this repo alone. The compaction's own log entry is candid about what it did (line 855/863 of the stabilization log), so this isn't concealment, but it does mean the centerpiece run's raw evidence trail is not fully present in-repo for a third party to re-verify.
+
+Verdict on this section: the project's *culture* (as expressed in docs, invariant text, verdict rules) is genuinely more honest than most such projects, and the report is right to note that. But "never grade your own work" is stated as an absolute in VARIANT-1 when the code contains at least one clear instance (finding 5 above) of the harness doing exactly that under budget pressure. That specific sentence should not survive contact with `_demote_exhausted_fidelity_findings`.
+
+## What the report omits that flatters the subject
+
+- **Security posture: absent.** No `docs/SECURITY*.md`, no `scripts/security*`. `eval(`×30, `exec(`×18, `shell=True`×14 in `harness/` — a real injection-surface count, un-triaged, never mentioned across 12 subsystem investigations that otherwise read code line-by-line.
+- **lib/ vs tools/ duplication: substantial and unmentioned.** 313 files in `harness/lib`, 300 in `harness/tools`, **198 filenames appear in both directories**. `acceptance_closeout.py` is byte-identical in both. This is a maintainability/drift risk (two copies of gate-adjacent logic that could silently diverge) directly relevant to a report about structural guarantees, and it's not discussed anywhere in the 1,170-line document.
+- **Dead code volume understated.** The report names three dead modules (static_execution_compiler, unified_selector, capability_token.check_path_access) as if that's the inventory; grep finds at least 20 additional unused/dead-annotated hits in `harness/` alone. The report's dead-code list reads as complete when it is a sample.
+- **Dependency manifest: effectively absent for the Python harness.** No `requirements*.txt` anywhere; the harness apparently relies on ambient/system Python packages with no lockfile. This is a real supply-chain and reproducibility gap that a report emphasizing "reproducibility" (§33 title) never raises.
+- **Desktop/browser: report's "not examined" framing undersells what exists.** `desktop/` has ~3,367 LOC plus 7 Electron test files, and there are three dedicated browser-operator test files under `harness/tests/harness/runtime/`. The report's §38 disclaimer ("desktop application, browser operators... were not examined") is accurate as a scope statement but its brevity implies "unknown, possibly thin" when in fact there is non-trivial, untriaged test coverage sitting there. Silence here doesn't fabricate a strength, but it does let the reader's imagination fill the gap more charitably than warranted either way — the honest move would have been to say "exists, untriaged" rather than omit it.
+- **The 15/15 run's uniqueness is overstated by omission.** The stabilization log contains at least two other complete, `all_nodes_passed=true`, `all_required_gates_passed=true` 14-node runs (log lines 781, 795) that the report never mentions. The report's exclusive focus on the 15-node cf3739f6 run as "It works, once, demonstrably" (VARIANT-1 §7) reads as if this were the sole successful completion ever recorded, which is not accurate — it may be the largest, but not the only, full pass. Separately, the same log (line 638) records a case where the closure ledger's `all_nodes_passed=true` flag **contradicted** the actual deliverable status (`evidence_gate.status=failed_for_full_requested_scope`) — meaning the flag the report treats as authoritative evidence has at least one documented instance of being wrong on its own.
+
+## Counter-evidence inventory (counts)
+
+| Category | Count | Notes |
+|---|---|---|
+| TODO/FIXME/HACK/XXX (harness/, core/) | 22 raw hits, ~5 substantive | Concentrated in `core/daemon`, `core/message-listener`, `core/ontology` — measurement/telemetry stubs |
+| Skipped/xfail tests | 0 | None found — but test surface is small (~30 files), so absence may reflect scope more than discipline |
+| `\|\| true` / `set +e` in scripts/ | 24 scripts | Mostly benign cleanup masking; one (`check-solar-harness-front-door.sh:44`) discards a status-check exit code before a downstream check, flagged not confirmed |
+| Orphaned check script not wired to CI | 1 (`check-autosci-install-closure.sh`) | Not referenced in workflows or CLAUDE.md/AGENTS.md |
+| Suppression comments (`type: ignore`/`noqa`/`eslint-disable`/`ts-ignore`/`ts-nocheck`) | 575 | Not individually sampled — volume alone is the finding |
+| Bare `except:` | 4 | In `.sh`-embedded Python (`ack-watcher.sh`, `events.sh` ×2 copies each) |
+| `except Exception: pass` (silent swallow) | 8 | `queue.sh` ×3, `events.sh` ×1, duplicated in lib/ and tools/ |
+| `except Exception:` (broad, non-swallow) | 150+ | Across `harness/lib/*.py`; not individually triaged |
+| Hardcoded `/home/` paths | 5, all benign | Test fixtures / docstring examples, no accidental personal path |
+| Hardcoded credentials | 0 | Only test fixtures with obviously fake values and env-var indirection — clean |
+| `eval(`/`exec(`/`shell=True` in harness/ | 30 / 18 / 14 | Un-triaged injection-surface count, never discussed in the report |
+| lib/tools filename overlap | 198 files | `harness/lib` (313) vs `harness/tools` (300); some byte-identical duplicates |
+
+## Specific sentences to soften or delete, with replacements
+
+1. **VARIANT-3 §Executive summary, finding 2**: "The model is never allowed to author the evidence of its own correctness. This is enforced structurally at three separate stages, not merely encouraged by prompting."
+   → Soften to: "The model is prevented from authoring citation spans and cannot edit carried-forward constraints; the third stage's 'deterministic derivation' operates over a capsule identity the model itself selects, and the review gates meant to backstop model self-grading (intent fidelity, requirement semantic review) are, respectively, demotable under budget pressure and advisory-only by design."
+
+2. **VARIANT-1 §4**: "That is the design philosophy in two sentences: admit what you do not know, and never grade your own work."
+   → This sentence should be deleted or qualified with a pointer to `_demote_exhausted_fidelity_findings()`, which is a documented counterexample to "never grade your own work" — the harness overrides its own reviewer's negative verdict once the repair budget is spent.
+
+3. **VARIANT-3 §7, "Why it is more than a checksum"**: "`verify_frozen_execution_chain`... recomputes every stage — including re-running `compile_scheduler_input` — rather than trusting stored verdicts. A tampered or stale bundle fails even if its own recorded verdict says 'pass.'"
+   → Add: "The recomputation is anchored to `scheduler_input`, a curated projection of the task-graph contract; the task-graph contract itself (`task_graph.contract.json`) is not referenced by hash inside `contract_sha256`, so fields it carries outside that projection (write_scope, artifact-name text, human-review state) can be edited post-freeze without invalidating the hash."
+
+4. **VARIANT-3 §32, "This is the freeze thesis defended against its own implementation"** and the closing line: "The system's most serious late-stage defect was a component quietly re-deriving meaning after the contract was sealed."
+   → This should not be presented as closed. Add a caveat: "The same shape of runtime string-matching over node fields to infer gate applicability (rather than reading a frozen gate declaration) appears to remain present in `graph_node_dispatcher.py:2690-2760` and `evolution_engine.py:255-287`; whether these are the fixed code path relapsed or parallel unfixed instances was not resolved by this review."
+
+5. **VARIANT-1 §7**: "It works, once, demonstrably."
+   → Technically defensible for the 15-node scale, but should be: "It has completed at least three full end-to-end runs with all gates passed (two 14-node, one 15-node); the 15-node run required a mid-run hotfix and coordinator restart, and its narrative log was subsequently compacted by the same operator who applied the fix." The current phrasing ("once, demonstrably") undersells the other passing runs while simultaneously overselling the featured run's cleanliness.
+
+6. **VARIANT-3 §5, Budget paragraph**: "After exhaustion, only fidelity findings — never deterministic errors or blocking ambiguities — may be demoted to advisory warnings."
+   → This sentence is accurate but should be followed immediately by the honesty-framing consequence: "This means the one independent-model check designed to catch a self-serving IntentIR can be silenced by running out the repair clock, without any deterministic check noticing."
+
+7. **VARIANT-1 §1**: "the model is never trusted to certify its own work."
+   → Same issue as #1/#2 above — should be scoped: "the model cannot alter provenance spans or edit carried-forward constraints; whether it is ever effectively trusted to certify its own work depends on repair-budget state and reviewer-model configuration, both of which have documented paths where the model's own output prevails."

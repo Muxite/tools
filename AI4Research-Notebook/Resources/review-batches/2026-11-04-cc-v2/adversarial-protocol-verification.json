@@ -1,0 +1,39 @@
+{
+  "date": "2026-11-04",
+  "scope": "Read-only current-production verification following fixes; original report remains historical",
+  "tests": {"command": "python -m unittest test_ccv2 -v", "cwd": "CC Protocols/reference", "result": "18 passed"},
+  "original_findings": [
+    {"id":"AP-01","status":"original absolute-script reproduction fixed; related executable-resolution defect remains","evidence":"test_external_script_and_missing_entrypoint_rejected passes. Native seal rejects absolute external argv[1:] and verifies resolved executable hash. AP-07 below shows verification/dispatch mismatch."},
+    {"id":"AP-02","status":"fixed for snapshot failure","evidence":"test_observation_failure_persists_unknown_and_reconciles passes. Per-resource observation is caught; state unknown/EFFECT_UNKNOWN is durable; lease retained; operator reconciliation marks failed/RECONCILED_STOP, never fabricated success."},
+    {"id":"AP-03","status":"fixed at command-construction boundary","evidence":"test_model_effect_does_not_grant_image_network passes. Network restriction now depends solely on network.request. No live Docker/network test claimed."},
+    {"id":"AP-04","status":"fixed","evidence":"test_boolean_schema_discovery passes for true and false; implementation preserves false through allOf and leaves true unconstrained."},
+    {"id":"AP-05","status":"fixed","evidence":"Partial tool reason now appears in diagnostics as PARTIAL_OUTPUT message; test_empty_and_partial_are_distinct passes. Tool text remains an assertion, not independently verified coverage evidence."},
+    {"id":"AP-06","status":"fixed documented path","evidence":"README command now uses PACKAGE/cc.yaml. Independently ran validate on examples/portable/cc.yaml successfully."}
+  ],
+  "new_findings": [
+    {
+      "id":"AP-07",
+      "severity":"P1",
+      "title":"Pinned resolved executable is verified but dispatch resolves the original bare executable name again",
+      "locations":["reference/ccv2.py:250","reference/ccv2.py:289","reference/ccv2.py:451"],
+      "attempted_declaration":{"bindings":{"default":{"kind":"native","command":["reviewpython.exe","-c","print('{\"outcome\":\"ok\",\"outputs\":{}}')"]}}},
+      "reproduce":"python AI4Research-Notebook/Resources/review-batches/2026-11-04-cc-v2/adversarial-protocol-verify.py",
+      "scenario":"On Windows, copy host Python executable to temporary A/reviewpython.exe and B/reviewpython.exe. Append inert executable-overlay bytes to B, giving B a distinct SHA256 while retaining a runnable Python executable. Seal with PATH preferring A. Change PATH to prefer B and call the release. PYTHONHOME points to the existing host runtime so copied interpreters find their standard library.",
+      "observed":"seal records A path and hash. release verifies A. call succeeds with original bare command reviewpython.exe, which now resolves B; B hash differs from sealed executable hash. This independently reproduced twice. No malicious capsule code, sandbox violation, or process race is required.",
+      "evidence_file":"adversarial-protocol-verification-evidence.json",
+      "minimal_general_fix":"Use the manifest-resolved executable path as actual native argv[0] after verifying it, or reject when the currently resolved executable differs from the sealed identity. For a bundle-contained executable, use its corresponding verified sealed copy. Record the actual path/hash dispatched, not only host self.python. Keep ordinary ambient dependency limitations explicit."
+    }
+  ],
+  "final_verification": {
+    "status": "all seven reported defects closed at the tested boundaries",
+    "AP-07": "Closed. Independently reran the original two-PATH executable reproduction. Current PATH resolves B with a different hash, while actual receipt_command[0] is the sealed A absolute path. Dispatch no longer re-resolves the bare name. Current source also records resolved_executable path/hash.",
+    "evidence_file": "adversarial-protocol-verification-final-evidence.json",
+    "suite": "Independently ran python -m unittest test_ccv2 -q: 21 tests passed.",
+    "limits": "This closes the reported identity/dispatch mismatch; no full native environment closure, OS isolation, live Docker enforcement or semantic correctness claim follows. Earlier new_findings entry is historical and superseded by this final verification."
+  },
+  "additional_verification": [
+    "invoke_tool rejects model-supplied _cc_key and injects supplied host invocation ID; test_host_key_is_not_model_argument passes. End-to-end durable retry safety still requires the host/client integration to reuse this identity; arbitrary raw MCP clients do not gain that guarantee.",
+    "Receipts now include enforced and observation_limits; these are descriptions of configured admission/control boundaries, not evidence arbitrary native processes lacked other effects.",
+    "No production files edited; only review artifacts and temporary capsule/executable files created. Obsolete all-in-one original reproduction was not rerun against expected rejection paths."
+  ]
+}

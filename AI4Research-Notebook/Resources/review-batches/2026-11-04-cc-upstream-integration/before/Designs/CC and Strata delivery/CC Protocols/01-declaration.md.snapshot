@@ -1,0 +1,140 @@
+---
+id: cc-protocol-01-declaration
+status: proposed-runtime-unverified
+source: November 3 single-CC workshop, M2a contracts and reviewed Muse addendum
+last_reviewed: 2026-11-04
+next_action: Replay against a qualified carrier before deployment
+---
+# Declaration and field dictionary
+
+## Capsule and capabilities
+
+A capsule is the distribution and versioning unit. Each named entry in `operations` is a callable capability. One call selects exactly one operation. A single-capability declaration expands to `operations.run`.
+
+| Scope | Owned fields |
+|---|---|
+| Capsule | Identity, version, default carrier, shared definitions and optional profiles. |
+| Capability | Description, execution binding, input ports, output ports, prerequisites, effects and guarantees. |
+| Bound call | Actual inputs, resolved targets, granted scopes, limits and selected checks. |
+| Receipt | Execution state, completeness, observed effects, outputs and assessment. |
+
+A shared definition has no implicit runtime effect. Operations reference it explicitly. Capsule summaries are derived. There is no additional capsule-wide input/output contract.
+
+## Identity
+
+A caller selects an operation by **package ID + release digest + operation ID**. Package version helps discovery. A release digest fixes executable meaning. A different binding, contract, or executable requires a new release. Never reassign a published ID/version to different bytes. Use a new major package version for an incompatible caller contract.
+
+## Authoring grammar
+
+- Read exactly one UTF-8 YAML mapping, using JSON scalar types.
+- Only unquoted JSON literals are implicitly typed.
+- Other plain scalars are strings.
+- Reject duplicate keys at every depth, aliases, anchors, merge keys, tags, non-string keys, non-finite numbers and unknown fields.
+- Order has no semantic meaning except inside JSON Schema or domain payloads where array order matters.
+- Protocol IDs match `[a-z][a-z0-9._-]*`.
+- Local operation, port and definition names are scoped to a package and namespace.
+- Never concatenate IDs using a separator allowed inside them.
+- Two operations may reuse the same port definition.
+
+## Fields
+
+| Author field | Scope and type | Requirement, default, meaning |
+|---|---|---|
+| `cc` | Package, string | Required, exactly `"1"`. Reject unsupported generations before binding. |
+| `id`, `version` | Package, ID and string | Required. Stable catalog ID and three decimal version components with no leading zero except zero itself. |
+| `carrier` | Package, image string or recipe object | Required default executable binding. An operation may replace it for a distinct implementation. |
+| `tags` | Package, unique ID list | Optional, default empty. Search hints only. |
+| `defs` | Package, map of local IDs to port types | Optional, default empty. Use `$name` in any port to reuse a definition. No alias chains. |
+| `rules` | Package, map of rule ID to descriptor | Optional, default empty. Define each referenced provider, effect, or independent check once. |
+| `profiles` | Package, map of profile ID to profile descriptor | Optional, default empty. All listed profiles are required readers for this release. Put advisory search terms in tags. |
+| `operations` | Package, nonempty map from operation ID to operation | Use for a bundle. Otherwise author the operation fields directly at root and the operation ID is `run`. Reject both forms together. |
+| `does` | Operation, nonempty string | Required. State action, subject and any interpretation or limitation a caller needs. Bundle discovery lists these descriptions. |
+| `run` | Operation, path string or binding object | Required. A path selects the process binding. An MCP/A2A binding object selects a declared provider and native operation. See document 06. |
+| `carrier` inside a named operation | Operation, carrier | Optional override. Omission inherits the package carrier. Reject redundant identical overrides. |
+| `takes`, `gives` | Operation, port name → port type | Inputs default to an empty map. Outputs required and nonempty. Every named port is required on complete success. Use an object schema for optional parameters. Explicit empty input and omission are equivalent. |
+| `needs`, `changes`, `guarantees` | Operation, unique lists of rule IDs | Default empty. Each reference must resolve to a rule of kind `need`, `effect`, or `check` respectively. No external effects are implied. `core.input` and `core.output` are implicit runner checks. Additional guarantees appear in the assessment. |
+
+## Port type
+
+- A primitive name (`string`, `number`, `integer`, `boolean`, `null`, `object`, or `array`) expands to a JSON Schema object with that type.
+- Quote the name `"null"`.
+- Alternatively use an inline JSON Schema 2020-12 object, `{schema_ref: Ref}` to pin an external JSON Schema, or `{artifact: MIME}` for opaque bytes of that exact media type.
+- A Ref is exactly `{uri, sha256}`, with a nonempty locator and a lowercase 64-hex digest of the identified bytes.
+- Resolve local schema fragments within the pinned document.
+- External validator dependencies must also be locked at build.
+- Generic object/array types promise only that structure.
+- Constrain a payload whenever a caller needs more.
+
+## Rule descriptor
+
+- Exactly `{kind, meaning, definition}`.
+- Kind is one of the three strings above.
+- Meaning is nonempty caller-facing text.
+- Definition is a Ref to the provider admission predicate, enforceable effect policy, or check definition.
+- A need is something the runner must supply or establish.
+- A change bounds an action the operation may take against a target.
+- A guarantee names a check with independently verifiable evidence.
+- Reserve the `core.` prefix for protocol identifiers.
+- A guarantee cannot grant authority.
+- Reject missing, unused or conflicting rule definitions.
+- A profile descriptor is exactly `{version, definition}` with a positive integer and a Ref to its validation and interpretation rules.
+- Unsupported profiles block compilation or admission.
+- Profiles may constrain existing data but may never redefine a core field or grant effects.
+
+## Execution binding
+
+A `run` string is an absolute POSIX executable path with no shell interpolation, arguments, traversal or inherited image entrypoint fallback. An object is exactly `{kind,provider,operation,protocol}`. Kind is `mcp` or `a2a`. Provider is a referenced need rule included in the operation's `needs`. Operation and protocol are nonempty native operation/version strings. The compiler rejects unsupported bindings. See [Distribution and interoperability](06-distribution-and-interoperability.md).
+
+## Carrier
+
+- Image shorthand is a registry reference ending in `@sha256:` and 64 lowercase hex digits, identifying a single-platform image manifest.
+- Platform comes from its verified config.
+- The recipe form is the workshop's closed `build-recipe` object: `format`, `source` (repository, full 40-hex Git commit and tree), `recipe`, `environment_lock`, `build_context` (each a Ref), `base_image` (format `oci-image`, pinned image, OCI platform), and `target` (nonempty build target).
+- Only this form asks the compiler to build an implementation.
+
+## Normalization and evolution
+
+For the README example, both the short form and an explicit `operations.run` must produce this JSON value (member order is immaterial):
+
+```json
+{"cc":"1","id":"text.trim","version":"1.0.0","carrier":"fixture.invalid/text@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","tags":[],"defs":{},"rules":{},"profiles":{},"operations":{"run":{"does":"Remove leading and trailing ASCII spaces. An all-space input returns an empty string.","run":"/tools/trim","takes":{"text":{"type":"string"}},"gives":{"trimmed":{"type":"string"}},"needs":[],"changes":[],"guarantees":[]}}}
+```
+
+- Normalize to a JSON object with exactly `cc,id,version,carrier,tags,defs,rules,profiles,operations`.
+- Materialize stated defaults.
+- Move a root operation to `operations.run`.
+- Each operation has `does,run,takes,gives,needs,changes,guarantees` and only a distinct explicit carrier override.
+- Expand primitive types in defs and literal ports.
+- Keep `$name` references by name in the normalized record and resolve them when validating values.
+- Keep image shorthand and recipe objects in their specified forms.
+- Sort unique ID lists lexically.
+- Preserve port names.
+- Do not copy shared definitions onto operations.
+- Unresolved values, placeholders for mandatory facts, and historical `unknown` or `suggested` clauses belong to a draft outside the installable language.
+- A known empty effect list is a meaningful promise.
+
+## Effects
+
+1. The author declares permitted action classes in the operation's `changes`.
+2. The host binds those classes to concrete resources and scopes under authenticated policy.
+3. The runner enforces the grants before and during execution, then records actual effects.
+4. Unknown effect state requires reconciliation. It is never treated as no effect.
+
+A grant is a host record with `rule` (effect ID), `resource` (resolved immutable identity or generation-bound handle) and `constraints` (validated by the pinned rule definition). For example, workspace.write can grant only src/** on workspace W at generation 8. An artifact Ref or input string grants no access by itself.
+
+The default environment permits private scratch computation and returned output files, with no network, persistent mounts, credentials or host-control access. Test code must execute inside that boundary. Spawned processes inherit the same enforced restrictions. A host unable to enforce a requested boundary must block the call.
+
+Read access to admitted input artifacts is part of the standard envelope. Reading a live repository, attaching a profiler or making a network request needs explicit resource/provider admission. Declare network data egress and mutations according to the bound rule. Rule prose is a display projection; the pinned rule definition is authoritative. Reject inconsistent prose and definition during qualification.
+
+## Compatibility
+
+| November 3 field or earlier owner | Placement in generation 1 |
+|---|---|
+| Purpose, tags, operation descriptions | One `does` per selectable action, tags once. Derive the package summary. |
+| Package takes/gives, operation name lists | Declare ports on the operation. Share validators in defs. Derive package discovery indexes without merging same-named ports of different operations. |
+| Package needs, changes, guarantees and per-operation references | Typed rule definitions and operation references. Preserve provider constraints including ABI, device and RAM in the pinned predicate. Package effect ceiling is the union for display only. |
+| Carriers, numeric carrier index | Default carrier plus explicit per-operation override. Resolve to immutable descriptors. |
+| State, qualification, brief, product, evaluation | Independent records. A draft can retain open questions. A submitted declaration cannot declare itself qualified. |
+| Legacy native carrier and M2a capability kind | Keep native implementation behind an adapter. Translate roles and required checks explicitly. Preserve the old release bytes in lineage. |
+
+Generation 1 and workshop 0.3 have different wire shapes. A bridge must translate, validate against the destination schema, and demonstrate equivalent behavior on positive and negative fixtures. If it cannot preserve a scope, validator, effect, required check, or provider boundary, stop with `INCOMPATIBLE_CONTRACT`. Never reinterpret a missing rule as permission.

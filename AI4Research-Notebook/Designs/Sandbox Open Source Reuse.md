@@ -1,0 +1,90 @@
+---
+id: sandbox-open-source-reuse
+status: researched-recommendations-integration-unverified
+source: Sources/Prompts/2026-10-27-open-source-hunt.txt; official project documentation linked below
+last_reviewed: 2026-10-27
+next_action: Qualify the narrow execution and model-routing adapters before adding optional tracking or workspace platforms
+---
+# Sandbox open-source reuse
+
+Keep the selected VM-per-lab model and native JiuwenSwarm integration. Replace infrastructure code we might otherwise write with documented components. Prefer a maintained tutorial, API/CLI reference and operational troubleshooting path over a small unexplained repository. Extra dependencies are justified when they remove lifecycle or protocol code we would have to maintain. Documentation is evidence of an integration path, not proof of reliability or AI4R compatibility.
+
+This is a documentation/source hunt completed on October 27. It installs nothing, benchmarks nothing, and does not amend the owning M1 runtime contracts. Components below are recommendations to qualify, not newly deployed services. The existing pinned JiuwenSwarm/JiuwenBox review remains distinct from moving upstream documentation. Pin releases and record their licenses at the integration checkpoint; do not claim a latest version is already tested.
+
+## What to reuse first
+
+| Responsibility | Reuse recommendation | Code or effort avoided | What remains ours |
+|---|---|---|---|
+| Agent composition, Skills and Factory bundles | Native JiuwenSwarm/OpenJiuwen skills, tools/MCP, teams/workflows and create/evolution hooks | A second skill registry, generic agent runtime or evolution framework | CC contracts, research acceptance, pinned bundle composition and accepted-artifact transfer |
+| Lab VM lifecycle | Existing provider API; on supported Linux KVM hosts, libvirt with cloud-init | Custom hypervisor management and ad-hoc guest bootstrap scripts | Provider configuration, durable-volume ownership, independent stop, device qualification |
+| Service and process supervision | systemd for stable lab services; Docker Engine SDK/API for OCI jobs; selective JiuwenBox for compatible tool sandboxes | Handwritten daemon restart loops, process-group supervision and raw Docker HTTP plumbing | Map lab/job IDs to owned resources; cancel/reconcile across backends; preserve data |
+| CC builds and services | Docker BuildKit/Buildx and Compose | Custom image builder, cache and multi-service launcher | Dependency pins, image digest, declared effects and resource policy |
+| Shared model routing | Qualify LiteLLM gateway with PostgreSQL for virtual-key management; keep vLLM or remote APIs as serving backends | Provider translation, aliases, key administration, usage and rate-limit plumbing | Role/feature policy, exact experimental model binding, lab-private access and failure policy |
+| Backup and restore | restic against an independent repository | Custom encrypted backup transport, snapshot indexing and restore tooling | Consistent DB/app export, retention, key custody, old-writer fencing and restore drills |
+| Source ingestion | Docling inside an ingestion CC; adapt Paper2Agent recipes for paper/repo conversion | A bespoke multi-format document parser and starting conversion/verification workflow | Source interpretation, dependencies, native bindings and independent task tests |
+| CC tests | pytest; Testcontainers when a real dependent service is needed | A bespoke test runner and disposable database/service setup | Fixed acceptance cases, scientific criteria, resource/stop/access tests and result interpretation |
+| Package distribution | Git releases plus the available OCI registry; ORAS when distributing non-image bundle assets | A custom package transport/catalog service | Bundle metadata, source permissions, digest mapping and qualification/adoption policy |
+| Reports and run records | Quarto for report rendering; MLflow Tracking only where run comparison/UI is useful | Custom scientific report rendering and experiment dashboard/storage APIs | Report assertions/evidence links; scientific validity and accepted-artifact authority |
+
+This is not a requirement to start every service. A first slice can use existing JiuwenSwarm, one VM, Docker/systemd and one configured model path. Add the shared gateway when several labs need managed model access. Run Docling, pytest, ORAS and Quarto as tools in CCs, not permanent services. Introduce MLflow only when existing run records are insufficient for users; add PostgreSQL/Redis only for features requiring them.
+
+## Why these documentation paths are useful
+
+**libvirt + cloud-init.** The [API architecture](https://libvirt.org/api.html), [virsh reference](https://www.libvirt.org/manpages/virsh.html), and [cloud-init libvirt tutorial](https://docs.cloud-init.io/en/latest/howto/launch_libvirt.html) provide concrete VM/domain, storage and bootstrap interfaces. Cloud-init has [configuration, debugging and failure-mode guides](https://docs.cloud-init.io/en/latest/). Prefer the organization's existing provider when available; do not introduce libvirt inside every guest. GPU access, ARM compatibility, networking and guest images still need host qualification. Graceful shutdown, forced power-off and deleting storage are separate operations.
+
+**systemd + Docker + JiuwenBox.** The [systemd kill manual](https://www.freedesktop.org/software/systemd/man/latest/systemd.kill.html) specifies cgroup-based stop behavior, timeouts and escalation. The [Docker API and SDK references](https://docs.docker.com/reference/api/engine/), [Compose service reference](https://docs.docker.com/reference/compose-file/services/), and [BuildKit guide](https://docs.docker.com/build/buildkit/) cover the container path. systemd stopping an adapter service does not automatically stop Docker-daemon-owned containers: our adapter must stop owned Docker jobs and verify their state. JiuwenBox remains a compatible execution backend/proxy; do not force bubblewrap around every OCI package. The stable supervisor is mostly configuration plus a narrow ownership/reconciliation adapter, not another generic scheduler. Docker Desktop product terms are distinct from the [Moby engine's Apache-2.0 code](https://github.com/moby/moby/blob/master/LICENSE).
+
+**LiteLLM.** [Model routing](https://docs.litellm.ai/docs/routing), [virtual keys](https://docs.litellm.ai/docs/proxy/virtual_keys), and [deployment/upgrade/health-check documentation](https://docs.litellm.ai/docs/proxy/deploy) expose more of the shared-access machinery than a simple forwarding proxy. Key management requires PostgreSQL; distributed counters/routing state can add Redis. This complexity can be worthwhile because it replaces code with documented behavior. Core code is [MIT with a separate enterprise-directory license](https://github.com/BerriAI/litellm/blob/main/LICENSE); check each required feature against the OSS release. Avoid relying on an enterprise-only feature. Aliases can load-balance/fail over: an exact-model experiment must use a constrained deployment and explicit failure policy, not assume a friendly alias preserves identity. Keep private models out of the shared gateway. JiuwenBox proxy injection is optional when needed; do not add a mandatory second proxy hop that duplicates gateway ownership.
+
+**restic.** [Quickstart/restore/check](https://restic.readthedocs.io/en/stable/010_introduction.html) and [backup options](https://restic.readthedocs.io/en/stable/040_backup.html) provide an operational route to retained lab files. Its [BSD-2-Clause license](https://github.com/restic/restic/blob/master/LICENSE) is explicit. A backup program does not make a changing database or simulator checkpoint consistent. Export/quiesce applications first, retain required data and image identities, then restore into a replacement lab and fence the old writer. Backup keys and the independent repository must survive loss of the VM.
+
+**Docling + Paper2Agent.** Docling has a [quickstart](https://docling-project.github.io/docling/getting_started/quickstart/), format/API guides and examples. Its [repository](https://github.com/docling-project/docling) distinguishes MIT code from model-specific licenses. Qualify extraction on our papers/tables; model downloads, CPU/GPU memory and offline operation affect deployment. [Paper2Agent](https://github.com/jmiao24/Paper2Agent) supplies a concrete tested-MCP conversion recipe and delivered usage instructions. Its present recipe expects a coding-agent host with Skills, shell and parallel specialist/verifier execution. Reuse the procedure/native MCP output through a JiuwenSwarm adapter; installing the Skill alone does not establish host compatibility. Treat its docs as workflow/reference material, not a complete lab operations manual. Mental-model Skills remain native instruction/method assets with independent usefulness evaluation.
+
+**pytest + Testcontainers.** [pytest fixtures/parametrization](https://docs.pytest.org/en/stable/) and [Testcontainers Python examples](https://testcontainers-python.readthedocs.io/en/latest/) support repeatable executable checks. Testcontainers needs access to a Docker runtime; run it in the trusted qualification environment rather than exposing the daemon to arbitrary candidate code. Passing functional tests supports only their tested scope. The candidate cannot write the authoritative acceptance rubric. Test model features, actual stop, private-route denial, interrupted work and upgrades separately from scientific correctness.
+
+**Git/OCI + ORAS.** [ORAS push/pull guides](https://oras.land/docs/how_to_guides/pushing_and_pulling/) and CLI/library references cover arbitrary OCI artifacts; the [project license](https://github.com/oras-project/oras/blob/main/LICENSE) is Apache-2.0. Use ordinary image tooling for images; use ORAS only for associated bundle assets when useful. Keep general, domain and lab-local source stores distinct while resolving selected immutable identities locally. Native JiuwenSwarm Skill installation remains the invocation/discovery interface. Distribution does not grant admission or publish a lab's work automatically.
+
+**Quarto + optional MLflow.** Quarto's [report/citation/format guide](https://quarto.org/docs/guide/) can turn a reporting CC's checked material into HTML, PDF or Word. [Execution/cache controls](https://quarto.org/docs/projects/code-execution.html) matter: rendering must not accidentally rerun an expensive or effectful experiment. Use saved accepted results by default. [MLflow's server guide](https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server/) documents a local SQLite start and remote metadata/artifact configuration; [Apache-2.0 code](https://github.com/mlflow/mlflow/blob/master/LICENSE.txt) supplies an optional run UI. Keep it lab-local/scoped initially. Tracking does not replace accepted-artifact checks, application backups or scientific review. Hosted/enterprise product features are not assumed.
+
+## Documentation screen and reusable repositories
+
+This is a qualitative reading screen, not a scored reliability comparison. “Strong path” means the linked material exposes concrete setup and reference/operational guidance; it does not mean we executed the examples.
+
+| Project group | Documentation we can build an integration/runbook from | Reading result |
+|---|---|---|
+| libvirt / cloud-init | API/domain objects, lifecycle CLI, guest-creation tutorial, status/debugging and failure modes | Strong infrastructure path; host qualification remains |
+| systemd / Docker | Service kill/timeout semantics, versioned Engine API/SDK, Compose service reference and BuildKit guide | Strong lifecycle/API path; cross-backend ownership is our adapter |
+| LiteLLM | Client config, keys, routing, deployment, health/upgrade/troubleshooting navigation | Strong gateway path; feature/edition and database cost must be checked |
+| restic | First backup, snapshot listing, restore and repository check commands | Strong backup path; application consistency is separate |
+| Docling | Quickstart, formats/document model, examples and API documentation | Useful parser path; assess model/offline/resource operation locally |
+| Paper2Agent | Conversion recipe, host prerequisites, generated usage and verification instructions | Useful recipe; weaker as a complete lab operations reference |
+| pytest / Testcontainers | Fixtures, parametrization and executable service-test examples | Strong test tooling; fixed research criteria stay ours |
+| ORAS | Push/pull, authentication, artifact/layout and CLI/library guides | Strong transport path; use only if non-image assets need it |
+| Quarto / MLflow | Report formats/citations/execution controls; tracking server, stores and configuration | Strong output/tracking path; introduce tracking only for a concrete need |
+| Coder / Temporal / OpenHands | Platform guides, operational/API references and examples | Documentation warrants consideration, but extra runtime ownership must earn its cost |
+
+Repository entry points already linked through the reviewed official material: [JiuwenSwarm](https://github.com/openJiuwen-ai/jiuwenswarm), [LiteLLM](https://github.com/BerriAI/litellm), [Docling](https://github.com/docling-project/docling), [Paper2Agent](https://github.com/jmiao24/Paper2Agent), [MLflow](https://github.com/mlflow/mlflow), [restic](https://github.com/restic/restic), [ORAS](https://github.com/oras-project/oras), [Quarto](https://github.com/quarto-dev/quarto-cli), and [Coder](https://github.com/coder/coder). Prefer released packages/binaries and documented extension APIs to vendoring whole repositories; vendor specific code only where the CC's dependency/reproducibility contract requires it.
+
+## Larger platforms considered
+
+| Candidate | Documentation / reuse value | Why defer or scope it |
+|---|---|---|
+| [Coder](https://coder.com/docs/user-guides) | Workspace templates, access and start/stop/update operations; [persistence guidance](https://coder.com/docs/admin/templates/extending-templates/resource-persistence) | Useful if human access/provisioning becomes the bottleneck. Additional platform/template state; destructive template and idle/deletion policies need qualification. [AGPL core](https://coder.com/docs/about) and commercial features must be distinguished. It does not replace AI4R research control. |
+| [Temporal](https://docs.temporal.io/develop/python) | Extensive workflow/activity, worker, retry and operations documentation | Strong option if native durable execution leaves a demonstrated gap. A second workflow engine introduces replay/determinism and worker/service integration; it does not solve scientific planning. |
+| [OpenHands SDK](https://docs.openhands.dev/sdk) | Python/REST agent server, tools, persistence, remote execution and API references | Could be a bounded coding-agent CC behind a tool boundary. Avoid replacing JiuwenSwarm's whole runtime merely to reuse one agent. Separate SDK/self-hosted capabilities from hosted/enterprise offerings. |
+| Harbor / Kubernetes / another generic agent framework | Can address registry governance, fleet scheduling or orchestration | No demonstrated requirement justifies operating another fleet/control plane in the first slice. Use an existing registry/provider first; reconsider against a concrete gap and operations cost. This is scope triage, not a comparative benchmark. |
+
+## Bounded qualification order
+
+1. **Execution ownership:** one lab, one CC job, Docker SDK operations, JiuwenBox-compatible tools and systemd service restart. Observe actual termination and retained project state, then independent provider VM stop. A service cgroup and a Docker job must both be covered.
+2. **Shared inference:** one LiteLLM endpoint with two lab-scoped keys, an allowed alias and a pinned experimental model. Exercise endpoint relocation, denied private access, unavailable deployment and quotas. Confirm required capabilities are in the chosen OSS release and count PostgreSQL/Redis resources.
+3. **Factory/tool chain:** ingest one source using Docling or a Paper2Agent-derived recipe, expose native skill/MCP bindings, package with BuildKit, and run fixed pytest checks. Use Testcontainers only for real service dependencies. Upgrade once while active work retains its pins.
+4. **Outputs/recovery:** render a report from retained evidence with Quarto, optionally inspect a run in MLflow, back up consistent application exports using restic, and restore into a replacement VM. Verify evidence links and fence old writers.
+
+Each checkpoint records chosen versions, documented feature/license availability, adapter changes, failure behavior and observed integration effort. Compare against the custom code removed, not a guessed percentage of time saved. Stop adding platforms when existing components cover the requirement. Our remaining work is the AI4R-specific policy/contract boundary, not rebuilding the underlying engines.
+
+## November 2 extension — Superagent and Strata
+
+[[Designs/Inference Engine Software Factory - Design Impact|Inference Engine Software Factory: Superagent and Strata]] — pinned source review, proposed control/provider changes and three unrun qualification trials.
+
+Superagent adds control-state and authorization patterns; Strata adds an optional backend and optimization target. This extension does not replace the earlier shortlist or establish runtime qualification.

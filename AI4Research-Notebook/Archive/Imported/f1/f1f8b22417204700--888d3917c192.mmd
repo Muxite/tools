@@ -1,0 +1,21 @@
+flowchart TB
+    Input[Qualified intake and protected default policy] --> IC
+    subgraph Node[Intention Compiler node]
+        IC[Intention work subnode: one CC] --> IR[Candidate Intent IR]
+        IR --> D1{Deterministic checks}
+        D1 -->|valid| V1[Intent verifier subnode: assessment only]
+        D1 -->|invalid or unavailable| G1[Protected Intent gate]
+        V1 --> G1
+        G1 -->|committed acceptance| RC[Requirements work subnode: one CC]
+        RC --> B[Candidate Research Brief]
+        B --> D2{Deterministic checks}
+        D2 -->|valid| V2[Requirements verifier subnode: assessment only]
+        D2 -->|invalid or unavailable| G2[Protected Requirements gate]
+        V2 --> G2
+        G2 -->|committed acceptance| NG[Protected node finalization: aggregate evidence]
+        G1 -->|halt| H[Visible halt and retained evidence]
+        G2 -->|halt| H
+        NG -->|durable release| Out[Accepted Research_Brief.json]
+        NG -->|incomplete or persistence failure| H
+    end
+    Out -.-> Consumer[Later static workflow or Phase 3 Leader]

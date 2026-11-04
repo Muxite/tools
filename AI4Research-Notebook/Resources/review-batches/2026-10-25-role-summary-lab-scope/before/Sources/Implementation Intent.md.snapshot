@@ -1,0 +1,191 @@
+---
+id: implementation-intent-2026-10-21
+status: active
+source: Sources/Prompts/2026-10-21-library-amendment-request.txt; Sources/Prompts/2026-10-21-accuracy-verification-clarification.txt; Sources/Prompts/2026-10-23-robotics-lab-brief-direction.txt; Sources/Prompts/2026-10-23-paper2agent-final-rev8.txt
+last_reviewed: 2026-10-23
+next_action: Use the high-level lab overview, user-confirmed final Paper2Agent rev8 and dated source receipts; qualify new behavior independently
+---
+# Current intent and working requirements
+
+This is an interpretation of [[Sources/Prompt Register|your exact messages]], not a replacement for them. Dated sections preserve the sequence of directions; their earlier "latest" wording does not override the current corrections here.
+
+## Current corrections — October 23
+
+- **Labs:** [[Sources/Prompts/2026-10-23-robotics-lab-brief-direction.txt|the current brief request]] defines a persistent lab with a sandbox containing its AI4R fork and installed applications such as robotics simulation or profiling. Shared/domain CCs integrate planning, execution, verification and research learning. RSI can develop CC and harness changes for sustained autonomy, with qualification independent of candidate code. [[Designs/Labs and Capability Capsules]] is the high-level overview; VM/container details remain an existing proposal rather than required application interfaces or demonstrated implementation.
+- **Paper2Agent:** [[Sources/Prompts/2026-10-23-paper2agent-final-rev8.txt|the explicit correction]] says revision 9 was deliberately removed and revision 8 is final. Rev9 discussion below is withdrawn history, not missing work. Use [[Designs/Paper2Agent Briefing/presentation/README]] and [[Presentation Library/Deck Catalog]] for the final file; retained rev9 build source is not a verified recipe for rev8.
+
+## Continuing research priorities
+
+Your immediate priority is **CC accuracy and verification**. CCs declare what job they promise to do, providing targets for independent held-out conformance tests, deterministic checks, and blind semantic review. Observations, hashes, and fingerprints establish provenance or describe behavior; they do not alone establish correctness. The proposition that CCs improve accuracy remains to be measured.
+
+The semantic verifier sees the declaration and exact output, never the producer's original task input. Protected deterministic fidelity/runtime checks may inspect accepted inputs separately. A verifier must not become a second producer. Mandatory gates remain protected; the planner can propose additional compatible gates.
+
+Abstention is not a wrong answer. Blocking an incorrect candidate is useful prevention; blocking a correct candidate is false rejection. A scientifically correct FAIL or INCONCLUSIVE conclusion is a substantive result. None is interchangeable with a crashed process or a missing model account.
+
+You want the library to cover your full work: current and old designs, code activity, research, experiments, presentations, meeting notes, prompts, decisions, and learning from the one-shot M1 build experiment. Source authority and actual runtime evidence matter more than apparent polish or large test counts.
+
+Use [[Designs/CC Reference|capsule references]] and [[Designs/CC History|the history]] to understand the system. [[Amendments/README|Small coder amendments]] are the implementation handoff, with explicit acceptance evidence and preserved native project identities. Reuse existing JiuwenSwarm/OpenJiuwen components where they improve quality, testing, or effort. Preserve compatible code; make exceptions explicit. Investigate planner visibility before concluding it lacks capsules.
+
+The earlier M2 proposal uses VM labs and container CCs with independent factories and images; see [[Designs/Lab Capsule and Factory Design Plan]]. The current application-facing direction in [[Designs/Labs and Capability Capsules]] fixes logical ownership and the research loop while leaving deployment choices open. It does not cancel the detailed proposal or establish implementation readiness.
+
+Luna is the default for bounded work. Source extraction, classification, reference drafting, link mapping, and independent reviews can be delegated. Central review resolves authority, contradictions, cross-component contracts, and conclusions. Drafts are not automatically accepted.
+
+## Authority and completion
+
+Your instruction authorizes notebook work and amendment preparation. It does not by itself demonstrate a runtime gain or turn a proposed amendment into an accepted product contract. [[Resources/Current Baseline|Baseline receipts]] pin inspection. Unknowns stay explicit. No unavailable chat is reconstructed and no source original is deleted or relocated.
+
+## Paper2Agent and whole-system improvement direction
+
+The [[Sources/Prompts/2026-10-21-paper2agent-system-direction.txt|new exact request]] authorizes considering architecture restructuring around Paper2Agent-type flows and eventual whole-system self-improvement. Reusable stages, especially finding and acquiring source, should be plannable capabilities; the whole factory can later be a composed DAG CC. Distinguish its candidate products from its own member CCs and from versioned resources. Reuse the pattern for library preparation and admission evidence without letting a producer grant itself standing.
+
+This expands the long-term objective beyond the earlier narrow improvement discussion. [[Designs/AI4Research Capability Growth]] records current-contract versus desired-behavior gaps and staged proposals; the maintained M1 package has not been amended by these notes. Use Luna for bulk reading/writing; 6.1 Sol is authorized here only for the restructuring and overall self-improvement assessment. Capture important directions, track notes-versus-user gaps, and use [[Designs/Agent Reading and Freshness]] to keep agent reading efficient and source-aware.
+
+## Presentation decision and branch provenance clarification
+
+The [[Sources/Prompts/2026-10-21-paper2agent-briefing-request.txt|briefing request]] asks for a small, diagram-led reading pack to decide whether Paper2Agent merits deeper investigation. Conceptual fit is already evident: CCs and AI4Research were intended for reusable capability patterns like this. The open question is the practical benefit, cost, and architectural adaptation, rather than whether the idea has any value. Assess flexible CC usage and a coordinator outside individual DAGs alongside ephemeral workers.
+
+The [[Sources/Prompts/2026-10-21-jiuwenswarm-origin-clarification.txt|origin correction]] is explicit: `jiuwenswarm` on `ai4r_muk` is our modified AI4Research work, not the original upstream JiuwenSwarm. The captured `ai4r_M1` code is another modified implementation checkpoint. Attribute M1 restrictions to our policy/adapter where supported, not to upstream. Compare actual original source and the exact OpenJiuwen dependency pin separately. The concise proposal is in [[Designs/Paper2Agent Briefing/2 Agent architecture]].
+
+## Notebook as source of truth, and the AI4R lab
+
+The [[Sources/Prompts/2026-10-21-lab-containers-and-source-of-truth.txt|latest message]] asks that this notebook be the one source of truth for current work, and that Muk's statements be written down. The immediate goal is a short Paper2Agent value-and-connection presentation, using [[Designs/Paper2Agent Briefing/1 Decision brief]] and [[Designs/Paper2Agent Briefing/2 Agent architecture]].
+
+Muk also says architectural issues must be resolved. The current `jiuwenswarm` edits are not claimed correct. The earlier design-package targeted parity with the pre-term AI4R project. The future goal is a self-improving AI4R that does a lot better.
+
+New idea: an "AI4R lab" where every CC is a container, many VMs run labs, a central image library vendors CC images to labs, each lab modifies and creates images and modifies itself, and some worktree edits merge back to the master branch. The notebook reads this as candidates returned through central review, never as lab-side promotion. See [[Designs/AI4R Lab and CC Images]] for the reading, the gaps against existing notes, and open questions.
+
+A [[Sources/Prompts/2026-10-21-pasted-architecture-review.txt|pasted review]] was supplied with the message. It prefers one typed workflow runtime over three call modes; the briefing now carries that as a proposal.
+
+## Lab VM, master, and CC as the universal component
+
+The [[Sources/Prompts/2026-10-21-lab-vm-master-and-cc-as-universal-component.txt|next message]] says each lab is a VM with an AI4R instance and its build resources. Capabilities derive from "master", meaning the latest well-tested branch. The lab's AI4R modifies itself, adds and improves CCs, and adjusts the workflow. Full containerization is likely, with a pilot first. Muk wants CC to be the reusable component for skills, tools, MCP and A2A, and a comparison with the self-improvement goals. See [[Designs/CC as Universal Component]]. Open: who certifies "well tested" outside the lab's reach.
+
+## The Paper2Agent talk
+
+The [[Sources/Prompts/2026-10-21-paper2agent-presentation-request.txt|request]] asks for a very short, dense, diagram-led talk of about ten minutes. It must include a diagram of information flow showing where leakage and methodology issues arise: researchers use data to make a paper and code, Paper2Agent uses that data and code to make more code, then tests on the same data. It also needs a workflow diagram. The result is [[Designs/Paper2Agent Briefing/presentation/README|the eight-slide deck]]. The leakage points are risks read from the design, not findings in the authors' data.
+
+## Talk revision 4
+
+Muk pasted a [[Sources/Prompts/2026-10-21-pasted-presentation-review.txt|review]] with no comment of their own. It says the talk had drifted into a methodology audit and should explain what Paper2Agent does, how it works, its value to AI4Research, and how both the factory and its generated tools map to capsules, with one balanced limits slide and the pilot protocol in backup. The notebook applied it. One tension is recorded: Muk earlier asked explicitly for a leakage diagram, so one coupling diagram stays in the main talk as the limits slide, with its unsupported claims hedged. Muk can move it to backup. See [[Designs/Paper2Agent Briefing/presentation/README]].
+
+## Talk revision 5
+
+Muk pasted a second [[Sources/Prompts/2026-10-21-pasted-presentation-review-2.txt|review]] and said the notebook may push back where it knows the AI4R planning better. The notebook applied most of it and kept three positions. The worked example (a clustering capability, factory call and product call) is a new slide. Source acquisition is a separate capsule that supplies a pinned snapshot to the factory, which matches Muk's earlier statement that finding and acquiring source should be its own plannable CC; the PRD already bars intake cloning and keeps the Builder offline, so this needs its own authorized path. A capsule may expose one operation or a coherent set, which fits the capsule schema's many unit sizes. The reviewer's request to state the 98.1% metric could not be met from the notes, so the slide says "reported score" and points to the paper. See [[Designs/Paper2Agent Briefing/presentation/README]].
+
+## Talk revision 6
+
+Muk then asked to shorten the presentation, with about ten slides being enough and "super short". The notebook read that as ten slides in the file and cut the talk to about six minutes. See [[Designs/Paper2Agent Briefing/presentation/README]].
+
+## Talk revision 7
+
+Muk pasted a design review and asked to keep the core ideas and not lose the plot. The notebook rebuilt the deck with native PowerPoint shapes (build_pptx.py) in an indigo and teal palette, with amber used only for limits. Positions kept against the review: (1) the before-and-after panels are folded into the worked-example slide, because a separate before-and-after slide would repeat it and Muk asked for about ten slides; (2) the coupling diagram stays in the main talk as slide 7, because Muk asked for a diagram showing where leakage and methodology issues appear, and the review moved limits to backup; (3) the three metrics keep their denominators and the "not re-checked" source line, because the numbers are still unverified; (4) the pipeline uses the repository's six stages with mount-and-run folded into Check, and the fresh verifier's repair ability stays visible on that stage. Core ideas kept: answer first (title slide), what it does, how it works, reported evidence, value, capsule fit, one limit, next step. See [[Designs/Paper2Agent Briefing/presentation/README]].
+
+## Talk revision 8
+
+Muk required the talk to start with the value of Paper2Agent to AI4Research, covering the value of the idea and the methodology without a deep dive, and not to diverge from the core intent. The core intent, from Muk's first request, is a short talk on the value of Paper2Agent and its connection to AI4Research, with a workflow diagram and a diagram of where leakage and methodology issues appear. Revision 8 puts value on slide 2 and keeps every other slide serving value, how it works, connection or the one limit. See [[Designs/Paper2Agent Briefing/presentation/README]].
+
+## October 21 factory integration and withdrawn talk revision
+
+Muk's [[Sources/Prompts/2026-10-21-capability-factory-integration.txt|October 21 message]] asks to integrate the Factory document and ensure the documents are in good condition. The pasted recap reports that rev8 was copied to Desktop and suggests a one-page feature definition as a next step; those are prior assistant words, not a new factory admission, ownership assignment, or implementation result. We treat Muk's request as authorization to integrate the existing proposal into the notebook reading route and presentation while keeping the detailed plan intact.
+
+[[Designs/Capability Capsule Factory Feature]] is the short entrypoint. [[Designs/Paper2Agent Capability Factory]] remains the stage/source note; [[Designs/AI4Research Capability Growth]] covers architecture changes and whole-system improvement. Withdrawn revision 9 of the talk made the three identities visible (factory stages, generated product CCs, resources) and kept two boundaries explicit: generated products need independent admission, and acquisition needs a separately authorized preparation path because our M1 intake cannot clone from the internet. The proposed flat pilot and future composite are distinguished. This is documentation alignment, not an M1 design amendment or runtime evidence.
+
+## October 21 detailed infrastructure direction
+
+The exact [[Sources/Prompts/2026-10-21-vm-capsule-factory-design-plan.txt|October 21 request]] set full CC containerization as the detailed design target. Every VM owns an evolving AI4R, factory and Docker images. Projects evolve independently; selected CC/platform improvements may return to the tested master base. Expected low overhead is a working assumption to measure. [[Designs/Lab Capsule and Factory Design Plan]] defines next work. At that point this superseded optional-carrier framing while preserving the bounded pilot and M1 authority. The current high-level lab overview above leaves deployment details open while retaining this proposal as a possible realization.
+
+## M2 scope correction and Docker review
+
+The [[Sources/Prompts/2026-10-21-m2-scope-clarification.txt|user correction]] places all VM/container/factory architecture in M2. M1 constraints describe the starting baseline, not M2 exclusions or a gate on design. [[Designs/Docker Architecture Review and Feasibility]] reviews actual Docker mechanics; [[Designs/Lab Capsule and Factory Design Plan]] now contains concrete provisioning and development slices.
+
+## Spark constraints and shared resources
+
+The exact [[Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt|request]] fixes the development machine as a 128 GB unified-memory GB10 Spark with a 2 TB SSD and reports observed image bloat on another machine. Models/inference should be central rather than duplicated per VM. [[Designs/Spark Shared Services and Storage]] defines shared acquisition, bounded working sets, capacity reservations and retained provenance during factory/generalist iteration. No Spark measurement is implied.
+
+## M1 coder prompt and notebook placement
+
+The user asks for a small, portable filename-only M1 benchmark/CI prompt closely matching the existing design. It now lives at [[Resources/Coder Prompts/benchmark-runner]], separate from M2 architecture. The original root file was moved; coder-facing text is unchanged. The user-reported working M1 machine is a separate source of runtime evidence, not proof that this workstation or the Spark has passed qualification.
+
+## Standalone, human-judged benchmark-runner
+
+The initial standalone interpretation of the three requests is superseded by [[Sources/Prompts/2026-10-22-benchmark-runner-branch-and-runtime-safety.txt|the branch/runtime clarification]]. [[Resources/Coder Prompts/benchmark-runner]] belongs in our AI4Research branch of JiuwenSwarm. Normal authorized development changes there are allowed; the protection applies during benchmark execution, which must never overwrite user files or mutate original projects/live state. It selects isolated branches/targets, runs cases in parallel and exports evidence for human judgment. Developers and developer-commanded agents are authorized callers. Automatic external scoring and M2 lab/factory implementation are not required. Codex authentication remains an explicit human setup dependency.
+
+## Final M1 benchmark handoff
+
+The [[Sources/Prompts/2026-10-22-benchmark-main-app-alignment.txt|latest request]] explicitly requires necessary main-app changes when benchmarking is unsupported, plus careful context use and plain technical English. [[Resources/Coder Prompts/benchmark-runner]] now points to the inspected `ai4r_M1` branch, existing sidecar code and deployment gaps. Development must fix required integration; runtime still protects original checkouts and user files. The coder prompt is self-contained for M1 and omits future architecture dependencies. The inspected remote head was `7cc7c2d843bc4ac22a7e9e731dc0efb2e09439e3`; source inspection is not runtime validation. See [[Activities/2026-10-22 Final M1 Benchmark Prompt]].
+
+## Optional Spark deployment split
+
+The [[Sources/Prompts/2026-10-22-spark-benchmark-setup-approved-plan.txt|approved plan]] creates [[Resources/Coder Prompts/spark-benchmark-setup]] for immediate direct-host Docker/Compose deployment. [[Resources/Coder Prompts/benchmark-runner]] retains case scheduling, comparisons and exports. Local inference is added only when needed. Practical storage headroom and owned cleanup apply now; M2 VMs, factories, registry and full capacity-controller services remain separate. This is a prompt/documentation delivery, not evidence that the Spark was accessed or qualified.
+
+## Prior multi-system proposal: superseded
+
+The earlier comparison proposal is retained in its original prompt captures and pre-edit snapshots. The current user direction below removes that delivery requirement and replaces it with one shared execution interface.
+
+## Runner usability and CLI-first scope
+
+The [[Sources/Prompts/2026-10-22-runner-cli-interface.txt|latest clarification and preference]] confirms an integrated runner package with a good interface and no collisions; the first version is CLI only. [[Resources/Coder Prompts/benchmark-runner]] now requires consistent commands, agent-readable JSON, helpful errors, an installed-command walkthrough and campaign ownership checks. Codex packaging remains target integration, not the runner deliverable. No web UI is requested for this version.
+
+## Current runner scope: tasks on AI4Research
+
+The [[Sources/Prompts/2026-10-22-ai4r-runner-scope.txt|latest correction]] narrows [[Resources/Coder Prompts/benchmark-runner]] to running tasks on AI4Research, collecting actual outputs/timing/usage and exporting evidence for human judgment. The CLI remains first. One documented versioned execution interface allows a hypothetical conforming system to work through configuration; no second product integration is required. The current coder prompts no longer prescribe a particular model provider or comparative target. [[Resources/Coder Prompts/spark-benchmark-setup]] deploys only AI4Research task instances. Earlier captures remain history, not current implementation scope.
+
+## Exact AI4R container and file layout
+
+The [[Sources/Prompts/2026-10-22-two-image-runner-layout.txt|latest exact layout]] fixes two images from AI4R: `ai4r` contains the app; `benchmark-runner` contains the runner CLI/queue/collection code and runs separately. User-supplied cases and inputs are mounted read-only into the runner; its persistent output bind mount points at the user's chosen host directory. The app receives only permitted task inputs and exposes actual artifact bytes through the shared interface. The runner automatically copies, verifies and records them on the mount; saved artifacts survive removal of both containers. App execution and collection have separate statuses. Files in container writable layers consume disk and are disposable, not automatically memory-only. Earlier host-installed-runner and replica requirements are superseded for this two-container deployment. Both coder prompts now state this explicitly. No Docker deployment was performed.
+
+## JiuwenSwarm reuse review
+
+[[Resources/Coder Prompts/benchmark-runner]] now identifies reusable app authentication/permission enforcement, sidecar client/ledger/evidence/cleanup and container settings. App policies stay in the app; the sidecar uses scoped client operations. Reviewed source is pinned in `Resources/review-batches/2026-10-22-runner-policy-reuse/source-receipt.json`. App-wheel inclusion of runner modules, required score mounts and bounded in-memory export helpers still need adaptation. These are source findings, not deployment results.
+
+## Shared prompt, code execution and observability
+
+The [[Sources/Prompts/2026-10-22-runner-code-observability.txt|latest direction]] makes the prompt explicitly for human and AI readers. [[Resources/Coder Prompts/benchmark-runner]] now requires declared executable steps and broad live/retained execution telemetry. Trusted runner setup/collection scripts run in owned sidecar workspaces; generated/untrusted task code uses the app execution boundary. Observations remain separate from human correctness assessment. Two-image deployment and persistent outputs are unchanged.
+
+## Durable labs as emerging projects
+
+The [[Sources/Prompts/2026-10-22-durable-startup-labs.txt|latest lab direction]] describes persistent labs as small startups/hackathon projects that accumulate data and capabilities, change models, undergo RSI and present results for future development. [[Designs/Durable Project Labs]] now owns this lifecycle. It supersedes disposable-lab framing: lab identity survives VM recovery, while deliberate forks get new identities. Broader candidate evolution, protected admission, consistent backup/restore and bounded storage are proposed M2 behavior; no infrastructure deployment or automatic activation is claimed. Immediate benchmark tooling remains separate.
+
+## Current runner delivery: sequential control and data plane
+
+The [[Sources/Prompts/2026-10-22-sequential-control-data-runner.txt|latest change]] prioritizes a small working app-testing tool. [[Resources/Coder Prompts/benchmark-runner]] is now one sequential control/data runner with one app container: it owns task sequencing, input transfer, execution observations and persistent artifact collection. Parallel execution, worker pools, leases and replicas are removed from first-delivery requirements. Existing code and essential telemetry are reused; advanced instrumentation is optional. The physical two-container separation remains, but the runner is an active campaign controller and data collector. Spark and current reading routes are aligned; M2 lab designs remain separate.
+
+## Nuwa presentation: same short format, different capability
+
+The [[Sources/Prompts/2026-10-22-nuwa-presentation-request.txt|latest presentation request]] asks for a separate Nuwa talk with the Paper2Agent considerations, similar length, value and inclusion. [[Designs/Nuwa Briefing/presentation/README]] delivers eight shown slides and two hidden backups, planned 5:50, with editable diagrams and notes. “numa” is interpreted as Nuwa from the preceding repository discussion. This changes the presentation deliverable, not the adopted architecture. The proposed integration follows the latest M2 factory context; it does not copy older M1 scope assumptions. No measured task benefit or integration is asserted.
+
+## Repository-owned benchmark operations
+
+The [[Sources/Prompts/2026-10-22-integrated-benchmark-operator-approved-plan.txt|approved implementation direction]] requires all executable deployment helpers in AI4R, an easy shared local/SSH command path and seven-day expiry of owned temporary resources only. Inputs, retained results, credentials, models and durable app/lab state are protected. Actual Spark testing is deferred; complete independent local checks and report unrun host checks. See [[Activities/2026-10-22 Integrated Benchmark Operator]] for the implemented code location and current validation.
+
+## Nuwa correction: preserve presentation principles, rebuild the subject
+
+The [[Sources/Prompts/2026-10-23-nuwa-person-to-skill-and-orange.txt|latest correction]] explicitly rejects filling the Paper2Agent talk as a template. Nuwa takes a person and produces a person-perspective skill. The [[Designs/Nuwa Briefing/presentation/README|orange revision]] now starts there, shows the person-specific layers and a Karpathy example, then connects the skill to existing AI4R reasoning steps, shortcomings and a bounded comparison. This supersedes the earlier factory-first narrative and visual palette while retaining a short, diagram-led talk. It does not change architecture or assert measured benefit.
+
+## Nuwa rev3: AI4R value is the central question
+
+The [[Sources/Prompts/2026-10-23-nuwa-ai4r-methodology-and-luna.txt|latest steering]] clarifies that AI4R is the point, not an optional connection. [[Designs/Nuwa Briefing/presentation/README|Rev3]] asks what Nuwa and its methodology can teach AI4R: source-linked procedure extraction, explicit failure conditions, disagreement, research directions and stronger checks. It adds a separate proposed M2 CC-factory pipeline slide and retains Nuwa's person-to-skill explanation. The user explicitly requested Luna adversarial review; its critiques led to conditional value claims, an untested-example label, separate qualification/admission and a generic-checklist control. This supersedes the interim optional-context framing, without adopting an implementation or claiming measured benefit.
+
+## Nuwa value immediately after the introduction
+
+The [[Sources/Prompts/2026-10-23-nuwa-value-second.txt|approved reorder]] moves the former AI4R-value slide 5 into position 2, shifts former 2–4 to 3–5, and preserves the remainder. [[Designs/Nuwa Briefing/presentation/README|Rev3]] retains all content, orange design, notes and 6:40 timing. This is a presentation-order change only.
+
+## Nuwa methodology as a third factory interface
+
+The [[Sources/Prompts/2026-10-23-nuwa-method-detail-three-factory-inputs.txt|latest direction]] requests concrete tables of mental models, decision rules, research sources and criteria, centered on methodology useful to AI4R. [[Designs/Nuwa Briefing/presentation/README|The revised rev3]] replaces its two broad explanation slides with those tables and presents three intended CC-factory inputs: a capability gap observed during a run; paper/repository/data; and a person name plus a target trait. These are distinct entry interfaces into one proposed lifecycle, with route-specific diagnosis, reproduction or research before shared candidate authoring, qualification and admission. A name/trait starts evidence discovery, and a gap starts diagnosis; neither proves a useful capability or grants promotion. This refines the earlier Nuwa-only branch into a shared interface view without claiming deployed interfaces or changing maintained runtime contracts.
+
+## Nuwa pipeline order and explicit value answer
+
+The [[Sources/Prompts/2026-10-23-nuwa-pipeline-order-explicit-value.txt|latest direction]] puts source exploration before the models/rules it produces. [[Designs/Nuwa Briefing/presentation/README|Rev3]] now gives a direct answer on slide 2: yes, useful as an evidence-backed capability-authoring design pattern. This is an assessment of design utility; measured AI4R task gains remain unproven. Research is slide 3, extraction slide 4; all later order and planned 7:20 timing remain.
+
+## Nuwa scope correction, 2026-10-23
+
+The latest direction narrows Nuwa's contribution to human-to-skill research/extraction as a possible person-plus-trait factory input. It supersedes the presentation's broader evidence-backed capability-authoring endorsement. AI4R retains its own capability evidence, tests and admission. Nuwa's small persona-fidelity evaluation and permissive structural checker do not establish task capability. This is presentation/design intent, not implementation or an empirical comparison of the systems.
+
+## October 23 supervised integration direction
+
+[[Activities/2026-10-23 Supervised M1 Integration]] records current authorization for local source integration and bounded corrections. A supervising agent assigns small tasks to Luna, checks their claims against later instructions and executable evidence, and records limits. RSI and model-router implementation belong to others; preserve their interfaces and document future merge checks. This supersedes older notebook-only scope descriptions for this session. No full audit or system acceptance is implied.
+
+## Final integration authorized after the new AI4R
+
+The later [[Sources/Prompts/2026-10-23-authorize-final-merges.txt|instruction]] authorizes final edits and merging after the new AI4R arrived. It supersedes keeping our source candidate separate solely because shared M1 was paused. Preserve incoming product changes, make final integration reviewable, and retain the same RSI/router ownership and qualification boundaries. See [[Activities/2026-10-23 Final M1 Merge]].

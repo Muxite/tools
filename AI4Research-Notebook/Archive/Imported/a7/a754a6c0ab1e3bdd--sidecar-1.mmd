@@ -1,0 +1,31 @@
+flowchart TB
+    O[Operator or authorized CI] -->|finite job| S
+    subgraph H[GB10 server host]
+      subgraph N[Private Docker network]
+        subgraph SC[Sidecar container]
+          S[Job coordinator]
+          B[Platform benchmark runner]
+          T[Test runner]
+          F[Referee scorer: separate OS identity]
+          S --> B
+          S --> T
+        end
+        A[App container]
+      end
+      X[Optional host-launcher executor function]
+      R[(Job results and evidence)]
+      L[(Protected labels and oracle)]
+      G[Separate report generator]
+      D[Docker and declared targets]
+    end
+    B -->|scoped benchmark token| A
+    T -->|scoped test token| A
+    S -->|job-scoped request| X
+    X -->|permitted operations| D
+    X --> R
+    B --> R
+    R --> F
+    L -->|referee only| F
+    F --> R
+    R --> G
+    G --> P[Audience-filtered reports]

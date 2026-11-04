@@ -1,0 +1,13 @@
+flowchart LR
+    I[Intake: request and files] --> IC[Intention Compiler node]
+    IC -->|research_brief| S{plan_source, set before the run}
+    S -->|static| T[Static template]
+    S -->|planned| P[Planner node]
+    T --> BG[Binder checks and plan gate]
+    P -->|plan_proposal| BG
+    BG -->|accepted| F[Frozen run_plan]
+    BG -->|planned plan rejected| H[Halt; start a linked second Intention Compiler attempt, the last one allowed]
+    BG -->|static template rejected| H2[Stop; recorded for human review]
+    F --> R[Research nodes, six, in Kahn order]
+    R --> D[Delivery node: exactly one in M1]
+    D --> O[Report and output directory]

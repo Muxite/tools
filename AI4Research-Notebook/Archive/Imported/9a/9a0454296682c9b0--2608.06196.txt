@@ -1,0 +1,1019 @@
+
+
+===== page 1 =====
+Comparative Approaches to Agent Retrieval over Large
+Skill Libraries
+Indivara Kolluru
+Praetorian
+ikolluru@andrew.cmu.edu
+Nathan Sportsman
+Praetorian
+nathan.sportsman@praetorian.com
+August 7, 2026
+Abstract
+Agents backed by large skill libraries must decide which skills to load and in what order. Loading the
+entire library into context is expensive and provides no structure for autonomous sequencing. We
+study two systems for this problem over a corpus of 690 skills: a hybrid ranker combining lexical and
+dense-embedding retrieval for sparse, on-demand loading, and a typed knowledge graph encoding
+workflow relations such as prerequisites, data flow, and ordering. On a set of 117 realistic, non-
+echoing queries, the hybrid ranker retrieves the correct skill within the top five in 73.5%±8.0 of cases,
+leaving roughly a quarter of queries unserved. When used as the design intended (substituting graph
+neighbours for additional ranked results at matched token budget), the graph is significantly worse
+(−11.2 points, p = 0.0007). Its LLM-generated edge layer adds nothing over neighbours obtained
+free from a local embedding pass, and 73% of the queries the ranker misses are not reachable through
+the graph at all. We attribute this to a pre-filter topology bound. Because the graph’s candidate
+edges are drawn from the same embedding neighbourhood the ranker already searches, 98.6% of
+typed edges connect skills the ranker had already surfaced together. The graph can enrich relation
+semantics but cannot extend retrieval reach. We further show that evaluating on author-written
+queries overstates hit@5 by up to 44 points, which would have hidden these results entirely. Our
+contribution is a mechanistic account of why added structure does not improve retrieval over a
+strong ranker, and identify the conditions under which adding structural interdependence into the
+retrieval is optimal.
+arXiv:2608.06196v1  [cs.AI]  6 Aug 2026
+
+
+===== page 2 =====
+1
+Introduction
+Modern AI agents increasingly rely on libraries of reusable
+skills:
+self-contained instruction files, each describing
+how to perform one capability, loaded into context when
+needed. As libraries grow, and ours holds 690 skills across
+five departments, two questions arise: which skills to load,
+and in what order.
+The naive answer to the first question is to load ev-
+erything, which in our corpus costs ∼46.9k tokens per
+task, paid on every invocation regardless of need. Any
+serious system must beat that cost, and doing so moti-
+vated this work. Our effort produced two systems aimed
+at the same goal of getting an agent the right skills with-
+out loading the library.
+The first, and the one we set
+out to build, is a typed knowledge graph over the li-
+brary, encoding workflow structure that a flat ranked list
+cannot represent: which skill is a prerequisite for which,
+whose output feeds whose input, what comes before what.
+The second is a hybrid ranker: BM25 lexical scoring
+fused with dense embedding similarity, serving sparse on-
+demand retrieval. Both are outputs of one investigation,
+and this paper reports what we learned by building each
+and then comparing them.
+We situate both systems in the loading problem they
+address.
+An agent’s skill library is a set of SKILL.md
+files, each a capability described by a name and a one-
+line description in its frontmatter, plus metadata (de-
+partment, category, tags, and hand-authored related-skill
+references). The library is reached through a gateway of
+meta-tools rather than by loading files directly, and there
+is no “load all skills” path: an agent would otherwise have
+to pull every skill’s discovery row into context, and that
+is the baseline both our systems improve on.
+Two access routes define the setting. In the pull route,
+the agent issues a query and receives a ranked list of can-
+didate skills, resolving only those it needs; this is the route
+the ranker (§3) serves and the one this paper evaluates.
+A second push route, in which a per-turn hook injects
+an advisory list of candidate skills without loading them,
+exists in the same system but is not evaluated here. Both
+routes are query-conditioned: they answer “which skill
+matches this request?” Neither answers “given the skill I
+am now using, what comes next?”, the gap the knowledge
+graph (§2) is designed to fill, and the distinction the rest
+of the paper turns on.
+The paper follows one line of argument. We present the
+knowledge graph and its edge-generation pipeline (§2),
+then the hybrid ranker it is measured against (§3), then
+the head-to-head comparison and its explanation (§5),
+and finally what that explanation implies (§6).
+The
+thread connecting these sections is a single claim in two
+parts: retrieval is not solved, and the graph nonetheless
+does not improve it, for a structural reason we make pre-
+cise.
+Contributions.
+1. The pre-filter topology bound (§5.3): a mech-
+anistic, reproducible result that drawing a knowl-
+edge graph’s candidate edges from an embedding’s
+nearest-neighbours caps the graph at that embed-
+ding’s own topology; the language model can add
+semantics to an edge but cannot extend the graph’s
+reach.
+2. Five
+converging
+measurements
+(§5.4):
+at
+matched token budget, substituting graph neigh-
+bours for additional ranked results is significantly
+worse (p = 0.0007); the LLM edge layer adds noth-
+ing over free embedding neighbours; 73% of missed
+queries are unreachable through the graph; search re-
+covers 2× more often where the entry guess is wrong.
+3. Author-written query sets inflate retrieval ac-
+curacy (§5.2): the same ranker and catalogue score
+44 points higher (keyword) and 21 points higher (hy-
+brid) on an author-written query set than on a non-
+echo set, a transferable methodological result.
+4. The
+method
+and
+its
+cost (§2.2):
+LLM-at-
+add-time typed-edge generation,
+producing 1421
+typed edges for ∼$2.70, hash-cached, cycle-safe,
+provenance-tagged, and reproducible, with an ex-
+haustive 8.5% direction-error census.
+The method
+works; the ranker is simply the better fit for entry
+retrieval.
+2
+Approach: A Typed Knowledge
+Graph
+We describe the graph’s edge model and its edge-
+generating pipeline and report the generator’s coverage,
+cost, and edge precision.
+2.1
+The edge model
+The graph has three edge layers, which differ in prove-
+nance and in how far we trust them.
+Curated edges
+are meaningful workflow relationships, hand-authored or
+LLM-generated. Derived edges come from each skill’s
+related metadata. Inferred similar to edges are em-
+bedding nearest-neighbours, the automatic backbone.
+The curated layer has eight typed relations.
+Each
+carries a traversal priority rather than a continuous
+weight:
+requires (→, prereq), specializes (→, IS-
+A), feeds into (→, data flow), routes to (→, hand-
+off),
+precedes (→,
+soft order),
+complements (↔),
+alternative to (↔), and verifies (→).
+An author
+writes one direction.
+The runtime indexes both end-
+points, so the edge set never doubles. That rule avoids
+hand-mirroring every edge, an O(N 2) burden that stalled
+an earlier Go-based attempt after wiring only 16 of 134
+skills. Four types (requires, specializes, feeds into,
+precedes) must stay acyclic.
+2
+
+
+===== page 3 =====
+In the current corpus, the curated and derived layers
+are both empty: only 1 of 689 skills declares related
+metadata, and no hand-authored edges exist. All active
+edges are LLM-generated (1421) or embedding-inferred
+(1626). The design ranks curated above llm, so a hand-
+authored edge overrides a model’s guess; this is the mech-
+anism that licences shipping the LLM layer at all. With
+zero curated edges, that override is implemented but un-
+exercised.
+The similar to backbone links each skill to its near-
+est neighbours in embedding space. Write ˆea for the L2-
+normalised embedding of skill a. Cosine similarity is then
+the dot product
+sim(a, b) = ˆea · ˆeb.
+(1)
+The neighbourhood NK(a) of skill a is the set of its K=8
+highest-similarity neighbours whose similarity also meets
+a threshold τ = 0.5:
+NK(a) = top- K b̸=a { b : sim(a, b) ≥τ },
+(2)
+yielding 1626 pairs over 690 nodes. Only id-pairs enter
+the committed graph. The scores stay in a seed file, so
+floating-point noise never churns the graph.
+2.2
+Edge generation
+Why not learn edges from usage first?
+The best
+evidence that two skills are related is that people use
+them together. That was our first approach: read the or-
+ganisation’s version-control history, find sequences where
+one skill follows another, and draw an edge wherever
+a pairing recurs.
+Two problems made it impractical.
+Counting co-occurrence needs one place where all the se-
+quences are logged, and none existed yet. And usage only
+shows what follows what, which suffices for precedes and
+complements, but a sequence never reveals that A re-
+quires B, or that A is a special case of B. A new skill
+also has no history to learn from. We therefore switched
+to asking a model when a skill is added, which needs no
+history and works from the first skill. We return to the us-
+age approach in §6.6: the missing sink has since shipped,
+and it is retained in the design as a future learned prove-
+nance.
+Coarse-to-fine generation.
+When a skill is added, we
+first take its top-K=8 embedding neighbours; that is the
+coarse step.
+We then make one call to an inexpensive
+model (claude-haiku-4-5) under forced tool use.
+It
+returns typed edges through an emit edges tool whose
+schema pins each type to the curated vocabulary; that is
+the fine step. We keep only curated types between tar-
+get and candidate, drop self-loops, and deduplicate. The
+neighbours are drawn across all departments, preserving
+cross-domain pivots while bounding cost to a constant K.
+Incremental
+cost.
+Each
+skill
+is
+keyed
+by
+sha256(description)[:16].
+Let ∆denote a set
+of skills added or edited, s a skill, hash(s) its current
+description hash, and hashprev(s) the hash recorded in
+the previous build artifact. The generator runs only for
+skills whose hash has changed, so the number of model
+calls is the count
+calls(∆) =
+{ s : hash(s)̸ = hashprev(s) }
+,
+(3)
+and adding one skill costs one call rather than a full re-
+build. An edge depends on both endpoints, but we key it
+on only one. It can therefore hold a stale view of its far
+endpoint until that skill is itself reprocessed. The edges
+are advisory, and they heal on the next build.
+Cycle-safety, provenance, determinism.
+A model
+can hallucinate a cycle, so we run a depth-first search
+and drop the back edges, separately for each acyclic type.
+Every edge carries provenance (empty for hand-authored,
+llm, or a reserved learned).
+Only one step is non-
+deterministic, the LLM call. It writes its output to an
+artifact, and the build then consumes that artifact deter-
+ministically, exactly as it consumes the embedding seeds.
+Build results (corpus = 690).
+The generator pro-
+duced 1421 typed edges with zero failed API calls in
+∼15.5 minutes; validation dropped 113 hallucinated cyclic
+edges, which keeps the acyclic types acyclic. Type dis-
+tribution: complements 390, feeds into 350, precedes
+242, routes to 128, requires 108, alternative to 101,
+specializes 89, verifies 13. (The shortlists came from
+a 639-era seed file, so about 50 newer skills received no
+edges. A refresh is pending; it will change coverage, not
+the results here.)
+Cost.
+At $1/M input and $5/M output tokens, the full
+backfill cost ∼$2.70, below the ∼$3 estimate; incremental
+cost is ∼$0.005 per edited skill. As §5.4 will show, this
+expenditure buys edges that add nothing over neighbours
+obtained free from a local embedding pass.
+Precision.
+Because edges are predicted, not observed,
+we audited 48 (6 per type), judging each from both
+endpoints as Correct/Plausible/Wrong. Loose precision
+(C+P) is 41/48 (∼85%); strict (C only) is 29/48 (60%).
+Those aggregates average over two populations that be-
+have differently.
+Figure 1 separates them by relation
+type, six edges each. Read that way, the three relations
+whose meaning does not depend on which endpoint comes
+first (requires, specializes, complements) are entirely
+correct-or-plausible, while the three whose meaning does
+(precedes, verifies, routes to) fall to 67–83%, with
+feeds into and alternative to in between. The single-
+number precision therefore understates the safe types and
+overstates the directional ones, and the split is ordered
+cleanly enough by directionality to suggest a systematic
+3
+
+
+===== page 4 =====
+0
+1
+2
+3
+4
+5
+6
+7
+8
+edges judged per type (6 sampled, 48 total)
+requires
+specializes
+complements
+feeds_into
+routes_to
+alternative_to
+precedes
+verifies
+100%
+100%
+100%
+83%
+83%
+83%
+67%
+67%
+Correct
+Plausible
+Wrong
+Figure 1: Most edge types are accurate; direction-based types miss more. Per-type audit verdicts (n=48, six per
+type); percentages are the correct-or-plausible share.
+error mode rather than sampling noise. §6.3 confirms this
+at population scale, where every contradiction category
+turns out to be a direction disagreement.
+3
+Skill Retrieval by Ranking
+Having built the graph, we turn to the other product of
+this work, the hybrid ranker that serves the pull route
+introduced in Section 1. It is the baseline we measure
+the graph against. This section describes the ranker and
+the efficiency of sparse loading; the retrieval accuracy it
+achieves, and the headroom it leaves, are reported in §5.
+What the ranker scores.
+The ranker scores catalogue
+entries of {id, kind, name, description, path}. It
+never returns path, so it scores each capability on
+name + description alone: one line of frontmatter. As
+noted in Section 4, the 690 full skill bodies are indexed by
+neither the ranker nor the edge generator; a sibling effort
+found that indexing bodies degrades retrieval under this
+short-context encoder.
+Three rankers.
+Keyword (BM25) [4] is dependency-
+free and always available, strong on exact identifiers and
+rare tokens, and serves as an off-topic gate.
+Seman-
+tic uses MiniLM vector similarity and is strong on para-
+phrase. Hybrid fuses the two and is our production de-
+fault. The embedding model is all-MiniLM-L6-v2 [3] at
+a pinned revision: 384-dim, mean-pooled, L2-normalised
+so cosine equals the dot product. It is the same model
+and revision the graph’s similar to layer uses, and the
+topology bound (§5.3) turns out to depend on that. This
+shared embedding is not incidental: both systems rest
+on the same similarity signal, which is exactly why one
+bounds the other.
+3.1
+The efficiency win, and the question
+it raises
+load everything
+(naive)
+search
+on demand
+graph
+traversal
+102
+103
+104
+105
+tokens per task
+(context window cost)
+46,915
+560
+330
+~99% cost
+Figure 2: Tokens per task (690 nodes), logarithmic axis.
+The payoff of sparse ranked loading is large and direct.
+The naive load-all harness costs 46,915 tokens per task
+(875 catalogue rows), while retrieving on demand costs
+∼560, a 98.8% reduction.
+Figure 2 compares all three
+regimes on one logarithmic axis. Search on demand and
+graph traversal cost almost the same, and both cost two
+orders of magnitude less than loading everything, so the
+saving comes from loading less rather than from loading
+smarter. Paired with hit@5 of 0.735 on realistic queries
+(§5.1), the ranker is a deployable improvement over the
+naive baseline on its own, though it leaves real room for
+improvement.
+That efficiency sharpens the second question. Sparse
+loading solves cost, but the ranker still misses roughly a
+quarter of realistic queries, so there is retrieval headroom
+for added structure to capture.
+The knowledge graph
+4
+
+
+===== page 5 =====
+encodes workflow relations a ranker does not represent,
+and the rest of the paper tests whether that structure
+closes the gap.
+4
+Dataset
+All measurements are taken on one skill library and one
+evaluation.
+Corpus.
+The library contains 690 skills across five de-
+partments at the time of our edge-generation run; earlier
+retrieval measurements were taken at 639 skills, as the
+corpus grows by daily import. We state the corpus size
+at each measurement rather than as a single figure. Each
+skill contributes one node; department, category, and tags
+are node attributes, not edges. The full skill bodies are not
+indexed by either system; the ranker and the edge gener-
+ator both read only the one-line description. A sibling
+effort tested body indexing separately and found it de-
+grades retrieval under this short-context encoder, though
+contemporaneous work at larger scale reports the oppo-
+site [6]; we treat this direction as open (§6.6).
+Evaluation sets.
+We measure retrieval on two query
+sets, and the contrast between them is itself a find-
+ing (§5.2). The primary set holds 117 natural-language
+queries.
+Each maps to a verified expected skill and is
+tagged direct, paraphrase, or indirect, and an integrity test
+rejects any query that echoes a skill’s description. We use
+it for every headline retrieval number, and we credit the
+sibling effort that built it. The second is a 37-query set
+written by the authors while reading the corpus, reported
+only to quantify the inflation that author-written queries
+introduce. Edge precision is measured on a separate sam-
+ple of 48 generated edges, six per type (§5).
+5
+Experiments and Results
+We now compare the two systems. We first report re-
+trieval accuracy (§5.1) and the inflation an author-written
+query set would have introduced (§5.2). We then present
+the pre-filter topology bound that structurally predicts
+the graph’s failure (§5.3), and finally test five graph us-
+age modes against that prediction (§5.4).
+5.1
+Retrieval accuracy
+Table 1: Retrieval on the 117-query non-echo set. Hybrid
+leaves 26.5% of queries unserved at top-5.
+Ranker
+top-1
+top-5
+indirect top-5
+keyword (BM25)
+0.274
+0.504
+0.419
+hybrid (default)
+0.504 0.735
+0.628
+We evaluate on the retrieval set:1 117 task-to-skill cases
+across roughly 15 domains, a catalogue of 875 entries,
+k=5.
+Its authors worded the queries deliberately not
+to echo the target skill’s description, tagged each direct,
+paraphrase, or indirect, and added an integrity test that
+rejects echoing queries. Table 1 reports the result. The
+production hybrid ranker retrieves the correct skill into
+the top five for 73.5% of queries, and for only 62.8% when
+the user describes a symptom rather than naming the
+skill. Retrieval is therefore not solved: roughly 31 of 117
+queries are still yet to be answered.
+5.2
+Author-written query sets inflate re-
+trieval accuracy
+The graph-boost result depends on measuring retrieval
+accurately, which proved to be the harder problem. An
+earlier version of this work used a 37-query set written by
+the same author who built the system. Evaluated with
+the same ranker and catalogue, that set reports hit@5 of
+0.946 for both keyword and hybrid, far above the non-
+echo figures of 0.504 and 0.735. The gap is 44.2 points
+for keyword and 21.1 points for hybrid. Figure 3 sets the
+two query sets side by side for each ranker. The gaps are
+unequal enough to change the ordering: on the author-
+written set the two rankers are level, and on the non-
+echo set they separate by more than 23 points. Only the
+queries change between the two conditions, so an evalua-
+tion built the natural way would have reported not merely
+inflated accuracy but a false equivalence between a lexical
+baseline and the production ranker.
+keyword
+hybrid
+0%
+50%
+100%
+hit@5
+(correct skill in top 5)
+95%
+50%
++44 pts
+95%
+74%
++21 pts
+author-written set (37 q)
+non-echo set (117 q)
+Figure 3: Author-written queries inflate retrieval ac-
+curacy. hit@5 on the author-written (37-query) and non-echo
+(117-query) sets; only the queries differ.
+The mechanism is description echo.
+Queries written
+1The 117-query non-echo evaluation set was constructed by a
+sibling team within the organisation. It is included in the reposi-
+tory; we did not control its construction but verified its integrity
+test.
+5
+
+
+===== page 6 =====
+while reading the corpus reuse the vocabulary of the de-
+scriptions being searched, and because BM25 scores exact
+term overlap, an echoing query approximates a primary-
+key lookup. This is why keyword collapses hardest when
+the echo is removed. We report both query sets rather
+than silently adopting the non-echo one, because the delta
+is itself the finding: a naive author-written evaluation
+would have reported near-perfect retrieval and hidden the
+headroom the graph then fails to capture.
+5.3
+The pre-filter topology bound
+This is the paper’s core structural finding, and we present
+it before the graph usage experiments because it predicts
+their outcome. The coarse-to-fine design was presented as
+a cost bound; it is also a topology bound, not previously
+recognised.
+Typed edges do not change reachability.
+Adding
+all 1421 typed edges to the inferred backbone leaves the
+graph’s connectivity essentially unchanged. Table 2 gives
+the three layer sets side by side; the last two rows are the
+comparison that matters. Adding all 1421 typed edges
+to similar to leaves wired nodes at 594 (zero newly
+connected) and components at 112 (zero merged). The
+largest component is unchanged, and 3-hop mean reach
+rises 2.4%. Figure 4 shows the same three metrics before
+and after. An entire layer of 1421 edges is added, and the
+structure it was supposed to create does not appear.
+Table 2:
+Graph structure by layer set (reach over wired
+nodes, undirected).
+Adding the typed layer to similar to
+changes no connectivity metric.
+layer set
+wired
+comps largest singles 3-hop
+typed only
+524/690
+190
+441
+166
+29.6
+similar to
+594/690
+112
+544
+96
+66.2
+all layers
+594/690
+112
+544
+96
+67.8
+skills with
+at least 1 edge
+separate
+clusters
+average 3-hop
+reach (nodes)
+0
+100
+200
+300
+400
+500
+600
+700
+594
+594
+no change
+112
+112
+no change
+66.2
+67.8
+similarity edges only
++ all 1421 typed edges
+Figure 4: Connectivity of the inferred backbone before and
+after adding all 1421 typed edges.
+The mechanism, measured.
+Of 1022 distinct typed
+pairs, 1008 (98.6%) are also similar to pairs; only 14
+(1.4%) fall outside, attributable to seed/corpus drift (in-
+ference, not measurement).
+Figure 5 shows that split.
+The 1.4% is not novel structure the model found; it is
+drift between the seed file and the current corpus. Be-
+cause the candidate shortlist is the embedding top-K, a
+typed edge can only ever be proposed between skills the
+embedding layer already connected.
+98.6% connect skills search already links
+1.4% seed/corpus drift
+Figure 5: Share of the 1022 distinct typed pairs that also
+appear as similar to pairs.
+Topology bound (general property of the
+method class). When LLM edge generation draws
+candidates from an embedding’s top-K neighbours,
+the resulting graph is confined to that embedding’s
+topology. The LLM can enrich semantics by assign-
+ing a typed relation to a pair, but it cannot add
+reach, because it is never shown a pair the embed-
+ding did not already surface. Any method that pre-
+filters candidates by the same signal the ranker uses
+inherits this ceiling.
+The topology bound predicts two things: re-ranking
+can only reshuffle within the ranker’s own candidate set,
+so no retrieval improvement is mechanistically available;
+and graph neighbours at matched budget should under-
+perform ranked results, because the graph draws from a
+subset of the same signal. The next section tests both
+predictions.
+5.4
+Graph usage experiments
+We test the graph in every plausible usage mode. Table 3
+and Figure 6 report the full ladder; the graph cannot
+retrieve without a ranker, so every graph arm calls hybrid
+to pick its entry point.
+Table 3: Performance ladder on the 117-query non-echo set.
+Every graph arm uses hybrid internally for entry selection.
+arm
+hit@5 note
+graph alone (no ranker)
+0.009 ≈chance
+hybrid@1
+0.504 search, 1 cand
+hybrid@1 + graph (6)
+0.632 search+graph
+hybrid@6
+0.744 search, 6 cands
+hybrid@10
+0.803 search, 10 cands
+Substitution at matched budget.
+The apples-to-
+apples question is: given room for N candidates, should
+6
+
+
+===== page 7 =====
+0.0
+0.1
+0.2
+0.3
+0.4
+0.5
+0.6
+0.7
+0.8
+hit@5 (fraction of queries where the correct skill
+appears in the top 5 results)
+graph alone
+(no ranker)
+hybrid@1
+hybrid@1
++ graph nbrs (6)
+hybrid@6
+hybrid@10
+0.009
+0.504
+0.632
+0.744
+0.803
+chance
+Figure 6: Performance ladder. At matched budget (6 can-
+didates), graph neighbours significantly underperform addi-
+tional ranked results.
+they be N ranked results or 1 result plus N−1 neigh-
+bours?
+At budget 6, hybrid@1+graph(6) scores 0.632
+against hybrid@6 at 0.744, a deficit of 11.2 points (Mc-
+Nemar p = 0.0007). The graph is significantly worse at
+matched budget on this corpus. The improvement over
+hybrid@1 (0.504 →0.632) reflects the value of having any
+additional candidates, not the value of graph structure.
+The LLM edge layer adds nothing over free neigh-
+bours.
+At budget 6, varying only which edge layer sup-
+plies the neighbours: similar to alone (free local kNN)
+scores 0.632; typed edges alone (the 1421 LLM-generated
+edges) score 0.607; both layers together score 0.632. The
+entire LLM edge-generation step (1421 edges, ∼$2.70,
+eight curated types) contributes zero measurable retrieval
+value over neighbours obtained free from a local embed-
+ding pass. This is the topology bound expressed as an
+outcome rather than a structural statistic.
+73% of missed queries are unreachable.
+Of the 30
+queries hybrid@6 misses, we measure reachability from
+hybrid’s top-1 result through the graph:
+6 (20%) are
+reachable within 1 hop, 2 (7%) at 3 hops, and 22 (73%)
+are unreachable within 3 hops. The headroom is struc-
+turally out of the graph’s reach at any ranking or edge
+quality; no amount of scoring improvement connects a
+target that is not connected.
+Where the entry guess is wrong, search recovers
+twice as often.
+Conditioning on whether hybrid’s top-
+1 result is correct: when the entry is correct (n=59),
+both arms score 1.000 trivially. When the entry is wrong
+(n=58), retrieving more ranked results recovers 48.3% of
+cases while graph neighbours recover 25.9%. The graph
+underperforms precisely where help is needed.
+Re-ranking (graph-boost) is a null.
+For complete-
+ness, we also test re-ranking the ranker’s output by
+spreading activation over the graph. Hybrid gains a sin-
+gle query in 117 (+0.85 points; 6 gained, 5 lost; McNemar
+p ≈1.000; 95% interval −4.8 to +6.5 points). This is a
+null: no evidence of an effect of either sign.
+6
+Discussion and Analysis
+6.1
+Why ranking is better at every usage
+mode
+Three mechanisms explain why five independent measure-
+ments converge.
+First, search is query-conditioned; the graph is
+not. Search ranks 690 capabilities against the user’s ac-
+tual task text; graph adjacency is fixed at build time. For
+“select the right skill for this task,” search has strictly
+more information.
+Second, the topology bound (§5.3) confines the
+graph to a strict subset of the ranker’s signal. The
+LLM edge layer adds zero reach (Table 2), zero retrieval
+value over free kNN (§5.4), and 73% of the queries the
+ranker misses are not reachable through the graph at all.
+A truncated view of a signal cannot beat the signal.
+Third, hybrid fusion already covers both failure
+modes the graph might have patched: the semantic chan-
+nel covers paraphrase gaps and BM25 covers lexical drift,
+which is why keyword sheds 44 points when echo is re-
+moved but hybrid sheds only 21 (Figure 3). The residual
+headroom that a “graph rescues buried queries” narrative
+would require has already been absorbed by the fusion.
+6.2
+Statistical power: the null is a bound,
+not a shortfall
+The substitution arm is significant (p = 0.0007); it is the
+re-ranking arm that requires care. Table 1 reports hit@5
+of 0.735; its 95% half-width is ±8.0 points at n=117. On
+the re-ranking arm, the graph-boost difference is +0.9
+points (Newcombe 95% interval −4.8 to +6.5; exact Mc-
+Nemar p = 1.000).
+The interval excludes gains larger
+than roughly 6.5 points, so re-ranking cannot recover
+more than about a quarter of the 26.5-point headroom.
+What the null supplies is an upper bound on the ef-
+fect, not a demonstration that the effect is exactly zero.
+Per-phrasing strata (n=30–44) are too small to support
+any sub-group conclusion; the mechanism, not the sample
+size, is what makes the aggregate null strong.
+6.3
+Direction-error census
+The direction-reversal mode visible per type in Figure 1
+is confirmed at population scale. Of 1022 distinct pairs,
+298 (29.2%) carry more than one type.
+Of those, 87
+(8.5% of all pairs) are contradictory. Twenty carry the
+same asymmetric type in both directions, which is an un-
+ambiguous error needing no semantic judgement. Every
+contradiction category is a direction disagreement (e.g.
+7
+
+
+===== page 8 =====
+20 routes to-vs-routes to reversed; 17 feeds into-vs-
+precedes reversed), so the 48-edge audit and the 1022-
+pair census agree on which relations fail and on how they
+fail.
+The implication for any product use is concrete:
+shipping “do X before Y ” guidance at 8.5% reversed is
+worse than shipping nothing, because a wrong prerequi-
+site actively misleads.
+6.4
+When the knowledge graph would be
+more beneficial
+Everything above concerns retrieval. The graph’s remain-
+ing structural case is on ordering: the question of what
+skill follows the current one, which retrieval does not pose.
+Consider a task needing n skills in sequence. Repeated
+search succeeds with probability pn; graph traversal suc-
+ceeds with p · q n−1, where q is per-hop edge accuracy.
+The graph wins iff q > p.
+The directional edge types
+that an ordering consumer would read run 0.67–0.83 ac-
+curacy, which straddles the p=0.735 threshold. Our num-
+bers cannot settle whether traversal beats repeated search
+for ordering; the question requires a skill-to-skill sequence
+dataset that does not yet exist and an 8.5% direction-
+error rate that is unmet. This is future work, not a rescue
+for entry retrieval.
+The graph need not outperform search to be useful:
+enriching resolve skill so that an agent loading a skill
+also receives its prerequisites, next-steps, and alternatives
+is an additive change with no adoption cost, provided the
+direction-error rate is first reduced.
+6.5
+Threats to validity
+We surface the threats a careful reviewer will raise. The
+primary evaluation set has 117 queries; one query is
+∼0.85pp of hit@5.
+The non-echo set and its integrity
+test were built by a sibling effort, not by us, which re-
+moves the author-echo bias but means we did not control
+its construction.
+The precision audit behind Figure 1
+is n=48, single-judge, and description-only, which is why
+the 87 structural contradictions (immune to this critique)
+carry the weight. No latency was measured. We never
+tested sufficiency: every cost arm counts rows rather than
+completed tasks. Our metric is single-gold hit@5; under
+it, a graph that supplies a needed prerequisite but dis-
+places the gold skill from the top five scores as a loss.
+Finally, this is a single corpus, single organisation, single
+embedding model: no claim about other libraries, scales,
+or backends is supported.
+6.6
+Future work
+In priority order.
+Co-usage telemetry:
+an ordered
+skill-call log has shipped to production; observed co-usage
+is orthogonal to the embedding and is the one remaining
+candidate signal that is not embedding-confined. It could
+in principle break the topology bound. The sequence
+and sufficiency experiment is the load-bearing miss-
+ing test.
+A harness exists that measures next-skill in-
+vocation with and without typed data; the decisive ex-
+periment is buildable but needs runtime wiring and must
+first resolve a known backfire effect from the suggestion
+hook.
+Candidate generation beyond top-K is the
+only route that could give the graph reach the ranker
+lacks. A graph-native retrieval system: the topology
+bound shows that an embedding-confined graph cannot
+extend retrieval reach; a system that generates candidate
+edges from sources beyond the embedding kNN (e.g. co-
+usage logs, dependency metadata, or cross-modal signals)
+could in principle break this ceiling and provide a retrieval
+mechanism that complements rather than duplicates the
+ranker.
+Disambiguation at scale: at larger corpus
+sizes where embedding neighbourhoods grow denser, clus-
+ters of near-identical skills may become harder for the
+ranker to distinguish; the disambiguation value of typed
+edges within such clusters warrants separate investiga-
+tion. Body indexing under a long-context encoder:
+a sibling effort found that indexing bodies reduces re-
+trieval under our 256-word-piece encoder, but Zheng et al.
+[6] report the opposite at scale, so we treat this direction
+as reopened rather than closed.
+7
+Related Work
+Two contemporaneous systems address our exact set-
+ting, retrieval over a library of SKILL.md files, and reach
+positive conclusions where we reach a negative.
+Skill-
+Router [6] studies retrieval over ∼80K skills and re-
+ports that the full implementation body, not the front-
+matter description, is the decisive signal:
+removing it
+degrades retrieval by 29–44 points across every method
+they test.
+Their two-stage retrieve-and-rerank pipeline
+reaches 74.0% top-1. Graph-of-Skills (GoS) [2] builds
+a typed graph over a SKILL.md library and retrieves
+a dependency-aware bundle via hybrid semantic–lexical
+seeding and reverse-weighted Personalized PageRank, re-
+porting gains on SkillsBench and ALFWorld together
+with large token reductions.
+The divergence from our result lies in candidate gener-
+ation. GoS derives its edges from dependency structure
+in the skill packages, not from the retriever’s own em-
+bedding neighbourhood.
+Our generator does, and §5.3
+shows the consequence: 98.6% of typed pairs fall inside
+the similar to set the ranker already computes. More
+broadly, graph-augmented retrieval has shown gains in
+compositional and multi-hop settings [1, 5]; our result
+is notable precisely because it holds in a non-saturated
+single-hop regime, which the topology bound explains.
+8
+Conclusion
+We set out to improve how an agent selects skills from
+a large library, and built two systems toward that end.
+8
+
+
+===== page 9 =====
+Sparse ranked loading cuts context cost by roughly two
+orders of magnitude, a real and deployable gain. The in-
+troduction promised a two-part thread, and we close it
+here. Retrieval is not solved: on a non-echo set of 117 re-
+alistic queries the hybrid ranker reaches the correct skill
+for 73.5% of cases, leaving roughly a quarter unfulfilled.
+The graph does not close the gap, for a structural reason.
+Five measurements converge: at matched budget, graph
+neighbours are significantly worse than additional ranked
+results (p = 0.0007); the LLM edge layer adds nothing
+over free embedding neighbours; 73% of missed queries
+are unreachable through the graph; search recovers twice
+as often where the entry guess is wrong; and re-ranking
+with the graph is a null. The structural reason is that
+98.6% of the graph’s edges connect skills the embedding
+layer had already connected, so the pre-filter that makes
+edge generation affordable also bounds the graph’s topol-
+ogy.
+The method works: it is cheap, reproducible, and rea-
+sonably accurate.
+What does not hold is the premise
+that an embedding-confined graph improves on a strong
+ranker at entry retrieval. Establishing that structurally,
+and identifying candidate generation beyond the embed-
+ding kNN and co-usage telemetry as the directions that
+remain open, is the contribution.
+Reproducibility
+Repository
+praetorian-inc/palatine,
+tag
+skill-graph-paper-v2 (commit 17223a95).
+Every
+figure reported here reproduces from that tag and from
+no other point in the repository: the work was developed
+as a stack of six pull requests, each contributing only
+its own edge layer, and three defects surfaced only
+when they were merged.
+Setup, environment pins,
+and each command with its expected output are in
+docs/skill-graph-reproduction.md at that tag.
+No
+measurement requires an API call.
+Two caveats recorded there are worth surfacing. The
+repository’s graph and gateway CI workflows trigger only
+on pull requests targeting main; every branch in the
+stack targeted a sibling, so neither suite ever ran on
+this work and the local runs are the sole evidence. And
+the committed gateway bundle must be rebuilt (make
+gateway-build) before any retrieval measurement, since
+a stale bundle causes the semantic and hybrid arms to
+skip silently rather than fail.
+The 117-case non-echo retrieval dataset, its phrasing
+taxonomy, and the description-only vs. description-plus-
+body ablation are prior work by a sibling effort and ship
+on main; only the graph arms are ours.
+References
+[1] Darren Edge, Ha Trinh, Newman Cheng, Joshua
+Bradley, Alex Chao, Apurva Mody, Steven Truitt, and
+Jonathan Larson. From local to global: A graph RAG
+approach to query-focused summarization.
+arXiv
+preprint arXiv:2404.16130, 2024.
+[2] Dawei
+Liu,
+Zongxia
+Li,
+Hongyang
+Du,
+Xiyang
+Wu,
+Shihang Gui,
+Yongbei Kuang,
+and Lichao
+Sun.
+Graph-of-skills:
+Dependency-aware struc-
+tural retrieval for massive agent skills.
+arXiv
+preprint arXiv:2604.05333, 2026. v3, 27 May 2026.
+Code and data:
+https://github.com/davidliuk/
+graph-of-skills.
+[3] Nils Reimers and Iryna Gurevych. Sentence-BERT:
+Sentence embeddings using Siamese BERT-networks.
+In Proceedings of EMNLP-IJCNLP, 2019.
+[4] Stephen Robertson and Hugo Zaragoza. The prob-
+abilistic relevance framework:
+BM25 and beyond.
+Foundations and Trends in Information Retrieval, 3
+(4):333–389, 2009.
+[5] Qiao Xiao, Haochen Shi, Yisen Gao, Wenbin Hu, Hui-
+hao Jing, Tianshi Zheng, Baixuan Xu, Ziheng Zhang,
+Weiqi Wang, Haoran Li, Jiaxin Bai, and Yangqiu
+Song. SING: Synthetic intention graph for scalable
+active tool discovery in LLM agents. arXiv preprint
+arXiv:2606.16591, 2026.
+[6] YanZhao Zheng, ZhenTao Zhang, Chao Ma, Yuan-
+Qiang Yu, JiHuan Zhu, Baohua Dong, and Hangcheng
+Zhu.
+SkillRouter:
+Retrieve-and-rerank skill se-
+lection for LLM agents at scale.
+arXiv preprint
+arXiv:2603.22455, 2026. Alibaba Group.
+9

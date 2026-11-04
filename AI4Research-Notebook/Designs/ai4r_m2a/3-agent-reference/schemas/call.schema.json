@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai4r.local/schemas/m2a/call",
+  "title": "AI4R M2a call",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "2.0.0-m2a.2"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "project_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contract_ref": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "package_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "release_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "capability_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "input_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "uri": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "uri",
+          "sha256"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "environment_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "provider_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "scope": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "id",
+          "digest",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "admission_ref": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "policy_ref": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "required_check_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "authorized_effects": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_wall_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_cost_units": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cost_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_child_depth": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "max_attempts",
+        "max_wall_seconds",
+        "max_cost_units",
+        "cost_unit",
+        "max_child_depth"
+      ],
+      "additionalProperties": false
+    },
+    "idempotency_key": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "budget_reservation_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$"
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "mode": {
+      "enum": [
+        "standalone",
+        "ai4r"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "project_id",
+    "contract_ref",
+    "package_id",
+    "release_digest",
+    "capability_id",
+    "input_refs",
+    "environment_digest",
+    "provider_bindings",
+    "admission_ref",
+    "policy_ref",
+    "required_check_ids",
+    "authorized_effects",
+    "limits",
+    "idempotency_key",
+    "budget_reservation_id",
+    "deadline",
+    "mode"
+  ],
+  "additionalProperties": false
+}

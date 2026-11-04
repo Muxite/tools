@@ -1,0 +1,12 @@
+flowchart TB
+ G[Node gate or attempt outcome] -->|accepted| N[Dependents become eligible]
+ G -->|failed or blocked| F[Node failed]
+ F --> E[Escalation record written]
+ F --> S[Dependents marked skipped, reason = failed node]
+ N --> K[Ready independent nodes continue in Kahn order]
+ S --> K
+ K --> O{At run end, any failed node?}
+ O -->|no| C[Run completed]
+ O -->|yes| P[Run partial: accepted artifacts and evidence kept]
+ X[Protected run-level stop] --> H[Halt run, contain active work, preserve evidence]
+ H -->|when storage is available| E

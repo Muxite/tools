@@ -1,0 +1,72 @@
+PLEASE IMPLEMENT THIS PLAN:
+# First checkpoint: compare the lab designs
+
+Produce **one short comparison note and its diagrams first**. Use that to assess the design before expanding the deck or specifying implementation.
+
+## 1. Compare the lab boundary
+
+Both options contain a complete, independently versioned AI4R, including RSI, factory, research subsystems and containerized CCs. Shared inference can be on another machine.
+
+```mermaid
+flowchart TB
+    P["People"] --> A["Lab interface"]
+    P --> B["Lab interface"]
+
+    subgraph C["Option A: shared host kernel"]
+        A --> R1["Lab AI4R containers"]
+        R1 --> CC1["Containerized CCs"]
+        R1 --> D1["Persistent lab data"]
+    end
+
+    subgraph V["Option B: VM per lab"]
+        B --> R2["Complete lab AI4R"]
+        R2 --> CC2["Containerized CCs"]
+        R2 --> D2["Persistent lab data"]
+        S["Stable VM-local supervisor"] --> CC2
+    end
+
+    H["Host/provider control"] --> C
+    H -->|"Independent VM stop"| V
+    R1 --> M["Shared inference endpoint"]
+    R2 --> M
+```
+
+| Choice | Pros | Cons |
+|---|---|---|
+| **Shared-host container labs** | Lower overhead, simpler provisioning, efficient image sharing | Labs share a kernel and engine; administrative access requires tighter scoping; independent system changes are harder |
+| **VM per lab with containerized CCs** | Clear lab ownership, direct human VM access, independent system versions, external whole-lab stop | More memory/storage overhead, guest maintenance, hardware/device access needs qualification |
+
+**Working recommendation:** VM per lab best matches independent environments that people can administer and AI4R can evolve. Containers remain the capability packaging and execution unit inside each VM. This is a recommendation to examine, not a measured conclusion.
+
+## 2. Compare management software separately
+
+Management software does not determine where AI4R’s research loop runs.
+
+| Approach | Pros | Cons |
+|---|---|---|
+| **Existing VM tooling + small supervisor** | Few dependencies, maximum control over AI4R behavior | We implement the missing lifecycle integration and operator experience |
+| **Selective OpenJiuwen/JiuwenBox reuse** | Existing sandbox APIs, job controls, goals, replay and RSI mechanisms | Must verify backend behavior; JiuwenBox isolation does not itself implement OCI packaging or whole-VM lifecycle |
+| **Coder Workspaces** | Existing workspace access, provisioning and collaboration features | Additional platform and configuration; its lifecycle assumptions require integration with unattended research |
+
+The comparison note will identify what we can reuse directly, what needs an adapter, and what remains ours. Coder will not receive preferred status before that comparison.
+
+## 3. Make shutdown visible
+
+Every diagram will show:
+
+- Experiment cancellation through the supervisor.
+- Normal lab shutdown that preserves durable data.
+- Host/provider emergency VM stop independent of AI4R.
+- Separate deletion and restart/reconciliation paths.
+
+Evidence must distinguish an exposed API from verified process termination. Shared services must survive the shutdown of an individual lab.
+
+## 4. Deliver artifacts at bounded checkpoints
+
+**Checkpoint 1 — comparison:** save the note, two equally detailed architecture diagrams, pros/cons and source links. Discuss this before further deck expansion.
+
+**Checkpoint 2 — selected architecture:** replace the current explanation with the agreed full diagram, technology stack and ownership boundaries.
+
+**Checkpoint 3 — presentation evidence:** add only appendix slides that substantiate a specific choice, including attributed upstream diagrams and their limits.
+
+For the first checkpoint, acceptance means the alternatives are understandable, fairly compared, and traceable to actual software capabilities. No installations, runtime changes or deck expansion belong to that first pass.

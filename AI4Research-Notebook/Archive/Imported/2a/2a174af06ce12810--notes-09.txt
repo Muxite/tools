@@ -1,0 +1,8 @@
+TIME 1:05
+SAY: Execution runs in rounds, called ticks, and every step of a tick is code. The only thing that changes is the ledger, the record of what has happened so far. On the left is what the freeze fixed for step E, including its gate, and nothing on that card can change during the run. Walking the ticks: at T1, A, B and F are ready because everything they depend on has passed, but F writes to the same files as A, so it waits. At T2, A has passed, so C is ready, and B fails its frozen gate and goes back for repair with the findings. At T3, B's 1 repair runs. At T4 it fails again, so B is failed, and D, E and G, which depend on it, are skipped.
+IF ASKED:
+- A tick is 6 steps: lock the graph and refuse if a guard fails, reconcile earlier dispatches, apply approval and the terminal barrier, verify the runtime projection and build the ready set, admit and lease, save the ledger (Report App. D.5)
+- The ready set is built in 4 steps: dependency order with ties by id, keep the nodes whose dependencies all passed, order by priority then id and take up to 8, and hold back a write conflict to a later tick (Report §2.4)
+- A node waiting for human review holds its dependents pending instead of skipping them
+- Each unit of work is fingerprinted, so a retry never repeats a paid call
+- The graph is illustrative; the rules are the code's

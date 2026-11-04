@@ -1,0 +1,45 @@
+from pathlib import Path
+import hashlib,json,shutil
+root=Path(__file__).resolve().parents[3];batch=Path(__file__).resolve().parent
+backups=[]
+def save(rel,text):
+ p=root/rel
+ if p.exists():
+  data=p.read_bytes();b=batch/'before'/(rel.replace('/','__')+'.snapshot');b.parent.mkdir(parents=True,exist_ok=True);b.write_bytes(data);backups.append({'path':rel,'sha256_before':hashlib.sha256(data).hexdigest()})
+ p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8',newline='\n')
+def edit(rel,fn):save(rel,fn((root/rel).read_text(encoding='utf-8-sig')))
+prompt='update the sandbox presentation and ntoes to see how we can reuse more opensource stuff, do an opensource hunt for more materials to make it much easier to reuse other peoples components to minimize our own effort and bug fix. tho id rather use something with a bit more complexity but super high documentation than easy with no documentation\n'
+rel='Sources/Prompts/2026-10-27-open-source-hunt.txt';save(rel,prompt)
+mf='Sources/capture-manifest.json';rows=json.loads((root/mf).read_text(encoding='utf-8-sig'));rows.append({'path':rel,'sha256':hashlib.sha256(prompt.encode()).hexdigest(),'capture_method':'Exact visible user message, UTF-8 LF; not a transport export','captured_date':'2026-10-27'});save(mf,json.dumps(rows,indent=2,ensure_ascii=False)+'\n')
+edit('Sources/Prompt Register.md',lambda s:s+'\n- [[Sources/Prompts/2026-10-27-open-source-hunt.txt|Open-source hunt and documentation preference]]: reduce custom infrastructure and bug-maintenance effort, preferring stronger documentation over superficial simplicity. Update notes and presentation.\n')
+summary='''## Open-source reuse after the October 27 hunt
+
+[[Designs/Sandbox Open Source Reuse]] owns the detailed shortlist, official documentation links, limitations and qualification order. Prefer documented interfaces and recovery/operations instructions over a small unexplained implementation. VM-per-lab and native JiuwenSwarm compatibility remain selected. New named components are recommendations to qualify, not installed or tested integrations.
+
+Use native JiuwenSwarm Skills/tools/MCP/workflows and creation/evolution hooks for agent and Factory CC composition. On a supported host, use the existing provider API or libvirt with cloud-init for VM lifecycle/bootstrap. Use systemd for stable lab services and Docker SDK/API, Compose and BuildKit for OCI ownership/builds, retaining selective JiuwenBox reuse. The stable supervisor is configuration plus a narrow job-ownership/reconciliation adapter; systemd stopping a service does not automatically stop Docker-daemon-owned jobs.
+
+LiteLLM is now the recommended shared-model gateway candidate because its documented aliases, virtual keys and limits remove custom access plumbing. Key management needs PostgreSQL, and some distributed features add Redis. Confirm required OSS features and license at the pinned release. Keep exact experimental model bindings in the lab adapter; do not let load-balancing/fallback silently change models. Private models remain lab-only and outside the shared gateway. Avoid a mandatory duplicate JiuwenBox proxy hop unless it serves a demonstrated need.
+
+Inside Factory CCs, reuse Docling for parsing, a Paper2Agent conversion/verification recipe where compatible, pytest for fixed functional/task checks, Testcontainers for real service dependencies when needed, BuildKit for images and ORAS for non-image assets in an existing OCI registry. Keep native Skill/tool bindings instead of building another registry/runtime. Quarto can render reports from retained evidence. restic can back up consistent application exports to an independent repository. MLflow is optional for run comparison/UI, initially scoped to a lab, and does not replace accepted-artifact authority or backups.
+
+Coder and Temporal have useful documentation but add control-plane/workflow responsibilities; defer until a concrete access/provisioning or durability gap justifies them. OpenHands can be scoped as a coding CC rather than replacing JiuwenSwarm. No reduction in bugs or engineering time is measured by this hunt. Qualify (1) execution ownership/stop, (2) scoped gateway and model pinning, (3) one native factory bundle, and (4) evidence-preserving report/restore before wider adoption.
+
+'''
+def design(s):
+ s=s.replace('## System views and model placement',summary+'## System views and model placement')
+ s=s.replace('Start with existing adapters and injected configuration; evaluate a gateway when shared credential/routing management needs it.','Use native lab adapters and injected configuration; LiteLLM is the recommended shared-gateway candidate to qualify where multi-lab credential/routing management is needed.')
+ s=s.replace('No gateway product or integrated compatibility is claimed selected/tested.','LiteLLM is now recommended for qualification; no deployment or integrated compatibility is claimed tested.')
+ return s
+edit('Designs/Sandbox Lab Design.md',design)
+edit('Designs/Lab Capsule and Factory Design Plan.md',lambda s:s.replace('## 1 Establish the smallest useful change',summary+'## 1 Establish the smallest useful change')+'\nFor each reuse spike, compare the custom code removed with configuration, adapter work and operational dependencies introduced. Record the chosen release, OSS feature/license availability and observed failure behavior. Do not deploy the entire shortlist together. [[Designs/Sandbox Open Source Reuse]] provides the concrete documentation and adoption gates.\n')
+edit('Sources/Implementation Intent.md',lambda s:s+'\n## October 27 documented open-source reuse\n\nThe user prefers extra complexity with excellent documentation to undocumented simplicity. The hunt recommends native JiuwenSwarm plus systemd/Docker/provider lifecycle, a LiteLLM shared gateway candidate, documented Factory tools, and restic/Quarto with optional MLflow. Do not rebuild generic engines or add every service at once. Preserve VM ownership, private model boundaries, CC agent/workflow composition and independent acceptance. Larger platforms require a demonstrated gap. Recommendations are documentation-based and integration-unverified. See [[Designs/Sandbox Open Source Reuse]].\n')
+edit('Designs/Labs and Capability Capsules.md',lambda s:s+'\n## Documented component reuse\n\n[[Designs/Sandbox Open Source Reuse]] maps the lab model to native JiuwenSwarm, provider/libvirt + cloud-init, systemd/Docker, a LiteLLM gateway candidate, Factory tool reuse and restic/Quarto outputs. MLflow, Testcontainers and additional platforms are conditional. The objective is less custom infrastructure; no measured maintenance saving or new runtime compatibility result is claimed.\n')
+pres='Designs/Sandbox Briefing/presentation/'
+edit(pres+'README.md',lambda s:s.replace('Design rev10','Design rev11').replace('Design%20rev10','Design%20rev11').replace('review-rev10/','review-rev11/').replace('`review-rev10/`','`review-rev11/`').replace('| 9 | Technology stack |','| 9 | Reuse-first proposed stack and our integration boundary |').replace('| 12 | Evidence and reuse limits |','| 12 | Open-source component evidence and integration limits |').replace('| 14 | Tradeoffs and resource limits |','| 14 | Larger platforms: value and adoption cost |')+'\n## October 27 open-source hunt\n\n[[Designs/Sandbox Open Source Reuse]] is the detailed decision note. Slides 2, 5, 6, 8 and 9 now name documented reuse candidates; slides 12–14 show evidence, remaining tests and platform adoption gates. Native JiuwenSwarm remains the integration surface. LiteLLM is a recommended gateway candidate with explicit PostgreSQL/feature/model-binding costs. Docling/Paper2Agent/pytest/BuildKit/ORAS/Quarto are tools or recipes used by CCs, not mandatory new control services. restic needs consistent exports and independent storage; MLflow remains optional. The deck stays at fifteen slides. `open_source_reuse.mjs` applies this revision and `export_open_source.mjs` exports rev11. No installations or runtime tests were performed for the hunt.\n')
+edit('Home.md',lambda s:s.replace('## Open directly','## Open directly\n\n- [[Designs/Sandbox Open Source Reuse|Sandbox open-source reuse hunt]] — documented component shortlist, code avoided, operations costs and bounded qualification order.'))
+renders=Path('C:/Users/m50066326/AppData/Local/Packages/OpenAI.Codex_2p2nqsd0c76g0/LocalCache/Roaming/Codex/web/Codex/artifact-sessions/exports/latest/e91be6b1fafe6d85492b7271ed7d3473f685aa0efa44c444b2b4a3768bc2c6e9')
+dest=root/pres/'review-rev11';dest.mkdir(exist_ok=True)
+for i in range(1,16):
+ for ext in ['png','layout.json']:shutil.copy2(renders/f'slide-{i}.{ext}',dest/f'slide-{i}.{ext}')
+(batch/'note-receipt.json').write_text(json.dumps({'scope':'official documentation/source hunt; no installs or runtime integration tests','backups':backups,'slides':15},indent=2)+'\n',encoding='utf-8')
+print(json.dumps({'updated_notes':len(backups),'slides':15,'comparison':'Designs/Sandbox Open Source Reuse.md'}))

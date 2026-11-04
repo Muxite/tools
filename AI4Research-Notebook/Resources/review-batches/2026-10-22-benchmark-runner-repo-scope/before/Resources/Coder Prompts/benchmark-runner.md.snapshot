@@ -1,0 +1,84 @@
+---
+id: coder-prompt-benchmark-runner
+status: ready-to-send
+source: Sources/Prompts/2026-10-22-benchmark-runner-orchestrator-request.txt; Sources/Prompts/2026-10-22-separate-baseline-container-request.txt; Sources/Prompts/2026-10-22-standalone-human-judged-benchmarks.txt
+last_reviewed: 2026-10-22
+next_action: Copy this document to the implementing agent; the human completes Codex authentication when doctor requests it
+---
+# benchmark-runner
+
+## For human
+
+Build a standalone tool in its own repository: choose AI4R and JiuwenSwarm branches/versions, load a test matrix, run isolated targets in parallel, and export the actual results for humans to judge. It must not modify the user's codebases or live installations. Each target gets runner-owned source copies, containers, workspaces, data and endpoints.
+
+Start with a CLI on the remote Docker host. The human will need to establish the Codex connection using the target runtime's supported authentication flow; the tool must identify exactly what is missing and resume after setup. Mocks cannot substitute for that validation. The instructions below are a build handoff, not a claim that the tool already exists.
+
+Review success by seeing a real A/B campaign complete, both sides' files exported, no branch/container/volume collisions and no user-code changes. The runner reports execution and preserves the programs' own decisions; humans assign each case's acceptance outcome. A useful CLI matters more than a dashboard or orchestration platform.
+
+## For AI: implementation objective and existing design
+
+Implement **benchmark-runner** in its own repository, outside the systems being evaluated. It selects versions, prepares isolated targets, schedules cases, observes execution and exports actual results for human review. Read existing interfaces and deployment assets, but do not edit the user's repositories to implement this tool. Follow standard Docker/Compose/Git practices and any task/spec process in the runner's own repository. Keep implementation focused and build a working vertical slice quickly.
+
+Read the current M1 design-package's `benchmark-runner.md` (the design document, not this handoff), `automation.md`, and the `README.md` files titled **AI4Research sidecar container** and **Test runner (client validation in the sidecar container)** to understand existing client/export and program boundaries. This updated handoff supersedes earlier single-target/sequential-campaign, fixed-container and external-referee/scoring assumptions: deliver standalone branch orchestration, parallel isolated targets, separate baseline containers and **human judgment**. Do not retrofit this into AI4R, rewrite its design/code or reintroduce automatic acceptance scoring. Existing M1 product behavior stays intact.
+
+### Non-negotiable ownership and judging boundaries
+
+All runner code, configuration, queue state, adapters, Compose overlays and outputs live under its own configured root. Treat user repositories/checkouts and supplied files as read-only. Never run branch switches, fetch/worktree administration, package installation, code generation, formatting, migrations, task-record updates or cleanup in the user's codebase. Use independent runner-owned clones; worktrees are allowed only from a runner-owned clone. Do not mount original source paths writable, alter live app volumes/services, or install dependencies into the user's application environment. If an existing API is missing, use an existing supported adapter/CLI or report the limitation; do not patch the target code.
+
+Report execution states such as completed, failed, blocked, cancelled and timed out. Record target exit codes and any program-produced gate/verdict text as observations, not the runner's judgment. Human assessment starts as **not reviewed**. Provide a human-editable per-case matrix/review sheet; do not automatically assign test PASS/FAIL, correctness scores, A/B winners, semantic judgments or merge/release decisions. Mechanical checks of the runner's own isolation, transport and evidence integrity are allowed; these do not establish task correctness. Do not add an LLM judge or external automatic referee.
+
+### 1. Deploy above the target apps
+
+Use a small host-side launcher/orchestrator, durable queue/ledger and bounded client workers. Start with Docker Compose plus the project's existing language/tooling and a simple transactional local store such as SQLite; no Kubernetes, distributed scheduler, mandatory UI or new message-broker stack is needed for the first release.
+
+Run the orchestrator on the selected remote Docker host so checkouts, mounts and artifacts are resolved there. Allow local development using the same configuration shape. Remote setup must be documented and repeatable; laptop access may launch it through SSH and retrieve exports. Do not assume a local laptop directory exists on a remote Docker daemon. Do not expose an unauthenticated Docker TCP socket.
+
+The runner-owned host launcher alone owns its Docker lifecycle and source preparation. Target apps, client workers and baseline adapters do not get the Docker socket or broad host credentials. Reporting summarizes observed execution; human review remains separate. Product startup does not depend on this tool.
+
+### 2. Branch selection and collision-free targets
+
+Configuration must support at least **AI4R branch A versus AI4R branch B** and **AI4R versus upstream JiuwenSwarm/OpenJiuwen**. Do not invent branch names or endpoints. Each target descriptor records repository, requested ref, resolved commit, dirty-tree status if relevant, adapter type, build recipe/lock, image identity, model/configuration and expected instance identity.
+
+Resolve a branch once to a full commit before campaign freeze using a runner-owned clone/mirror. Prepare independent runner-owned clones or detached worktrees from that owned mirror; never administer the user's checkout or mutate a source tree underneath a running build/target. Do not share Git alternates or mutable source storage with the user's repository. Build each distinct immutable candidate once and reuse it across cases. Selecting another branch creates/reuses an isolated target, not an in-place checkout inside a live container. Generated POC code may run only in disposable target workspaces, never in the user's original project directories.
+
+AI4R and JiuwenSwarm run in **different target containers**, with separate Compose project identities, app state/database volumes, writable workspaces, logs, configuration, session/Codex state and endpoints. A/B AI4R instances get the same isolation. Use campaign/target/worker ownership labels; avoid fixed `container_name`, global named volumes and fixed published ports that collide. A worker must have an unambiguous route to its target: use a target-specific network/alias or a dedicated worker on that target's network. Never rely on an ambiguous `app` alias across multiple networks. Publish only necessary operator endpoints on configured private/loopback interfaces.
+
+### 3. Load cases and run a real parallel queue
+
+Load versioned YAML/JSON case files and a campaign manifest specifying targets, resources/setup, steps, timeouts, repeats, budgets and human-review references. Restricted expectations/answer keys are not product inputs. Keep the apparatus generic; do not embed supplied examples or held-out test specifics in implementation prompts or agent contexts.
+
+Provide configurable worker concurrency and queue the case × target × repeat matrix. **Actually run independent cases/targets concurrently** when capacity permits, including both sides of A/B. If an app supports only one active run, give each worker its own target instance or serialize only that instance; do not turn the whole campaign into a sequential loop. This requires no parallelism or restructuring inside a research DAG.
+
+Persist pending/claimed/running/terminal queue state, leases and correlated campaign/case/repeat/target/request/run IDs transactionally. After runner/connection restart, reconcile uncertain submissions and resume observation without duplicate runs or blindly repeating effects. A failed case is recorded and unrelated work continues unless the configured stop policy or shared-resource failure requires otherwise. Never omit unfinished cases or count missing evidence as success. Support status/progress, explicit cancellation and a finite job deadline; cancellation preserves collected evidence and touches only owned runs.
+
+Separate ordinary throughput mode from comparable performance mode. Parallel jobs sharing models/GPU/CPU can affect timing; record concurrency/contention. Resource-exclusive measurements must serialize through a declared reservation. Do not call concurrently contaminated timings isolated performance gains. Match case/resource/model/seed/budget pins for paired comparisons, including AI4R's verification overhead, and explicitly flag incomparable pairs.
+
+### 4. Clean Docker mounts and working APIs
+
+Preflight the resolved Compose configuration and actual mounts before admitting a target. Resolve paths against the remote host's configured campaign root, create only owned directories, verify required files, ownership and UID/GID access, and reject traversal/foreign paths. Use read-only case/resource mounts or supported import operations; writable app state/output is target-specific. Never let Docker silently create an empty directory where a required file was expected. Inspect mounts and prove representative input-read/output-write behavior inside the actual containers. Do not bake host-specific absolute paths or credentials into images.
+
+AI4R uses its existing readiness/submit/reconcile/status/events/retrieve/cancel contract with scoped authentication. Verify target instance/build, contract version and model/storage prerequisites, then check exported identity matches the requested target. Inside a target network use its service DNS/container port, not a worker's localhost; published host ports are separate. Implement compatibility in the runner's adapter. Missing target operations/exports are limitations or blocked prerequisites, not permission to modify AI4R, import private modules or mount its database into the runner.
+
+Implement a runner-owned JiuwenSwarm/OpenJiuwen adapter with `prepare`, `run`, `collect` behavior using its existing SDK/CLI/API. It addresses the separate baseline target and does not assume AI4R API compatibility. Record exact upstream repository/commit, agent/harness version and effective model; modified AI4R is not an upstream baseline. Missing internal gates/traces are explicit limitations, not fabricated values or judgments. Export both targets' terminal artifacts in the same reviewable format without changing either target's code.
+
+### 5. Codex readiness and human setup
+
+Provide a `doctor`/preflight path that distinguishes container liveness from working model authentication and an actual authorized model call. Detect the configured Codex runtime/bridge for each target; use its documented login/setup flow and tell the human which target/session requires action. Never invent a login command, copy a developer's entire home directory or expose tokens in logs/reports/images. Keep writable authentication/session state isolated per target or use an explicitly supported scoped bridge arrangement.
+
+If authentication is unavailable, finish independent implementation/container/mock checks, report **BLOCKED: human Codex setup required**, and provide the exact supported next step and rerun command. Queued model work must wait or remain blocked honestly; do not fabricate a successful baseline. After setup, verify real model-backed work for both systems, cancellation and record export. Mocks remain labeled and excluded from real comparison claims. Do not make model credentials part of the exported campaign bundle.
+
+### 6. Evidence, results and file export
+
+For every target/case/repeat, retain submitted inputs/setup and hashes, code/image/configuration/model identities, effective budgets/environment, requests/events, actual outputs, relevant provenance, program-produced check/gate decisions and downstream actions where exposed, terminal reasons, time/usage and limitations. Host inventory and peak sampling remain attributable per job, with concurrent host activity identified. Never infer a program decision that its exported evidence does not expose.
+
+Generate JSON results, a CSV matrix and a readable Markdown/HTML summary. Include per-case **Inputs and Setup**, **Actual Output and Observations**, artifact links, program-produced outcomes, execution coverage/failures/blocks, incomplete work and descriptive timing/usage deltas. Give humans blank **Assessment**, **Evidence references** and **Review notes** fields, with optional criteria supplied by them; do not prefill a verdict. Distinguish process failure from a scientific negative reported by the app. Do not turn missing metrics/cost into zero, use app-verifier verdicts as ground truth, or silently retry/repair to improve apparent results.
+
+Export an inspectable campaign directory/archive containing reports, execution records, manifests/hashes and permitted artifacts, sufficient for human review after disposable containers are removed. Record oversized/excluded artifacts and retained references. Reports rebuild from saved records without rerunning agents and preserve separately entered human assessments. Restricted human criteria/answer keys must not reach targets/models or unauthorized export audiences; credentials never enter the bundle. No score records or automated referee are required for this tool.
+
+### 7. Fast, bounded delivery and acceptance
+
+First reuse existing documented launch/client behavior through runner-owned adapters and deliver: CLI/configuration, two isolated targets, a generic case queue, concurrency greater than one, actual results and file export. Supply commands for `doctor`, `run`, `status`, `resume`, `cancel`, `compare`, `export` and owned-resource cleanup (or equivalents). Provide a generic example campaign with placeholder repo/ref/host values, not machine-specific paths or leaked tests. No target CI/merge integration is required. Do not modify either codebase to implement this tool or require M1 pilot/scoring work as a prerequisite.
+
+On the remote host, validate actual Compose isolation and API calls, not only mocks. Prove targets overlap, use intended commits/images, write only owned state and retain correctly attributed results. Prove branch selection leaves the user's repository and other target untouched; resume does not duplicate work; one target failure preserves the other's result; mounts/export survive cleanup; missing Codex setup is reported. Then verify a real AI4R-versus-JiuwenSwarm campaign after human authentication. Validate no original-source contents, Git refs/index/status, user app configuration or live volumes were changed by runner operations; source checks must themselves avoid index writes or other repository mutations. Preserve actual commands/results and unresolved prerequisites in the runner's own repository. Do not claim remote/model success without access, or fill human acceptance fields automatically.
+
+Keep disk/cache/log growth bounded during development and queued campaigns: small build contexts, shared immutable dependency layers, build-once images, per-job disk/memory/CPU/model limits, capacity-aware admission and bounded concurrency. The eventual Spark target is ARM64 with 128 GB unified memory/2 TB SSD; qualify the actual remote host rather than assuming that hardware. Do not retain every failed image or tar export. Cleanup removes only labeled owned resources after export verification and preserves required replay pins. Do not implement the M2 VM/capsule factory system as a prerequisite for this tool.

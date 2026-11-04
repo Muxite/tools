@@ -1,0 +1,25 @@
+# Optional historical references
+
+These pinned versions are reference material, never required build input. They remain immutable in Git and are not updated when the maintained design changes. Use the [current package](README.md) for product and architecture decisions.
+
+| Reference | What it preserves |
+|---|---|
+| [Original architecture directory](https://github.com/Stellven/jiuwenswarm/tree/343a77dbd5e6dcd18de2e57794cc992d36c2f35c/docs/architecture) | Earlier overview, B1 design, capsule discussions and diagrams before replacement by the current design. Useful for understanding superseded reasoning. |
+| [Original architecture overview](https://github.com/Stellven/jiuwenswarm/blob/343a77dbd5e6dcd18de2e57794cc992d36c2f35c/docs/architecture/OVERVIEW.md) | Historical source referenced by the AI4R-001 records. It does not govern Intent Compilation and Verification Slice (formerly TRIAL-1). |
+| [Package before this cleanup](https://github.com/Stellven/jiuwenswarm/tree/62d1fe7069baf15379487fdd6cf20e3c459263ad/docs/architecture/build-package) | Exact October 6 PRD/design package before navigation and coverage simplification. Includes the earlier owner-oriented coverage map. |
+
+No archived source is a fallback requirement. Adopt a historical idea only through an explicit current design decision. Retain existing coding identities when reconciling older records; their source assumptions must be checked against the current PRD and decisions.
+
+## Muk cleanup checkpoint
+
+On 2026-10-06, pinned Git snapshot `0e560729374cfb35119a9d5b42b43860c5d513ad`, retained by branch `archive/muk-design-before-cleanup-2026-10-06`, preserved the muk architecture tree, product captures and task supplement before removal from active reading paths. It contains exact local draft bytes and older nested snapshots. Files already absent locally remain recoverable from parent `b710bed752e66a21c993e77d90fa588598140924`.
+
+These are optional historical references, not another maintained design. Inspect specific original files without restoring them into active directories:
+
+```text
+git show 0e560729374cfb35119a9d5b42b43860c5d513ad:docs/architecture/immediate-plan.md
+git show 0e560729374cfb35119a9d5b42b43860c5d513ad:docs/tasks/M1/TASKS.md
+git show b710bed752e66a21c993e77d90fa588598140924:docs/product/prd-m1-full-2026-10-02.txt
+```
+
+The snapshot branch is local until explicitly published. Preserve that ref when transferring the cleanup to another checkout. No snapshot supplies missing current requirements; use the [maintained reading route](README.md#required-reading-order).

@@ -1,0 +1,24 @@
+flowchart TB
+  subgraph FACTORY["Proposed factory: reusable stage CCs, composite later"]
+    direction LR
+    INPUT["Paper + repository"] --> A["Acquire<br/>pinned source"]
+    A --> B["Extract resources<br/>run references"]
+    B --> C["Build thin wrappers<br/>test and package"]
+  end
+  subgraph USE["Candidate-to-use lifecycle"]
+    direction LR
+    OUT["Candidate capability<br/>+ evidence"] --> ADM["Independent admission<br/>and standing"]
+    ADM --> LIB[("Eligible CC library")]
+    LIB --> AG["Agents and<br/>research workflows"]
+  end
+  FACTORY -->|"produces candidates"| USE
+  FACTORY --> RES[("Versioned resources<br/>papers, source, reference results")]
+  RES -->|"inputs for capability use"| USE
+  classDef work fill:#E9F1FF,stroke:#3264A5,color:#142C4A,stroke-width:2px;
+  classDef host fill:#FFF0CD,stroke:#AA7424,color:#573A14,stroke-width:2px;
+  classDef data fill:#E3F3E9,stroke:#357958,color:#173D2A,stroke-width:2px;
+  class A,B,C work;
+  class ADM host;
+  class LIB,RES data;
+  style FACTORY fill:#F5F8FD,stroke:#3264A5,stroke-width:2px,stroke-dasharray:6 4;
+  style USE fill:#FAFBFD,stroke:#8592A6;

@@ -1,0 +1,29 @@
+flowchart TB
+    CORE["Shared lab and CC contracts<br/>Operations, bindings, state and checks"]
+    subgraph W["First validation case: workload profiling"]
+        WCC["Workload CC package<br/>Profile, extract, predict and evaluate"]
+        WAPP["Batch profiler or telemetry service<br/>Declared measurement access"]
+        WDATA["Traces and machine records<br/>Held-out cases and result artifacts"]
+        WCC --> WAPP
+        WAPP --> WDATA
+    end
+    subgraph R["Non-blocking example: robotics"]
+        RCC["Robotics CC package<br/>Configure, run, observe and compare"]
+        RAPP["Library, batch or simulator service<br/>Native interface selected later"]
+        RDATA["Scenes and controller versions<br/>Episodes and checkpoints"]
+        RCC --> RAPP
+        RAPP --> RDATA
+    end
+    CORE --> WCC
+    CORE --> RCC
+    FIXTURE["Small stateful fixture<br/>Tests lifecycle before simulator exists"]
+    CORE --> FIXTURE
+    class CORE control
+    class WCC,WAPP,RCC,RAPP,FIXTURE work
+    class WDATA,RDATA data
+
+    classDef work fill:#e8f1ff,stroke:#3568a8,color:#142d4e,stroke-width:1.5px
+    classDef control fill:#fff1d7,stroke:#a66d16,color:#513406,stroke-width:1.5px
+    classDef qualify fill:#eee8fa,stroke:#7854a0,color:#35204d,stroke-width:1.5px
+    classDef data fill:#e5f3eb,stroke:#3c8160,color:#163e2a,stroke-width:1.5px
+    classDef external fill:#f0f2f5,stroke:#65758a,color:#273547,stroke-width:1.5px

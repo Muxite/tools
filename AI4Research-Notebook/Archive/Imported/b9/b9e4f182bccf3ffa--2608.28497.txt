@@ -1,0 +1,2694 @@
+
+
+===== page 1 =====
+On the Maintenance and Co-evolution of Agent Plugins: An Empirical Study of
+Claude Code Plugin Marketplaces
+AHMED HEREIZ, Queen’s University, Canada
+YINGZHE LYU, Queen’s University, Canada
+HAO LI, Queen’s University, Canada
+BRAM ADAMS, Queen’s University, Canada
+AHMED E. HASSAN, Queen’s University, Canada
+AI coding agents, software tools that automate development tasks through reasoning and tool use, are increasingly extended through
+plugin marketplaces, yet the structure, maintenance, and co-evolution dynamics of these emerging repositories remain empirically
+unexplored. Unlike traditional software packages that deliver functionality through source code, agent plugins deliver functionality
+through a combination of natural-language instruction files, scripts, and configuration files, raising the question of whether these
+plugins are maintained artifacts that co-evolve across components, or one-off artifacts that developers write once and do not need
+to revisit. To study the maintenance and co-evolution of agent plugins, we conduct an empirical study of 1,926 repositories hosting
+Claude Code plugin marketplaces, analyzing 8,351 plugins and 77,773 commits across 2,018 marketplaces. We find that the marketplace
+is expanding rapidly, plugin-touching commit activity growing 8.8× over six months after the October 2025 launch, and plugins
+targeting Software Engineering tasks accounting for 61.3% of all plugins. Plugin development is predominantly feature-driven, with
+feature commits occurring at more than twice the rate of conventional open-source software (OSS) (39.6% vs. 17.2%). Claude co-authors
+34.9% of all commits, and four commit types (docs, perf, style, and refactor) carry substantially different meanings in plugin repositories
+than in traditional software. Most component types evolve independently, but within skills directories, natural-language instruction
+files and implementation scripts co-evolve at above-chance rates, with 78% of co-changes being functionally coupled, representing a
+new class of maintenance dependency not observed in traditional software engineering. These findings characterize AI-native plugin
+repositories as a distinct class of software whose development practices and maintenance dependencies require dedicated empirical
+frameworks.
+CCS Concepts: • Software and its engineering →Software evolution; Maintaining software; Collaboration in software develop-
+ment; • Computing methodologies →Artificial intelligence.
+Additional Key Words and Phrases: AI Agent, Agentic AI, Agent Plugin, Plugin Marketplace, Claude Code, Skill, MCP
+ACM Reference Format:
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan. 2026. On the Maintenance and Co-evolution of Agent
+Plugins: An Empirical Study of Claude Code Plugin Marketplaces. ACM Trans. Softw. Eng. Methodol. 1, 1 (August 2026), 41 pages.
+https://doi.org/10.1145/nnnnnnn.nnnnnnn
+Authors’ Contact Information: Ahmed Hereiz, ahmed.hereiz@queensu.ca, Queen’s University, Software Analysis and Intelligence Lab (SAIL), Kingston,
+ON, Canada; Yingzhe Lyu, ylyu@cs.queensu.ca, Queen’s University, Software Analysis and Intelligence Lab (SAIL), Kingston, ON, Canada; Hao Li,
+hao.li@queensu.ca, Queen’s University, Software Analysis and Intelligence Lab (SAIL), Kingston, ON, Canada; Bram Adams, bram.adams@queensu.ca,
+Queen’s University, Software Analysis and Intelligence Lab (SAIL), Kingston, ON, Canada; Ahmed E. Hassan, ahmed@cs.queensu.ca, Queen’s University,
+Software Analysis and Intelligence Lab (SAIL), Kingston, ON, Canada.
+Permission to make digital or hard copies of all or part of this work for personal or classroom use is granted without fee provided that copies are not
+made or distributed for profit or commercial advantage and that copies bear this notice and the full citation on the first page. Copyrights for components
+of this work owned by others than ACM must be honored. Abstracting with credit is permitted. To copy otherwise, or republish, to post on servers or to
+redistribute to lists, requires prior specific permission and/or a fee. Request permissions from permissions@acm.org.
+© 2026 ACM.
+Manuscript submitted to ACM
+Manuscript submitted to ACM
+1
+arXiv:2608.28497v1  [cs.SE]  28 Aug 2026
+
+
+===== page 2 =====
+2
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+1
+Introduction
+Large Language Model (LLM) agents have emerged as autonomous tools for addressing complex tasks that require
+reasoning, tool usage, and interaction with external environments. These agents can be extended using plugins, through
+which developers package and distribute agent behavior, including skills, custom commands, hooks, and model context
+protocol (MCP) servers, enabling teams to share and reuse consistent agent workflows across projects rather than
+reconfiguring the agent independently for each project [5]. We use the term agent plugins1 to refer to such distributable
+behavior packages to distinguish them from traditional software plugins. Developed by Anthropic, Claude Code was one
+of the first AI coding agents to support an agent plugin system, though similar capabilities had already been spreading
+to other AI coding agents. Agent plugins are distributed through shared repositories called marketplaces, which act as
+catalogs of available plugins that users can register with Claude Code and install from [4].
+The maintenance and co-evolution of software artifacts are well-studied topics in traditional software engineering [15,
+45, 51]. Other recent research has extended this focus to adjacent artifact classes, exploring the maintenance health of
+cross-language bindings for machine learning libraries, identifying technical lags and incomplete release coverage [26].
+Prior work has also investigated the artifact classes of agent skills [31], general-purpose AI assistant stores [44, 50],
+and conventional software package ecosystems [13, 23]. However, no prior work has studied the maintenance and
+co-evolution of agent plugins, a new artifact class in which natural-language instruction files and source code artifacts
+co-exist as primary distributed artifacts.
+In multi-component plugins, failing to update co-evolved components together carries the risk of leaving them out
+of sync, potentially introducing inconsistencies and silent defects. Unlike traditional software packages, which deliver
+functionality through source code, Claude Code plugins rely primarily on natural-language Markdown files that Claude
+reads and interprets at runtime, alongside supporting scripts and configuration files. This distinction raises the question
+of whether software engineering methods developed for source-code repositories, which themselves often combine
+multiple programming languages [30], would transfer to agent plugin repositories.
+We hence study the software maintenance and co-evolution of agent plugins, providing the first empirical baseline
+for this artifact class, and examine whether traditional software engineering methods would transfer to this new artifact
+class, where natural-language files are the primary distributed artifact rather than source code. Addressing this issue
+establishes a foundation for future research into the development patterns and maintenance of this unique artifact class.
+Without an empirical baseline for this artifact class, researchers lack the foundation needed to study its development
+patterns, compare it with conventional ecosystems, or build tools calibrated to its unique characteristics.
+We construct our dataset of the Claude Code plugin marketplace by mining agent plugin marketplaces hosted on
+GitHub. Our dataset is the first to capture real-world agent plugin activities across 1,926 repositories, 8,351 plugins, and
+77,773 commits. To study the maintenance and the co-evolution of agent plugins, we investigate the following three
+research questions (RQs):
+RQ1: What are the structural and maintenance characteristics of the Claude Code plugin marketplaces?
+Agent plugin marketplaces have emerged as a key channel for distributing extensions across teams and communities.
+However, what types of plugins developers build, whether these marketplaces show signs of active and sustained
+maintenance, or how their structure compares to traditional package ecosystems is yet to be understood. Our analysis
+shows the plugin marketplace is expanding, with plugin-touching commit activity growing 8.8× within six months. The
+marketplace is dominated by plugins for software engineering tasks, and 34.4% of plugins combine multiple component
+1https://agent-plugins.org/
+Manuscript submitted to ACM
+
+
+===== page 3 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+3
+types (e.g., skills paired with hooks or agents). Our study provides the first empirical baseline for this class of artifact,
+covering its structural composition, maintenance patterns, and component evolution.
+RQ2: How are plugins developed and maintained? Agent plugin repositories are composed primarily of natural
+language instructions for LLMs alongside scripts and configuration files, raising the question of whether the same types
+of development activities that occur in plugin repositories carry the same meaning as in traditional open source software
+(OSS). We inspect the development and maintenance activity of commits in agent plugin repositories against the widely
+accepted Conventional Commits Specification (CCS) definition [12]. Our analysis reveals that the actual development
+and maintenance behavior has shifted from the definition of CCS categories in commits labeled as documentation,
+performance, style, and refactor under the CCS definition in agent plugin repositories compared to traditional OSS.
+RQ3: How do plugin components co-evolve? With 34.4% of plugins combining multiple component types,
+whether these components co-evolve during maintenance remains an open question. Failing to properly update co-
+evolved components carries the risk of leaving components out of sync, which may introduce inconsistencies and silent
+defects. Our results show that most components can be maintained independently. However, we find that 78% of the
+Script–Markdown co-changes within skills/ are functionally coupled, driven by interface changes, internal logic
+updates, and variable synchronization that propagate from scripts to their paired natural-language instruction files.
+This paper makes the following contributions:
+• We provide the first large-scale empirical characterization of an AI coding agent plugin marketplace, covering
+structure, development patterns, and component co-evolution across 1,926 repositories, 8,351 plugins, and 77,773
+commits.
+• We show that the developers’ intention for commits in agent plugin repositories has shifted from the definition
+of CCS categories, and provide an approach to reclassify commits by what their diffs actually do, revealing four
+CCS categories that carry different meanings.
+• We show that most plugin components evolve independently, but identify a brittle Script–Markdown coupling
+within skills, and develop a taxonomy of coupling categories.
+• We release our dataset2 of plugin marketplaces as a foundation for future research on AI-native software
+development.
+The remainder of this paper is structured as follows. Section 2 presents the background and related work. Section 3
+describes our case study design. Sections 4–6 address our three research questions. Section 7 presents implications for
+researchers. Section 8 discusses threats to validity, and Section 9 concludes the paper.
+2
+Background and Related Work
+In this section, we begin by introducing agent plugin systems, using the Claude Code plugin system as a leading
+example, followed by a broader discussion of AI coding agents and plugin ecosystems. Subsequently, we discuss the
+commit classification for the conventional commits specification (CCS) and the corresponding challenges in the age of
+AI contribution which we use in our commit analysis in RQ2, as well as software co-evolution studies that are used in
+our co-change analysis in RQ3.
+2https://github.com/SAILResearch/agentic_plugin_marketplace
+Manuscript submitted to ACM
+
+
+===== page 4 =====
+4
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+Fig. 1. Structure and control flow of a Claude Code plugin. The left box illustrates the components in a real plugin
+(python-api-plugin) installed on disk, and the middle and right boxes illustrate how Claude Code loads and uses the same
+components over the course of a single task.
+Table 1. Claude Code plugin component types.
+Directory / File
+Purpose
+commands/
+User-invoked prompts triggered via slash-commands (e.g., /plugin:review)
+agents/
+Custom agent definitions
+skills/
+Agent skills (SKILL.md files)
+hooks/
+Shell commands triggered by events within Claude Code lifecycle (e.g. a
+PostToolUse hook was triggered to run a linter once Claude edits a file)
+.mcp.json
+Model Context Protocol (MCP) server configurations
+.lsp.json
+Language Server Protocol (LSP) server configurations
+settings.json
+Default Claude Code configuration
+.claude-plugin/plugin.json
+Optional plugin manifest
+2.1
+The Claude Code Plugin System
+Claude Code is an AI-powered, agentic coding tool developed by Anthropic [5] that can read codebases, edit files,
+execute commands, and integrate with development tools. It supports two ways to add custom skills, agents, and hooks:
+standalone configuration and plugins [5]. Standalone configuration relies on the project-level .claude/ directory
+and is typically used for personal workflows. In contrast, plugins are designed for reuse across projects, sharing with
+teammates, and distributing to the community. A plugin can contain any combination of supported component types,
+each serving a distinct purpose. Table 1 lists all supported types.
+Manuscript submitted to ACM
+
+
+===== page 5 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+5
+Three component types shape Claude’s responses during a session. Commands (commands/) are Markdown files users
+call as slash-commands (e.g., /plugin-name:review), each defining a reusable prompt for a single bounded interaction.
+Skills (SKILL.md files in named subdirectories of skills/) are primarily model-invoked, which means that Claude
+selects and applies them automatically based on the current task, though users can also invoke a skill explicitly. Agents
+(agents/) are also model-invoked, but each runs in its own context window with a custom system prompt and restricted
+tool access, so Claude can carry out a subtask in isolation rather than accumulating it in the main conversation.
+The four remaining types operate independently of the conversation, triggered by session events or applied as
+configuration rather than selected by Claude during a task. Hooks (hooks/hooks.json) are shell commands that run
+automatically at fixed points in Claude Code’s lifecycle [3], giving deterministic control over its behavior instead
+of relying on the model to decide whether to act, for example, running a linter after every file write. MCP servers
+(.mcp.json) connect Claude to external tools and data sources through the MCP [2], giving it direct access to databases,
+issue trackers, and APIs without requiring the user to copy data into chat. LSP servers (.lsp.json) connect Claude to
+LSP daemons [37] for real-time code intelligence such as go-to-definition and type checking. settings.json supplies
+default configuration applied whenever the plugin is enabled. Currently, it supports only two settings: which of the
+plugin’s agents to promote to the main conversation thread, and the status line to show for that agent.
+Figure 1 illustrates the loading and execution process for a single task. The user asks Claude Code to add an endpoint,
+write tests, run a security review, and open a pull request, placing that task in Claude’s context window. Because
+api-conventions matches the task, its full SKILL.md loads in step 3 (only its name and description were loaded in
+step 2), and Claude writes the endpoint following its conventions. The edit fires a hook that runs a linter, whose output
+enters the context only if it fails. Claude delegates the security review to security-agent, which reasons and calls
+tools inside its own isolated context window and returns only its final result. The pr-summary skill loads the same
+way api-conventions did, and Claude calls github-mcp-server to open the pull request, whose link is added to the
+context. Claude reports the security findings and the pull request link back to the user.
+Agent plugin distribution is facilitated through marketplaces [4], which act as catalogs of available plugins defined
+via a marketplace.json file. Registering a marketplace with Claude Code, then installing individual plugins from it
+are the two steps required to use third-party plugins [6]. An official marketplace is automatically registered by default,
+users can additionally register third-party marketplaces hosted on GitHub or other Git providers, or local directories.
+2.2
+Software Package Ecosystems
+Empirical software engineering has a long tradition of studying software package ecosystems, which we extend to
+the emerging class of agent plugin marketplaces.
+Several studies have analyzed the structure and evolution of conventional software package registries through the
+lens of dependency networks. Kikas et al. [23] analyzed dependency networks across npm, RubyGems, and Cargo,
+finding that transitive dependencies grow rapidly and that significant structural differences exist across ecosystems.
+Decan et al. [13] extended this comparison to seven packaging ecosystems, collectively hosting more than 830,000
+packages and 5.8 million releases, finding that all ecosystems grow continuously over time in both package count and
+update frequency. While these studies focus on dependency relationships between packages, we study the Claude
+Code agent plugin marketplaces as a new class of AI-native software, where distributed artifacts are natural-language
+instruction files, scripts, and configuration files rather than compiled packages.
+Onagh and Nayebi [39] studied extension decisions in the GitHub Marketplace, analyzing 6,983 CI Actions from 3,869
+providers and finding that the marketplace expands by approximately 41% annually and that 65% of newly released CI
+Manuscript submitted to ACM
+
+
+===== page 6 =====
+6
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+Actions replicate existing capabilities within six months of the original tool’s launch. While Onagh and Nayebi studied
+functional replication in a non-AI code-based extension marketplace (GitHub CI Actions), we study the agent plugin
+marketplaces, where the artifacts are natural-language instruction files rather than executable actions.
+Hassan et al. [16] introduced the concept of FMware, software that relies on foundation models as a core component,
+and catalogued the engineering challenges that arise when natural language becomes a primary software artifact. Li
+et al. [27] built on this by empirically studying 24,800 open-source prompts from 92 GitHub repositories, introducing
+promptware as a specific instance of FMware built using natural language prompts. The authors find that prompts are
+predominantly stored in Markdown (72.8%), with 38.5% exhibiting semantic duplication and 80.1% falling below standard
+reading-ease thresholds, showing that natural-language software assets face maintenance challenges analogous to
+those in traditional code. Claude Code agent plugins are one instance of promptware, distinguished by co-existing with
+executable scripts and configuration files that co-evolve within the same repository.
+Several studies have empirically analyzed general-purpose AI assistant plugin and extension ecosystems. Su et al.
+[44] mined 722,349 GPTs from the GPT Store, analyzing the platform’s classification system, interaction modes, and user
+behavior at scale. GPTs are built through natural language instructions and knowledge files. Yan et al. [50] conducted the
+first comprehensive characterization of the ChatGPT plugin store, classifying 1,038 plugins into 21 functional categories
+using zero-shot NLI classification. ChatGPT plugins are API integrations described by a JSON manifest file. They found
+an uneven distribution of functionality, with more than half of all plugins concentrated in five categories: Data &
+Research (12.9%), Tools (11.2%), Business (10.1%), Developer & Code (9.7%), and Entertainment (6.7%). While Su et al.
+and Yan et al. studied AI assistant stores whose artifacts carry no versioned development history, Claude Code agent
+plugins are GitHub repositories combining natural-language instruction files, executable scripts, and configuration files,
+enabling commit-level analysis of development practices and component co-evolution.
+Ling et al. [31] conducted a large-scale analysis of 40,285 agent skills from the skills.sh marketplace, finding that
+skills concentrate heavily in software engineering workflows with widespread intent-level redundancy. Zhu et al. [53]
+extended this line of work by detecting multi-modal clone relationships across 20,000 skills, finding that 75% of skills
+participate in at least one clone pair and that the ecosystem is inflated 3.5× by undeclared reuse, with 40% of clone pairs
+crossing author boundaries. While Ling et al. and Zhu et al. studied skills artifacts, we study the Claude Code plugin
+marketplace, where skills are one component type within a structured multi-component plugin system distributed
+through a dedicated marketplace. Table 2 summarizes the differences between these studies and ours.
+2.3
+Commit Classification and AI Contributions
+Before the Conventional Commits Specification, researchers proposed manual taxonomies for classifying software
+changes. Swanson [45] introduced one of the earliest taxonomies, distinguishing corrective, adaptive, and perfective
+maintenance. Hindle et al. [17] extended this by manually classifying 2,000 large commits across nine OSS projects,
+introducing additional categories including Implementation, Module Management, and Non-functional changes, and
+finding that large commits are more perfective while small commits are more corrective. Bhatia et al. [10] further
+extended Hindle et al.’s taxonomy to ML research repositories, finding that ML-specific artifacts require two new
+top-level categories (Data and Dependency Management) and 16 new sub-categories, showing that commit taxonomies
+need adaptation when the primary artifact shifts away from traditional source code.
+The conventional commits specification (CCS) [12] standardized 11 commit types, providing a machine-readable
+schema for communicating the intent of a change that is increasingly adopted in open-source projects. Zeng et al.
+[52] studied 88,704 commits from 116 traditional open-source projects that explicitly adopt CCS, finding that fix and
+Manuscript submitted to ACM
+
+
+===== page 7 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+7
+chore together account for 53% of commits and that developers frequently misuse CCS labels due to overlapping type
+definitions. While Zeng et al. [52] studied CCS adoption in traditional open-source projects, we study commit type
+distributions in the plugin marketplace, where the primary artifact is a natural-language instruction file rather than
+source code.
+Hönel et al. [18] improved automated commit classification by combining commit message keywords with source
+code density metrics. Wan et al. [47] established a comprehensive benchmark for CCS commit classification and
+message generation, providing a standardized evaluation framework for automated classification methods. Li et al. [28]
+introduced AIDev, a large-scale dataset of 456,535 agent-authored pull requests from 61,453 repositories, and applied
+LLM-based CCS annotation at scale to label each PR’s purpose, demonstrating that automated CCS classification is viable
+for large collections of unlabeled commits. Li et al. [29] published a dedicated dataset paper with 932,791 Agentic pull
+requests from 116,211 repositories, providing formal infrastructure for large-scale studies of AI coding agent behavior.
+While prior work developed and validated commit classification methods for traditional source-code repositories,
+we apply commit classification to the agent plugin marketplaces, where the primary artifact is a natural-language
+instruction file rather than compiled code, and during manual validation we inspect file-level diffs alongside commit
+messages.
+Researchers have studied AI contributions in traditional source-code repositories. Tufano et al. [46] mined ChatGPT
+mentions across open-source projects, identifying 467 confirmed instances of AI-assisted contributions and classifying
+them into 45 tasks spanning documentation, refactoring, test generation, and feature implementation. Robbes et al. [41]
+generalized detection beyond explicit mentions, cataloguing co-author trailers, email patterns, and branch prefixes
+across a range of coding agents as heuristics for identifying agent contributions in commit histories. In this paper, we
+apply co-authorship detection heuristics to the plugin marketplace.
+In addition, Watanabe et al. [48] studied 567 Claude Code pull requests on GitHub, finding that 83.8% were accepted
+by project maintainers, establishing that agentic contributions integrate at rates comparable to human contributions.
+Horikawa et al. [19] showed that agentic refactoring is dominated by low-level, consistency-oriented edits rather than
+the high-level design changes common in human refactoring. Ouatiti et al. [40] found that AI coding agents log less
+frequently than humans (58.4% of repositories), but at higher density when they do, with 67% of generated logging
+statements non-compliant with project logging instructions and 72.5% of those requiring repair by human developers.
+These studies operate exclusively on source-code repositories. In our study, we examine how these behavioral patterns
+manifest in an AI-native marketplace where the primary artifact is a natural-language instruction file rather than
+compiled code.
+2.4
+Software Co-evolution
+A body of empirical work studies co-evolution, the tendency of different artifact types within a project to change
+together. Such co-evolution typically indicates extra maintenance work, and forgetting to update either co-evolving
+artifact increases the risk of breakage. McIntosh et al. [36] first applied association rules to measure co-evolution between
+build files and source code in ten C and Java projects, finding that build maintenance imposes up to 27% overhead
+on production code development. Jiang and Adams [20] applied association rules to measure co-evolution between
+infrastructure-as-code files and source code across OpenStack projects, finding tight coupling between infrastructure and
+both production and test files. Barrak et al. [9] extended this to machine-learning projects, finding a median co-change
+confidence of 91.91% between DVC pipeline files and source code. While McIntosh et al., Jiang and Adams and Barrak
+Manuscript submitted to ACM
+
+
+===== page 8 =====
+8
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+Table 2. Comparison of related AI ecosystem studies. NL = natural language.
+Su et al. [44]
+Yan et al. [50]
+Ling et al. [31]
+Our study
+Target system
+Conversational LLM
+Conversational LLM
+AI coding agent
+AI coding agent
+Scale
+722,349 GPTs
+1,038 plugins
+40,285 skills
+8,351 plugins
+Artifact form
+NL customization
+API integration
+NL skill file
+Multi-component package
+NL instruction files
+✓
+×
+✓
+✓
+Executable scripts
+×
+×
+×
+✓
+Config files
+×
+✓
+×
+✓
+Repository-based
+×
+×
+✓
+✓
+et al. applied association-rule frameworks to well-defined artifact pairs in source-code repositories (infrastructure–
+source and pipeline–source), we apply the same framework to AI-native plugin repositories, where the co-evolution
+relationships are between natural-language component types rather than between code and its companion artifacts.
+Zaidman et al. [51] mined the version histories of two open-source systems alongside test coverage reports, identifying
+three growth patterns in how production and test code co-evolve: synchronous, time-delay, and test backlog. Marsavina
+et al. [35] studied five open-source systems using Apriori association rule mining (support 50%, confidence 60%),
+identifying six fine-grained co-evolution patterns at the class and source-code entity level. Fluri et al. [15] examined
+three OSS systems (ArgoUML, Azureus, and JDT Core), finding that 97% of comment updates occur in the same revision
+as the associated code change. These studies examine co-evolution between code and its companion artifacts (tests or
+comments). While prior studies examined co-evolution between code and its companion artifacts (tests or comments)
+in traditional OSS, we examine co-evolution within AI-native plugin repositories between implementation scripts and
+their paired natural-language instruction files.
+3
+Data Collection
+3.1
+Repository Discovery and Filtering
+Claude Code uses a publicly documented schema (marketplace.json) [5] that is hosted on GitHub, making the full
+ecosystem discoverable via the GitHub Code Search API and enabling the large-scale empirical analysis we conduct in
+our RQs. To support the empirical analyses for studying the marketplace characteristics, development and maintenance
+activities, and the component co-evolution. Our data collection follows a two-step pipeline: 1) repository discovery and
+filtering, and 2) data extraction. Figure 2 illustrates the pipeline and also provides a summary of the resulting dataset.
+To identify all GitHub repositories that host a Claude Code plugin marketplace, we use the GitHub Code Search API
+with the query filename:.claude-plugin/marketplace.json to discover all repositories containing the manifest
+file required for a Claude Code plugin marketplace. We apply a divide-and-conquer strategy to circumvent the 1000
+results per query limit on GitHub’s Code Search API, as done in the prior work [21]. The search was executed on 2
+April 2026 and yielded 11,254 raw repository references. The raw search results contain duplicate references arising
+from identical files indexed under different paths or API pages. We deduplicate by repository full name, retaining one
+record per unique repository, reducing the 11,254 raw references to 10,646 unique repositories.
+Many repositories in the raw set are personal experiments, test repositories, or forks with no community traction. To
+retain only repositories that represent community-adopted plugins, we apply a minimum threshold of 10 GitHub stars,
+following prior MSR studies [38]. Plugins are a newer artifact class than the software projects these thresholds were
+calibrated on, so we also evaluated the analysis at 5 and 25 stars. As we discuss in the Threats to Validity (Section 8),
+Manuscript submitted to ACM
+
+
+===== page 9 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+9
+11,254
+Raw References
+Deduplicate
+by repo name
+10,646
+Unique Repos
+Summary of the collected dataset.
+1,926 Repositories
+2,018 Marketplaces
+8,351 Plugins
+77,773 Plugin-touching commits
+3,948 Unique authors
+GitHub Code Search API 
+filename:.claude-plugin/marketplace.json
+Star Filter
+≥ 10 GitHub stars
+1,926
+Repositories
+Repository Discovery and Filtering
+Marketplace and Plugin
+Parsing
+Cloning and Commit
+History Extraction
+Data Extraction
+2,018 marketplace entries
+9,565 plugin records
+77,773 plugin-touching commits
+3,948 unique authors
+Plugin
+Filtering
+Fig. 2. Overview of the data collection pipeline and dataset summary.
+these qualitative findings are stable across all three thresholds. Out of the 10,646 unique repositories, 81.7% have fewer
+than 10 stars, including 46.3% that carry zero stars, confirming that a threshold is necessary to separate low-quality
+noise from community-adopted repositories.
+3.2
+Data Extraction
+Marketplace and Plugin Parsing. To obtain plugin-level records (plugins declared inside marketplace.json files),
+we parse each marketplace file found in the cloned repositories following the Anthropic plugin marketplace schema [5].
+Parsing the cloned repositories yields 2,018 marketplaces and 9,565 raw plugins. We then apply a filtering step to
+remove entries whose source field references a plugin located outside the marketplace repository rather than a local
+subdirectory, as we can only analyze plugins whose files are directly available in the cloned repository. We also filter
+out entries that are cross-marketplace duplicates, true duplicates, entries with a blank source field, and entries whose
+declared path does not resolve to an existing directory in the cloned repository for the same reason. After filtering,
+8,351 valid, locally-resolvable plugins remain.
+Cloning and Commit History Extraction. We clone all 1,926 repositories and extract their complete Git commit
+histories from the cloned repositories. We record the commit-level metadata including author, timestamp, commit
+title, commit message, and the file changes for each commit that touches plugin component files shown in Table 1.
+We focus only on plugin-touching commits rather than all commits in the repository because we want to study how
+plugin components are developed and maintained. Commits that do not touch any plugin component reflect broader
+repository activity outside our scope. This process yields 77,773 plugin-touching commits (i.e., commits that modify at
+least one plugin component file, regardless of whether other non-plugin files are also changed) contributed by 3,948
+unique authors across 1,926 repositories. The median number of plugin-touching commits per repository is 13 (mean =
+Manuscript submitted to ACM
+
+
+===== page 10 =====
+10
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+40.4), and only 115 repositories (6.0%) contain a single commit, indicating that the majority of repositories represent
+ongoing development rather than one-off uploads.
+4
+RQ1: What Are the Structural and Maintenance Characteristics of the Claude Code Plugin
+Marketplaces?
+4.1
+Motivation
+Prior work has shown that natural language is becoming a primary software artifact with distinct engineering
+challenges [16, 27]. Claude Code plugins represent one of the first large-scale software ecosystems built primarily
+around natural-language artifacts. These artifacts range from Markdown instruction files that AI agents read at
+runtime, executable scripts and configuration files, yet their growth trajectory, functionality of the plugins, structural
+composition, and development activity remain unstudied. Understanding whether the development activities of agent
+plugin marketplaces are accelerating or represent only an initial burst reveals whether the marketplace has moved
+beyond an initial adoption phase into sustained development. Prior work on software ecosystems has shown that a
+significant share of projects die in their first year, with fewer than half surviving five years [1]. Sustained growth
+motivates understanding what developers are actually building, specifically the functionality of these plugins, and
+the kinds of tasks being delegated to AI agents. Knowing what plugins do, their internal structure in terms of which
+component types developers use and how those types co-occur identifies the technical artifacts developers must account
+for when building and maintaining plugins. Plugin maintenance and update patterns reveal whether contributors are
+actively improving their work over time or abandoning plugins after an initial release. Taken together, these four
+dimensions offer researchers one of the first large-scale empirical windows into how developers build and maintain
+software whose primary deliverable is natural-language instructions, executable scripts, and configuration files.
+4.2
+Approach
+To study the agent plugin marketplace, we use the dataset described in Section 3.2 and conduct four analyses.
+Trace repository and component creation. We retrieve each repository’s creation date from the GitHub REST
+API across all 1,926 repositories and use it as the date the marketplace entered the ecosystem. To obtain a finer-grained,
+component-level view, we identify the earliest commit that introduced each component file: SKILL.md files within
+skills/ subdirectories, .md command files within commands/, .md agent definitions within agents/, hook configuration
+files within hooks/, plugin.json manifests, marketplace.json registries, and .mcp.json server configurations. We
+then perform a non-parametric Mann-Whitney U test [34, 49], which makes no assumption of normal distribution,
+to check if there is a significant difference in the monthly repository-creation counts between the pre-launch and
+post-launch periods. We also apply Cliff’s 𝛿[11] effect size to measure the magnitude of difference between two groups
+of observations. We apply the thresholds provided by Romano et al. [42] for Cliff’s 𝛿:
+Effect size =
+
+
+𝑛𝑒𝑔𝑙𝑖𝑔𝑖𝑏𝑙𝑒,
+if |𝛿| ≤0.147
+𝑠𝑚𝑎𝑙𝑙,
+if 0.147 < |𝛿| ≤0.33
+𝑚𝑒𝑑𝑖𝑢𝑚,
+if 0.33 < |𝛿| ≤0.474
+𝑙𝑎𝑟𝑔𝑒,
+if 0.474 < |𝛿| ≤1
+(1)
+Classify plugin functionality. To understand what developers are actually building and the functionality of
+these plugins, we classify all 8,351 valid plugins (Section 3.2) into a two-layer taxonomy of 6 major categories and 20
+Manuscript submitted to ACM
+
+
+===== page 11 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+11
+sub-categories, adopting the same classification scheme used by Ling et al. [31] for agent skills. The categories proposed
+by Ling et al. [31] cover end-to-end agent workflows in categories like Software Engineering, Information Retrieval,
+and Content Creation. We verified after applying the taxonomy that no new categories were required, confirming that
+it transfers to Claude Code plugins without modification. Given a plugin’s name and description, we label plugins
+with Qwen3-Coder-Next-80B from the same Qwen family used by Ling et al. [31] (Qwen2.5-32B-Instruct), assigning a
+plugin to one sub-category with the plugin name and description as input. The prompt template we used for classifying
+plugins is provided in Appendix A.
+Analyze plugin composition. We apply a four-level approach across the 2,018 marketplaces and 8,351 valid plugins
+described in Section 3.2. At the marketplace level, we count the number of plugins declared in each marketplace.json.
+At the plugin level, we check whether each plugin root contains any of the seven component types defined in the Claude
+Code documentation [5]: commands/, agents/, skills/, hooks/, .mcp.json, .lsp.json, and settings.json. We
+then construct a co-occurrence matrix recording which component types appear together within the same repository,
+and we group files by extension to characterize the file types each component uses within each component directory.
+Measure commit activity growth. To understand the plugin development and update patterns, we count plugin-
+touching commits per month across the 72,191 plugin-touching commits from the official launch of the Claude Code
+plugin marketplace in October 2025 through the data cutoff at the end of March 2026, using the commit timestamps from
+the dataset described in Section 3.2. We perform the non-parametric Mann-Kendall test [22, 33] to determine if there is
+a monotonic upward or downward trend in monthly commit count. The null hypothesis (H0) for the Mann-Kendall
+test is that there is no monotonic trend across our ordered sequence of six monthly commit counts and the alternative
+hypothesis (H1) is that a monotonic trend is present. We also apply the Sen’s slope [43] to estimate the magnitude if a
+statistically significant Mann-Kendall correlation is present. Sen’s slope is a non-parametric estimator that indicates the
+rate of change per unit time step. Following the same aggregation-based mitigation for serial autocorrelation (where
+consecutive monthly observations tend to be correlated with each other) used by Kudrjavets et al. [24], we compute
+both tests on monthly-aggregated commit counts rather than raw daily timestamps.
+4.3
+Results
+Plugins designed for software engineering tasks dominate the plugin marketplaces, with their four sub-
+categories collectively accounting for 61.3% of all plugins, far ahead of any other major category. Table 3 shows
+the full distribution across six major categories and 20 sub-categories, alongside the corresponding percentages from
+Ling et al. [31] for comparison. This concentration mirrors the distribution reported by Ling et al. [31] for the skills.sh
+agent skills marketplace, suggesting that the Software Engineering dominance is not specific to this marketplace but
+reflects the broader early-adopter profile of AI coding agent platforms, where the primary user base consists of software
+developers extending their own workflows. The remaining five categories all fall within 2 percentage points of the
+skills.sh distribution, except Content Creation (8.2% vs. 12.1%) and Data & Analytics (7.9% vs. 10.6%), which are
+moderately lower in our study.
+Repository creation in the second half of the post-launch period (Jan–Mar 2026) was 2.1× higher than in
+the first half (Oct–Dec 2025), indicating accelerating adoption beyond the initial launch. Figure 3(a) shows
+that 1,102 new repositories were created during Jan–Mar 2026, compared with 525 during Oct–Dec 2025, representing a
+2.1× increase. The majority of these repositories (84.5%) were newly created during the six-month post-launch window,
+while the remaining 15.5% were pre-existing repositories whose owners registered a plugin manifest after the standards
+were announced. The Mann-Whitney U test shows that the difference in monthly repository creation counts between
+Manuscript submitted to ACM
+
+
+===== page 12 =====
+12
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+Table 3. Taxonomy and category-level statistics of agent plugins.
+Major Category
+Sub-category
+# Plugins
+% of Total
+% skills.sh [31]
+# Median Stars
+Software Engineering
+Code Generation
+2,164
+25.9%
+14.3%
+40.0
+Infrastructure
+1,387
+16.6%
+24.0%
+40.0
+Debug & Analysis
+1,234
+14.8%
+13.2%
+49.0
+Version Control
+336
+4.0%
+3.2%
+37.5
+Information Retrieval
+Academic Search
+196
+2.3%
+2.7%
+46.5
+Web Search
+133
+1.6%
+1.4%
+47.5
+Live Data Streams
+24
+0.3%
+0.7%
+68.0
+Productivity Tools
+Task Management
+481
+5.8%
+5.6%
+33.0
+Document Systems
+275
+3.3%
+3.9%
+46.5
+Team Communication
+207
+2.5%
+1.7%
+40.0
+Data & Analytics
+Data Processing
+468
+5.6%
+7.9%
+40.5
+Data Visualization
+130
+1.6%
+1.8%
+30.5
+Math & Calculation
+70
+0.8%
+0.9%
+43.5
+Content Creation
+Text Generation
+430
+5.1%
+5.5%
+44.0
+Image Generation
+146
+1.7%
+3.0%
+52.0
+Audio & Video
+133
+1.6%
+3.6%
+47.5
+Utilities & Other
+Other Utilities
+218
+2.6%
+2.8%
+41.0
+Memory & Cognition
+208
+2.5%
+2.3%
+48.5
+Command Execution
+62
+0.7%
+0.8%
+47.5
+Local File Control
+24
+0.3%
+0.6%
+113.0
+the 20-month pre-launch period and the 6-month post-launch period is statistically significant (𝑝< 0.001), with Cliff’s
+𝛿= 1.0 indicating a large magnitude of the statistical difference. These statistical test results confirm that repository
+creation concentrates in the post-launch period.
+Skill instances grew at a substantially higher rate than all other component types, with the gap widening
+further from commands and agents from November 2025 onwards. Figure 3(b) shows that skills diverged from the
+other component types starting November 2025, growing 22× from 1,776 instances at launch to 39,287 by March 2026,
+compared to commands growing 3.7× (2,763 to 10,238) and agents 3.9× (1,671 to 6,500). By March 2026, skills instances
+(39,287) outnumbered all other component types combined (20,280), with skills consisting primarily of natural-language
+instruction files, reflecting natural language as the dominant artifact type across the marketplace.
+34.4% of plugins combine two or more component types, and 72.1% of marketplaces host a single plugin.
+Figure 4 shows that all three distributions are heavily right-skewed, with 56.4% (4,711 of 8,351) of plugins relying on
+a single component type while 49.8% (4,157 of 8,351) contain two or more component file instances. sangrokjung/
+claude-forge exemplifies the upper end of structural diversity, combining 6 of the 7 component types within a single
+plugin, including 56 commands and 11 agents alongside skills, hooks, rules, and a settings manifest. The single-plugin
+marketplace majority reflects individual repositories publishing self-contained extensions for personal or team use,
+while at the tail, three community aggregators alone account for 12.1% of all plugins: jeremylongshore/claude-code-
+plugins-plus-skills (417), TheBushidoCollective/han (338), and BbgnsurfTech/claude-skills-collection
+(258), each indexing contributions from multiple sources into a single registry.
+Manuscript submitted to ACM
+
+
+===== page 13 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+13
+0
+100
+200
+300
+400
+500
+Number of New Repositories per Month
+Claude Code Plugins
+officially launched
+(a)  Monthly Repository Creation Dates
+New repos / month
+Cumulative number of repositories
+2024-02
+2024-03
+2024-04
+2024-05
+2024-06
+2024-07
+2024-08
+2024-09
+2024-10
+2024-11
+2024-12
+2025-01
+2025-02
+2025-03
+2025-04
+2025-05
+2025-06
+2025-07
+2025-08
+2025-09
+2025-10
+2025-11
+2025-12
+2026-01
+2026-02
+2026-03
+Month
+0
+5000
+10000
+15000
+20000
+25000
+30000
+35000
+40000
+Cumulative Number of Component Instances
+Pre-launch:
+developers built
+components first,
+packaged later
+(b)  Cumulative Component Growth
+skills (SKILL.md) (39,287)
+commands (.md) (10,238)
+plugin.json (7,818)
+agents (.md) (6,500)
+marketplace.json (1,924)
+hooks (1,003)
+.mcp.json (615)
+0
+250
+500
+750
+1,000
+1,250
+1,500
+1,750
+2,000
+Cumulative Number of Repositories
+Fig. 3. Plugin marketplace repository age and component growth. The x-axis uses compressed spacing for the pre-launch period
+(January 2024–September 2025) and uniform spacing thereafter, axis-break marks signal the scale change. (a) Monthly distribution of
+plugin marketplace repository creation dates, with 84.5% created in the six months following the October 2025 launch. (b) Cumulative
+plugin component counts by type. All component types grow over time.
+Instruction-oriented components are written almost entirely in Markdown, while configuration-oriented
+components are exclusively JSON. Figure 5 shows how file type varies with the role each component plays in the
+plugin architecture. Commands, agents, and skills are predominantly Markdown, specifying plugin behavior by writing
+natural language instructions in .md files. Model context protocol (MCP), Language server protocol (LSP) and settings
+components are exclusively JSON, reflecting their role as structured tool and environment configuration. Skills and
+hooks are the two mixed cases. Skills occasionally include non-Markdown files alongside their primary instruction
+content, while hooks are the most heterogeneous component overall, combining shell scripts, Python, and JavaScript
+files with JSON configuration. The small non-Markdown share observed for commands/ (<3%) reflects leftover files
+left in the directory rather than a second component format. Claude Code only reads the .md file when invoking a
+command, consistent with commands being defined as single Markdown files in the Claude Code documentation [5].
+Among plugin repos that combine multiple component types, Skills co-occur most frequently with every
+other type, while Commands–Agents is the most common pairing that does not involve Skills. Figure 6 shows
+Manuscript submitted to ACM
+
+
+===== page 14 =====
+14
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+1
+2 5
+6 10
+11 20
+21 50
+51+
+Number of plugins in marketplace
+0
+250
+500
+750
+1000
+1250
+1500
+1750
+Number of marketplaces
+1,435
+(72.1%)
+285
+(14.3%)
+114
+(5.7%)
+64
+(3.2%)
+61
+(3.1%)
+32
+(1.6%)
+(a) Marketplace size
+0
+1
+2
+3
+4
+5
+6
+Number of component types in plugin
+0
+1000
+2000
+3000
+4000
+5000
+6000
+7000
+Number of plugins
+766
+(9.2%)
+4,711
+(56.4%)
+1,843
+(22.1%)
+763
+(9.1%)
+223
+(2.7%)
+43
+(0.5%)
+2
+(0.02%)
+(b) Component types per plugin
+single-type 
+ 56.4% of plugins
+use one component type
+multi-type 
+ 34.4% of plugins have
+two or more component types
+0
+1
+2 5
+6 10
+11 20
+21 50
+51+
+Number of component files in plugin
+0
+1000
+2000
+3000
+4000
+5000
+6000
+Number of plugins
+766
+(9.2%)
+3,428
+(41.0%)
+2,199
+(26.3%)
+868
+(10.4%)
+557
+(6.7%)
+331
+(4.0%)
+202
+(2.4%)
+(c) Component instances per plugin
+single 
+ 41.0% of plugins have
+exactly one component instance
+multi 
+ 49.8% of plugins have
+two or more component instances
+Fig. 4. (a) Distribution of marketplace sizes (number of plugins per marketplace.json). (b) number of distinct component types per
+plugin. (c) total number of component files per plugin.
+0
+20
+40
+60
+80
+100
+Share of files by file type (%)
+Commands
+Agents
+Skills
+Hooks
+MCP (.mcp.json)
+LSP (.lsp.json)
+Settings (settings.json)
+97%
+98%
+70%
+5%
+7%
+16%
+29%
+100%
+100%
+100%
+7%
+28%
+14%
+13%
+n=10,064
+n=8,024
+n=140,418
+n=3,237
+n=477
+n=76
+n=33
+File-Type Composition Within Each Component
+File type
+md
+py
+json
+js / ts
+sh
+yaml / yml
+other
+Fig. 5. File type composition within each plugin component type. Instruction-oriented components (Commands, Agents, Skills) are
+predominantly Markdown, while configuration-oriented components (MCP, LSP, Settings) are exclusively JSON.
+that Skills appear in nearly every co-occurrence pair. This pattern is unsurprising because Skills are the most prevalent
+component type in the marketplace, increasing the likelihood that they co-occur with other types. In contrast, the
+frequent Commands-Agents pairing cannot be explained by prevalence alone, as neither component type dominates
+the marketplace. This pattern suggests that developers intentionally combine the two. We therefore examine in RQ3
+(Section 6) whether the Commands–Agents pairing reflects functional coupling, where changes to one component
+require corresponding changes to the other.
+Manuscript submitted to ACM
+
+
+===== page 15 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+15
+skills
+commands
+agents
+hooks
+.mcp.json
+.lsp.json
+settings.json
+skills
+commands
+agents
+hooks
+.mcp.json
+.lsp.json
+settings.json
+1415
+491
+470
+433
+228
+13
+22
+491
+616
+349
+301
+115
+11
+10
+470
+349
+526
+284
+109
+9
+22
+433
+301
+284
+534
+115
+8
+19
+228
+115
+109
+115
+262
+8
+7
+13
+11
+9
+8
+8
+22
+0
+22
+10
+22
+19
+7
+0
+24
+Component Co-occurrence (number of repositories with both)
+0
+200
+400
+600
+800
+1000
+1200
+1400
+Fig. 6. Component co-occurrence matrix across repositories. Each cell shows the number of repositories that contain both components.
+Skills co-occur most frequently with all other component types due to their dominant presence.
+2025-10
+2025-11
+2025-12
+2026-01
+2026-02
+2026-03
+Month
+0
+5,000
+10,000
+15,000
+20,000
+25,000
+Commits per Month
+Commits / month
+Cumulative
+0
+10,000
+20,000
+30,000
+40,000
+50,000
+60,000
+70,000
+Cumulative Commits
+Fig. 7. Plugin-touching commits per month (bars) and cumulative total (line) since the official plugin launch (𝑛= 72,191. October 2025
+through date cutoff at March 2026). Each month sets a new high, with no plateau by the data cutoff.
+Plugin-touching commit activity grew 8.8× between the October 2025 launch and March 2026, rising from
+2,923 commits in October 2025 to 25,618 in March 2026, with each month setting a new record. Figure 7 shows
+monthly commit counts and the cumulative total across 72,191 plugin-touching commits from the official launch through
+the end of March 2026. The monthly commit count rose in every month of this period, and a Mann-Kendall trend test
+confirms that the upward trend is statistically significant with a p-value of 0.003. Our Sen’s slope test also estimates the
+month-to-month commit growth at roughly 4,550 additional commits per month. The consistent month-over-month
+Manuscript submitted to ACM
+
+
+===== page 16 =====
+16
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+growth with no plateau by the data cutoff indicates that agent plugin development activity is still accelerating, raising
+the question of how that growing effort is organized, which RQ2 addresses by classifying all 77,773 plugin-touching
+commits by type and authorship.
+Takeaway (RQ1)
+• Software Engineering plugins account for 61.3% of all plugins, a concentration that mirrors findings for the
+skills.sh agent skills marketplace [31].
+• 34.4% of plugins combine two or more types, with Commands-Agents being the most common pairing.
+• Plugin-touching commit activity grew 8.8× in six months with no sign of plateau, indicating the marketplace
+remains in active growth.
+5
+RQ2: How Are Plugins Developed and Maintained?
+5.1
+Motivation
+Prior work [52] characterizes how developers build and maintain traditional software by studying the kinds of
+changes they commit, e.g., feature work, bug fix, and maintenance. Our findings from RQ1 show that agent plugin
+repositories keep accumulating commits after their initial release, and that these repositories consist primarily of natural
+language instructions alongside scripts and configuration files, rather than program code. Since the artifacts under
+change differ from program code, the development and maintenance activities behind plugin commits may also differ
+from those reported for traditional software. In addition, AI coding agents are now widely used in real-world software
+development [28, 29], and agent plugin developers are especially likely to delegate work to the agents, raising the
+question of how much of this development and maintenance work is AI-assisted.
+5.2
+Approach
+As software development grows increasingly in complexity, developers adopt commit categorization systems, with the
+Conventional Commits Specification (CCS) being one of the most widely used conventions [52], to enhance readability
+for both humans and automated tools. We therefore adopt the CCS classification system and analyze the commits in
+agent plugin repositories. We first apply a two-stage pipeline to assign each commit a label under the CCS classification
+system to establish a baseline for our study. We then conduct a manual study to comprehend the actual development
+and maintenance behaviors by analyzing the developers’ intentions on a subset of commits carrying CCS identifiers.
+We then re-classify the commits with an LLM using rubrics summarized from the manual study step to identify CCS
+types whose meaning in plugin repositories shifts from their original definition in traditional software engineering.
+Classify commit types under CCS categories. We apply a two-stage CCS pipeline following Li et al. [28] on all
+77,773 plugin-touching commits, assigning each commit exactly one CCS type. Stage 1 matches commits that already
+carry a CCS-style prefix (e.g., feat: or fix:) via regular expressions, classifying 51,141 commits (65.7%) directly. Stage 2
+prompts GPT-5-mini with all 11 CCS definitions plus an other category for commits that do not fit any standard type,
+obtaining a predicted type and confidence score for each of the remaining 26,632 commits (Listing 2).
+We validate each stage on a separate 385-commit random sample (95% confidence and a 5% margin of error [8]),
+manually labeled by a single rater reading the commit message alongside the changed files. We apply the Cohen’s
+Kappa with thresholds for interpreting the strength of agreements in Landis and Koch [25] and find that Stage 1 reaches
+92% agreement (𝜅= 0.903) while Stage 2 reaches 76.4% (𝜅= 0.707), indicating above substantial agreement [8]. To
+Manuscript submitted to ACM
+
+
+===== page 17 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+17
+compare against conventional OSS, we plot our distribution against Zeng et al. [52], who report CCS type distributions
+across 88,704 commits from 116 source-code OSS repositories. To examine how commit effort is distributed across
+plugin components, we build a heatmap in which each cell shows the percentage of that component type’s commits
+carrying each CCS type, enabling direct comparison across components regardless of their volume.
+Analyze commit behavior through manual study. To understand the meaning of the commits and how they
+are internally different from traditional software commits, we draw a stratified random sample of 700 commits from
+the full 77,773 plugin-touching commits (Section 3.2), treating each CCS type as a stratum at 95% confidence and 5%
+margin with a minimum of 50 commits per stratum [8]. We follow an open coding method [32] to inspect and classify
+the sampled commits. The first two authors first jointly inspect a subset of sampled commits from each CCS type and
+construct an initial set of categories based on the commit content and the agent plugin context. The two authors then
+independently classify the remaining commits based on the initial categories. When they encounter commits that do
+not fall into any existing category, the two authors discuss and introduce new categories as needed. Disagreements
+are also resolved through discussion until both authors agree on all classification results. At the end, the two authors
+inspect the whole set of 700 plugin-touching commits and identify their actual CCS categories (discussed in Section 5.3),
+reaching substantial agreement (Cohen’s 𝜅= 0.671).
+Re-classify commit types whose labels no longer match their function. We first identify the CCS types
+whose meaning in plugin repositories diverges from their traditional software engineering definition, based on the 700
+manually inspected plugin commits. We then re-classify all commits that belong to the CCS types that show definition
+shifts into appropriate CCS types. Unlike the Classify commit types under CCS categories step, which relies on the
+developers’ intent stated in the commit message, the re-classification in this step reads the actual content diff to discern
+the commit behavior, the same way the 700 commits were labeled during manual study. We summarize the findings
+from the manual study into per-type rubrics that define CCS categories through development and maintenance behavior
+in agent plugin scenario (Listing 3 in Appendix C) and leverage GPT-5-mini, the same model used during commit
+classification under CCS categories, to automate the labeling at scale. We validate the rubric on the doc, ci, style commit
+subset of the double-labeled sample, reaching 83% agreement with the two raters’ consensus (𝜅= 0.65), comparable to
+the 𝜅= 0.70 agreement between the raters themselves.
+Detect agent contributions. To understand what kind of tasks developers delegate to agents, we apply the commit-
+level heuristics of Robbes et al. [41] for detecting the presence of coding agents in software repositories to our 77,773
+plugin-touching commits (Section 3.2), covering all known agents listed in Robbes et al. [41]. For each commit, we scan
+the message body for co-author trailers (e.g., Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>)
+and agent email addresses, and the author field for agent name patterns, all drawn from their catalogue.
+5.3
+Results
+In plugin repositories, docs, perf, style, and refactor describe activities that differ from traditional software
+engineering interpretations. Table 4 presents the full content category breakdown across the 700-commit sample.
+74% of docs commits modify instruction files Claude reads at inference time rather than human-readable documentation,
+making them functionally equivalent to feat or fix in traditional SE. Whether the developer wrote docs: explicitly
+or the pipeline inferred it from the Markdown artifact, the label reflects the form of the change, not its function. perf
+targets model tier assignment, orchestration overhead, and prompt verbosity rather than algorithmic complexity or
+runtime throughput. style extends into instruction wording precision, where a phrasing change shifts model behavior
+at runtime rather than affecting code formatting. refactor is dominated by rewording AI-facing instruction text without
+Manuscript submitted to ACM
+
+
+===== page 18 =====
+18
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+Table 4. Development and maintenance behavior observed in a stratified sample of 700 plugin-touching commits, one stratum per
+CCS type. Sample sizes follow stratified random sampling [8]: 𝑛= 137 for feat, 83 for fix, 80 for chore, and 50 per remaining type. fix
+and revert allow multiple labels per commit so their percentages may not sum to 100%. Bold indicates the change type within each
+CCS label that departs most from its conventional software engineering counterpart. Underline indicates the sub-categories whose
+meaning differs from the conventional meaning of their CCS label.
+CCS Type
+Change Type
+Description
+N (%)
+feat (𝑛=137)
+Plugin or component addition
+New plugin.json, marketplace entry, or major component added
+66 (48.2%)
+Component update
+Existing instruction using natural language or config files extended
+54 (39.4%)
+Incidental touch
+Plugin file changed as a side-effect of non-plugin work
+17 (12.4%)
+fix (𝑛=83)
+Instruction/content fix
+Wrong behavioral text corrected in skill, command, or agent files
+41 (49.4%)
+Hook/command script fix
+Bugs in executable plugin scripts or hooks.json
+27 (32.5%)
+Plugin manifest fix
+Wrong metadata in plugin.json or marketplace.json
+12 (14.5%)
+Path fix
+Wrong file paths corrected alongside another fix
+7 (8.4%)
+Incidental touch
+Plugin file changed as a side-effect of non-plugin work
+5 (6.0%)
+chore (𝑛=80)
+Plugin version bump
+Version field incremented in plugin.json or marketplace.json
+51 (63.8%)
+Incidental touch
+Plugin file changed as a side-effect of non-plugin work
+19 (23.8%)
+Manifest/registry update
+Non-version metadata changes (descriptions, skill paths, authors)
+10 (12.5%)
+docs (𝑛=50)
+AI instruction update
+SKILL.md or agents/*.md updated, read at runtime by the LLM, devel-
+oper used docs
+37 (74.0%)
+Human doc update
+README, CHANGELOG, or release notes; no runtime effect on the AI
+13 (26.0%)
+refactor (𝑛=50)
+Instruction/content refactor
+AI-facing Markdown restructured without intended behavior change
+25 (50.0%)
+File/directory restructuring
+Files or dirs moved or renamed to match schema conventions
+12 (24.0%)
+Incidental touch
+Plugin file changed as a side-effect of non-plugin work
+7 (14.0%)
+Component restructuring
+Plugin components extracted, split, merged, or converted
+6 (12.0%)
+test (𝑛=50)
+Incidental touch
+Plugin file changed as a side-effect of non-plugin work
+24 (48.0%)
+Plugin test file
+pytest, shell, or integration tests for executable plugin scripts
+14 (28.0%)
+AI behavior test file
+Eval cases or pressure tests for model routing and behavior
+7 (14.0%)
+Agent/skill test instruction
+SKILL.md or agent file encoding testing methodology in prose
+5 (10.0%)
+style (𝑛=50)
+Instruction style
+Wording, precision, or formatting of AI-facing instruction files
+18 (36.0%)
+Code style
+Formatting or linting of executable scripts and config JSON
+16 (32.0%)
+Incidental touch
+Plugin file changed as a side-effect of non-plugin work
+13 (26.0%)
+AI output style
+Verbatim text the AI is instructed to produce reworded
+3 (6.0%)
+perf (𝑛=50)
+AI execution management
+Model tier assignment, orchestration, hook tuning, routing accuracy
+24 (48.0%)
+Prompt optimization
+Instruction rewrites to reduce token cost or enable prompt caching
+15 (30.0%)
+Traditional performance
+Runtime improvements, algorithmic changes, or install/download speed
+11 (22.0%)
+revert (𝑛=50)
+Instruction/content reversal
+Original commit primarily changed AI-facing .md files
+25 (50.0%)
+Config/structure reversal
+Original commit primarily changed plugin config or hooks files
+16 (32.0%)
+Incidental touch
+Plugin file changed as a side-effect of non-plugin work
+6 (12.0%)
+Code/script reversal
+Original commit primarily changed executable plugin scripts
+3 (6.0%)
+Version rollback [secondary]
+Version number decremented alongside a primary revert label
+10 (20.0%)
+ci (𝑛=50)
+CI/CD workflow management
+GitHub Actions workflows, release pipelines, or validation scripts
+35 (70.0%)
+CI-domain instruction update
+SKILL.md or command files updated inside a plugin that gives Claude
+CI/CD expertise, ci reflects the plugin’s domain, not a pipeline change
+14 (28.0%)
+Incidental touch
+Plugin file changed as a side-effect of non-plugin work
+1 (2.0%)
+build (𝑛=50)
+Build-label mismatch
+Commit labeled build unrelated to actual build activity
+46 (92.0%)
+Dependency update
+npm bumps, CDN URL changes, or build toolchain updates
+4 (8.0%)
+changing intended behavior and by schema realignment, rather than the code-quality concerns the label carries in
+conventional repositories. These four types diverge from their conventional meaning in two ways. perf and refactor
+commits hold their CCS labels while referring to natural language AI instructions rather than programming code,
+whereas docs and style commits often belong to a different CCS type, indicating a gap that we quantify below.
+feat, fix, chore, and ci retain their conventional meaning in plugin repositories, with feat and fix shifting
+from source code to natural-language instruction files. As shown in Table 4, feat commits frequently introduce
+new plugins, add components, or extend existing instruction content. Where conventional feature development centers
+Manuscript submitted to ACM
+
+
+===== page 19 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+19
+0.0%
+5.0%
+10.0%
+15.0%
+20.0%
+25.0%
+30.0%
+35.0%
+40.0%
+Share of all commits
+feat
+fix
+chore
+docs
+refactor
+build
+test
+style
+perf
+ci
+docs: 6,708 commits
+re-classified out
+Plugin 
+ retained
+Plugin 
+ gained (re-classified in)
+Plugin 
+ lost (re-classified out)
+Traditional SWE (Zeng et al.)
+39.6
+17.2
+25.8
+27.0
+21.0
+26.0
+1.7
+8.1
+8.8
+9.6
+1.1
+3.5
+0.5
+6.0
+0.3
+0.9
+0.4
+0.4
+0.1
+1.3
+Fig. 8. CCS distribution of plugin commits after re-classifying docs, ci, and style by the function of each commit’s diff (blue), with the
+commits each type gains (green) or loses (hatched vermilion) under re-classification, against the traditional-SWE baseline (orange,
+Zeng et al. [52]). docs collapses from 10.3% to 1.7% as its commits move to feat, fix, and chore.
+on implementing code, feature development in plugin repositories often consists of specifying new behavior in natural
+language. About half (49.4%) of fix commits correct wrong behavioral text in instruction files rather than code bugs.
+Wrong tool references, incorrect workflow steps, and flawed examples in SKILL.md or agent files are the primary
+defect category in plugin repositories. In contrast, chore and ci remain closer to their conventional meaning, with the
+majority of commits in each type performing traditional maintenance tasks. Chore commits follow traditional release
+mechanics on plugin-specific artifacts. 63.8% are version increments in plugin.json or marketplace.json, while
+12.5% are non-version manifest updates registering new skill paths or updating marketplace registry entries. 70.0% of
+ci commits manage conventional GitHub Actions workflows and release pipelines, while the remainder come from
+developers of CI-analysis plugins who write ci for instruction updates because their plugin domain is CI tooling, not
+because any pipeline changed.
+Instruction Markdown files in plugin repositories are the shared target of feat, fix, style, and refactor
+commits, with developer intent as the only criterion distinguishing them. Table 4 shows the sub-category
+descriptions that separate each type across the 700-commit sample. In conventional repositories, these four types map
+to structurally different changes. In plugin repositories, all four can consist of the same text edit to the same instruction
+file, leaving developer intent as the only criterion. The boundary between them is inherently ambiguous, as the same
+diff can qualify as any of the four depending on what the developer intended.
+Manuscript submitted to ACM
+
+
+===== page 20 =====
+20
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+feat
+fix
+chore
+docs
+refactor
+style
+perf
+test
+build
+ci
+revert
+other
+Commit Type (CCS)
+.claude-plugin/
+skills/
+commands/
+agents/
+hooks/
+.mcp.json
+.lsp.json
+settings.json
+Plugin Component
+33.0%
+17.6%
+38.7%
+1.4%
+6.2%
+0.1%
+0.2%
+0.3%
+1.9%
+0.2%
+0.4%
+0.1%
+49.4%
+28.1%
+7.4%
+2.0%
+10.7%
+0.3%
+0.4%
+0.6%
+0.5%
+0.1%
+0.3%
+0.2%
+52.2%
+26.6%
+6.0%
+0.8%
+12.4%
+0.5%
+0.4%
+0.2%
+0.3%
+0.1%
+0.4%
+0.2%
+52.0%
+21.4%
+9.4%
+0.7%
+13.5%
+0.3%
+0.6%
+0.4%
+0.9%
+0.0%
+0.4%
+0.4%
+46.3%
+30.2%
+6.8%
+0.7%
+11.8%
+0.4%
+0.7%
+0.9%
+1.6%
+0.1%
+0.4%
+0.2%
+49.3%
+20.8%
+14.0%
+0.2%
+10.4%
+0.3%
+0.2%
+0.7%
+2.4%
+0.4%
+0.9%
+0.5%
+63.4%
+19.5%
+3.7%
+2.4%
+9.8%
+0.0%
+0.0%
+0.0%
+1.2%
+0.0%
+0.0%
+0.0%
+40.4%
+15.3%
+31.6%
+0.5%
+8.1%
+0.4%
+0.2%
+0.7%
+0.9%
+0.4%
+0.7%
+0.8%
+Commit Type × Plugin Component (re-classified docs/ci/style)
+celli, j = |Ci, j|/|Ci| × 100%  (row-normalized per component)
+0%
+10%
+20%
+30%
+40%
+50%
+60%
+% of component's commits
+Fig. 9. CCS type distribution across plugin components. Each cell shows the percentage of that component’s commits carrying a
+given CCS type, enabling direct comparison across components regardless of their volume.
+The docs share drops from 10.3% to 1.7% after re-classification, as 80% of commits initially labeled docs are
+reassigned to feat or fix. Figure 8 plots the re-classified distribution against the traditional-SWE baseline, where the
+hatched segment on the docs bar marks the 6,709 commits re-classified out of docs and the green segments on feat and
+fix mark the commits they absorb. Of the 8,007 commits labeled docs, only 16% remain human documentation, and the
+rest belong to fix (3,353), feat (3,047), or chore (279) by the work they perform. More of them are fix than feat, so much of
+the documentation activity in plugin repositories corrects the instructions the agent runs rather than adding new ones.
+ci and style shift far less, with 61% and 62% keeping their original type, so among the three only docs is re-classified at
+scale. The re-classification also reverses the comparison with conventional OSS: the raw docs share (10.3%) sits above
+the 8.1% reported by Zeng et al. [52], but by the work these commits perform it falls to 1.7%, well below that baseline.
+feat dominates plugin commits at 39.6%, more than double its 17.2% share in conventional OSS, while
+chore at 21.0% shows that developers actively return to maintain their plugins after initial creation. Figure 8
+shows feat, fix, and chore together account for 86.5% (67,271 out of 77,773 commits) of all classified commits, with feat
+alone at 39.6% (30,820 out of 77,773). The feat dominance reflects the low-friction authoring model of Markdown-based
+plugins, where adding a capability requires writing natural language instructions rather than programming language
+code. While feat reflects the ease of initial plugin authoring, the substantial chore share (21.0%), primarily due to version
+increments and manifest updates, shows that developers do return to maintain their plugins rather than abandoning
+Manuscript submitted to ACM
+
+
+===== page 21 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+21
+Table 5. Agent contributions and Claude co-authorship across 77,773 plugin-touching commits.
+(a) Multi-agent detection results following Robbes et al. [41], covering
+all known agents listed in their study. The heuristics were applied
+to 𝑛= 77,773 commits. Agents with zero commit-level matches are
+omitted.
+Agent
+Heuristics
+# Commits
+%
+Claude
+trailer, email, author
+27,159
+34.9
+Copilot
+trailer, email, author
+331
+0.4
+Cursor
+trailer, email, author
+80
+0.1
+Amp
+trailer
+65
+<0.1
+Codex
+trailer, email, author
+24
+<0.1
+Gemini
+trailer, name pattern
+17
+<0.1
+Devin
+trailer, author
+12
+<0.1
+CodeRabbit
+trailer
+10
+<0.1
+Sourcery
+trailer
+5
+<0.1
+Jules
+trailer
+4
+<0.1
+Opencode
+trailer
+3
+<0.1
+Aider
+trailer, email, author
+1
+<0.1
+ChatGPT
+trailer
+1
+<0.1
+QwenCoder
+trailer
+1
+<0.1
+Any agent
+27,636
+35.5
+(b) Claude co-authorship rate by CCS type following the
+heuristics of Robbes et al. [41], after re-classifying docs, ci,
+and style commits (Section 5.3).
+CCS
+# Commits
+# Claude
+% Claude
+feat
+30,820
+12,234
+39.7
+fix
+20,089
+7,723
+38.4
+chore
+16,362
+3,798
+23.2
+refactor
+6,872
+2,438
+35.5
+docs
+1,299
+405
+31.2
+build
+854
+161
+18.9
+test
+425
+132
+31.1
+perf
+287
+115
+40.1
+revert
+265
+43
+16.2
+style
+248
+51
+20.6
+other
+139
+24
+17.3
+ci
+113
+35
+31.0
+Total
+77,773
+27,159
+34.9
+them after initial creation. fix ranks second at 25.8%, below the 27% it holds in conventional OSS [52], reflecting the
+corrective maintenance burden of programming language artifacts. build and test are also substantially less common in
+plugin repositories (1.1% and 0.5%, respectively) than in conventional OSS, since natural-language artifacts require
+no compilation pipeline or dedicated test suite, though the Zeng et al. repositories are substantially older, which may
+amplify their fix share (Section 8).
+feat is the dominant commit type across nearly all plugin component types, with .claude-plugin/ as the
+sole exception where chore leads. Figure 9 shows how commit intent shifts across each component type. Among
+behavioral components, feat accounts for 46.3–52.2% of commits in skills/, commands/, agents/, and hooks/. In
+contrast, chore dominates at 38.7% versus feat at 33.0% for .claude-plugin/. This exception reflects the nature of
+.claude-plugin/, which stores version manifests, schema declarations, and marketplace registrations that accumulate
+recurring configuration updates rather than new behavioral additions. These updates account for much of the overall
+chore share shown in Figure 8.
+35.5% of plugin commits are co-authored by an AI coding agent, with Claude accounting for 34.9% and
+dominating AI-assisted plugin development and AI contribution most commonly seen in perf commits
+(40.1%). Table 5 reports detection results for all agents in Robbes et al. [41]’s catalogue alongside Claude’s co-authorship
+rate, broken down by commit type. Overall, 35.5% of plugin commits match at least one coding agent. Of these, 77
+commits (0.1%) match more than one agent. All other coding agents combined contribute less than 0.5%, making the
+marketplace effectively a single-agent environment. This partly reflects the dataset. The plugins studied are built for
+Claude Code, where Claude is the natural co-author. Co-authorship ranges from 40.1% for perf commits to 16.2% for
+revert commits, a gap of 23.9 percentage points, suggesting that developers use Claude depending on task type rather
+than uniformly across all development tasks.
+Manuscript submitted to ACM
+
+
+===== page 22 =====
+22
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+Takeaway (RQ2)
+• A manual analysis of 700 commits reveals that four CCS types carry different meanings in plugin reposito-
+ries: docs commits predominantly update runtime AI behavior, perf targets prompt efficiency rather than
+algorithmic speed, style extends to instruction wording, and refactor is dominated by schema realignment.
+• Plugin development is predominantly feature-driven. feat, fix, and chore account for 86.5% of all commits,
+with feat at 39.6% reflecting the ease of adding capabilities through natural-language instruction files.
+• AI coding agents co-author 35.5% of all plugin commits, with co-authorship ranging from 40.1% for perf to
+16.2% for revert commits.
+6
+RQ3: How Do Plugin Components Co-Evolve?
+6.1
+Motivation
+Prior work reports that in traditional OSS, infrastructure code and source code co-evolve tightly, which introduces ad-
+ditional efforts for the people responsible for these changes to keep the project compilable, deployable, or executable [20].
+Our findings from previous research questions show that agent plugins frequently combine multiple component types
+and languages (both natural language and multiple programming languages) within the same repository (RQ1), with
+significant contribution from AI coding agents (RQ2). The distinct composition of components, languages, and contri-
+butions indicates that the prior findings on co-evolution and coupling on traditional OSS might not transfer well to
+agent plugin repositories.
+Therefore, we investigate whether agent plugins have similar coupling between components, examining potential
+co-evolutions at two levels: 1) inter-component and 2) intra-component. Since development is predominantly natural-
+language driven (RQ2), when scripts and Markdown files change together, classifying what drives that inter-component
+coupling reveals how maintaining natural-language artifacts differs from maintaining source code. Intra-component co-
+evolution operates within individual components themselves, where the same question arises at the file-type level, since
+skills and hooks mix file types that could co-evolve within a single directory. Together, the answers offer researchers
+the first empirical co-evolution measurements for AI-native repositories, where the dependency of interest runs not
+between two code files but between an implementation script and the natural-language instructions an agent reads at
+runtime.
+6.2
+Approach
+To study how plugin components co-evolve, we first collect merged pull requests (PRs), then conduct analyses using
+the dataset described in Section 3.2.
+Collect merged pull requests. To capture developer-reviewed units of change in which related modifications are
+bundled together, making cross-component co-change more visible within individual commits [9], we collect merged
+pull requests via the GitHub REST API across all 1,926 repositories. We retrieve closed pull requests and retain only
+those with a non-null merged_at timestamp, since only merged pull requests represent changes accepted into the code
+base, capping at 500 changed files per pull request to avoid timeouts on large non-plugin changes. This yields 112,807
+merged pull requests. For the coupling analyses, we restrict to the 748 repositories with more than ten merged pull
+requests following Barrak et al. [9] and to multi-component plugins (those containing at least two distinct component
+Manuscript submitted to ACM
+
+
+===== page 23 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+23
+types), since association rules between component types require both types to appear in the data, yielding 10,679 plugin
+pull requests from 2,592 plugins.
+Measure cross-component coupling. Association rules measure how often two items co-occur in transactions.
+Applied to pull requests, they capture how often two component types change together in the same pull request and
+whether that co-change is stronger than chance. To understand whether updating one component forces updates to
+others, we apply the association rule methodology first introduced for build co-evolution by McIntosh et al. [36] and
+later adopted by Jiang and Adams [20] with merged pull requests as the unit of work. For each directed component
+type pair (X→Y and Y→X are measured separately since Confidence is asymmetric), we compute Support, Confidence,
+Lift, and a chi-squared significance test (𝛼= 0.05) without an additional multiple-testing correction, consistent with
+Jiang and Adams [20]:
+𝑆𝑢𝑝𝑝(𝑋⇒𝑌) = 𝑆𝑢𝑝𝑝(𝑌⇒𝑋) = 𝑃(𝑋∩𝑌)
+(2)
+𝐶𝑜𝑛𝑓(𝑋⇒𝑌) = 𝑃(𝑋∩𝑌)
+𝑃(𝑋)
+= 𝑆𝑢𝑝𝑝(𝑋⇒𝑌)
+𝑃(𝑋)
+(3)
+𝐿𝑖𝑓𝑡(𝑋⇒𝑌) = 𝑃(𝑋∩𝑌)
+𝑃(𝑋)𝑃(𝑌) = 𝐶𝑜𝑛𝑓(𝑋⇒𝑌)
+𝑃(𝑌)
+(4)
+𝜒2(𝑋⇒𝑌) = 𝑛(𝐿𝑖𝑓𝑡−1)2
+𝑆𝑢𝑝𝑝× 𝐶𝑜𝑛𝑓
+(𝐶𝑜𝑛𝑓−𝑆𝑢𝑝𝑝)(𝐿𝑖𝑓𝑡−𝐶𝑜𝑛𝑓)
+(5)
+Support measures how often X and Y change together across all pull requests. Confidence measures how often Y
+changes given that X already changed in the same pull request. Lift contextualizes this Confidence by accounting for
+how frequently Y changes overall, with above 1 indicating that Y changes more often with X than expected from their
+individual frequencies [9].
+Measure intra-component coupling. To assess whether different file types co-change within individual component
+directories, we apply the same association rule methodology within skills/ and hooks/, using file types as the unit
+of work rather than component types. Any plugin with a skills/ or hooks/ directory qualifies, since the analysis
+requires only two distinct file types within a single directory rather than two distinct component types across a plugin,
+yielding 13,587 intra-skills pull requests from 5,353 plugins and 1,696 intra-hooks pull requests from 1,085 plugins
+across the same 748 repositories.
+Filter and sample co-change pull requests. To study what happens when scripts and Markdown files change
+together, we apply two filters to the 13,587 intra-skills pull requests. First, we retain only pull requests where at least
+one script (.py, .sh, or .ts) and at least one Markdown file co-change within the same skills/ subdirectory, yielding
+1,908 pull requests. Second, we restrict to pull requests where all such files are modified rather than newly created,
+excluding pull requests where the script and its paired Markdown file are introduced together in the same pull request,
+yielding 323 pull requests. We draw a stratified sample of 64 pull requests (20% per stratum) across the six script-type ×
+Markdown-type combinations (.py, .sh, .ts × SKILL.md, Other .md), ensuring all co-change combinations are represented
+when we construct the taxonomy.
+Classify co-change patterns. We read the full script and Markdown diff of each pull request and classify what the
+developer changed in the script and why the Markdown required corresponding updates. Following Dig and Johnson
+[14], who distinguish structural changes that preserve a component’s behavior from behavioral changes that modify it,
+we characterize each co-change by the nature of the underlying script change rather than by the file type touched. We do
+not reuse their object-oriented catalog directly. Instead, we derive five plugin-specific coupling categories through open
+coding of the sample. We follow the same open coding process used for the commit content categories (RQ2): the first
+Manuscript submitted to ACM
+
+
+===== page 24 =====
+24
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+two authors jointly inspect a small set of pull requests and construct an initial set of categories based on the nature of
+the underlying script change, then independently classify more pull requests based on the initial categories, discussing
+and adding a new category as needed when a pull request does not fit an existing one. The two raters independently
+coded all 64 pull requests against the resulting scheme, reaching substantial agreement (Cohen’s 𝜅= 0.74), and resolved
+the 13 disagreements through discussion until every pull request had a single agreed label.
+Scale the taxonomy with an LLM classifier. To extend the taxonomy built from the 64 human-coded pull requests
+to the remaining 259, we apply an LLM classifier, following the same LLM-assisted scaling approach used for commit
+classification in RQ2. We prompt a gpt-5-mini classifier to assign one of the five categories to each co-change pull
+request from its full script and Markdown diff, treating the 64 human-coded pull requests as ground truth. We validate
+the classifier’s predictions against this ground truth, reaching substantial agreement (Cohen’s 𝜅= 0.62), then apply it to
+the remaining 259 co-change pull requests. The classification prompt is provided in Appendix D.
+6.3
+Results
+The inter-component analysis shows that skills co-change with every other component type in at least
+43.2% of pull requests where the other type changes, showing that keeping skills consistent with the rest of
+a plugin is a recurring effort. Table 6 reports the association rule metrics for all directed component pairs across
+10,679 plugin pull requests. Confidence reaches at least 43.2% in all four component to skills rules, peaking at 56.6% for
+agents to skills. The repository significance column shows the percentage of repositories in which the pair couples
+significantly within that repository on its own, ranging from 16.9%–27.9% across pairs. Prior studies provide context
+for the magnitude of these co-change rates. Jiang and Adams [20] report median Confidence values between 3.5% and
+45.8% for infrastructure-code coupling, while Barrak et al. [9] report median Confidence values between 27.46% and
+91.91% for DVC-source coupling at the pull-request level. The 43–57% component to skills Confidence falls within the
+range observed for cross-artifact co-evolution in these settings, showing that changes to other plugin components
+frequently coincide with changes to skills.
+Lift (Eq. 4) provides a potential explanation for these high co-change rates reflect the dominance of skills. Because
+skills is the most common component type, it changes in the majority of pull requests regardless of what else changes, so
+every component-to-skills Lift falls below 1 (0.59–0.78). For example, agents change with skills in 56.6% of pull requests, a
+substantial and recurring amount of co-change work, so the co-change is real. Lift is only 0.78, so this is likely due to the
+dominance of skills and we cannot attribute it to a coupling specific to agents and skills. In contrast, agents–commands
+reaches Lift 1.40 (𝑝< 0.05), the only one of the five reported pairs where co-change exceeds chance. Further analysis
+reveals that the coupling between agents and commands is bidirectional. We observe that the agent definitions embed
+command slash-names in their output text, and commands reference specific agents in their delegation instructions.
+For example, an agent definition instructs “Run /rune:activate to retry”, while a command’s instructions read “You
+MUST use the Task tool to launch 3 reviewer agents in parallel”. As each component explicitly references the other,
+renaming either one requires updating all corresponding files that mention it.
+The intra-component analysis shows that, scripts and Markdown files co-change in at least 55% of pull
+requests within a single component, showing above-chance coupling within skills/. Table 7 reports the
+intra-component association rules across 13,587 skill pull requests and 1,696 hook pull requests. Confidence ranges from
+55–64% for script–Markdown pairs within skills/ (all 𝑝< 0.05). SKILL.md appears in 82.5% of all skill pull requests
+regardless of what else changes, suggesting developers consistently update it whenever a skill changes. In contrast,
+hooks function as single-language isolated scripts with no cross-file coupling. Unlike the inter-component results, Lift
+Manuscript submitted to ACM
+
+
+===== page 25 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+25
+Table 6. Association rule metrics for directed component type pairs (𝑛= 10,679 plugin pull requests). Pairs with fewer than 100
+co-changing pull requests (PRs) are omitted, as are pairs whose coupling is not statistically significant (𝜒2 ≤3.84). Repos significance
+shows the percentage of repositories with statistically significant coupling (𝜒2 > 3.84).
+Rule (𝑋→𝑌)
+Co-changing PRs
+Conf
+Lift
+Repos significance
+skills →commands
+1,162
+14.9%
+0.64
+23.4%
+commands →skills
+1,162
+46.5%
+0.64
+23.4%
+skills →agents
+1,176
+15.1%
+0.78
+25.8%
+agents →skills
+1,176
+56.6%
+0.78
+25.8%
+skills →hooks
+678
+8.7%
+0.59
+27.9%
+hooks →skills
+678
+43.2%
+0.59
+27.9%
+agents →commands
+679
+32.7%
+1.40
+25.0%
+commands →agents
+679
+27.2%
+1.40
+25.0%
+skills →MCP
+146
+1.9%
+0.65
+16.9%
+MCP →skills
+146
+47.2%
+0.65
+16.9%
+Table 7. Intra-skills file-type co-change association rules (𝑛= 13,587 pull requests from 5,353 plugins). Script-to-script pairs and pairs
+with fewer than 200 co-changing pull requests are omitted, as are pairs whose coupling is not statistically significant (𝜒2 ≤3.84).
+Other .md corresponds to supporting files [7]. Repos significance shows the percentage of repositories with significant coupling
+(𝜒2 > 3.84).
+Rule (𝑋→𝑌)
+Co-changing PRs
+Conf
+Lift
+Repos significance
+.py →README.md
+201
+19.1%
+4.14
+33.3%
+README.md →.py
+201
+32.1%
+4.14
+33.3%
+.json →README.md
+203
+17.5%
+3.80
+48.6%
+README.md →.json
+203
+32.4%
+3.80
+48.6%
+.py →Other .md
+670
+63.6%
+1.58
+16.0%
+Other .md →.py
+670
+12.2%
+1.58
+16.0%
+.sh →Other .md
+289
+55.0%
+1.37
+23.1%
+Other .md →.sh
+289
+5.3%
+1.37
+23.1%
+.json →Other .md
+548
+47.3%
+1.17
+12.4%
+Other .md →.json
+548
+10.0%
+1.17
+12.4%
+SKILL.md →.json
+694
+6.2%
+0.73
+11.7%
+.json →SKILL.md
+694
+59.9%
+0.73
+11.7%
+README.md →Other .md
+360
+57.4%
+1.43
+26.1%
+Other .md →README.md
+360
+6.6%
+1.43
+26.1%
+Other .md →SKILL.md
+4,086
+74.6%
+0.91
+15.8%
+SKILL.md →Other .md
+4,086
+36.5%
+0.91
+15.8%
+here exceeds 1 for all script–Markdown pairs (1.37–1.58), confirming that scripts and Markdown files co-change more
+than chance alone would predict within a single skill directory.
+50 of the 64 sampled pull requests (78%) contain at least one functionally coupled script–Markdown
+co-change. Table 8 summarizes the four coupling categories. Interface changes and internal logic changes are the two
+most frequent drivers, each covering 17 of the 50 coupled pull requests (34%). When a developer adds or removes a flag,
+command, or method, or changes what the script computes or outputs, SKILL.md must be rewritten before the agent can
+Manuscript submitted to ACM
+
+
+===== page 26 =====
+26
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+Table 8. Script–Markdown co-change categories. The scheme was built by open coding a sample of 64 pull requests (two raters,
+Cohen’s 𝜅= 0.74) and applied to the remaining 259 by a gpt-5-mini classifier (validated at 𝜅= 0.62 against the 64). The first four
+categories are coupling mechanisms, and the remaining No coupling category shows no correlation between script and Markdown
+file changes.
+Category
+Description
+Human
+LLM
+(n=64)
+(n=259)
+Interface change
+A flag, command, argument, or method is added or removed in the script; SKILL.md
+updates the callable surface the agent invokes.
+17 (27%)
+87 (34%)
+Internal logic change
+The script’s behavior or output changes while it is invoked the same way; SKILL.
+md updates its description of what the skill does.
+17 (27%)
+68 (26%)
+Variable/version sync
+A version, default, or identifier the script embeds changes (model name, environ-
+ment variable, version string); every Markdown file that quotes it follows.
+9 (14%)
+33 (13%)
+Repo re-structuring
+A file, path, or configuration-file format is moved, renamed, or reformatted; SKILL.
+md updates the affected paths, filenames, or format examples.
+7 (11%)
+24 (9%)
+No coupling
+The script and the Markdown both change, but the script change does not drive
+the Markdown file change.
+14 (22%)
+47 (18%)
+Fig. 10. Examples of script and Markdown changes across the coupling categories, selected from real plugin pull requests. For each
+example, the script update is shown on the left and the related Markdown update on the right.
+invoke the skill correctly. Variable and version synchronization (9 pull requests), where a model identifier, environment
+variable, or version string changes in the script, every Markdown file that quotes it must follow, because these variables
+exist only in the natural language that configures the skill. In one sampled pull request, a single model-identifier change
+propagated to 24 SKILL.md files. Repo re-structuring (7 pull requests) covers changes where a renamed path, filename,
+or configuration-file format forces matching edits to every instruction that references it. The remaining 14 pull requests
+(22%) show no coupling. In these pull requests the script and the Markdown file both change, but the script update is
+not what drives the Markdown edit. The gpt-5-mini classifier, which reaches substantial agreement with the human
+labels (Cohen’s 𝜅= 0.62), reproduces this distribution almost exactly on the remaining 259 co-change pull requests
+(Table 8, LLM column), confirming the taxonomy generalizes beyond the manually coded sample.
+Figure 10 illustrates one representative diff pair per category. For interface changes, an import script gained two new
+flags (–image-field, –skip-fields), and SKILL.md added a section covering both flags and the updated invocation.
+Manuscript submitted to ACM
+
+
+===== page 27 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+27
+For internal logic changes, a status command was extended to auto-detect the latest mission directory, and the SKILL.md
+invocation shrank from an 80-character shell pipeline the agent had to compose verbatim to a single plain call. For
+variable and version synchronization, a provider template changed one model identifier, and 24 SKILL.md files were
+updated in the same pull request because the model name was quoted in every sub-skill’s instructions. For repo
+re-structuring, a skill switched its configuration file from .alva.json to .env, and SKILL.md replaced every JSON
+example with the dotenv format.
+Takeaway (RQ3)
+• The inter-component analysis shows skills co-changing with every other component type in at least 43.2%
+of pull requests, though Lift stays below 1 (0.59–0.78), and only agents–commands co-change above chance.
+• The intra-component analysis shows scripts and Markdown files inside skills/ co-changing above chance
+(Lift 1.37–1.58), revealing dependencies not visible at the component level.
+• Manual inspection of 64 sampled co-change pull requests confirms that 78% are functionally coupled, driven
+by interface and internal-logic changes that propagate from scripts to their paired instruction files.
+7
+Implications
+7.1
+Implications for Researchers
+Researchers should treat AI-facing Markdown as a first-class software artifact whose maintenance requires
+dedicated analysis methods beyond code-centric metrics. RQ2 shows that 74% of docs commits in plugin repositories
+modify instructions read by Claude at runtime rather than human-readable documentation, making them functionally
+equivalent to feat or fix commits in traditional SE. Code-centric measures such as complexity, clone detection, and test
+density cannot capture the semantic drift, instruction staleness, or capability coverage of the natural-language artifact
+that directly controls Claude’s behavior at runtime, and tracking maintenance quality in plugin repositories requires
+new analysis methods designed for natural-language content rather than recalibrated code metrics. Researchers should
+develop analyses tailored to the semantic structure of natural-language instruction files, including semantic differencing
+to detect meaning changes without surface-level edits, instruction linting to identify missing or contradictory directives,
+and consistency metrics that verify Markdown plugin files remain synchronized with their paired scripts. Whether
+commits that touch both plugin component files and non-plugin artifacts such as source code, configuration, and
+documentation reflect systematic coupling between plugins and their host repositories or coincidental project activity
+remains an open question, and resolving it would determine whether instruction-aware analyses need to extend beyond
+plugin boundaries to provide complete coverage.
+Researchers should not apply commit classifiers trained on conventional OSS directly to AI-native plugin
+repositories, as commit-type semantics diverge substantially across ecosystems. Our manual analysis of 700
+commits in (RQ2) shows that four CCS types carry substantially different meanings in plugin repositories. Applying
+commit classifiers trained on conventional OSS to plugin repositories, or comparing CCS distributions without semantic
+validation, will produce misleading results, in plugin repositories, docs commits most often modify runtime AI behavior,
+and perf commits target prompt efficiency rather than algorithmic speed. Researchers building commit analysis tools
+for plugin ecosystems should fine-tune automated classifiers on the semantically validated plugin-specific labels, and
+researchers studying other AI-native ecosystems should validate whether the same semantic shifts appear before
+applying conventional CCS taxonomies. Whether the same semantic drift holds in the emerging plugin marketplace of
+Manuscript submitted to ACM
+
+
+===== page 28 =====
+28
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+other AI coding agents, such as GitHub Copilot and OpenAI Codex, where natural-language-first artifacts may produce
+analogous label shifts, remains untested.
+Researchers should study human-AI collaboration in AI-native plugin repositories. Claude co-authors 34.9%
+of all plugin-touching commits with measurable variation across types, from 40.1% in perf to 16.2% in revert (RQ2).
+These agent plugin marketplaces expose a visible division of labor between humans and coding agents across tens of
+thousands of real commits, providing large-scale observational data on human-AI collaboration. Researchers should
+use this marketplace to study delegation patterns, review dynamics, and how human and agent responsibilities evolve
+as AI-native projects mature. Whether the human-AI co-authorship profile shifts over a plugin’s lifecycle remains
+uncharacterized. Tracking whether the high feat co-authorship rate of the initial growth phase gives way to increasing
+fix and perf co-authorship as a plugin matures would reveal whether AI involvement is a persistent property of the
+maintenance regime or concentrated in early development.
+Software maintenance researchers should develop consistency-checking techniques for code–instruction
+dependencies. 78% of Script–Markdown co-changes in our sample are functionally necessary, driven by interface and
+internal-logic changes, with variable renames cascading across instruction files (RQ3). Unlike traditional documentation
+drift, a stale SKILL.md causes Claude to invoke the skill incorrectly at runtime, making instruction staleness a correctness
+defect rather than a readability issue with no compiler or type checker to flag the mismatch at development time,
+analogous to cross-language interface errors where a signature change in one language silently breaks callers in
+another. Researchers should build automated techniques that extract callable interfaces from scripts and verify that
+corresponding Markdown instructions, parameter names, and usage examples remain synchronized. Automated
+propagation of interface changes to natural-language files is a tractable and unsolved problem. The four co-change
+categories in Section 6 each have a predictable structure detectable from a script diff, a single identifier rename already
+propagates to dozens of Markdown files in practice, and no existing tool addresses this class of dependency.
+Researchers studying AI coding agent platforms should plan longitudinal follow-ups of plugin market-
+places. Commit activity grew 8.8× between the October 2025 launch and March 2026 with no sign of plateau at the data
+cutoff (RQ1). The rapid post-launch creation of repositories also produced structural redundancy: 38.7% of normalized
+plugin names appear more than once, with the majority tracing to collective aggregator repositories that re-register
+plugins from other sources, meaning raw plugin counts overstate true supply breadth. As more developers from diverse
+professional domains join this expanding marketplace, the current concentration in Software Engineering (61.3% of
+all plugins) is likely to evolve, with other fields potentially growing into substantial segments. Researchers should
+track how the category distribution evolves as the marketplace grows, whether developers shift focus toward other
+fields or whether SE concentration deepens further, and whether multi-component plugins transition from a minority
+(34.4%) to the dominant architectural pattern. Whether the Software Engineering concentration and Skills dominance
+observed here represent a temporary signature of the early growth phase or a persistent structural property of AI
+coding agent marketplaces remains unknown, and answering it would require longitudinal tracking of this marketplace
+or cross-platform comparisons at different stages of maturity.
+7.2
+Implications for Plugin Developers
+Plugin developers who modify Agent or Command definitions should verify that cross-references between
+the two remain consistent. Agents–Commands is the only component pair with above-chance co-change coupling
+across 10,679 plugin pull requests (RQ3). Some agent definitions embed command slash-names in their output text
+and some commands embed agent names in their delegation instructions. In these cases, renaming either artifact
+Manuscript submitted to ACM
+
+
+===== page 29 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+29
+leaves the other referencing a name that no longer exists, with no static check or compiler to flag the broken reference
+before Claude attempts the invocation at runtime. Developers should verify, before merging any rename to an Agent or
+Command file, that every cross-reference to it in the paired artifact still resolves to a valid name. Whether the coupling
+between Agents and Commands grows stronger as a plugin matures, or whether newer component types such as MCP
+servers become the dominant co-change pair over time, remains an open question.
+Plugin developers who modify scripts in skills/ directories should verify whether a corresponding
+SKILL.md update is needed. 78% of script–Markdown co-changes in our sample are functionally coupled (RQ3).
+Leaving SKILL.md behind after a script change causes Claude to invoke the skill with outdated instructions, passing
+flags that no longer exist, use renamed identifiers, or follow an invocation pattern that the script no longer supports,
+with no runtime error to alert the developer. Developers should check their diff against the four coupling categories
+before submitting a script PR and include the Markdown update in the same PR rather than a follow-up. Whether a
+tool can detect these four categories from a script diff and automatically propose the corresponding Markdown update
+remains an open problem, though the predictable structure of each category suggests it is feasible.
+8
+Threats to Validity
+Search completeness. Our discovery relies on the GitHub Code Search API, which indexes only publicly visible
+files. Repositories that are private or that were deleted before our search date are not captured. The recursive prefix
+partitioning mitigates the API cap but cannot recover content that is not indexed.
+Star threshold. The choice of ten stars as the noise-removal threshold is a tradeoff between coverage and noise
+removal. We ran the full data collection pipeline at two alternative thresholds. At 5 stars: 2,694 repositories. At 10 stars
+(our baseline): 1,926 repositories. At 25 stars: 1,247 repositories. Across all three thresholds, Skills remains the dominant
+component type, feat remains the dominant commit type, and the relative ordering of component types is consistent,
+supporting the robustness of our qualitative findings.
+Temporal scope. The dataset was collected in April 2026 and represents a snapshot of a rapidly evolving ecosystem.
+Trends observed here, particularly growth rates and adoption patterns, may not generalize to later periods. The median
+repository age at collection time is only 80 days, meaning many repositories had not yet accumulated a long commit
+history at the point of collection.
+Generalizability. All findings describe the Claude Code agent plugin marketplaces specifically. Whether the
+observed patterns, including the SE-heavy composition, the Agents–Commands coupling, and the redefined commit
+type semantics, generalize to other AI coding agent platforms (e.g., Cursor, Copilot, Gemini) or to AI-native ecosystems
+more broadly remains untested. Researchers should treat these findings as a baseline for Claude Code agent plugin
+marketplaces and verify whether they replicate before drawing conclusions about AI-native software in general.
+Manual labeling. Two of our analyses rely on manual coding: RQ2 classifies a stratified sample of 700 commits into
+content sub-categories, and RQ3 classifies a stratified sample of 64 co-change pull requests into coupling categories. Both
+follow the same open coding procedure. The first two authors jointly inspect a small pilot set and construct an initial set
+of categories from the content and the agent plugin context, then independently code the full sample, adding a category
+through discussion whenever a commit or pull request does not fit an existing one, and resolving disagreements until
+they agree on every category definition. Inter-rater reliability is substantial in both analyses (Cohen’s 𝜅= 0.671 across
+the 700 commits and 𝜅= 0.74 across the 64 pull requests with thresholds according to Landis and Koch [25]), and the
+13 pull-request disagreements in RQ3 were reconciled to a single agreed label. Full validation details are reported in the
+RQ2 (Section 5) and RQ3 (Section 6) approach sections. Despite these steps, ambiguous cases still require subjective
+Manuscript submitted to ACM
+
+
+===== page 30 =====
+30
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+judgment, for example, distinguishing an interface change from an internal logic change when a pull request does
+both, or an instruction-content edit from a behavioral change in a commit, and the assigned label reflects the raters’
+interpretation of developer intent from the diff and commit message.
+LLM-based classification. Plugin taxonomy classification uses Qwen3-Coder-Next-80B and commit type classifica-
+tion uses GPT-5-mini, and both introduce potential biases from model training data and prompt sensitivity. We mitigate
+taxonomy classification risk by adopting the same scheme and model family used by Ling et al. [31] for a comparable
+task, and commit classification risk by validating Stage 2 against human labels on two independent 385-commit samples,
+achieving substantial agreement (𝜅= 0.707). Nonetheless, LLM outputs are non-deterministic and may differ across
+runs or model versions, and the classifications reported here reflect a single run on the final model versions.
+Agent detection. Agent contribution detection follows the heuristics of Robbes et al. [41], which rely on co-author
+trailers, email addresses, author names, and branch prefixes. More commonly, developers who use AI agents to generate
+content may commit the result themselves without adding a co-author trailer, leaving no signal for our heuristics to
+detect. The 34.9% Claude attribution rate should therefore be interpreted as a lower bound on true AI involvement
+rather than an exact count.
+9
+Conclusion
+This paper presents the first large-scale empirical study of an AI coding agent plugin marketplace, analyzing 1,926
+repositories, 8,351 plugins, and 77,773 commits from the Claude Code plugin marketplace on GitHub. We conducted
+three studies to characterize the marketplace structure, its development patterns, and its component co-evolution
+behavior.
+Our findings show that AI-native plugins are a fundamentally different class of software artifact from conventional
+OSS packages. The marketplaces are young and their development is accelerating, with 84.5% of repositories created
+in the six months after the official launch and plugin-touching commit activity growing 8.8× over the same period.
+Software Engineering plugins dominate (61.3%), and 34.4% of plugins combine multiple component types, providing the
+first empirical baseline for this class of artifact. Development is predominantly feature-driven (feat at 39.6%) and heavily
+AI-assisted, with Claude alone co-authoring 34.9% of all commits. Four CCS types, docs, perf, style, and refactor, each
+redefine their conventional meaning in plugin repositories, where the primary artifact is a natural-language instruction
+file rather than executable code. Cross-ecosystem comparisons using these labels without semantic validation risk
+drawing incorrect conclusions. Only the Agents–Commands component pair co-changes above chance (Lift = 1.40); all
+other component pairs evolve independently, and Script–Markdown coupling within skills/ represents a new class of
+maintenance dependency with no analog in traditional SE.
+References
+[1] Adem Ait, Javier Luis Cánovas Izquierdo, and Jordi Cabot. 2022. An empirical study on the survival rate of GitHub projects. In Proceedings of the
+19th International Conference on Mining Software Repositories (MSR). ACM, 365–375. doi:10.1145/3524842.3527941
+[2] Anthropic. 2024. Model Context Protocol. https://modelcontextprotocol.io.
+[3] Anthropic. 2025. Automate Actions with Hooks. https://code.claude.com/docs/en/hooks-guide.
+[4] Anthropic. 2025. Claude Code Plugin Marketplaces. https://code.claude.com/docs/en/plugin-marketplaces.
+[5] Anthropic. 2025. Claude Code Plugins. https://code.claude.com/docs/en/plugins.
+[6] Anthropic. 2025. Discover Claude Code Plugins. https://code.claude.com/docs/en/discover-plugins.
+[7] Anthropic. 2025. Extend Claude with Skills. https://code.claude.com/docs/en/skills.
+[8] Sebastian Baltes and Paul Ralph. 2022. Sampling in Software Engineering Research: A Critical Review and Guidelines. Empirical Software
+Engineering. 27, 4 (2022), 94. doi:10.1007/S10664-021-10072-8
+Manuscript submitted to ACM
+
+
+===== page 31 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+31
+[9] Amine Barrak, Ellis E. Eghan, and Bram Adams. 2021. On the Co-evolution of ML Pipelines and Source Code—Empirical Study of DVC Projects. In
+Proceedings of the IEEE International Conference on Software Analysis, Evolution and Reengineering (SANER). IEEE, 422–433.
+[10] Aaditya Bhatia, Ellis E. Eghan, Manel Grichi, William G. Cavanagh, Zhen Ming Jiang, and Bram Adams. 2023. Towards a Change Taxonomy for
+Machine Learning Pipelines: Empirical Study of ML Pipelines and Forks Related to Academic Publications. Empirical Software Engineering 28, 3
+(2023), 60. doi:10.1007/s10664-022-10282-8
+[11] Norman Cliff. 1993. Dominance statistics: Ordinal analyses to answer ordinal questions. Psychological bulletin 114, 3 (1993), 494.
+[12] Conventional Commits. 2024. Conventional Commits Specification. https://www.conventionalcommits.org.
+[13] Alexandre Decan, Tom Mens, and Philippe Grosjean. 2019. An Empirical Comparison of Dependency Network Evolution in Seven Software
+Packaging Ecosystems. Empirical Software Engineering 24, 1 (2019), 381–416. doi:10.1007/S10664-017-9589-Y
+[14] Danny Dig and Ralph Johnson. 2006. How do APIs evolve? A story of refactoring. Journal of Software Maintenance and Evolution: Research and
+Practice 18, 2 (2006), 83–107. doi:10.1002/SMR.328
+[15] Beat Fluri, Michael Würsch, and Harald C. Gall. 2007. Do Code and Comments Co-Evolve? On the Relation Between Source Code and Comment
+Changes. In Proceedings of the 14th Working Conference on Reverse Engineering (WCRE). IEEE Computer Society, 70–79. doi:10.1109/MSR.2007.5
+[16] Ahmed E. Hassan, Dayi Lin, Gopi Krishnan Rajbahadur, Keheliya Gallaba, Filipe Roseiro Côgo, Boyuan Chen, Haoxiang Zhang, Kishanthan
+Thangarajah, Gustavo Ansaldi Oliva, Jiahuei (Justina) Lin, Wali Mohammad Abdullah, and Zhen Ming (Jack) Jiang. 2024. Rethinking Software
+Engineering in the Era of Foundation Models: A Curated Catalogue of Challenges in the Development of Trustworthy FMware. In Companion
+Proceedings of the 32nd ACM International Conference on the Foundations of Software Engineering (FSE). ACM, 294–305. doi:10.1145/3663529.3663849
+[17] Abram Hindle, Daniel M. German, and Ric Holt. 2008. What Do Large Commits Tell Us? A Taxonomical Study of Large Commits. In Proceedings of
+the 5th International Working Conference on Mining Software Repositories (MSR). 99–108. doi:10.1145/1370750.1370773
+[18] Sebastian Hönel, Morgan Ericsson, Welf Löwe, and Anna Wingkvist. 2020. Using Source Code Density to Improve the Accuracy of Automatic
+Commit Classification into Maintenance Activities. Journal of Systems and Software 168 (2020), 110673.
+[19] Kosei Horikawa, Hao Li, Yutaro Kashiwa, Bram Adams, Hajimu Iida, and Ahmed E. Hassan. 2025. Agentic Refactoring: An Empirical Study of AI
+Coding Agents. arXiv preprint arXiv:2511.04824 (2025). https://arxiv.org/abs/2511.04824.
+[20] Yujuan Jiang and Bram Adams. 2015. Co-evolution of Infrastructure and Source Code—An Empirical Study. In Proceedings of the International
+Conference on Mining Software Repositories (MSR). IEEE Computer Society, 45–55.
+[21] Eirini Kalliamvakou, Georgios Gousios, Kelly Blincoe, Leif Singer, Daniel M. German, and Daniela Damian. 2016. An In-Depth Study of the Promises
+and Perils of Mining GitHub. Empirical Software Engineering 21, 5 (2016), 2035–2071.
+[22] Maurice George Kendall and Jean Dickinson Gibbons. 1962. Rank correlation methods. (1962).
+[23] Riivo Kikas, Georgios Gousios, Marlon Dumas, and Dietmar Pfahl. 2017. Structure and Evolution of Package Dependency Networks. In Proceedings
+of the 14th International Conference on Mining Software Repositories (MSR). IEEE Computer Society, 102–112. doi:10.1109/MSR.2017.55
+[24] Gunnar Kudrjavets, Nachiappan Nagappan, and Ayushi Rastogi. 2023. Are We Speeding Up or Slowing Down? On Temporal Aspects of Code
+Velocity. In 2023 IEEE/ACM 20th International Conference on Mining Software Repositories (MSR). IEEE, 267–271. doi:10.1109/MSR59073.2023.00046
+[25] J Richard Landis and Gary G Koch. 1977. The measurement of observer agreement for categorical data. biometrics (1977), 159–174.
+[26] Hao Li and Cor-Paul Bezemer. 2025. Bridging the language gap: an empirical study of bindings for open source machine learning libraries across
+software package ecosystems. Empirical Software Engineering 30, 1 (2025), 6. doi:10.1007/s10664-024-10570-5
+[27] Hao Li, Hicham Masri, Filipe Roseiro Côgo, Abdul Ali Bangash, Bram Adams, and Ahmed E. Hassan. 2026. Understanding Prompt Management in
+GitHub Repositories: A Call for Best Practices. IEEE Software 43, 2 (2026), 85–93. doi:10.1109/MS.2025.3644251
+[28] Hao Li, Haoxiang Zhang, and Ahmed E. Hassan. 2025. The Rise of AI Teammates in Software Engineering (SE) 3.0: How Autonomous Coding
+Agents Are Reshaping Software Engineering. (2025). doi:10.48550/ARXIV.2507.15003
+[29] Hao Li, Haoxiang Zhang, and Ahmed E. Hassan. 2026. AIDev: Studying AI Coding Agents on GitHub. In Proceedings of the International Conference
+on Mining Software Repositories (MSR). ACM, 1029–1033.
+[30] Wen Li, Austin Marino, Haoran Yang, Na Meng, Li Li, and Haipeng Cai. 2024. How Are Multilingual Systems Constructed: Characterizing Language
+Use and Selection in Open-Source Multilingual Software. ACM Transactions on Software Engineering and Methodology 33, 3 (2024), 63:1–63:46.
+doi:10.1145/3631967
+[31] George Ling, Shanshan Zhong, and Richard Huang. 2026. Agent Skills: A Data-Driven Analysis of Claude Skills for Extending Large Language
+Model Functionality. arXiv preprint arXiv:2602.08004 (2026).
+[32] Howard Lune and Bruce L Berg. 2017. Qualitative research methods for the social sciences. Pearson.
+[33] Henry B Mann. 1945. Nonparametric tests against trend. Econometrica: Journal of the econometric society (1945), 245–259.
+[34] Henry B. Mann and Donald R. Whitney. 1947. On a test of whether one of two random variables is stochastically larger than the other. The Annals
+of Mathematical Statistics 18, 1 (1947), 50–60.
+[35] Cosmin Marsavina, Daniele Romano, and Andy Zaidman. 2014. Studying Fine-Grained Co-Evolution Patterns of Production and Test Code. In
+Proceedings of the 14th IEEE International Working Conference on Source Code Analysis and Manipulation (SCAM). IEEE Computer Society, 195–204.
+doi:10.1109/SCAM.2014.6975653
+[36] Shane McIntosh, Bram Adams, Thanh H. D. Nguyen, Yasutaka Kamei, and Ahmed E. Hassan. 2011. An Empirical Study of Build Maintenance Effort.
+In Proceedings of the 33rd International Conference on Software Engineering (ICSE). 141–150. doi:10.1145/1985793.1985813
+[37] Microsoft. 2016. Language Server Protocol Specification. https://microsoft.github.io/language-server-protocol/.
+Manuscript submitted to ACM
+
+
+===== page 32 =====
+32
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+[38] Meiyappan Nagappan, Thomas Zimmermann, and Christian Bird. 2013. Diversity in Software Engineering Research. In Proceedings of the 2013 9th
+Joint Meeting on Foundations of Software Engineering (ESEC/FSE 2013). ACM, 466–476. doi:10.1145/2491411.2491415
+[39] Elnaz Onagh and Meiyappan Nayebi. 2025. Extension Decisions in Open Source Software Ecosystem. Journal of Systems and Software 230 (2025),
+112552. doi:10.1016/J.JSS.2025.112552
+[40] Youssef Esseddiq Ouatiti, Mohammed Sayagh, Hao Li, and Ahmed E. Hassan. 2026. Do AI Coding Agents Log Like Humans? An Empirical Study.
+arXiv preprint arXiv:2604.09409 (2026). https://arxiv.org/abs/2604.09409.
+[41] Romain Robbes, Théo Matricon, Thomas Degueule, Andre Hora, and Stefano Zacchiroli. 2026. Promises, Perils, and (Timely) Heuristics for Mining
+Coding Agent Activity. In Proceedings of the 23rd International Conference on Mining Software Repositories (MSR). ACM, 496–507. doi:10.1145/3793302.
+3793375
+[42] Jeanine Romano, Jeffrey D Kromrey, Jesse Coraggio, and Jeff Skowronek. 2006. Appropriate Statistics for Ordinal Level Data: Should We Really
+Be Using T-Test and Cohen’d for Evaluating Group Differences on the NSSE and Other Surveys. In annual meeting of the Florida Association of
+Institutional Research. 1–3.
+[43] Pranab Kumar Sen. 1968. Estimates of the regression coefficient based on Kendall’s tau. Journal of the American statistical association 63, 324 (1968),
+1379–1389.
+[44] Dongxun Su, Yanjie Zhao, Xinyi Hou, Shenao Wang, and Haoyu Wang. 2025. GPT Store Mining and Analysis. In Proceedings of the 16th International
+Conference on Internetware. ACM, 344–354. doi:10.1145/3755881.3755900
+[45] E. Burton Swanson. 1976. The dimensions of maintenance. In Proceedings of the 2nd International Conference on Software Engineering. 492–497.
+[46] Rosalia Tufano, Antonio Mastropaolo, Federica Pepe, Ozren Dabić, Massimiliano Di Penta, and Gabriele Bavota. 2024. Unveiling ChatGPT’s Usage
+in Open Source Projects: A Mining-Based Study. In Proceedings of the 21st International Conference on Mining Software Repositories (MSR). ACM,
+571–583. doi:10.1145/3643991.3644918
+[47] Zirui Wan, Zhaonan Wu, Xinyi Hou, Yanjie Zhao, Pengcheng Xia, and Haoyu Wang. 2025. CommitSuite: A Comprehensive Benchmark for Commit
+Classification and Message Generation. https://arxiv.org/abs/2605.02256.
+[48] Miku Watanabe, Hao Li, Yutaro Kashiwa, Brittany Reid, Hajimu Iida, and Ahmed E. Hassan. 2026. On the Use of Agentic Coding: An Empirical
+Study of Pull Requests on GitHub. ACM Transactions on Software Engineering and Methodology (TOSEM) (2026). doi:10.1145/3798166
+[49] Frank Wilcoxon. 1945. Individual comparisons by ranking methods. Biometrics bulletin 1, 6 (1945), 80–83.
+[50] Chuan Yan, Ruomai Ren, Mark Huasong Meng, Liuhuo Wan, Tian Yang Ooi, and Guangdong Bai. 2024. Exploring ChatGPT App Ecosystem:
+Distribution, Deployment and Security. In Proceedings of the 39th IEEE/ACM International Conference on Automated Software Engineering (ASE).
+ACM, 1370–1382. doi:10.1145/3691620.3695510
+[51] Andy Zaidman, Bart Van Rompaey, Serge Demeyer, and Arie van Deursen. 2008. Mining Software Repositories to Study Co-Evolution of Production
+& Test Code. In Proceedings of the 2008 International Conference on Software Testing, Verification, and Validation (ICST). IEEE Computer Society,
+220–229. doi:10.1109/ICST.2008.47
+[52] Qunhong Zeng, Yuxia Zhang, Zhiqing Qiu, and Hui Liu. 2025. A First Look at Conventional Commits Classification. In Proceedings of the IEEE/ACM
+47th International Conference on Software Engineering (ICSE). IEEE, 2277–2289. doi:10.1109/ICSE55347.2025.00011
+[53] Jiaying Zhu, Lyuye Zhang, Wenbo Guo, and Yang Liu. 2026. SkillClone: Multi-Modal Clone Detection and Clone Propagation Analysis in the Agent
+Skill Ecosystem. CoRR abs/2603.22447. doi:10.48550/ARXIV.2603.22447
+A
+Plugin Classification Prompt
+Listing 1 shows the prompt used to classify plugins into the 6 major categories and 20 sub-categories with Qwen3-
+Coder-Next-80B.
+Prompt for Plugin Use Case Classification
+Role
+You are an expert AI Agent Plugin Classifier. Your task is to categorize a given agent plugin into
+a specific taxonomy based on its name and description.
+Taxonomy
+You must classify the plugin into one of the following 6 Major Categories and their corresponding
+Sub Categories. Read the definitions carefully.
+Manuscript submitted to ACM
+
+
+===== page 33 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+33
+1. Software Engineering
+1.1 Code Generation: Plugins related to writing source code, generating unit tests, code
+translation, refactoring, or code completion.
+1.2 Debug & Analysis: Plugins for finding bugs, static analysis, code explanation, security
+auditing, or linting.
+1.3 Version Control: Plugins involving Git, GitHub, GitLab, managing pull requests, commits, or
+branching.
+1.4 Infrastructure: Plugins related to DevOps, Python environment, cloud services (AWS/Azure),
+Docker, Kubernetes, CI/CD pipelines, or server deployment.
+2. Information Retrieval
+2.1 Web Search: General purpose internet search engines (Google/Bing) for current events, general
+knowledge, or news.
+2.2 Academic Search: Searching specific knowledge bases, encyclopedias (Wikipedia), academic papers
+(ArXiv), or legal databases.
+2.3 Live Data Streams: Fetching real time dynamic data such as stock prices, weather forecasts,
+traffic status, or sports scores.
+3. Productivity Tools
+3.1 Team Communication: Tools for messaging (Slack/Discord), emails, calendar scheduling, or
+meeting management.
+3.2 Document Systems: Interactions with documentation tools (Notion/Google Docs), wiki systems, or
+reading/parsing PDF documents.
+3.3 Task Management: Plugins for project planning tools (Jira/Trello), to do lists, or issue
+tracking.
+4. Data & Analytics
+4.1 Data Processing: ETL tasks, data cleaning, format conversion (JSON to CSV), sorting, filtering,
+or database querying (SQL).
+4.2 Math & Calculation: Performing mathematical operations, using calculators, symbolic math, or
+complex physics/logic formulas.
+4.3 Data Visualization: Generating charts, graphs, plots, or visual reports from data sets.
+5. Content Creation
+5.1 Image Generation: Creating images from text, editing photos, style transfer, or object removal.
+5.2 Text Generation: Creative writing, storytelling, translation between languages, poetry, or
+marketing copy.
+5.3 Audio & Video: Text to Speech, Speech to Text, video editing, music generation, or video
+analysis.
+6. Utilities & Other
+6.1 Local File Control: Operations on the local file system such as reading, writing, moving, or
+deleting files and folders.
+Manuscript submitted to ACM
+
+
+===== page 34 =====
+34
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+6.2 Command Execution: Running shell commands, terminal operations, or monitoring system resources
+(CPU/RAM).
+6.3 Memory & Cognition: Managing conversation history, summarizing long contexts for memory, or
+storing user preferences.
+6.4 Other Utilities: Miscellaneous tools that do not fit elsewhere, such as random number
+generation, UUID creation, or specific API wrappers.
+Constraints
+Analyze the Plugin Name and Plugin Description deeply.
+Select exactly ONE Sub Category that best fits the plugin.
+Output the result in strict JSON format.
+Do not output any conversational text.
+Input Format
+Plugin Name: [Name] Plugin Description: [Description]
+Output Format
+"major_category_id": "Number",
+"major_category_name": "String",
+"sub_category_id": "Number.Number",
+"sub_category_name": "String",
+"reasoning": "Brief explanation in English"
+Task
+Input: Plugin Name: PLUGIN_NAME Plugin Description: PLUGIN_DESCRIPTION
+Output:
+Listing 1. Prompt for plugin use case classification (Qwen3-Coder-Next-80B)
+B
+Conventional Commit Type Classification Prompt
+Listing 2 shows the prompt used to classify the 26,632 non-conforming commits into the 12-category CCS taxonomy
+with GPT-5-mini. Each commit is accompanied by contextual metadata: repository name, commit hash, message, plugin
+component types touched, file counts, and plugin file ratio.
+Manuscript submitted to ACM
+
+
+===== page 35 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+35
+Prompt for Conventional Commit Classification
+You are a Conventional Commit classifier. Classify each commit into exactly one type.
+Use the commit message as the primary signal. You may also use changed-file context and metadata to
+disambiguate whether the work is documentation, tests, CI/build, refactoring, chores, or
+feature/bug work.
+Do not invent missing details. If the evidence is weak, choose the best-fitting label and lower
+confidence.
+Types:
+- feat: A new feature
+- fix: A bug fix
+- docs: Documentation only changes
+- style: Changes that do not affect the meaning of the code
+- refactor: A code change that neither fixes a bug nor adds a feature
+- perf: A code change that improves performance
+- test: Adding missing tests or correcting existing tests
+- build: Changes that affect the build system or external dependencies
+- ci: Changes to our CI configuration files and scripts
+- chore: Changes to the build process or auxiliary tools
+- revert: Reverts a previous commit
+- other: Any other changes that do not fit the above categories
+Return valid JSON with this schema:
+{"results":[{"id": <int>, "output": "<type>",
+"reason": "<brief reason>", "confidence": <1-10>}]}
+--- Per-commit context (provided for each commit) ---
+COMMIT: <repo> @ <hash>
+Message: <commit message>
+Components: <plugin component types touched>
+Files changed: <total> total (<plugin> plugin, <non-plugin> non-plugin)
+Plugin ratio: <ratio>
+Listing 2. Prompt for Conventional Commit classification (GPT-5-mini)
+C
+Commit Re-classification Prompt
+Listing 3 shows the prompt used to re-classify commits originally labeled docs, ci, or style into the 12-category
+CCS taxonomy with GPT-5-mini. A type-specific rubric is selected by the commit’s original label, and each commit is
+Manuscript submitted to ACM
+
+
+===== page 36 =====
+36
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+provided with its message and a per-file sample of its diff, grouped by file role (AI-read instruction files, human-facing
+documentation, configuration, workflows, and scripts).
+Prompt for commit re-classification (rubric selected by original label)
+--- rubric for `docs` ---
+You are re-classifying a commit a developer labeled `docs` in an AI-agent PLUGIN repo. Decide its
+TRUE Conventional Commit type from the DIFF.
+AI-READ files (SKILL.md, agents/*.md, commands/*.md, skills/**, references/*.md) are the agent's
+runtime instructions; changing their CONTENT changes behavior. HUMAN-READ files (README,
+CONTRIBUTING, CHANGELOG, and archived / context / userstory files) are ignored by the agent.
+Judge by what the +/- lines DO:
+- feat -> ADDS an instruction the agent will act on (new section, rule, step, capability, procedure,
+example), OR registers a NEW plugin/component entry in marketplace.json / plugin.json.
+- fix -> CORRECTS existing agent behavior: a wrong tool/step/path/example, a rule, a script-
+invocation procedure, or a skill's `description` / frontmatter TRIGGER (which controls WHEN
+the skill fires).
+- chore -> ONLY version bumps, or REMOVING / reorganizing marketplace or plugin entries and
+metadata (not adding new ones).
+- docs -> behavior unchanged: only human-facing or archived/context files; OR, even inside an AI-
+read file, only inert metadata (version, date, badge) or a LINK change (adding, removing, or
+fixing a source-attribution or bare reference link).
+Read the DIFF, not the message. Key distinctions learned from real cases:
+- Removing/fixing a source-attribution or dead link, or adding a bare reference/doc link, is
+informational -> docs (even in a SKILL.md).
+- Adding a new plugin entry to marketplace.json -> feat; removing one or editing its metadata ->
+chore.
+- Changing a skill's `description`/trigger, or the procedure the agent uses to invoke a script ->
+fix.
+- A SKILL.md touched only by a version bump or whitespace -> docs; the real change may sit in a
+README while the AI-read file only got a bump -> docs.
+--- rubric for `ci` ---
+You are re-classifying a commit a developer labeled `ci` in an AI-agent PLUGIN repo. `ci:` is
+sometimes a real pipeline change, sometimes just a TOPIC prefix for a CI-themed plugin. Decide
+from the DIFF.
+Manuscript submitted to ACM
+
+
+===== page 37 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+37
+- ci -> the diff changes an ACTUAL pipeline/CI automation: .github/workflows/*, GitLab/CircleCI
+configs, release or CI-validation scripts.
+- feat -> the diff builds or extends a CI-EXPERT agent/skill/command (AI-read instruction files);
+no pipeline file changed.
+- fix -> the diff corrects existing CI-expert instruction content; no pipeline file changed.
+Read the DIFF, not the message. No workflow/CI-config file touched and the change is to SKILL.md/
+agents/commands -> feat/fix, not ci (the plugin's TOPIC is CI, but nothing ran). A real
+workflow file changed -> ci, even if plugin files were also touched.
+--- rubric for `style` ---
+You are re-classifying a commit a developer labeled `style` in an AI-agent PLUGIN repo. Traditional
+style = formatting with no change in meaning; but rewording an AI-read instruction can change
+agent behavior, which is not style. Decide from the DIFF.
+- style -> pure formatting, no change in meaning: whitespace, backticks, markdown structure, script
+linting/reformatting, or reordering that changes no instruction.
+- feat -> the wording change adds or strengthens a directive so the agent does something new/
+different, or changes the verbatim text the agent outputs.
+- fix -> the wording change corrects an existing directive so the agent behaves correctly.
+Read the DIFF, not the message. Ask: would the agent behave differently after this change? Yes ->
+feat/fix. Cosmetic only -> style. Reformatting .py/.sh/.js is style.
+--- output format (appended to the selected rubric) ---
+true_type may be ANY of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert,
+other. Keeping <original label> is fine if it still fits. Most re-labels are feat/fix; let the
+diff decide.
+Return STRICT JSON only:
+{"true_type":"<type>","moved":<true|false>,"reason":"<short: what changed and why>","confidence
+":<1-10>}
+--- Per-commit input ---
+Original label: <docs|ci|style>
+Repo: <repo> @ <hash>
+Files changed by role: <role:count ...>
+Commit message (may be unreliable): <message, truncated>
+FULL DIFF (grouped by file role): <per-file sample of the diff>
+Manuscript submitted to ACM
+
+
+===== page 38 =====
+38
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+Listing 3. Prompt for commit re-classification (GPT-5-mini)
+D
+Script–Markdown Coupling Classification Prompt
+Listing 4 shows the full prompt used to classify the 259 co-change pull requests into the coupling taxonomy with
+gpt-5-mini. Each pull request is presented to the model as its full script and Markdown diff. The validation code is
+available in the replication package.
+Prompt for Script–Markdown Coupling Classification
+You are labeling a merged pull request from an AI-agent PLUGIN repository.
+Every PR you see modifies BOTH:
+(1) an implementation SCRIPT (.py, .sh, or .ts), and
+(2) a natural-language INSTRUCTION file (SKILL.md, or a supporting .md) in the SAME
+skills/ subdirectory.
+The instruction file is what the AI agent READS AT RUNTIME to learn how to invoke and
+use the script, so a change to the script often forces the instruction file to follow.
+Label the PR in TWO steps. Read the DIFFS, not any message.
+========================================================================
+STEP 1 -- IS IT COUPLED? (do this first; most mistakes happen here)
+========================================================================
+Coupling is a relationship between the SCRIPT change and the MARKDOWN change: the
+markdown edit must CLOSELY REFLECT the SPECIFIC thing the script changed. Both files
+changing in the same PR is NOT enough on its own.
+Ask: does the markdown edit closely reflect THIS script edit?
+- YES -- the markdown documents or updates the EXACT flag, value, path, behavior, or
+output that the script changed -> it is COUPLED, go to STEP 2.
+- NO -> answer no_coupling.
+Choose no_coupling whenever ANY of these hold:
+- The script changed, but the markdown does NOT closely reflect that specific change
+(the markdown edit is about something else, or never mentions what the script did).
+- Either side is cosmetic only: whitespace, emoji->ASCII, table alignment, backticks,
+reordering, reformatting with no change in meaning.
+- The markdown edit addresses a DIFFERENT concern than the script edit (e.g. the
+script fixes a regex while the markdown standardizes an invocation path).
+- The markdown documents behavior that ALREADY existed, or is a general cleanup,
+Manuscript submitted to ACM
+
+
+===== page 39 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+39
+trimming, or reorganization not driven by the script edit.
+- The script and markdown edits are in DIFFERENT sub-skills bundled in one PR.
+A script's BEHAVIOR changing does NOT by itself make the doc coupled -- the doc must
+closely reflect THAT change. Be willing to answer no_coupling.
+no_coupling examples:
+- Script replaces emoji with ASCII in echo lines; SKILL.md replaces the same emoji in
+bullets. Cosmetic on both sides. => no_coupling
+- Script adds a --limit option; the markdown adds unrelated sections and never
+documents --limit. The specific change is not reflected. => no_coupling
+- Script tightens a regex / error handling; the markdown only adds a "run from repo
+root, use ${CLAUDE_SKILL_ROOT}" note. Different concern. => no_coupling
+- A test is added for behavior that already existed; the doc note describes that
+pre-existing behavior. => no_coupling
+========================================================================
+STEP 2 -- IF COUPLED, WHICH MECHANISM? (pick exactly one)
+========================================================================
+First split into SURFACE vs CAPABILITY, then pick the leaf.
+Q: did the skill's CAPABILITIES or BEHAVIOR change, or did only a NAME/VALUE/FILE that
+the markdown quotes change (skill does the same thing)?
+--- SURFACE change (same capabilities; only a quoted string moved) ---
+value_version_sync -> the moved string is a VALUE the skill PASSES or EMBEDS: a version,
+a default value, a MODEL identifier, an ENVIRONMENT-VARIABLE NAME, a token/field id, or
+the skill's OWN `name` identity.
+repo_restructuring -> the moved string is a FILE name, DIRECTORY, PATH, an invoked
+BINARY name, or a CONFIG-FILE FORMAT (json->yaml, json->.env, moved storage/hook path,
+renamed data/reference files).
+(A renamed FILE/PATH/BINARY/FORMAT is repo, NOT value. The skill's own `name` identity
+is value, NOT repo.)
+--- CAPABILITY / BEHAVIOR change --- decide by the OBSERVABLE MARKDOWN SIGNAL:
+interface_change -> the markdown ADDED or REMOVED a CALLABLE ENTRY: a new `--flag`/option
+row in a parameters table, a new subcommand/command in a usage or commands list, or it
+DELETED one. The list of things the agent can TYPE grew or shrank. (Also: the calling
+convention changed, e.g. positional args -> one JSON blob.)
+internal_logic_change -> the markdown did NOT add/remove a callable entry; it changed
+PROSE, EXAMPLES, or OUTPUT descriptions: documenting auto-detection (an existing arg
+Manuscript submitted to ACM
+
+
+===== page 40 =====
+40
+Ahmed Hereiz, Yingzhe Lyu, Hao Li, Bram Adams, and Ahmed E. Hassan
+becomes optional), a NEW OUTPUT field, a changed output schema, RENAMED OUTPUT field
+names, added validation, changed semantics, or a stub becoming a real implementation.
+PRECEDENCE when a PR changes several things at once (this resolves most hard cases):
+An INPUT-SURFACE change WINS over an accompanying behavior/output change. In order:
+1. a NEW input flag / command / subcommand ADDED or REMOVED -> interface_change
+(even if behavior also changed)
+2. a renamed INPUT value the agent passes (model id, env-var NAME, version, default,
+the skill's own `name`) -> value_version_sync (even if behavior also changed)
+3. a renamed FILE / PATH / invoked BINARY / config-file FORMAT -> repo_restructuring
+(even if behavior also changed)
+4. ONLY if there is NO input-surface change above -- the change is purely OUTPUT (a
+new or renamed output field, a changed schema), or AUTO-DETECTION (an existing arg
+becomes optional), or added validation, or a stub becoming real -> internal_logic_change
+NOTE: an argument becoming OPTIONAL via auto-detection is NOT an input-surface change; it
+is internal_logic_change. A new OUTPUT field is NOT an input-surface change either.
+CRITICAL edge cases (these are exactly where labelers disagreed -- follow them):
+- RENAMED OUTPUT field names that change the result contract (hits/misses -> assertions;
+time_to_close -> time_to_resolve) are internal_logic_change (the output contract
+changed), NOT value_version_sync. value_version_sync is only for INPUT values the agent
+passes (model id, env-var name, version, default).
+- A NEW subcommand shown as a new command block (e.g. a `console` command) is
+interface_change, even if it also collects or returns data.
+- An argument becoming OPTIONAL because the script now auto-detects it is
+internal_logic_change (behavior), NOT interface_change.
+- Renaming the skill's OWN `name` identity -> value_version_sync; renaming DATA/REFERENCE
+files -> repo_restructuring.
+WORKED EXAMPLES (coupled)
+interface_change:
+- The markdown adds two new rows --image-field and --skip-fields to its parameter table
+- The markdown adds a new `console` command block to its commands list (script added a
+new subcommand), even though the command also returns collected data
+- The markdown removes an API-endpoint / method row that the script deleted
+- The markdown rewrites every usage line from positional args to one JSON argument
+internal_logic_change:
+- The markdown documents that a command now auto-detects its dir, so an argument is
+optional; no flag/command row was added or removed
+- The markdown adds a prose section describing a NEW OUTPUT field (a `trends` object)
+Manuscript submitted to ACM
+
+
+===== page 41 =====
+An Empirical Study of Claude Code Plugin Marketplaces
+41
+- The markdown updates the output contract, renaming result fields hits/misses ->
+assertions and the score formula
+- The markdown documents new validation of a required response field
+- The markdown is rewritten from a stub description to real usage (script stub -> real)
+value_version_sync:
+- A model default gpt-5.2-mini -> claude-haiku-4-5, quoted across many docs, updated
+- An env-var NAME JIRA_AUTH_TOKEN -> JIRA_API_TOKEN, or opaque field ids swapped
+- A version string bumped; the skill's own `name:` renamed
+repo_restructuring:
+- A config file format .alva.json (JSON) -> .env (KEY=VALUE); docs replace the examples
+- Data/reference FILES renamed (ecosystem-research.md -> spring-boot-ecosystem-research.md)
+- The invoked CLI binary renamed agent-channel -> agent-channeltalk; a storage PATH moved
+Return STRICT JSON only, no prose. Give a RANKED list of labels, best first:
+{"labels":["<primary label>", "<optional second label>"],
+"reason":"<short: coupled? which mechanism(s), and if two, why this order>",
+"confidence":<1-10>}
+HOW MANY LABELS:
+- Give ONE label when a single mechanism clearly drives the Markdown edit. This is the
+common case.
+- Give TWO ranked labels ONLY when the pull request genuinely does two things at once and
+BOTH drive the Markdown edit, so that dropping either one would misrepresent the change
+(for example: a NEW FLAG is added AND a model/default VALUE is changed, and the Markdown
+documents both). Rank the stronger driver first.
+- Do NOT add a second label to hedge, to play safe, or when one mechanism clearly
+dominates. If one label is the honest answer, give one. Never list more than two.
+Every label must be one of: interface_change, internal_logic_change, value_version_sync,
+repo_restructuring, no_coupling. The FIRST label is your single best answer.
+Listing 4. Prompt for Script–Markdown coupling classification (gpt-5-mini).
+Manuscript submitted to ACM

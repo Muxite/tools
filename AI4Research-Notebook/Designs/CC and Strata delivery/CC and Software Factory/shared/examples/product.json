@@ -1,0 +1,58 @@
+{
+  "record_type": "factory-product",
+  "schema_version": "0.3.0-proposal",
+  "id": "factory-candidate-one",
+  "brief": {
+    "uri": "brief.json",
+    "sha256": "578d93b8ce73f5bde13b7719c7dd841964f8ba34735199eea5280c14bce12f31"
+  },
+  "deliveries": [
+    {
+      "format": "git-commit",
+      "source": {
+        "repository": "https://fixture.invalid/factory/strata.git",
+        "commit": "1111111111111111111111111111111111111111",
+        "tree": "2222222222222222222222222222222222222222"
+      }
+    },
+    {
+      "format": "oci-image",
+      "platform": "linux/arm64",
+      "image": "fixture.invalid/engine-candidate@sha256:fdac092b4534de27ca32d4c078d8f52e73e90e76eac7bf8af4f0d00af0c09869"
+    }
+  ],
+  "build": {
+    "format": "build-recipe",
+    "source": {
+      "repository": "https://fixture.invalid/factory/strata.git",
+      "commit": "1111111111111111111111111111111111111111",
+      "tree": "2222222222222222222222222222222222222222"
+    },
+    "recipe": {
+      "uri": "fixture:rebuild-recipe",
+      "sha256": "3bc3bfa7017381ea065b757b0c4ce0070be152a15f33879015e02d9451f7837b"
+    },
+    "environment_lock": {
+      "uri": "fixture:build-environment",
+      "sha256": "26f22b1ca56820719226538f1a3d2bd9e156521cef193534d5555312981e13ee"
+    },
+    "target": "linux/arm64 / CUDA / GB10",
+    "build_context": {
+      "uri": "fixture:source-and-build-input-archive",
+      "sha256": "d010a8c0b05605a4bf3547616367af3041ae8e2d675e0aa7d11d01f56bc8d93b"
+    },
+    "base_image": {
+      "format": "oci-image",
+      "platform": "linux/arm64",
+      "image": "fixture.invalid/cuda-base@sha256:655b09d38d867e0831d6ae6fe5bd2ef9882cb8cd128bb99c2fa10fe7207b8e95"
+    }
+  },
+  "provenance": {
+    "uri": "fixture:builder-attestation",
+    "sha256": "f62e67f6385a7a9dee65987c83101d77e547630cef74f627c4ffd475b66a5f55"
+  },
+  "delivered_ccs": [],
+  "limitations": [
+    "Synthetic handoff fixture. The candidate source and image have not been built or measured."
+  ]
+}

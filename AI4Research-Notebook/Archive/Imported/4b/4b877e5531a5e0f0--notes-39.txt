@@ -1,0 +1,11 @@
+INSERT: optional slide; delete or hide it and the talk flows unchanged
+TIME 1:15
+SAY: Main points:
+- Left: separate processes each load their own weights, so memory grows with the number of copies
+- Right: one process batching requests makes more tokens per second than several processes
+- On the Spark the weights, the experiments and the OS share one pool, so fewer models leave more room
+- This suggests the router should prefer a few resident models, and only cost was measured; quality was not
+- Routing is behind RouterPort with a fixed route today, so this is an input for later phases
+Supplemental points:
+- Bandwidth bound for decode is in the appendix
+- MPS was not tested

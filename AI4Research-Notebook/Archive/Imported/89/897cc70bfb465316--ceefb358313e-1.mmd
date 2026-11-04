@@ -1,0 +1,23 @@
+flowchart TB
+    Operator[Human or authorized development agent] --> Job[Explicit bounded job]
+    CI[Future CI executor] --> Job
+    subgraph Dev[Optional development-only Compose profile]
+        Job --> Runner[Sidecar: execute registered tools]
+        Registry[Tool definitions and effect policy] --> Runner
+        Runner --> Validate[Validation adapter]
+        Runner --> Diagnose[Container diagnostic adapter]
+        Runner --> Reports[Development evidence and job result]
+    end
+    Browser[User browser] -->|Host loopback only: 127.0.0.1:5173| AppWeb
+    subgraph App[AI4Research workflow image and container]
+        AppWeb[Built web frontend and authenticated control API: container port 5173]
+        Runtime[Workflow runtime]
+        AppWeb --> Runtime
+    end
+    Validate -->|Private Compose network: configured service DNS and port 5173| AppWeb
+    Diagnose -->|Bounded request| Host[Host executor: enforce target and effects]
+    Host -->|Registered target-bound diagnostic operation| Runtime
+    Host -->|Own temporary resources| Env[Isolated test environment]
+    Runtime -->|Permitted observations through client contract| Reports
+    Reports --> Operator
+    Reports --> CI

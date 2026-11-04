@@ -1,0 +1,32 @@
+flowchart TB
+    P[Permitted VM provider and architecture] --> APP
+    subgraph H[Qualified VM host - Spark only if permitted]
+        CAP[Owned storage and memory admission]
+        MODELS[Canonical model store]
+        INF[Optional shared inference gateway]
+        SOURCE[Prepared sources and verified images]
+        MODELS --> INF
+        subgraph V[CPU lab VM]
+            APP[Compose - AI4R and local factory]
+            RELAY[Scoped model relay]
+            BROKER[VM system broker]
+            ENGINE[Local Docker Engine]
+            BUILDER[Optional local BuildKit - bounded cache]
+            IMG[Local runnable images]
+            CC[Invocation containers]
+            DATA[Quota-bound workspace and evidence]
+            APP -->|authorized jobs| BROKER
+            BROKER --> ENGINE
+            ENGINE --> BUILDER
+            BUILDER -->|explicit load| IMG
+            ENGINE --> CC
+            IMG --> CC
+            CC -->|invocation IPC| RELAY
+            BROKER --> DATA
+        end
+        RELAY -->|authenticated private endpoint| INF
+        SOURCE -->|pinned artifacts on demand| BROKER
+        CAP -.-> BROKER
+        CAP -.-> INF
+    end
+    APP -.->|candidate exports| Q[Central qualification]

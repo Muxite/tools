@@ -1,0 +1,34 @@
+---
+id: resource-current-baseline
+status: source-reviewed
+source: Resources/verification/baseline-2026-10-21.json
+last_reviewed: 2026-10-21
+next_action: Qualify a runnable candidate before comparison and check remote drift at handoff
+---
+# Current baseline and source delta
+
+The original development checkout is preserved at **98bd9d913f9ddae5f0d6a3ae256bff10f25ee743**. The branch captured at implementation start is **d3d7f565c6c05ccf764fe0780fde149b7dc89b95**, in [the separate review worktree](../../AI4Research-Development/jiuwenswarm-m1-review-d3d7f56). Both remain available; no checkout files were edited. The [receipt](verification/baseline-2026-10-21.json) records changed paths and selected source hashes. A shallow-fetch update message does not establish ancestry; this review compares the exact two trees.
+
+## What changed
+
+The 35 changed paths concern web shell styling and inputs, reconnect/session handling, Codex device-login controls, deployment launch convenience, and M1-001/M1-006/native task records. The capsule bodies, check bundles, runner, and native adapter have no diff between these revisions. Earlier bounded CC source observations still apply to those unchanged files; they do not qualify the changed integration or a built image.
+
+The new `deploy/m1/start-local.sh` enables an explicit loopback-only reusable bootstrap option (`AI4R_REUSABLE_LOGIN=1`); default Compose behavior remains one-use unless enabled. Source refuses a reusable bootstrap for a non-loopback IP origin. Treat either actual URL as a credential. The supplied one-use instructions belong to the earlier configuration and should not be silently rewritten as a universal rule. Empty configuration supports inspection, not research readiness.
+
+Codex login now propagates the device user code and tracks cancellation state. These are source observations, not independently validated authentication or deployment claims. The captured task register is r45; it still reports integrated candidate NOT_BUILT and final system evidence NOT_RUN. Later child records may contain narrower build or deployed-checkpoint observations; retain their actual scope and candidate identity.
+
+## Authority and assurance
+
+[[Designs/Project Authority]] explains stale AGENTS and branch-local PRD/task pointers. Actual `docs/code/Missions/M1/TASKS.md` is populated; do not allocate duplicate tasks from stale registration-pending text or the older design checkout. Preserve task/IF/AC identities and reconcile source baseline receipts.
+
+| Evidence level | Assessment |
+|---|---|
+| Designed | PRD and maintained design present; source-specific authority requires receipts |
+| Implemented | Actual capsule, native adapter, host checks, broker, science and web code present |
+| Runnable | Deployment paths exist; actual M1 build/account/resource qualification not performed here |
+| Verified | Notebook tests and separate lab receipts only; neither implies M1 acceptance |
+| Accepted | No new integrated M1 acceptance or CC accuracy gain established |
+
+## Host observation
+
+On this continuation Docker Desktop responds with Linux server 29.8.0, x86_64, 16 CPUs and approximately 8 GB daemon memory. Ubuntu-24.04 resolves the Windows Docker CLI through WSL. This supersedes the earlier unavailable-daemon observation; it does not establish a native Ubuntu daemon or GB10 support. Real lab smoke checks belong in [[Designs/Lab Progression]]. A small lab container is not an M1 production runtime.

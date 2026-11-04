@@ -1,0 +1,53 @@
+AI4Research Meeting Summary
+
+Topic: Capability Capsules (CC), tool validation, task planning, and iterative self-improvement (RSI)
+
+1. Capability Capsules vs. ordinary skills
+- The discussion contrasts Capability Capsules (CCs) with ordinary skills/tools.
+- CCs include explicit declarations about what a tool does, including its expected inputs and outputs, and checks/gates that can validate a tool before it is used.
+- Ordinary skills may be used directly without the system checking whether a tool is broken or appropriate, unless the agent is specifically prompted to check.
+- The proposed benefit is that explicit declarations give a planner better information for assembling a task graph and increase the chance of producing a valid plan.
+
+2. Planning and feasibility checks
+- Plans are represented as task graphs whose nodes have input/output requirements.
+- A plan should be marked infeasible if the graph has a cycle or if connected steps have incompatible inputs and outputs.
+- The meeting discussed a comparison in which the baseline system reportedly needed many more attempts to find a plan than the CC-based approach. The transcript's exact counts and context are unclear, so the figures should be verified before being reported.
+- A key feedback point: results must distinguish a feasible/workable plan from an infeasible plan. Cases where a required capability is missing should not be shown as successful/green.
+
+3. Detecting defective tools
+- The CC approach uses declarations and built-in checks to inspect tools before use; the discussion describes this check as occurring for every capsule.
+- The baseline/open-agent setup may only discover a defective tool after attempting to use it, and may not catch the issue every time.
+- The comparison should clearly distinguish detecting/reporting a defect before use from eventually encountering or reporting it after use.
+- Tests should be run and reported fairly, with reproducible cases and without manipulating test setup to make results look better.
+
+4. Evaluating changes to tools
+- The team discussed testing small changes to tools and determining which changes are safe/good versus unsafe/bad.
+- The intended evaluation is whether the system accepts good changes and blocks bad ones. The transcript mentions 20 proposed changes and combinations/permutations of changes.
+- The metric needs an explicit definition and calculation rule. A reader should be able to tell what a reported percentage or score means, rather than seeing a number without its denominator or interpretation.
+- The test setup is described as simulating a self-improvement/recursive self-improvement (RSI) scenario: one system is prompted to change a tool, and the comparison system has the same underlying tool but lacks CC checks.
+
+5. Fix the task-planning result tables
+- Several result tables/labels were challenged as misleading or incorrect.
+- If a task cannot be planned because a capability is missing, it should be labelled infeasible rather than shown as a successful plan.
+- The current “defect” measure was unclear, and some examples did not visibly demonstrate an advantage for CCs.
+- For a paper-reading/summarization task, the expected input is the paper and the output is a summary; the team questioned why input/output incompatibility would be counted as a defect in that case.
+- Revise the tables so feasibility, defects, and the difference between CC and non-CC results are clearly defined and genuinely supported by the examples.
+
+6. RSI / iterative improvement experiment
+- A second part of the presentation tested whether an RSI-style process could improve two capsules/tools, including a calculation tool and a table-normalization tool.
+- The experiment creates a modified (“child”) version of an original (“parent”) capsule and compares performance, including runtime.
+- The discussion says the first iteration showed little improvement, while a later iteration showed more improvement in at least some cases. Negative time reduction means the modified version took longer.
+- A target of 10% runtime reduction was mentioned.
+- The terminology for the baseline and “round 1/round 2” was confusing. Clarify whether each round is an iteration and show the original baseline separately so the comparisons are easy to interpret.
+- The test cases are reportedly in the code repository so others can reproduce the calculations. Clearly label each case, the task being performed (e.g., sum/mean/min/max calculations), and the metric being measured (runtime and correctness).
+- The transcript indicates that the improvement process makes model calls but does not use the full agent harness/ReAct loop in this experiment; tools are disabled and the model is allowed to return one response. This setup should be described explicitly.
+
+Action items
+- Verify the exact counts and experimental conditions behind the planning-attempt comparison before citing the numbers.
+- Make the CC-versus-baseline evaluation fair, reproducible, and clearly documented.
+- Define all metrics, denominators, labels, and feasibility criteria.
+- Correct tables that mark missing-capability or otherwise infeasible tasks as successful.
+- Separate “defect detected before use” from “defect discovered later.”
+- Document the tool-change combinations and the rule for classifying changes as good or bad.
+- Clarify RSI baseline/iteration numbering and report runtime and correctness for each test case.
+- Keep test cases and calculation instructions accessible in the repository.

@@ -1,0 +1,17 @@
+flowchart TB
+    In[Accepted inputs] --> W
+    subgraph N[One node]
+        subgraph U[One work subnode; repeated per work subnode]
+            W[Work CC writes outputs 1..k] --> C[Check bundle runs once over all k outputs]
+            C -->|any mandatory check fails: no verifier runs| GH[One halting gate decision for the work subnode]
+            C -->|all pass| V1[Verifier CC on output 1]
+            C -->|all pass| VK[Verifier CC on output k]
+            V1 --> G1[Gate decision for output 1]
+            VK --> GK[Gate decision for output k]
+        end
+        GH --> NG
+        G1 --> NG{Node gate: every decision advances?}
+        GK --> NG
+    end
+    NG -->|yes: store durably, then release| Out[Accepted outputs to the next nodes]
+    NG -->|no| H[Stop this node; skip its dependents; keep evidence]

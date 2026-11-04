@@ -1,0 +1,7 @@
+TIME 1:30
+SAY: Main points:
+- A DAG fan-out of k nodes only gives a k-fold speedup if the nodes use different resources
+- Two heavy GPU jobs, or two LLMs on different models, share the GPU by turns and lose time at each switch
+- Same-model LLM calls batch, which turns parallelism into a gain
+- Pairing a GPU-heavy node with a light one such as speech or encode costs almost nothing
+- Node durations in a plan would need a sharing factor from the pair matrix, and a memory budget for model copies

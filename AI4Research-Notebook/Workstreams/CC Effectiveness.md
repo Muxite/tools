@@ -1,0 +1,39 @@
+---
+id: workstream-cc
+status: active
+source: Sources/Research Intent; Resources/M1 Readiness
+last_reviewed: 2026-10-23
+next_action: Use CC Accuracy Study and the first coder amendment to qualify the three-arm comparison
+---
+# CC effectiveness
+
+**Current priority:** accuracy, independently tested against declared obligations. [[Experiments/CC Accuracy Study]] supersedes the earlier two-arm pilot for this claim. Compare raw, plain-with-checks, and CC-with-the-same-checks. Keep declaration/output-only semantic review separate from input-dependent host checks. Record appropriate abstention, avoidable abstention, blocked incorrect outputs, blocked correct outputs, valid scientific negatives, and operational failures separately.
+
+Use [[Designs/CC Reference]] for the pinned historical core-role reference and [[Resources/Current Baseline]] for later source and candidate identities. Later Planner/Builder changes have their own receipts; a complete current-body delta review remains outstanding. Use [[Amendments/README]] for the study amendment handoff. Existing qualitative daily-work cases remain development material; they are not protected held-out evidence.
+
+**Problem:** we have a detailed CC design, but need evidence that capsules improve the work an agent produces. Contract compliance, a passing verifier, and a completed workflow do not establish comparative value.
+
+Compare a CC-equipped workflow with a plain agent on the same M1 component tasks and daily research work. Keep model access, evidence, tools, and budgets matched. Count the capsule workflow's internal calls, checking, and retries as part of its cost.
+
+## Research questions
+
+- Which tasks improve in quality, and which regress?
+- Does decomposition, the prompt/instruction content, reusable tooling, or checking explain the benefit?
+- What do capsules add in elapsed time, model use, setup, and failure recovery?
+- Does an improvement hold on tasks that were not used to tune the capsule?
+
+## Work sequence
+
+| Step | Output | Status |
+|---|---|---|
+| Reconcile candidate and design | [[Resources/M1 Readiness\|Readiness record]] | Bounded audit available; runnable target pending |
+| Freeze comparison | [[Experiments/CC Accuracy Study\|Three-arm accuracy study]] | Proposed; older two-arm protocol and daily-work catalog remain development history |
+| Run baseline | Raw outputs, scores, failures, costs | Unrun |
+| Improve one bounded factor | Revised CC with lineage | Awaiting observed failure |
+| Evaluate containerization | [[Designs/cc-containerization-and-lab-isolation\|Decision evidence]] | Open |
+
+Keep [[Workstreams/Skills to CCs|skill conversion]] connected to this evaluation rather than treating a converted skill as a proven capsule. CCs should become better because their evidence improves, not because the wrapper becomes more elaborate.
+
+## October 23 implementation candidates
+
+[[Activities/2026-10-23 Capsule Branches and Factory Direction]] records the earlier independent-branch checkpoint for Generalist, three deterministic utilities and typed DAG planning. [[Resources/Current Baseline]] records their later source integration. These are development candidates with local checks, not measured improvements or admitted capabilities. Generalist has an explicit host-authenticated task projection exception; specialist semantic review remains declaration/output-only. Real comparative/held-out evidence and admission remain separate.

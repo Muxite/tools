@@ -1,0 +1,36 @@
+---
+id: skills-to-cc-mapping
+status: proposed
+source: jiuwenswarm/docs/architecture/design-package/2-capability-capsules.md; jiuwenswarm/docs/architecture/design-package/reference/capsules/README.md
+last_reviewed: 2026-10-20
+next_action: Map a small set of candidate skills to explicit CC declarations and independently owned checks for review.
+---
+# Skills to CC mapping
+
+Links: [[Workstreams/CC Effectiveness]] · [[Workstreams/Lab Infrastructure]] · [[Home]] · [[Resources/M1 Readiness]]
+
+A skill is a capability description or reusable instruction bundle. A CC is a versioned unit with a machine-readable declaration, pinned body, explicit ports, needs/effects, enforced budget, and independent check assignment. A skill can inform a CC body, but the terms are not interchangeable: instructions alone do not specify enforceable boundaries or evidence of conformance.
+
+| Candidate skill capability | Possible CC form | Boundary/check design question |
+|---|---|---|
+| Search and source discovery | `research.search` agent CC | Are source IDs, deduplication and provenance explicit and independently checkable? |
+| Study screening | `research.screening` agent CC | Are inclusion/exclusion criteria fixed and evidence for each decision retained? |
+| Evidence extraction | Tool CC or bounded agent CC | Are missing values preserved and schema/range checks deterministic? |
+| Synthesis and hypothesis | `research.hypothesis` agent CC | Can claim support and uncertainty be scored from declared output alone? |
+| Reproducible computation | `research.benchmark` tool CC | Are environment, inputs, outputs, and resource effects pinned and captured? |
+| Final report | `research.delivery` agent CC | Does every material claim link to accepted evidence and conform to artifact contract? |
+
+## Spec Kit as a capability hypothesis
+
+Spec Kit may help an author turn a skill idea into structured specification artifacts, checks, or build steps. Treat that as a hypothesis to test. Do not auto-activate Spec Kit whenever a task mentions skills, research, or CCs. A human or explicit workflow policy chooses whether to use it; record exact version, inputs, outputs, effort, and resulting artifacts. Any claim that it improves CC quality needs a matched study under [[Experiments/cc-effectiveness-protocol|CC Effectiveness Protocol]] with identical models, tools, budgets, and scorer blinding.
+
+## Mapping workflow
+
+1. Start from one bounded research responsibility, not a large end-to-end agent role.
+2. Define typed input/output artifacts and explicit failure behavior.
+3. Declare model and tool needs, resource caps, filesystem/network/secret effects, and immutable dependencies.
+4. Assign deterministic checks and a verifier owned independently of the CC author. Check outputs against the declaration and preserve raw evidence.
+5. Pin declaration, body, checks and dependencies by hashes. A changed body is a new version.
+6. Trial one CC against a plain-agent baseline on frozen cases before expanding the library.
+
+This mapping is a design aid, not an admission record. The M1 package remains the architecture reference; see [Capability Capsules](../../jiuwenswarm/docs/architecture/design-package/2-capability-capsules.md) and [CC build references](../../jiuwenswarm/docs/architecture/design-package/reference/capsules/README.md) for source context.

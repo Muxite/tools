@@ -1,0 +1,8 @@
+TIME 1:00
+SAY: Main points:
+- Keeping a model resident cuts the first token from 6.14 s to 0.049 s
+- Sharing the GPU-code cache cuts a fresh container from 64.4 s to 5.3 s
+- A warm container starts a short task in 49 ms instead of 219 ms
+- Batching four requests uses 2.5 GiB instead of 8.9 GiB and gives 614 instead of 258 tokens per second
+- The blend predicts shared counters with 4.0 pp error against 16.0 pp for the sum
+- Pairing LLM decode with speech or video encode instead of training avoids about a 2x slowdown

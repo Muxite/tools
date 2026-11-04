@@ -1,0 +1,67 @@
+---
+id: paper2agent-presentation
+status: proposed
+source: ../../../Sources/Prompts/2026-10-21-paper2agent-presentation-request.txt; ../../../Sources/Prompts/2026-10-21-pasted-presentation-review.txt; ../1 Decision brief.md; ../2 Agent architecture.md; ../../../Resources/review-batches/2026-10-21-paper2agent/paper2agent-source-review.md
+last_reviewed: 2026-10-23
+next_action: Locate or rebuild and independently review the missing rev9 deck; rev8 is available as an earlier artifact
+---
+# Paper2Agent talk (about 6 minutes, eight shown slides and two backups)
+
+**Artifact check, October 23:** the revision 9 deck and `review-rev9/` renders described below were not found in the workspace or Desktop filename search. The latest numbered editable deck present in this folder is [Paper2Agent Talk rev8.pptx](Paper2Agent%20Talk%20rev8.pptx). The [build_pptx.py](build_pptx.py) source targets revision 9, but has not been executed during this collection; the following revision 9 content and rendering descriptions remain historical claims, not freshly verified artifacts. See the [[Presentation Library/Deck Catalog|local artifact catalog]] for available files.
+
+The intended revision 9 deck is built from [build_pptx.py](build_pptx.py). It explains Paper2Agent's value and method, then shows the proposed AI4Research mapping. Speaker notes carry the script. Revision 9 is aligned to the [[Designs/Capability Capsule Factory Feature|one-page Factory definition]] and [[Designs/Paper2Agent Capability Factory|detailed Factory plan]]. The earlier rev8 remains here and on Desktop as a dated copy. Planned time is about 5:50; **the talk has not been rehearsed aloud**. Reported benchmark values were checked against `paper.md` in the pinned Paper2Agent clone; they are the authors' results, not our replication.
+
+## Revision history
+
+- Rev 9: integrated the Factory feature definition into the existing short talk. Slide 6 now distinguishes governed factory stages, candidate product CCs, and versioned resources; its notes explain flat orchestration first and possible composition later. Slide 8 repeats the distinction. Slide 4's metric label now states that 98.1% is execution-task accuracy, checked with the other displayed values against the pinned manuscript text. No admission or M1 runtime result is implied. The earlier note reported rendered slides in `review-rev9/`; that directory is currently unavailable.
+- Rev 1 to 3 (same day): a decision-first talk with a leakage diagram, a pilot ask and a long evidence critique.
+- Rev 8: value first. Muk asked to start with the value of the Paper2Agent idea and its methodology, without a deep dive; slide 2 is now a two-panel value slide (idea, methodology) and the title slide states the value. File renamed rev8 because rev7 was locked by an open PowerPoint window.
+- Rev 7: visual redesign after a third pasted review (see [[Sources/Implementation Intent]], Talk revision 7): native shapes, indigo and teal palette, no category labels or THUS lines, pipeline, example, cards and an integration diagram instead of tables.
+- Rev 6: cut to ten slides in the file (eight shown, two hidden backup) and about six minutes at Muk's request. Removed the before-and-after slide, the separate capsule-fit slide, the backup results table and the backup control table; the controls moved into the pilot backup row "Against coupling".
+- Rev 5: applied a second outside review. Added the worked example, softened claims, made source acquisition a separate capsule, and trimmed the limits script. Positions kept against the review are recorded in [[Sources/Implementation Intent]].
+- Rev 4: re-centered on understanding and integration after a pasted outside review said the talk had become a methodology audit. The pilot protocol, controls, detailed results and M1 gaps moved to hidden backup slides. The leakage diagram stayed in the main talk as one balanced limits slide, because Muk asked for a leakage diagram. It now has three coupling points and a "what a pass does show" entry, and the unsupported "tuned on D" claim is hedged.
+
+## Slides (revision 9)
+
+| # | Slide | Time | Visual |
+|---|---|---|---|
+| 1 | Title, with the value to AI4Research as the short answer | 0:20 | three-step strip |
+| 2 | Value: reusable capabilities from a process with evidence (the idea, the methodology) | 0:45 | two panels |
+| 3 | Run the original method, then extract and check tools | 0:50 | five-stage pipeline with artifacts |
+| 4 | Reported results support feasibility across research packages | 0:45 | three metric cards |
+| 5 | One research operation becomes a candidate tool capsule | 0:55 | source, factory, candidate CC panels |
+| 6 | The factory makes candidates and evidence | 0:55 | factory stages, product candidates, resources, independent admission |
+| 7 | One limit: the tool and its checks share the same sources | 0:50 | three-lane coupling diagram |
+| 8 | Adapt the pattern; demonstrate one complete mapping | 0:30 | value, fit, next |
+| 9 | Backup, hidden: a bounded pilot with hidden tests first | | table |
+| 10 | Backup, hidden: where today's M1 stands against this flow | | table |
+
+Planned time 5:50. The documented intended file is `Paper2Agent Talk rev9.pptx` (currently unavailable), built by [build_pptx.py](build_pptx.py) with native shapes, so every box is editable. The older tundlekit route (`build_deck.py`, `deck.json`, `figures/`) produced revision 6 and is kept for reference. Revision 6 is `Paper2Agent Decision Talk (rev6).pptx`.
+
+For the current deck, run `python build_pptx.py` from this directory. `figures/make_figures.py`, `build_deck.py`, `deck.json`, and tundlekit commands apply only to the archived revision 6 route.
+
+## Claim ledger
+
+| Claim on a slide | Source | Status |
+|---|---|---|
+| Benchmark numbers (100 vs 78.7, 98.1, 593 of 599, 74 of 100, 91.2 vs 80.3 in backup) | Paper2Agent pinned clone `8c2d059`, `skills/paper2agent/paper2agent-paper/references/paper.md` lines 139, 183 and 603; [Nature article](https://www.nature.com/articles/s41586-026-11044-y) | Checked against the local manuscript text for this revision. Authors' reported results; no independent replication. Do not mix versions. |
+| Before-and-after tool example | Our illustration of the transformation the pipeline performs | Illustrative, labelled so on the slide |
+| Example genomics tools (variant scoring, sequence prediction, plots) | Pasted outside summary, arXiv version | Not verified here; stated only in the notes |
+| Stage list, ZIP relocation test | [[Resources/review-batches/2026-10-21-paper2agent/paper2agent-source-review\|Paper2Agent source review]], commit 8c2d059 | Read from instructions and scripts; nothing run |
+| Fresh verifier is a different agent but may repair code, up to six attempts per tool | Repo: `paper2mcp/references/orchestration.md` lines 31 and 44, `workflow-state.md` lines 83 and 96 | Read in the repo this session |
+| Tests are tutorial-derived and reuse the tutorial's labels | Repo: `paper2mcp/references/runtime.md` lines 64 and 87 | Read in the repo this session |
+| Evaluated agent is not given the expected answer | Repo: `paper2mcp/references/extensions.md` line 22 | Read in the repo this session |
+| 300 questions come from tutorials | Evidence notes: "tutorial-derived biology benchmark" | Not re-checked against the paper |
+| Results in the paper were chosen on the data, so tuning may carry over | Our inference | **Unsupported as fact; stated as "if C was tuned on D"** |
+| Builder and user are both Claude Code; failing functions are dropped | Pasted outside summary | Not verified; kept out of the main slides |
+| Acquisition as a separate capsule that supplies a pinned snapshot | Muk, earlier in this session (finding and acquiring source should be its own plannable CC); PRD intake bars cloning and the Builder is offline | Proposed; needs its own authorized path |
+| A capsule may expose one operation or a coherent set | Capsule schema covers units of many sizes (earlier notes) | Consistent with the notes; not re-checked this turn |
+| The metric behind 98.1% | Pinned manuscript `paper.md` line 183 | Accuracy across 42 execution tasks from ten non-biology papers, five runs |
+| Value table, capsule-fit figure, integration direction | [[Designs/AI4Research Capability Growth]], [[Designs/CC as Universal Component]] | Proposed; nothing built or measured |
+| Factory stages, candidate product CCs, versioned resources and independent admission | [[Designs/Capability Capsule Factory Feature]], [[Designs/Paper2Agent Capability Factory]] | Proposed feature split; M1 factory not built |
+
+## Known weak spots
+
+- Slide 9 is the main place a sceptical audience may push. It is framed as risks read from the design, not findings.
+- Reported benchmark results have not been independently reproduced in AI4Research.
+- No threshold, cost or model comparison is given for the pilot, which is in backup only.

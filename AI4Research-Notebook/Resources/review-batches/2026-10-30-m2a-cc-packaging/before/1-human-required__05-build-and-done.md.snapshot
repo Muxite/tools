@@ -1,0 +1,49 @@
+---
+id: ai4r-m2a-1-human-required-05-build-and-done
+status: proposed-runtime-unverified
+source: ai4r_m2a/3-agent-reference/source-manifest.json
+last_reviewed: 2026-10-29
+next_action: Implement against the acceptance matrix and attach measured evidence
+---
+# 5. Build a small core, then prove the complete initial scope
+
+[Package home](../README.md) · [Detailed evaluation](../2-human-relevant/evaluation-and-decisions.md)
+
+**M2a is complete only when every initial CC is portable and the integrated research behavior passes the acceptance suite.** A calculation-only pilot is a useful checkpoint, not completion. Build the call/evidence contract once, then add adapters; do not build a new planner, job scheduler, vector database or lab control plane unless a measured gap requires it.
+
+![Build and qualification order](../diagrams/06-build.svg)
+
+## Start here: Stage 1
+
+[Stage 1](00-stage-1.md) is the mandatory first implementation milestone and the concrete exit definition of Wave A. It covers `calculate`, `normalize_table` and `markdown_report`, guarded portable invocation, a real native-agent demonstration, checked artifacts and one restart boundary. Pass all seven [Stage 1 criteria](../3-agent-reference/stage-1.json) before expanding into the rest. Full M2A acceptance remains separate.
+
+| Initial CC | Required capabilities | First delivery wave |
+|---|---|---|
+| Calculation | Calculate; normalize table (typed variants retained through adapters) | A |
+| Reporting | Markdown report; packet report; summary-to-packet; deliver; deliver-paper | A skeleton, C full |
+| Intent | Compile intent, retain unresolved questions | B |
+| Contract | Compile requirements and explicit acceptance obligations | B |
+| Literature | Search; screen; rank; summarize paper | B |
+| Hypothesis | Propose evidence-linked hypotheses | C |
+| Build | Build a script/program with reproducible source and tests | C |
+| Evaluation | Benchmark; evaluate against a pinned protocol | C |
+| Planner | Plan; plan-paper as optional advisory operations | C |
+| Generalist | Bounded JiuwenSwarm specialist invocation | C |
+
+The list is the initial product scope, independent of current source names. Some operations need to be implemented rather than renamed. [Conversion guide](../2-human-relevant/conversion-and-integration.md) and [migration inventory](../3-agent-reference/migration-map.json) identify that distinction. New domain CCs such as workload profiling, robotics or Paper2Agent can use the same interfaces, but are not prerequisites for completing these ten categories.
+
+**Wave A:** portable package loader, mandatory call path, receipts, artifact store, calculation and basic reporting, native tool binding. Demonstrate one end-to-end checked result and rejection through every external surface.
+
+**Wave B:** intent/contract/literature, compatible discovery, protected binding, evidence-linked research loop. Demonstrate a change of strategy after new evidence and a named clarification path in interactive and headless modes.
+
+**Wave C:** all remaining members, asynchronous execution and restart, environment-specific qualification, full delivery/reproduction. Demonstrate safe removal, new release admission and reuse of unaffected evidence.
+
+**Wave D:** matched native-baseline comparisons and fault-injection qualification. Fix discovered problems; do not waive failed cases to declare completion. Keep code changes bounded and each wave independently reviewable.
+
+## The two questions a coding agent must answer
+
+“Am I following the plan?” Every change maps to a [M2A requirement](../3-agent-reference/acceptance-matrix.json), preserves its owner/authority boundary and has a test of the intended behavior. Any deviation is recorded with the changed requirement and replacement evidence before implementation claims completion.
+
+“Am I done?” All 14 obligations pass with pinned runtime evidence; all ten categories and all listed members are covered; Python/CLI/MCP preserve checks; native JiuwenSwarm drives the loop; long-run fault tests and the matched correctness/completion trial meet the stated gates; a real delivery is reproducible within its declared level. **Documentation/schema checks do not satisfy runtime obligations.** Current [implementation status](../3-agent-reference/implementation-status.json): NOT_RUN.
+
+Stop adding scope once those gates pass. Factory automation, optimizing routing, a new UI and unrestricted self-modification are later work. Qualification of any imported/generated CC remains mandatory from the first wave.

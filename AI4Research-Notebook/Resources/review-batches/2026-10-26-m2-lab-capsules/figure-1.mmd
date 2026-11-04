@@ -1,0 +1,23 @@
+flowchart TB
+    subgraph LAB[Persistent lab boundary]
+        AI[AI4R planner and research loop]
+        FACT[CC factory]
+        QUAL[Independent qualification and activation]
+        PKG[Versioned robotics CC package]
+        CTRL[Lab resource controller]
+        OPS[Scoped operation invocations]
+        SIM[Simulator service]
+        STATE[Lab metadata and service state]
+        ART[Versioned assets and sealed results]
+        AI -->|select operation| OPS
+        FACT -->|candidate| QUAL
+        QUAL -->|eligible version| PKG
+        PKG -->|operation contracts| OPS
+        PKG -->|resource requirements| CTRL
+        CTRL -->|start inspect stop and recover| SIM
+        OPS -->|bounded commands and session handles| SIM
+        SIM --> STATE
+        SIM --> ART
+        OPS -->|validated output import| ART
+        AI -->|accepted findings| STATE
+    end

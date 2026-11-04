@@ -1,0 +1,22 @@
+---
+id: m1-cc-planner-reference
+status: active
+source: AI4Research-Development/jiuwenswarm-m1/jiuwenswarm/research/capsules/planner.py; research/native.py; research/planning.py; research/binding.py
+last_reviewed: 2026-10-21
+next_action: Capture the effective plan policy, candidate snapshot, resource inventory, and rejection reasons before assessing candidate starvation.
+---
+# Planner
+
+`research.planner` emits one data-only proposal from a frozen Brief, library snapshot, resource inventory, and plan policy. It proposes; it does not install capsules, grant effects, run checks, call tools, or decide acceptance. A static authored graph is also supported, so the planner is not necessarily active in every run.
+
+**Ports.** Required inputs are `brief` (`research-brief:2.0.0`), `library_snapshot` (`library-snapshot:field-contract:1`), `resource_inventory` (`resource-inventory:field-contract:1`), and `plan_policy` (`plan-policy:field-contract:1`). Output `plan_proposal` is `plan-proposal:field-contract:3` (`research_assets/planner/planner.declaration.json`).
+
+**Call and limits.** The capsule invokes `NativePlanner.propose` once. The native adapter verifies the pinned OpenJiuwen runtime; its Leader harness has text-only messages, no tools/subagents/skills or task loop, one governed bridge call, zero SDK retries, and bounded wait (`native.py`). Declaration budget is one model call, zero tool calls, 120 seconds; no network. This is an implemented adapter path in source, not proof that a live path was run.
+
+**Checks and policy.** Proposal parsing preserves malformed candidate bytes for protected checks; a textual `INFEASIBLE` is captured and halts the plan. Host binding checks schema, Brief coverage, active library membership and planner selectability, port compatibility, dependency closure, acyclicity, one Delivery leaf with required Evaluation ancestry, mandatory check bundle presence, effect/network/resource feasibility, budgets, and whether suggested checks are known (`planning.py`, `binding.py`). Mandatory stages and checking profiles remain protected. The planner receives a frozen snapshot, not live library access. Optional compatible gates may be candidate choices only when admitted and policy-eligible.
+
+**Failure and interpretation.** A structurally valid graph can still be poor or omit semantically useful work: source explicitly says quality and meaning are not verified, and coverage is checked by identifiers. A rejected proposal is not an accepted plan. Model-reported infeasibility, invalid proposal, binder rejection, and runtime failure are distinct outcomes and should not be collapsed. The controller can create a linked bounded rerun after a rejection/failure, but this is not a same-attempt automatic model repair loop.
+
+**Planner-breadth test.** For each case, record available candidate pins, selectable flags, required-stage policy, resource inventory, maximum nodes, effects/network ceilings, plan-source mode, proposal, and each binder reason. Test a newly admitted optional gate that is compatible and eligible, a gate blocked for a known effect/resource reason, and a case where mandatory controls prevent relaxation. This distinguishes absent catalog entries, policy constraints, and poor model selection. No evidence currently proves the live planner is starved.
+
+**Evidence and limits.** [[Designs/CC Reference/Source Map]] links the carrier, prompt, declaration, adapter, checks, and focused test files. Tests do not establish live proposal quality or candidate-breadth performance.

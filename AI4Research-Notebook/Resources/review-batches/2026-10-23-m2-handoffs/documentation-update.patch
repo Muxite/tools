@@ -1,0 +1,704 @@
+--- a/Designs/Lab Capsule and Factory Design Plan.md
++++ b/Designs/Lab Capsule and Factory Design Plan.md
+@@ -1,11 +1,16 @@
+ ---
+ id: vm-cc-factory-design-plan
+ status: proposed-m2
+-source: Sources/Prompts/2026-10-21-vm-capsule-factory-design-plan.txt; Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt
+-last_reviewed: 2026-10-22
+-next_action: Inventory the Spark and establish host resource admission and shared inference before scaling lab builds
++source: Sources/Prompts/2026-10-21-vm-capsule-factory-design-plan.txt; Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt; Sources/Prompts/2026-10-23-m2-component-handoffs.txt
++last_reviewed: 2026-10-23
++next_action: Use the three scoped M2 handoffs; prove one lab lifecycle and one tool carrier before factory automation
+ ---
+ # M2: VM labs, container capsules and local factories
++
++## October 23 implementation handoff
++
++[[Resources/Handoffs/m2-labs/README|Current scoped handoff]] is the implementation route. Spark is primarily a restricted benchmark host; development/builds happen elsewhere where practical. The existing no-sudo two-image benchmark workflow stays independent. VMs, a registry, shared local inference and a full capacity controller are not bootstrap prerequisites. M2 infrastructure remains unimplemented by this documentation revision. The full target below is retained; first-delivery scope and sequencing follow the handoff.
++
+ 
+ **M2 direction:** every lab is a durable project environment, initially hosted in a Linux VM, with an independently evolving AI4R, a local capability factory, Docker images and persistent project resources. Full CC containerization is the target. Selected capsule and platform improvements can return to a tested master AI4R base; publication does not silently update other labs or running plans.
+ 
+@@ -19,9 +24,9 @@
+ 
+ [[Designs/Durable Project Labs]] defines each lab as a small startup/research/hackathon project: stable identity and persistent knowledge, data, code, capabilities and results across model switches, upgrades, pause and recovery. VM/container instances are replaceable. First implement durable storage, reconciliation and verified restore, then extend factory/RSI evolution and versioned presentation checkpoints. This refines lifecycle design; the immediate app/benchmark deployment remains separate.
+ 
+-## Spark development target
++## Full shared-services target, separate from immediate deployment
+ 
+-[[Designs/Spark Shared Services and Storage]] owns the hardware and resource policy: GB10 ARM64, 128 GB unified memory, the supplied 2 TB SSD, one host model store/inference service, and bounded CPU lab VMs. Start with two active labs. GPU passthrough is unsupported in NVIDIA's current Spark documentation, so GPU inference stays on the host; CPU VM support still needs a real host qualification. The earlier generic x86 prototype is not the Spark deployment. The storage budget reserves 20% of usable capacity and includes VM-local image/cache duplicates, registry copies and transient downloads/builds.
++[[Designs/Spark Shared Services and Storage]] owns the hardware and resource policy: GB10 ARM64, 128 GB unified memory, the supplied 2 TB SSD, one host model store/inference service, and bounded CPU lab VMs. Start with one lab and prove restore before adding the second; a local model service is added only when required. GPU passthrough is unsupported in NVIDIA's current Spark documentation, so GPU inference stays on the host; CPU VM support still needs a real host qualification. The earlier generic x86 prototype is not the Spark deployment. The storage budget reserves 20% of usable capacity and includes VM-local image/cache duplicates, registry copies and transient downloads/builds.
+ 
+ ## Infrastructure overview
+ 
+@@ -79,7 +84,7 @@
+ 
+ | Step | Build | Concrete exit |
+ |---|---|---|
+-| 0. Spark capacity and shared services | Inventory actual disk/memory/ARM64 VM support; implement reservations, model acquisition and one host inference endpoint | Two lab identities share one model artifact/worker without duplicate downloads; over-budget downloads/builds are refused; host driver stack remains intact |
++| 0. Minimal capacity and boundary examples | Inventory actual build/execution hosts, retain 20% headroom, freeze scoped file/identity examples and use the configured model route | A bounded operation is admitted or refused with owned accounting; no VM, model download or shared service is required to start carrier work |
+ | 1. Freeze boundary examples | Invocation/result examples, image-identity record, broker build/launch API and source-to-image manifest | One real existing CC mapped from current Python helper/callable API to files; role/grant/check owners explicit |
+ | 2. Tool carrier on one engine | Container entrypoint adapter and host Docker carrier, manually authored image | Real invocation by image ID; correct output ingestion/checks; corrupt output, timeout, cancellation and unauthorized mount rejection |
+ | 3. Host broker and durable jobs | Narrow local service, ownership labels, paths/limits, persisted IDs and recovery | No raw Docker authority in agents; restart reconciles live/stopped jobs without duplicate effects; evidence survives cleanup |
+@@ -89,7 +94,7 @@
+ | 7. Agent/verifier conversion | Invocation-scoped model bridge and verifier image | Actual model call evidence; verifier payload excludes producer inputs; checks/gates retain authority; expand remaining executable CCs |
+ | 8. Contribution and platform evolution | Candidate source/image export, central rebuild/qualification, explicit app/factory update and state migration | Separate CC and platform promotions; selective lab update and compatible state rollback; existing pins/evidence retained |
+ 
+-CPU labs with host-managed local inference are the initial Spark profile. GPU benchmark jobs require a separately qualified host accelerator path, not guest passthrough. Every factory repair/download/build uses the shared capacity ledger, with bounded attempts and retained evidence. The first manual image must work before attributing generated-image failures to the factory. CC accuracy experiments continue alongside infrastructure; deployment acceptance does not prove an accuracy gain.
++CPU lab VMs on a qualified provider are the M2 target; use the existing model connection first. Host-managed local inference is optional until a selected task needs it. GPU benchmark jobs require a separately qualified host accelerator path, not guest passthrough. Every factory repair/download/build uses the shared capacity ledger, with bounded attempts and retained evidence. The first manual image must work before attributing generated-image failures to the factory. CC accuracy experiments continue alongside infrastructure; deployment acceptance does not prove an accuracy gain.
+ 
+ ## Release and development identity
+ 
+--- a/Designs/VM Lab Infrastructure Design.md
++++ b/Designs/VM Lab Infrastructure Design.md
+@@ -1,11 +1,16 @@
+ ---
+ id: vm-lab-infrastructure-design
+ status: proposed-m2
+-source: Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt
+-last_reviewed: 2026-10-22
+-next_action: Qualify ARM64 CPU guests on the Spark and connect their scoped relays to host inference
++source: Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt; Sources/Prompts/2026-10-23-m2-component-handoffs.txt
++last_reviewed: 2026-10-23
++next_action: Implement one lab on a permitted provider; do not add Spark provisioning to benchmark startup
+ ---
+ # M2 VM lab infrastructure
++
++## October 23 implementation handoff
++
++[[Resources/Handoffs/m2-labs/vm-labs|Current scoped handoff]] is the implementation route. Spark is primarily a restricted benchmark host; development/builds happen elsewhere where practical. The existing no-sudo two-image benchmark workflow stays independent. VMs, a registry, shared local inference and a full capacity controller are not bootstrap prerequisites. M2 infrastructure remains unimplemented by this documentation revision. The full target below is retained; first-delivery scope and sequencing follow the handoff.
++
+ 
+ Parent: [[Designs/Lab Capsule and Factory Design Plan]]. Review: [[Designs/Docker Architecture Review and Feasibility]]. M2 target architecture; M1 is the migration baseline.
+ 
+@@ -15,7 +20,7 @@
+ 
+ ## Spark placement and capacity
+ 
+-[[Designs/Spark Shared Services and Storage]] is the resource-policy owner. Target the user's GB10 Spark, 128 GB unified memory and 2 TB SSD. Use ARM64 CPU lab VMs and a host-managed model store/GPU inference service. No model weights or inference workers are copied into guests. Local model bridges become scoped relays to the private host gateway. CPU virtualization must be qualified on the actual Spark; the previous x86 reference was generic design context. GPU passthrough is not a supported Spark deployment path.
++[[Designs/Spark Shared Services and Storage]] is the resource-policy owner. Target the user's GB10 Spark, 128 GB unified memory and 2 TB SSD. If Spark is selected and qualified as a VM host, use ARM64 CPU guests; otherwise use another permitted provider. Use the configured model connection first and add host-managed local inference only when required. No model weights or inference workers are copied into guests. Local model bridges become scoped relays to the private host gateway. CPU virtualization must be qualified on the actual Spark; the previous x86 reference was generic design context. GPU passthrough is not a supported Spark deployment path.
+ 
+ ## Concrete deployment
+ 
+@@ -23,19 +28,19 @@
+ 
+ ```mermaid
+ flowchart TB
+-    P[ARM64 VM provisioner] --> APP
+-    subgraph H[Spark host]
+-        CAP[Host storage and memory admission]
++    P[Permitted VM provider and architecture] --> APP
++    subgraph H[Qualified VM host - Spark only if permitted]
++        CAP[Owned storage and memory admission]
+         MODELS[Canonical model store]
+-        INF[Host GPU inference gateway]
+-        SOURCE[Prepared sources and image registry]
++        INF[Optional shared inference gateway]
++        SOURCE[Prepared sources and verified images]
+         MODELS --> INF
+         subgraph V[CPU lab VM]
+             APP[Compose - AI4R and local factory]
+             RELAY[Scoped model relay]
+             BROKER[VM system broker]
+             ENGINE[Local Docker Engine]
+-            BUILDER[BuildKit - bounded cache]
++            BUILDER[Optional local BuildKit - bounded cache]
+             IMG[Local runnable images]
+             CC[Invocation containers]
+             DATA[Quota-bound workspace and evidence]
+@@ -62,16 +67,16 @@
+ 
+ ## Creating a new VM
+ 
+-Use a checksummed ARM64 Linux cloud image, cloud-init and versioned bootstrap. First probe the actual Spark kernel, KVM device, guest firmware and libvirt/provider capability; CPU guest support is not yet established here. Preserve the vendor host GPU stack. Creating VMs inside Docker Desktop or passing the Spark GPU into guests is not the deployment model.
++Use a checksummed ARM64 Linux cloud image, cloud-init and versioned bootstrap. First inspect permitted provider capability; if Spark VM hosting is selected, probe its kernel, KVM device, guest firmware and provider capability without modifying them; CPU guest support is not yet established here. Preserve the vendor host GPU stack. Creating VMs inside Docker Desktop or passing the Spark GPU into guests is not the deployment model.
+ 
+ 1. Select lab/project IDs, architecture, VM size/storage/network and tested M2 release. Generate unique cloud-init instance ID, hostname and operator access. Never clone live sessions or credentials.
+ 2. Create a fresh guest disk from the verified image; attach persistent project storage independent of the VM OS lifecycle. Boot with metadata/user-data, wait for cloud-init completion and record the provider identity. NoCloud uses instance identity to distinguish first boot. [NoCloud](https://docs.cloud-init.io/en/latest/reference/datasources/nocloud.html).
+ 3. Install release-selected Docker Engine, Compose/Buildx and broker versions; create service accounts/directories, log rotation and quotas. Keep package versions in a tested release lock. [Engine installation](https://docs.docker.com/engine/install/ubuntu/).
+-4. Fetch the release manifest/Compose definition and source commit. Create a standalone Git clone and local development branch. Import seed CC/admission records and pull compatible images by registry digest. Seed resources separately.
++4. Fetch the release manifest/Compose definition and source commit. Create a standalone Git clone and local development branch. Import seed records through their authorized migration/admission path; source merge/import is not automatic eligibility. Load compatible images from verified archives and inspect exact IDs/platforms, or pull by digest when an optional registry exists. Seed resources separately.
+ 5. Enroll scoped credentials outside Git/images/templates. Start the host broker and stable Compose services. Missing required pins or credentials produces a visible failed/blocked preparation state.
+ 6. Check app/API health, broker authorization, platform/image availability, output ownership, effective limits, model route and a known CC invocation. Record evidence before READY; boot completion alone is insufficient.
+ 
+-The previous amd64 `virt-install` example is retired for this Spark target. After host qualification, the provider definition must select ARM64 guest firmware/cloud image and cloud-init data, connect only to the private model/resource gateways, enforce memory/disk ceilings, and install host-known guest broker versions. Start with two guests at approximately 16 GB memory and 200 GB maximum virtual disk each, subject to the shared pool and actual measured needs. These are proposed bounds, not tested sizing. Provisioning reserves capacity before creating disks or pulling images.
++The previous amd64 `virt-install` example is retired for this Spark target. After host qualification, the provider definition must select ARM64 guest firmware/cloud image and cloud-init data, connect only to the private model/resource gateways, enforce memory/disk ceilings, and install host-known guest broker versions. First prove one real lab and its restore path. The former two-guest example of approximately 16 GB memory and 200 GB maximum virtual disk each is an optional planning envelope, subject to measured needs and actual placement. These are proposed bounds, not tested sizing. Provisioning reserves capacity before creating disks or pulling images.
+ 
+ ## Host paths and versioned state
+ 
+--- a/Designs/Container Capability Capsule Design.md
++++ b/Designs/Container Capability Capsule Design.md
+@@ -1,17 +1,22 @@
+ ---
+ id: container-cc-initial-design
+ status: proposed-m2
+-source: Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt
+-last_reviewed: 2026-10-21
+-next_action: Implement the file-based tool adapter and verify host gate equivalence
++source: Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt; Sources/Prompts/2026-10-23-m2-component-handoffs.txt
++last_reviewed: 2026-10-23
++next_action: Prove one immutable stateless tool container through independent checks and gates
+ ---
+ # M2 container capability capsules
++
++## October 23 implementation handoff
++
++[[Resources/Handoffs/m2-labs/container-capsules|Current scoped handoff]] is the implementation route. Spark is primarily a restricted benchmark host; development/builds happen elsewhere where practical. The existing no-sudo two-image benchmark workflow stays independent. VMs, a registry, shared local inference and a full capacity controller are not bootstrap prerequisites. M2 infrastructure remains unimplemented by this documentation revision. The full target below is retained; first-delivery scope and sequencing follow the handoff.
++
+ 
+ Parent: [[Designs/Lab Capsule and Factory Design Plan]]. Every executable CC version has an immutable container carrier. Its declaration remains the capability contract; the image packages its implementation and software environment. There is one image per version, not one image build per invocation. Many invocations reuse that image with separate containers and workspaces.
+ 
+ ## Spark execution and retention
+ 
+-[[Designs/Spark Shared Services and Storage]] owns physical resource limits. Use ARM64 images on the GB10 Spark. CPU lab CCs use invocation-scoped IPC to their local relay, which forwards authorized requests to the shared host inference gateway. Images package code/dependencies rather than weights or complete project repos/datasets. Model revision, quantization and runtime handles are frozen external dependencies. Weight bytes and GPU workers are central; conversation state is request-scoped.
++[[Designs/Spark Shared Services and Storage]] owns physical resource limits. Use ARM64 images on the GB10 Spark. Agent lab CCs use invocation-scoped model IPC. The existing model connection is used first; an optional local relay can forward requests to a qualified shared host inference gateway when local models are needed. Images package code/dependencies rather than weights or complete project repos/datasets. Model revision, quantization and runtime handles are frozen external dependencies. Weight bytes and GPU workers are central; conversation state is request-scoped.
+ 
+ Image identity is immutable but retention is finite. Active/retained-run references protect required artifacts; removing the last local copy changes replay availability unless a verified external copy exists. Per-VM engine stores/builders do not deduplicate across guests. Reserve temporary/import/output space before execution. Development uses the same limits.
+ 
+@@ -24,7 +29,7 @@
+ | Multi-platform index digest | Identifies a set of platform images; also record which child manifest/platform actually ran |
+ | Export archive SHA-256 | Verifies transferred file bytes; not a substitute for manifest/config identity |
+ 
+-Published releases use registry digest references. Unpublished local candidates can run by full local image ID under explicit local admission. This refines the earlier assumption that every build immediately has a usable registry digest. Publishing creates an additional distribution record; it never rewrites a frozen local invocation. Inspect local IDs and repository digests separately. [Image inspection](https://docs.docker.com/reference/cli/docker/image/inspect/), [digest pulls](https://docs.docker.com/reference/cli/docker/image/pull/).
++Registry-published releases use digest references; archive-distributed releases retain verified transport hashes plus inspected local image/platform identities, with no registry requirement. Unpublished local candidates can run by full local image ID under explicit local admission. This refines the earlier assumption that every build immediately has a usable registry digest. Publishing creates an additional distribution record; it never rewrites a frozen local invocation. Inspect local IDs and repository digests separately. [Image inspection](https://docs.docker.com/reference/cli/docker/image/inspect/), [digest pulls](https://docs.docker.com/reference/cli/docker/image/pull/).
+ 
+ ## Package and invocation boundary
+ 
+--- a/Designs/Per Lab Capability Factory Design.md
++++ b/Designs/Per Lab Capability Factory Design.md
+@@ -1,19 +1,28 @@
+ ---
+ id: per-lab-factory-initial-design
+ status: proposed-m2
+-source: Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt
+-last_reviewed: 2026-10-21
+-next_action: Prove a manual source-to-image pipeline, then automate it as a lab-local AI4R workflow
++source: Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt; Sources/Prompts/2026-10-23-m2-component-handoffs.txt
++last_reviewed: 2026-10-23
++next_action: Prove manual packaging and qualification, then add bounded adaptive authoring
+ ---
+ # M2 per-lab capability factory
+ 
++## October 23 implementation handoff
++
++[[Resources/Handoffs/m2-labs/local-factories|Current scoped handoff]] is the implementation route. Spark is primarily a restricted benchmark host; development/builds happen elsewhere where practical. The existing no-sudo two-image benchmark workflow stays independent. VMs, a registry, shared local inference and a full capacity controller are not bootstrap prerequisites. M2 infrastructure remains unimplemented by this documentation revision. The full target below is retained; first-delivery scope and sequencing follow the handoff.
++
++
+ Parent: [[Designs/Lab Capsule and Factory Design Plan]]. The factory is part of each VM's AI4R, initially a module/worker in its app service. It owns independent jobs, source templates, local candidate records and evolution history. Docker Engine owns local images; BuildKit owns separate build/cache state; neither is the eligibility catalog.
+ 
+-## Spark development profile
++## Build placement and Spark execution profile
+ 
+-[[Designs/Spark Shared Services and Storage]] owns storage/memory policy. Each factory remains independent in its CPU VM, but model/repository acquisition is host-managed. Reserve peak bytes before every build, pull, export or repair. Start with one heavyweight storage operation machine-wide and a 30 GB GC target per lab builder, inside the guest disk ceiling. Weights and datasets are not image content.
++[[Designs/Spark Shared Services and Storage]] owns storage/memory policy. Each factory controller/history remains independent in its lab VM. Workstation/CI builds are preferred where practical; source acquisition and optional model acquisition have separately scoped owners. Spark is primarily the benchmark execution target. Reserve peak bytes before every build, pull, export or repair. Start with one heavyweight storage operation per bounded build/execution pool. A 30 GB GC target is a proposed M2 dedicated lab-builder profile, not the existing 10 GB deployment-builder default or a required Spark allocation; cache lives on the actual build host. Weights and datasets are not image content.
+ 
+ Generalist gap-filling attempts retain source/evidence deltas rather than unlimited images, contexts, clones or VM snapshots. Parent journeys cap attempts and cumulative new bytes. Publish selected candidates, then reclaim unleased local replicas through reference-aware retention. Registry blobs and each VM's loaded layers consume separate physical allocations. Model calls use host inference through the scoped relay; a STORAGE_BLOCKED result is scheduling, not a scientific verdict.
++
++## Fixed durable control, bounded adaptive work
++
++Use both: a fixed lifecycle owns identities, leases, budgets, checkpoints, qualification and admission boundaries; bounded agents adapt discovery/implementation/repair inside individual stages. Prove manual source-to-image invocation before adaptive authoring. No unbounded recursive factory or implicit promotion.
+ 
+ ## Source-to-image pipeline
+ 
+@@ -21,7 +30,7 @@
+ flowchart LR
+     S[Authorized prepared source] --> A[Author declaration and implementation]
+     A --> C[Capture immutable build context]
+-    C --> B[Host broker runs Buildx and BuildKit]
++    C --> B[Broker selects permitted local or remote builder]
+     B --> L[Explicit load into local Engine]
+     L --> I[Record local image ID and platform]
+     I --> T[Independent sandbox qualification]
+@@ -29,14 +38,14 @@
+     I --> X[Candidate image and source export]
+     T --> X
+     X --> Q[Central rebuild and qualification]
+-    Q --> R[Tested release and registry pins]
++    Q --> R[Tested release with archive or registry identity]
+ ```
+ 
+ The qualification path can inspect a candidate before it is admitted for research use, under a separate sandbox-job permission. The factory may submit checks/evidence, but cannot assign its own admission outcome. Export may preserve failed candidates for diagnosis; publication and central adoption are never inferred from a successful upload.
+ 
+ ## Build mechanics
+ 
+-Use one named Buildx builder per lab with the `docker-container` driver initially. The broker provisions the tested BuildKit image/version and applies build concurrency/resource limits. BuildKit is itself an infrastructure container on the VM engine. Its cache/state is separate from Engine images; build results require an output exporter. [Docker container driver](https://docs.docker.com/build/builders/drivers/docker-container/).
++On a qualified development VM, one named Buildx `docker-container` builder per lab is a simple option. A lab-local factory can instead submit a captured context to a permitted, namespaced workstation/CI build backend and import the verified result; a builder on Spark is not required. The broker provisions the tested BuildKit image/version and applies build concurrency/resource limits. BuildKit is itself an infrastructure container on the VM engine. Its cache/state is separate from Engine images; build results require an output exporter. [Docker container driver](https://docs.docker.com/build/builders/drivers/docker-container/).
+ 
+ Illustrative operator commands inside an already prepared VM, not calls available directly to CC agents:
+ 
+--- a/Designs/Durable Project Labs.md
++++ b/Designs/Durable Project Labs.md
+@@ -1,11 +1,16 @@
+ ---
+ id: durable-project-labs
+ status: proposed-m2
+-source: Sources/Prompts/2026-10-22-durable-startup-labs.txt
+-last_reviewed: 2026-10-22
+-next_action: Specify persistent lab identity, storage, lifecycle and recovery before expanding autonomous lab evolution
++source: Sources/Prompts/2026-10-22-durable-startup-labs.txt; Sources/Prompts/2026-10-23-m2-component-handoffs.txt
++last_reviewed: 2026-10-23
++next_action: Prove persistent state, enforceable single-writer recovery and a verified external restore
+ ---
+ # Durable project labs
++
++## October 23 implementation handoff
++
++[[Resources/Handoffs/m2-labs/vm-labs|Current scoped handoff]] is the implementation route. Spark is primarily a restricted benchmark host; development/builds happen elsewhere where practical. The existing no-sudo two-image benchmark workflow stays independent. VMs, a registry, shared local inference and a full capacity controller are not bootstrap prerequisites. M2 infrastructure remains unimplemented by this documentation revision. The full target below is retained; first-delivery scope and sequencing follow the handoff.
++
+ 
+ A lab is a long-lived project environment: a small team or startup with a brief, accumulated knowledge, code, capabilities and evidence of progress. It can support a research project, hackathon prototype or emerging product. AI4R supplies the initial capabilities; the project develops its own useful outputs and improvements over time. A lab can be paused, upgraded, moved or restored without losing its identity or work.
+ 
+@@ -49,7 +54,7 @@
+ 
+ Model choice is a versioned lab configuration. Switch providers/models for **new runs** after compatibility, tool/schema support, access and capacity checks; keep already-started runs pinned. Store the effective model/revision where available, runtime, settings and prompt/workflow version per run. Preserve prior conversation evidence; do not assume an opaque provider session or model's internal state can migrate. Required knowledge stays in project-owned records.
+ 
+-Use the central model store/inference service rather than a copy per lab. A lab can refer to several model profiles over its life without keeping every model loaded or every revision local. Record whether historical runs remain locally replayable, externally recoverable or provenance-only; a manifest alone cannot recreate a deleted dependency.
++When local models are needed, use a central artifact/inference service rather than weight copies per lab; otherwise reuse the configured model connection. A lab can refer to several model profiles over its life without keeping every model loaded or every revision local. Record whether historical runs remain locally replayable, externally recoverable or provenance-only; a manifest alone cannot recreate a deleted dependency.
+ 
+ The desired M2 improvement scope is broader than the current M1 RSI helper: a lab may develop new CCs and propose improvements to its own code, workflows, prompts and model configuration under an explicit target profile. Project data persists across attempts, with immutable dataset versions and provenance. Learning from development outcomes must not contaminate protected evaluation sets.
+ 
+--- a/Designs/Spark Shared Services and Storage.md
++++ b/Designs/Spark Shared Services and Storage.md
+@@ -1,15 +1,20 @@
+ ---
+ id: m2-spark-shared-services-storage
+ status: proposed-m2
+-source: Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt; Resources/review-batches/2026-10-21-spark-storage-design/source-receipt.json
+-last_reviewed: 2026-10-22
+-next_action: Inventory the actual Spark and implement capacity admission before enabling unattended downloads or factory iteration
++source: Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt; Resources/review-batches/2026-10-21-spark-storage-design/source-receipt.json; Sources/Prompts/2026-10-23-m2-component-handoffs.txt
++last_reviewed: 2026-10-23
++next_action: Use minimal owned capacity checks and existing models first; add shared services only when needed
+ ---
+ # M2 Spark: shared inference and bounded sandbox storage
+ 
+-The development target is the user's **GB10 DGX Spark with 128 GB unified memory and a 2 TB SSD**. Treat 2 TB as the supplied machine constraint, not an inferred vendor SKU. Measure usable filesystem bytes and existing usage on arrival. A nominal 2 TB is about 1.82 TiB before formatting; all policies below use measured bytes rather than mixing GB/GiB.
+-
+-**Architecture choice:** labs retain independent AI4R, factories, catalogs and local Docker engines. Large common resources belong to host-managed services: one model store, a shared GPU inference gateway, prepared repository/data storage, an OCI registry, and a capacity controller. Independent development does not require duplicate model weights or a model server per VM.
++## October 23 implementation handoff
++
++[[Resources/Handoffs/m2-labs/contracts-and-boundaries|Current scoped handoff]] is the implementation route. Spark is primarily a restricted benchmark host; development/builds happen elsewhere where practical. The existing no-sudo two-image benchmark workflow stays independent. VMs, a registry, shared local inference and a full capacity controller are not bootstrap prerequisites. M2 infrastructure remains unimplemented by this documentation revision. The full target below is retained; first-delivery scope and sequencing follow the handoff.
++
++
++The constrained benchmark execution target is the user's **GB10 DGX Spark with 128 GB unified memory and a 2 TB SSD**. Treat 2 TB as the supplied machine constraint, not an inferred vendor SKU. Measure usable filesystem bytes and existing usage on arrival. A nominal 2 TB is about 1.82 TiB before formatting; all policies below use measured bytes rather than mixing GB/GiB.
++
++**Full M2 architecture option:** labs retain independent AI4R, factories, catalogs and local Docker engines. Start with owned capacity checks and the existing model route; add the following shared services only as needed. These are not immediate benchmark dependencies. Large common resources belong to host-managed services: one model store, a shared GPU inference gateway, prepared repository/data storage, an OCI registry, and a capacity controller. Independent development does not require duplicate model weights or a model server per VM.
+ 
+ This page owns the resource policy for [[Designs/Lab Capsule and Factory Design Plan]], [[Designs/VM Lab Infrastructure Design]], [[Designs/Container Capability Capsule Design]] and [[Designs/Per Lab Capability Factory Design]]. It refines their earlier generic-host assumptions. Proposed limits are starting controls, not measured capacity or executed cleanup.
+ 
+@@ -17,13 +22,13 @@
+ 
+ ## Spark's benchmark-host role
+ 
+-Routine development and image builds should happen on development machines or a suitable build service where practical. Future deployment should move only versioned, architecture-compatible images and selected inputs to Spark, support inspection there, and return verified outputs/provenance to development machines. Count transfer staging and temporary overlap against capacity; keep durable project data under explicit storage/backup policy. The sent benchmark prompt is unchanged; this flow is untested. See [[Activities/2026-10-22 Spark Benchmark Host Direction]].
++Routine development and image builds should happen on development machines or a suitable build service where practical. Future deployment should move only versioned, architecture-compatible images and selected inputs to Spark, support inspection there, and return verified outputs/provenance to development machines. Count transfer staging and temporary overlap against capacity; keep durable project data under explicit storage/backup policy. Repository-owned staging/inspection/fetch is now source-implemented; actual Spark execution remains unverified. Use the current implementation status, not the older prompt, for delivered-code facts. See [[Activities/2026-10-22 Spark Benchmark Host Direction]].
+ 
+ ## Hardware changes the deployment
+ 
+ Spark is Arm-based with unified CPU/GPU memory. Plan `linux/arm64` host services, guest images and CC images, and qualify repository dependencies accordingly. NVIDIA currently states that GPU passthrough for virtualization environments is unsupported. Put inference on the Spark host instead of assigning its GPU to lab VMs. CPU-guest KVM/provider support still needs an actual host probe; this document does not establish that a particular Spark kernel boots our lab VMs. [Hardware](https://docs.nvidia.com/dgx/dgx-spark/hardware.html), [passthrough support](https://docs.nvidia.com/dgx/dgx-spark/support.html).
+ 
+-Keep vendor GPU drivers/host services intact during initial bring-up. First qualify one ARM64 CPU guest, storage quotas and the guest-to-host inference path. If the supported host configuration cannot run the intended CPU guests, record a provider decision: separate CPU VM host or an explicitly different container-only isolation profile. Do not silently call a container a VM. Central storage/inference and the carrier protocol can be developed independently of this decision.
++Keep vendor GPU drivers/host services intact during initial bring-up. If VM hosting on Spark is selected and permitted, qualify one ARM64 CPU guest first; otherwise use a separate VM provider. Add the guest-to-host inference path only when local models are needed. If the supported host configuration cannot run the intended CPU guests, record a provider decision: separate CPU VM host or an explicitly different container-only isolation profile. Do not silently call a container a VM. Central storage/inference and the carrier protocol can be developed independently of this decision.
+ 
+ ```mermaid
+ flowchart TB
+@@ -96,7 +101,7 @@
+ | Unallocated physical safety headroom | 20% | 400 | Reserved for controlled completion/recovery, not routine downloads or a new lab |
+ | **Total** | **100%** | **2,000** | No dataset/image category is counted twice |
+ 
+-Start with two active CPU labs, each with a maximum 200 GB virtual disk in this illustrative budget. The remaining 100 GB in the VM pool covers the shared guest base, permitted snapshots and staging; it is not a third lab allocation. Per-lab starting sub-budgets: 25 GB OS/source/config, 75 GB engine images/container layers, 30 GB BuildKit cache, 50 GB working data/output, 20 GB local headroom. Sub-budgets are ledger targets unless backed by actual separate filesystems/quotas; total virtual-disk size is not a per-directory quota.
++The full two-lab illustrative budget assigns each CPU lab at most a 200 GB virtual disk; first qualify one lab and restore before enabling the second. This is not a required Spark allocation. The remaining 100 GB in the VM pool covers the shared guest base, permitted snapshots and staging; it is not a third lab allocation. Per-lab starting sub-budgets: 25 GB OS/source/config, 75 GB engine images/container layers, 30 GB BuildKit cache, 50 GB working data/output, 20 GB local headroom. Sub-budgets are ledger targets unless backed by actual separate filesystems/quotas; total virtual-disk size is not a per-directory quota.
+ 
+ Stopped labs still consume their allocated bytes and retained reservations. Many projects can have archived source/catalog/evidence manifests without retaining a full VM disk for each. Verify restore and external/local artifact availability before disposing of an old VM; starting a new lab is not a reason to erase an unexported project. The 2 TB SSD is a bounded working set, not an unlimited model/repository/VM archive. Sustained growth requires selection/eviction or verified external SSD/NAS/object storage.
+ 
+--- a/Designs/Docker Architecture Review and Feasibility.md
++++ b/Designs/Docker Architecture Review and Feasibility.md
+@@ -1,11 +1,16 @@
+ ---
+ id: docker-lab-architecture-feasibility
+ status: reviewed-m2-proposal
+-source: Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Resources/review-batches/2026-10-21-docker-architecture-review/source-receipt.json; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt
+-last_reviewed: 2026-10-21
+-next_action: Implement a tool CC carrier adapter and host broker, then prove provisioning on two CPU VMs
++source: Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Resources/review-batches/2026-10-21-docker-architecture-review/source-receipt.json; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt; Sources/Prompts/2026-10-23-m2-component-handoffs.txt
++last_reviewed: 2026-10-23
++next_action: Follow current scoped M2 handoffs; qualify provider and carrier on available hardware
+ ---
+ # Docker architecture review and feasibility
++
++## October 23 implementation handoff
++
++[[Resources/Handoffs/m2-labs/README|Current scoped handoff]] is the implementation route. Spark is primarily a restricted benchmark host; development/builds happen elsewhere where practical. The existing no-sudo two-image benchmark workflow stays independent. VMs, a registry, shared local inference and a full capacity controller are not bootstrap prerequisites. M2 infrastructure remains unimplemented by this documentation revision. The full target below is retained; first-delivery scope and sequencing follow the handoff.
++
+ 
+ **Assessment:** feasible as an M2 infrastructure design, subject to actual host qualification. Use Linux CPU lab VMs with local Docker engines, Compose-managed AI4R services, VM brokers and sibling CC containers. On the Spark, shared host inference and one model store replace per-VM GPU/model ownership; CPU virtualization still needs qualification. Every lab retains its own factory, catalog and development history. Resource admission and bounded retention are prerequisites for sustained iteration on the 2 TB SSD.
+ 
+--- a/Designs/Capability Capsule Factory Feature.md
++++ b/Designs/Capability Capsule Factory Feature.md
+@@ -1,11 +1,16 @@
+ ---
+ id: feature-capability-capsule-factory
+ status: proposed
+-source: [[Paper2Agent Capability Factory]]; [[AI4Research Capability Growth]]; [[CC as Universal Component]]; maintained PRD V10 §§3.1.2, 4.4.3–4.4.7; design decisions D21, R5, D45–D46; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt
++source: [[Paper2Agent Capability Factory]]; [[AI4Research Capability Growth]]; [[CC as Universal Component]]; maintained PRD V10 §§3.1.2, 4.4.3–4.4.7; design decisions D21, R5, D45–D46; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt; Sources/Prompts/2026-10-23-m2-component-handoffs.txt
+ last_reviewed: 2026-10-23
+-next_action: Reconcile profile, acquisition and binder changes with the maintained design; select one bounded use case and define its stage contracts before any prototype
++next_action: Use fixed durable control with bounded adaptive agents after the manual carrier works
+ ---
+ # Capability Capsule Factory
++
++## October 23 implementation handoff
++
++[[Resources/Handoffs/m2-labs/local-factories|Current scoped handoff]] is the implementation route. Spark is primarily a restricted benchmark host; development/builds happen elsewhere where practical. The existing no-sudo two-image benchmark workflow stays independent. VMs, a registry, shared local inference and a full capacity controller are not bootstrap prerequisites. M2 infrastructure remains unimplemented by this documentation revision. The full target below is retained; first-delivery scope and sequencing follow the handoff.
++
+ 
+ **M2 scope correction:** this factory and VM/container architecture are M2. Earlier M1-scope limitations below describe the starting baseline, not a requirement to extend M1 or obtain a new M1 approval. [[Designs/Per Lab Capability Factory Design]] is the current deployment/build design; [[Designs/Lab Capsule and Factory Design Plan]] owns M2 development order.
+ 
+@@ -17,7 +22,7 @@
+ 
+ The pilot should demonstrate one bounded, repeatable research-to-capability journey as a **flat workflow** of separately governed stages: (1) prepare authorized, pinned sources; (2) review paper material when supplied; (3) select concrete upstream operations for a user task; (4) run upstream references in a qualified environment; (5) build a thin candidate wrapper; (6) independently compare wrapper behavior and failures with references; and (7) validate clean installation, actual calls and package contents. Paper-only input may yield a reviewed reading resource; repository-only input may yield candidate tools while explicitly recording absent paper evidence.
+ 
+-**M1 boundary:** Our modified AI4Research M1 design supports bounded agent/tool CCs and the protected admission/runtime path. Its current research plan shape and binding rules do not represent this factory workflow, and composite CC creation/execution is deferred (D21). A pilot therefore requires an accepted design amendment for profile/terminal types and plan/binding contracts before implementation; reuse native stages where their contracts fit. Do not describe the factory or a composite as current M1 behavior or attribute our adapter choices to upstream JiuwenSwarm.
++**M1 boundary:** Our modified AI4Research M1 design supports bounded agent/tool CCs and the protected admission/runtime path. Its integrated generic Planner does not by itself implement factory lifecycle, build permissions or admission authority; composite CC creation/execution remains outside the M1 factory delivery (D21). A pilot therefore requires an accepted design amendment for profile/terminal types and plan/binding contracts before implementation; reuse native stages where their contracts fit. Do not describe factory automation or a composite as current M1 behavior or attribute our adapter choices to upstream JiuwenSwarm.
+ 
+ **Future:** Consider a composite/plannable factory only after a flat pilot demonstrates repeated value and a maintained design specifies pinned members, typed edges, member-level checks, bounded effects/budgets and aggregate acceptance. Broader self-improvement or automatic promotion is separate future work.
+ 
+--- a/Designs/Design Library.md
++++ b/Designs/Design Library.md
+@@ -2,10 +2,15 @@
+ id: design-library
+ status: active
+ source: Resources/review-batches/personal-collections-and-readiness.md
+-last_reviewed: 2026-10-22
++last_reviewed: 2026-10-23
+ next_action: Read current design contracts for implementation; use older designs for provenance
+ ---
+ # Design library
++
++## Latest M2 handoff and source update
++
++[[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] is the portable implementation package for VM labs, container capsules and local factories. Shared identity/protocol/resource/admission contracts and acceptance scenarios are included; existing design notes retain the full target and provenance.
++
+ 
+ **Current notebook reading package:** [[Designs/CC History]] · [[Designs/Project Authority]] · [[Designs/CC Reference]] · [[Designs/Lab Progression]] · [[Amendments/README]]. [[Resources/Current Baseline]] distinguishes the maintained design checkout from captured M1 implementation snapshots.
+ 
+--- a/Designs/Agent Reading and Freshness.md
++++ b/Designs/Agent Reading and Freshness.md
+@@ -3,9 +3,14 @@
+ status: active
+ source: ../AGENTS.md; Project Authority.md; jiuwenswarm/docs/architecture/design-package/README.md
+ last_reviewed: 2026-10-23
+-next_action: Refresh only the source rows affected by a changed receipt; keep user intent and authority gaps explicit
++next_action: Start at the current M2 handoffs and dated source receipts, preserving earlier checkpoints
+ ---
+ # Agent reading route and source freshness
++
++## Latest M2 handoff and source update
++
++For current M2 build instructions use [[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]]. The package records observed remote source `809351f8`; Planner/capsule source is now integrated, without implying qualification/deployment. Older unmerged-branch and Docker observations remain dated history.
++
+ 
+ ## Current delivery reading route
+ 
+@@ -89,7 +94,7 @@
+ 
+ Read [[Activities/2026-10-22 Integrated Benchmark Operator]] for the current implementation location, public runbook, supported command path and exact evidence limits. It supersedes instructions requiring private workstation operator scripts. Runtime data and installed hashed repository programs are distinct from handwritten private dependencies. Live Docker/SSH/ARM64/Spark readiness is not established by local fixture tests.
+ 
+-## October 23 core planning correction
++## Earlier October 23 core planning correction checkpoint
+ 
+ For current typed DAG implementation and deployment merge status, read
+ [[Activities/2026-10-23 Required M1 Planner]] before the historical optional
+--- a/Workstreams/Lab Infrastructure.md
++++ b/Workstreams/Lab Infrastructure.md
+@@ -2,10 +2,15 @@
+ id: workstream-lab
+ status: active
+ source: Sources/Research Intent; Designs/cc-containerization-and-lab-isolation
+-last_reviewed: 2026-10-22
+-next_action: Use the optional Spark setup prompt for immediate deployment; keep M2 VM/factory work separate
++last_reviewed: 2026-10-23
++next_action: Use the three M2 handoffs on permitted development infrastructure; keep benchmark deployment independent
+ ---
+ # Lab infrastructure
++
++## Latest M2 handoff and source update
++
++[[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] supplies three scoped build handoffs. Develop/build on permitted workstations/CI; Spark runs selected benchmark images/data. Do not make VM provisioning, local inference, a registry or a capacity-controller service prerequisites for ordinary no-sudo startup.
++
+ 
+ **Problem:** long-lived research/startup projects need durable independent environments to run and evolve AI4Research without mixing data, credentials, code or results. Each lab must be able to contribute useful changes back to the central project.
+ 
+@@ -36,7 +41,7 @@
+ 
+ ## Current target
+ 
+-[[Designs/Lab Capsule and Factory Design Plan]] defines one evolving AI4R and independent factory/image store per VM, separate projects and selected contributions to a tested central base. The single-host prototype remains bounded evidence and reusable tooling. Next: Spark resource admission, ARM64 CPU guest qualification and M2 carrier/factory implementation.
++[[Designs/Lab Capsule and Factory Design Plan]] defines one evolving AI4R and independent factory/image store per VM, separate projects and selected contributions to a tested central base. The single-host prototype remains bounded evidence and reusable tooling. Next: one permitted durable VM lab and one actual tool carrier; use the scoped M2 handoffs and qualify Spark-specific placement only when selected.
+ 
+ ## M2 scope
+ 
+--- a/Home.md
++++ b/Home.md
+@@ -3,9 +3,14 @@
+ status: active
+ source: Sources/Prompt Register
+ last_reviewed: 2026-10-23
+-next_action: Review the Builder upgrade candidate, then qualify connected execution before merging it into M1
++next_action: Use the M2 component handoffs and current source status; qualify live M1 independently
+ ---
+ # Muk's AI4Research notebook
++
++## Latest M2 handoff and source update
++
++Three connected handoffs are ready for bounded specification: durable VM labs, container CC carriers and independent local factories. [[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] keeps the no-sudo benchmark workflow independent and records current integrated M1 source versus unverified runtime behavior.
++
+ 
+ ## Builder upgrade candidate
+ 
+@@ -16,7 +21,7 @@
+ [[Activities/2026-10-23 Final M1 Merge]] records the merge with the newly supplied AI4R, fresh-checkout verification, exact branch state and remaining connected-runtime work. Earlier delivery and pause statements below retain their historical scope.
+ 
+ 
+-## October 23 delivery status
++## Earlier October 23 delivery status checkpoint
+ 
+ [[Activities/2026-10-23 Delivery and Verification Status]] separates pushed deployment tooling, the separate local Planner/capsule branches, passing software checks and unverified live execution. Start there for current implementation status; the older design/prompt routes below remain context.
+ 
+--- a/Active Stage.md
++++ b/Active Stage.md
+@@ -3,9 +3,14 @@
+ status: active
+ source: Sources/Prompt Register
+ last_reviewed: 2026-10-23
+-next_action: Review the Builder upgrade candidate, then qualify connected execution before merging it into M1
++next_action: Qualify the integrated M1 runtime and select one bounded M2 component slice
+ ---
+ # CC effectiveness and a personal research lab
++
++## Latest M2 handoff and source update
++
++[[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] defines the next M2 slices. Current inspected remote M1 source now integrates the required Planner and optional capsule code; the previous separate-branch status is historical. No M2 VM/carrier/factory runtime acceptance is claimed.
++
+ 
+ ## Builder upgrade candidate
+ 
+@@ -16,7 +21,7 @@
+ [[Activities/2026-10-23 Final M1 Merge]] records the merge with the newly supplied AI4R, fresh-checkout verification, exact branch state and remaining connected-runtime work. Earlier delivery and pause statements below retain their historical scope.
+ 
+ 
+-## October 23 implementation checkpoint
++## Earlier October 23 implementation checkpoint checkpoint
+ 
+ [[Activities/2026-10-23 Delivery and Verification Status]]: no-sudo deployment tooling is pushed through `6a70305`; the required typed Planner is separately committed at `9d8f21b` and is not merged into current M1. Local software checks pass within their stated scope. A live authenticated campaign and actual Spark validation remain outstanding; no CC effectiveness result is established.
+ 
+--- a/Activities/Activity Register.md
++++ b/Activities/Activity Register.md
+@@ -79,3 +79,5 @@
+ - 2026-10-23: [[Activities/2026-10-23 Final M1 Merge]] — authorized final integration with new AI4R, preserved incoming contracts and release pins, fresh-checkout checks and explicit remaining runtime limits.
+ 
+ - 2026-10-23: [[Activities/2026-10-23 Builder Upgrade]] — bounded Codex edits and protected self-tests implemented on a separate branch; 121 Linux checks and 15 fresh-checkout Windows checks passed; live qualification pending.
++
++- 2026-10-23: [[Activities/2026-10-23 M2 Component Handoffs]] — three scoped portable M2 build handoffs; aligned Spark/build/storage/factory decisions and current M1 source status; no infrastructure implementation or runtime acceptance.
+--- a/Activities/2026-10-23 Delivery and Verification Status.md
++++ b/Activities/2026-10-23 Delivery and Verification Status.md
+@@ -1,11 +1,14 @@
+ ---
+ id: ai4r-delivery-and-verification-status-20261023
+-status: implemented-with-explicit-unverified-runtime
++status: historical-checkpoint-with-later-source-update
+ source: Sources/Prompts/2026-10-23-document-delivery-and-extent.txt; Resources/review-batches/2026-10-23-delivery-documentation/implementation-source-receipt.json
+ last_reviewed: 2026-10-23
+-next_action: Run a small real campaign with a working Docker engine and credentials; separately integrate and qualify the Planner and selected capsules
++next_action: Use the later integration status; retain this earlier delivery record as history
+ ---
+ # AI4R delivery and verification status
++
++**Later source update:** remote `ai4r_M1` at `809351f8` now contains the required Planner and optional capsule source. Statements below about unmerged local features describe the earlier checkpoint and are superseded for that remote baseline. Source merge is not qualification, activation, deployment or runtime acceptance. See [[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] for current source receipts and scope.
++
+ 
+ **Historical delivery checkpoint:** shared M1 later reverted deployment at `1fd17ab`. [[Activities/2026-10-23 Supervised M1 Integration]] owns the latest state. Runbook/status links below now point to the preserved candidate because those files were removed from shared M1.
+ 
+--- a/Activities/2026-10-23 Required M1 Planner.md
++++ b/Activities/2026-10-23 Required M1 Planner.md
+@@ -1,11 +1,14 @@
+ ---
+ id: required-m1-typed-planner
+-status: implemented-local-checks
++status: historical-checkpoint-with-later-source-update
+ source: Sources/Prompts/2026-10-23-required-m1-planner.txt; Sources/Prompts/2026-10-23-catalog-dag-repair.txt; Sources/Prompts/2026-10-23-push-and-adversarial-review.txt; Sources/Prompts/2026-10-23-review-and-fix.txt
+ last_reviewed: 2026-10-23
+-next_action: Review and merge the isolated Planner branch, qualify its production checks, then run authenticated model and container campaigns
++next_action: Qualify the integrated Planner and production checks; retain earlier branch evidence
+ ---
+ # Required M1 typed Planner
++
++**Later source update:** remote `ai4r_M1` at `809351f8` now contains the required Planner and optional capsule source. Statements below about unmerged local features describe the earlier checkpoint and are superseded for that remote baseline. Source merge is not qualification, activation, deployment or runtime acceptance. See [[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] for current source receipts and scope.
++
+ 
+ The latest user correction supersedes the optional-Planner framing in
+ [[Activities/2026-10-23 Capsule Branches and Factory Direction]]. Typed DAG
+--- a/Resources/M1 Readiness.md
++++ b/Resources/M1 Readiness.md
+@@ -3,16 +3,21 @@
+ status: observed
+ source: Resources/review-batches/personal-collections-and-readiness.md
+ last_reviewed: 2026-10-23
+-next_action: Qualify connected execution on merged M1; read the final merge note for exact scope and exclusions
++next_action: Qualify actual integrated M1 behavior; source integration is not runtime acceptance
+ ---
+ # M1 readiness
++
++## Latest M2 handoff and source update
++
++Later source inspection at `809351f8` shows the required Planner and optional capsule source integrated. The prior separate-branch state is historical. [[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] records that source advance and the integration report's limits; tests were not rerun by this documentation task, and M2 implementation/runtime acceptance remains unverified.
++
+ 
+ ## Latest final integration
+ 
+ [[Activities/2026-10-23 Final M1 Merge]] records the merge with the newly supplied AI4R, fresh-checkout verification, exact branch state and remaining connected-runtime work. Earlier delivery and pause statements below retain their historical scope.
+ 
+ 
+-## October 23 status update
++## Earlier October 23 status update checkpoint
+ 
+ [[Activities/2026-10-23 Delivery and Verification Status]] is the current implementation/evidence summary. Deployment is pushed at `6a70305`; the Planner and optional capsules remain separate branches. Selected host/CLI and controlled Planner checks passed; live Docker/model/Spark and integrated M1 acceptance remain unverified. The following October 20/21 audit is preserved historical evidence and does not describe the newest checkout.
+ 
+--- a/Resources/Current Baseline.md
++++ b/Resources/Current Baseline.md
+@@ -3,11 +3,16 @@
+ status: source-reviewed
+ source: Resources/verification/baseline-2026-10-21.json
+ last_reviewed: 2026-10-23
+-next_action: Use dated source receipts and recheck the Docker engine before claiming runtime readiness
++next_action: Recheck the target source and host before making deployment or model claims
+ ---
+ # Current baseline and source delta
+ 
+-## October 23 source and host update
++## Latest M2 handoff and source update
++
++Observed remote M1 source advanced to `809351f8993661a9fdc6e4e635d48f3d262f991b`. Planner/capsule source integration is now present. [[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] records current source receipts; older code/host checkpoints below remain historical and do not establish live runtime readiness.
++
++
++## Earlier October 23 source and host update checkpoint
+ 
+ [[Activities/2026-10-23 Delivery and Verification Status]] records current source identities: pushed deployment implementation `6a70305`, separate local Planner `9d8f21b`. The latest engine probe cannot connect to Docker's Linux pipe. The available-engine observation below belongs to October 21 and is retained as history, not current readiness. Prior captured checkouts and receipts are preserved.
+ 
+--- a/Resources/Coder Prompts/README.md
++++ b/Resources/Coder Prompts/README.md
+@@ -2,7 +2,7 @@
+ id: coder-prompts-index
+ status: active
+ source: Sources/Prompts/2026-10-21-notebook-organization-request.txt; Sources/Prompts/2026-10-22-benchmark-runner-orchestrator-request.txt; Sources/Prompts/2026-10-22-benchmark-runner-branch-and-runtime-safety.txt
+-last_reviewed: 2026-10-22
++last_reviewed: 2026-10-23
+ next_action: Choose benchmark-runner for execution tooling or spark-benchmark-setup for optional Spark deployment
+ ---
+ # Coder prompts
+@@ -15,3 +15,13 @@
+ | [[Resources/Coder Prompts/spark-benchmark-setup\|spark-benchmark-setup]] | Optional Spark deployment of ai4r plus benchmark-runner, user-selected mounts and bounded storage | Approved setup handoff; not a benchmark prerequisite or VM/factory implementation |
+ 
+ See [[Workstreams/M1 Design Code and Tests]] for implementation context and [[Designs/Design Library]] for canonical design links. M2 VM labs, factories, container CCs and Spark resource policy remain proposals under [[Designs/Lab Capsule and Factory Design Plan]] and [[Designs/Spark Shared Services and Storage]].
++
++## M2 component implementation handoffs
++
++[[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] contains the portable shared contract, baseline, validation and three handoffs:
++
++- [[Resources/Handoffs/m2-labs/vm-labs|vm-labs]]: durable project identity, permitted VM provider, persistent state and fenced recovery.
++- [[Resources/Handoffs/m2-labs/container-capsules|container-capsules]]: one stateless image carrier through the existing check/gate boundary.
++- [[Resources/Handoffs/m2-labs/local-factories|local-factories]]: fixed durable lifecycle with bounded adaptive authoring and independent admission.
++
++These do not replace the working M1 benchmark runner or require Spark infrastructure changes.
+--- a/Resources/Coder Prompts/spark-benchmark-setup.md
++++ b/Resources/Coder Prompts/spark-benchmark-setup.md
+@@ -1,11 +1,28 @@
+ ---
+ id: coder-prompt-spark-benchmark-setup
+-status: ready-to-send
++status: implemented-source-target-qualification-pending
+ source: Sources/Prompts/2026-10-22-two-image-runner-layout.txt; Sources/Prompts/2026-10-22-ai4r-runner-scope.txt; Sources/Prompts/2026-10-22-spark-benchmark-setup-approved-plan.txt
+-last_reviewed: 2026-10-22
+-next_action: Implement and verify optional direct-host Spark deployment in the AI4Research branch
++last_reviewed: 2026-10-23
++next_action: Reuse the existing no-sudo commands and qualify actual target behavior when access is available
+ ---
+ # spark-benchmark-setup
++
++## Current delivery update — October 23
++
++Repository-owned deployment is already source-implemented (`up`, existing-image
++selection, stage/start/logs/fetch). Inspect current `ai4r_M1`,
++`deploy/m1/OPERATIONS.md` and `deploy/m1/INTEGRATION-STATUS.md` before follow-up;
++do not build a second setup framework. Normal `up`/`start` uses no sudo, host
++cgroup preparation, forced WSL root, privileged container or socket mount.
++Use existing images and selected data on Spark; build elsewhere. Local inference
++is optional, and code-execution tasks retain their actual executor prerequisites.
++Remaining actual Spark/model checks are unverified, not evidence that source
++implementation is absent. Continue independent/local work without waiting for
++unavailable remote access. The original verification checklist below is retained
++for later target qualification, not a claim it has passed.
++
++M2 VM/carrier/factory implementation is separate: [[Resources/Handoffs/m2-labs/README|M2 implementation handoffs]] .
++
+ 
+ ## For human
+ 
+--- a/Sources/Prompt Register.md
++++ b/Sources/Prompt Register.md
+@@ -135,3 +135,7 @@
+ ## Builder execution and repair direction
+ 
+ [[Sources/Prompts/2026-10-23-builder-upgrade.txt]] preserves the exact visible instruction authorizing a Builder-only upgrade with Codex subscription calls, implementor tests, bounded repair and independent Benchmark/verifier authority. [[Activities/2026-10-23 Builder Upgrade]] separates this authorized amendment from the maintained design and actual runtime evidence. Hash and capture method are in `Sources/capture-manifest.json`.
++
++## October 23 M2 handoffs
++
++[[Activities/2026-10-23 M2 Component Handoffs]] implements the exact request in `2026-10-23-m2-component-handoffs.txt`; hashes and pre-edit receipts are retained.
+--- a/Sources/capture-manifest.json
++++ b/Sources/capture-manifest.json
+@@ -477,5 +477,12 @@
+     "sha256": "bf61d471b61e4d72241ad7541ee5256d6d2f5c953c6927b0b93dcbcc501175c0",
+     "capture_method": "exact visible user message transcribed as UTF-8 LF with final newline; not a chat transport export",
+     "captured_date": "2026-10-23"
++  },
++  {
++    "path": "Sources/Prompts/2026-10-23-m2-component-handoffs.txt",
++    "sha256": "00d818d6628b60c026983e15b34ddc0e72a0a1341fe2ac9ca8910fba059ae262",
++    "capture_method": "exact visible individual user message as UTF-8 LF with terminal newline; not a transport export",
++    "captured_date": "2026-10-23",
++    "original_message_timestamp": "unavailable; capture date only"
+   }
+ ]
+--- a/Activities/2026-10-23 No-sudo Benchmark Launch.md
++++ b/Activities/2026-10-23 No-sudo Benchmark Launch.md
+@@ -3,9 +3,12 @@
+ status: implemented-local-checks
+ source: Sources/Prompts/2026-10-23-no-sudo-benchmark-launch.txt
+ last_reviewed: 2026-10-23
+-next_action: Test the image pair with a running Docker engine and actual task/model credentials; revise executor portability separately
++next_action: Qualify current app/runner images with actual credentials and Docker on the selected target
+ ---
+ # No-sudo benchmark launch
++
++**Later integration status:** the observed remote M1 source at `809351f8` now includes the required Planner and optional capsule source. Earlier separate-branch statements below are historical. Source integration is not qualification, activation or runtime acceptance. See [[Resources/Handoffs/m2-labs/implementation-status]] and [[Activities/2026-10-23 M2 Component Handoffs]].
++
+ 
+ The user selected a simple temporary deployment workflow: ordinary Docker images
+ and data, simple commands, no sudo, and no new Spark host setup requirement.
+--- a/Activities/2026-10-23 Capsule Branches and Factory Direction.md
++++ b/Activities/2026-10-23 Capsule Branches and Factory Direction.md
+@@ -3,9 +3,12 @@
+ status: implemented-local-checks
+ source: Sources/Prompts/2026-10-23-capsule-branches.txt; Sources/Prompts/2026-10-23-capsule-development-process.txt; Sources/Prompts/2026-10-23-factory-agent-or-pipeline.txt
+ last_reviewed: 2026-10-23
+-next_action: Review and merge selected branches, then independently qualify checking assets and validate admitted capsules with a real model and available Docker host
++next_action: Independently qualify and activate desired integrated candidate source
+ ---
+ # Capsule branches and factory direction
++
++**Later integration status:** the observed remote M1 source at `809351f8` now includes the required Planner and optional capsule source. Earlier separate-branch statements below are historical. Source integration is not qualification, activation or runtime acceptance. See [[Resources/Handoffs/m2-labs/implementation-status]] and [[Activities/2026-10-23 M2 Component Handoffs]].
++
+ 
+ **Later correction:** [[Activities/2026-10-23 Required M1 Planner]] supersedes
+ the optional-Planner framing below. Core typed planning belongs in M1;

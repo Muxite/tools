@@ -1,0 +1,114 @@
+---
+id: cc-protocol-06-distribution-and-interoperability
+status: proposed-runtime-unverified
+source: November 3 workshop and November 4 protocol revisions
+last_reviewed: 2026-11-04
+next_action: Qualify the binding and evidence policy before production use
+---
+# Receiving, installing and calling a CC
+
+## Delivery forms
+
+| Received item | Meaning | Next action |
+|---|---|---|
+| Authoring YAML | Desired capability and implementation binding, possibly unfinished | Compile or resolve missing requirements. |
+| Registry reference | OCI artifact pinned by distribution digest | Retrieve and inspect the CC release. |
+| Offline bundle | Archive of an OCI image layout | Verify and import the release and bundled executable closure. |
+| Hosted access descriptor | Endpoint plus release and interface identity | Authenticate, verify the deployment binding, then discover operations. |
+
+A version tag can help find a release. Resolve it to a digest before installation. Record both the OCI distribution manifest digest and the digest of the CC release manifest payload. The former identifies the transport object; the latter is the existing `release` field used by CC calls. They are different byte subjects.
+
+## OCI distribution binding 1
+
+Use the OCI 1.1 image manifest to carry a CC artifact. These media types are local CC conventions pending public registration.
+
+| Element | Required value |
+|---|---|
+| OCI manifest `mediaType` | `application/vnd.oci.image.manifest.v1+json` |
+| OCI manifest `artifactType` | `application/vnd.ai4r.cc.v1` |
+| Config | Standard OCI empty JSON descriptor |
+| First layer | CC release manifest bytes, media type `application/vnd.ai4r.cc.release.v1+json` |
+| Remaining layers | Normalized declaration and referenced definition/material files, each with its actual media type, byte size and SHA-256 |
+
+The release payload keeps `{cc,declaration,bindings,materials}`. Each binding pins an executable image and platform. Registry image references are resolved separately and verified against their own manifest/layer hashes. Repeated file digests use one blob. Installation requires the complete execution closure of the selected release. Qualification and build attestations can be retrieved as associated records and verified against their subjects.
+
+An offline delivery is a tar containing `oci-layout`, `index.json` and `blobs/sha256/*`. The index lists exactly one CC artifact descriptor plus the executable image descriptors. Include all blobs needed to resolve their closure and any supplied evidence. Preserve release payload bytes so online and offline imports have the same CC release identity. Before extraction, reject escaping paths, links, duplicate paths and non-regular entries. Reject missing blobs and hash/size mismatches. Credentials and run-specific datasets are supplied separately.
+
+This uses OCI artifact and image-layout mechanisms. The CC payload and selection rules above are proposed conventions. [OCI artifacts](https://github.com/opencontainers/image-spec/blob/v1.1.1/artifacts-guidance.md), [OCI image layout](https://github.com/opencontainers/image-spec/blob/v1.1.1/image-layout.md)
+
+## Recipient workflow
+
+1. **Inspect.** Read the manifest without executing it. Display each operation's behavior, types, effects, provider requirements, platform and evidence scope.
+2. **Add.** Resolve closure, validate schemas and byte identities, check issuer/local trust policy and register an installed release. Record baseline compliance separately from qualification.
+3. **Bind.** Supply resource/provider handles and grants through authenticated host configuration. Keep credentials outside model-visible arguments.
+4. **Discover.** Advertise operations eligible for the current principal and environment. Resolve shared types and rule descriptions for the caller.
+5. **Call.** Select one operation, supply its arguments, and record the actual release and target identities.
+6. **Retrieve.** Return outputs, execution state, completeness and assessment. For long calls, expose status and cancellation.
+
+Installation alone does not authorize a provider, resource or external effect. An installed baseline-compliant utility can be usable under local policy without independent scientific qualification. Evaluation or publication policies can require stronger evidence.
+
+## Execution bindings
+
+The operation's `run` field selects one binding. The package carrier still identifies the shipped executable or adapter implementation.
+
+| Form | Meaning |
+|---|---|
+| Absolute path string | Default one-request process binding in document 03. |
+| `{kind: mcp, provider: ID, operation: NAME, protocol: VERSION}` | Invoke a tool through the named admitted MCP provider. |
+| `{kind: a2a, provider: ID, operation: SKILL, protocol: VERSION}` | Delegate to the named A2A agent under an explicit skill routing agreement. |
+
+The provider ID must appear in `needs` and resolve to a rule of kind need. Pin the adapter and negotiated native protocol version. A call to a remote service also needs the corresponding scoped effect. The provider record binds endpoint, authentication scope, deployment identity and supported interface. An externally hosted implementation must supply verifiable deployment identity or be marked provenance-limited. A checksum of the local adapter alone does not identify the remote model or service.
+
+A hosted descriptor is exactly `{release,interface,protocol,endpoint,deployment}`. Interface is `mcp` or `a2a`; protocol is a concrete version; endpoint is an absolute HTTPS URL; deployment is a Ref to an authenticated mapping between endpoint and release. Credential grants are separate. Revalidate deployment identity after updates. A claimed release without authenticated binding is insufficient for reproducible use.
+
+## MCP projection
+
+The pinned JiuwenSwarm client requires an additional receipt-preservation adapter: its normal extraction reads content blocks, not `structuredContent`. Capture the raw receipt at the host boundary or generate matching canonical JSON text and structured representations from one record. Bind the native host invocation identity to the CC key before automatic reconnect/retry. See [the upstream audit](09-upstream-coding-integration.md) for verified source paths and unresolved runtime tests.
+
+Generate tool definitions from the installed CC declaration.
+
+| CC owner | MCP projection |
+|---|---|
+| Selected release and operation | Host registry entry. Use a host-assigned unique tool name; bind it to exactly one release/op for an invocation. |
+| `does` and rule meanings | Tool description including material limitations and effects. |
+| `takes` | Object `inputSchema`, with required named properties and resolved shared schemas. |
+| `gives` | Output schemas in the CC receipt's `outputs` field, alongside state, completeness and assessment. |
+| Artifact input/output | Explicit `{uri,sha256}` input argument and artifact Ref output. Host stages bytes. |
+| Declared effects | Inform tool annotations where applicable. Actual grants remain host-enforced. |
+
+The model supplies plain JSON argument values. The adapter wraps them as CC `{value}` inputs or `{ref}` artifacts. Release, key, policy, caller identity and grants are host binding data. Persistent handles remain explicit arguments. Tool-name rebinding must invalidate stale advertisements and must never change an already bound call.
+
+Successful MCP execution returns a structured CC receipt. Use `isError` for execution failure or blocked execution, with native protocol errors for malformed RPCs. Semantic assessment failure or partial-but-valid evidence stays visible in the receipt. A running receipt requires a negotiated MCP task extension or explicit host job status/cancel tools. A reconnect must retain the same logical-call identity. MCP transport IDs alone do not establish effect idempotency.
+
+MCP supports discovery, input/output schemas and structured tool results. This mapping is the proposed CC adapter contract. [MCP tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)
+
+## A2A projection
+
+A hosted agent can expose an Agent Card derived from its CC operations and deployment. The Card describes skills and interface versions. A2A messages and tasks carry the delegated work. Maintain a host mapping from authenticated remote task/context IDs to CC call/attempt IDs.
+
+Do not assume an A2A skill ID is a native direct-call selector. A CC A2A adapter must define and validate a versioned data-part routing convention carrying `{op,inputs}`. A peer without that convention can accept ordinary delegated requests, but exact CC operation dispatch is unsupported. Record `UNSUPPORTED_BINDING` rather than silently allowing arbitrary agent behavior.
+
+| A2A observation | CC handling |
+|---|---|
+| Task working | Running call with remote task correlation. |
+| Input or authentication requested | Pause within deadline under host policy; obtain authorized input or fail explicitly in headless mode. |
+| Completed task | Validate returned artifacts, persist output identities, then assess. Completion alone gives no verification verdict. |
+| Failed/cancelled task | Failed/cancelled execution after effect reconciliation. |
+| Connection loss | Re-query the same task. Unresolved effect state remains unknown. |
+
+Only advertised interface versions and implemented optional features may be used. A2A provides delegated-task and artifact semantics; the CC adapter adds the pinned execution and evidence record. [A2A specification](https://a2a-protocol.org/latest/specification/)
+
+## Identity ownership
+
+| Identity | Owner | Purpose |
+|---|---|---|
+| CC package/version | Author and catalog | Discovery and compatibility |
+| CC release digest | Compiler | Immutable declaration and binding identity |
+| OCI distribution digest | Registry/importer | Transport manifest integrity |
+| Provider deployment and target handle | Host/provider | Actual running service or resource generation |
+| MCP request ID / A2A task ID | Native transport or peer | Protocol correlation |
+| CC call ID and key | Admission host and caller | Logical invocation and duplicate suppression |
+| Attempt and job | Runner | Concrete execution and recovery |
+| Artifact digest | Producer/store verified by host | Output bytes |
+
+A bridge records these relationships. It must not equate a transport request, remote task, package release or execution attempt.

@@ -1,0 +1,86 @@
+{
+  "schema_version": "2.0.0-m2a.2",
+  "id": "receipt.example.1",
+  "call_id": "call.example.1",
+  "bound_call_ref": {
+    "uri": "fixture:call",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "terminal": false,
+  "status": "accepted",
+  "required_check_ids": [
+    "calculation.input.v1",
+    "calculation.output.v1"
+  ],
+  "checks": [
+    {
+      "id": "calculation.input.v1",
+      "checker_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "verdict": "PASS",
+      "evidence_refs": [
+        {
+          "uri": "fixture:check-calculation.input.v1",
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      ]
+    },
+    {
+      "id": "calculation.output.v1",
+      "checker_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "verdict": "PASS",
+      "evidence_refs": [
+        {
+          "uri": "fixture:check-calculation.output.v1",
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      ]
+    }
+  ],
+  "output_refs": [
+    {
+      "id": "report",
+      "uri": "fixture:report",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "media_type": "text/markdown",
+      "bytes": 42,
+      "audience": [
+        "caller"
+      ],
+      "reproduction": "exact_replay"
+    },
+    {
+      "id": "reproduce",
+      "uri": "fixture:reproduce",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "media_type": "text/plain",
+      "bytes": 42,
+      "audience": [
+        "caller"
+      ],
+      "reproduction": "exact_replay"
+    },
+    {
+      "id": "result",
+      "uri": "fixture:result",
+      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "media_type": "application/json",
+      "bytes": 42,
+      "audience": [
+        "caller"
+      ],
+      "reproduction": "exact_replay"
+    }
+  ],
+  "observed_effects": [
+    "artifact.write"
+  ],
+  "effect_state": "confirmed",
+  "usage": {
+    "cost_units": 1,
+    "wall_seconds": 0.1,
+    "attempt": 1
+  },
+  "reason_code": "CHECKED",
+  "job_id": null,
+  "parent_call_id": null
+}

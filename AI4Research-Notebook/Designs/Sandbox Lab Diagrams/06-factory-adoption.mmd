@@ -1,0 +1,30 @@
+flowchart TB
+    REQUEST["Lab or RSI capability request<br/>Behavior, sources and budget"]
+    FACTORY["CC factory<br/>Capture, adapt and build candidate"]
+    QUAL["Independent qualification<br/>Frozen criteria and package journeys"]
+    ELIGIBLE["Eligible exact package version"]
+    ACTIVATE["Activation controller<br/>Compatibility and service readiness"]
+    SELECT["Automatically active locally<br/>New work selects exact version"]
+    ACTIVE["Existing sessions and jobs<br/>Retain compatible old bindings"]
+    WAIT["Activation pending or rollback<br/>Capacity, state or readiness blocker"]
+    FAILED["Rejected or blocked candidate<br/>Retain evidence"]
+    CENTRAL["Optional central submission<br/>Separate qualification and adoption"]
+    REQUEST --> FACTORY
+    FACTORY --> QUAL
+    QUAL -->|"pass"| ELIGIBLE
+    QUAL -->|"fail or unavailable evidence"| FAILED
+    ELIGIBLE --> ACTIVATE
+    ACTIVATE -->|"ready"| SELECT
+    ACTIVATE -->|"not ready"| WAIT
+    SELECT -.->|"does not rewrite"| ACTIVE
+    ELIGIBLE -.->|"selected export"| CENTRAL
+    class REQUEST,ACTIVE,FAILED data
+    class FACTORY work
+    class QUAL,ELIGIBLE,CENTRAL qualify
+    class ACTIVATE,SELECT,WAIT control
+
+    classDef work fill:#e8f1ff,stroke:#3568a8,color:#142d4e,stroke-width:1.5px
+    classDef control fill:#fff1d7,stroke:#a66d16,color:#513406,stroke-width:1.5px
+    classDef qualify fill:#eee8fa,stroke:#7854a0,color:#35204d,stroke-width:1.5px
+    classDef data fill:#e5f3eb,stroke:#3c8160,color:#163e2a,stroke-width:1.5px
+    classDef external fill:#f0f2f5,stroke:#65758a,color:#273547,stroke-width:1.5px

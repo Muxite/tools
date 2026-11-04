@@ -1,0 +1,217 @@
+---
+id: sandbox-lab-design-m2
+status: selected-architecture-runtime-unverified
+source: Sources/Prompts/2026-10-26-adaptive-sandbox-replacement.txt; https://chatgpt.com/share/6adf9a5b-2320-83e9-afeb-ff63c4f96671
+last_reviewed: 2026-10-27
+next_action: Review the complete system diagrams and acceptance scenarios, then qualify one bounded lab integration
+---
+# Sandbox Lab Design
+
+
+**Selected October 27:** one VM per lab with selective JiuwenBox reuse. This is the user-selected M2 architecture, not a deployed or compatibility-qualified system. [[Designs/Lab Design Comparison]] retains the alternatives and source evidence.
+
+![Selected VM-per-lab deployment](Lab%20Design%20Comparison/02-vm-per-lab.png)
+
+[Scalable deployment view](Lab%20Design%20Comparison/02-vm-per-lab.svg). This is the selected deployment view; earlier optional-VM or shared-host-only placement is superseded. The comparison drawing shows the boundary and lifecycle, while the reuse allocation below identifies the selected software roles.
+
+| Layer | Selected direction |
+|---|---|
+| Lab boundary | A Linux VM per lab, its own guest environment and Docker Engine; people primarily connect to their lab interface and may directly administer their guest |
+| Research runtime | The lab's complete independently versioned AI4R, including research, planning, checking, memory, capability library, factory and RSI |
+| Capability execution | Vendored OCI/container CCs include their tool implementations and software dependencies; a stable supervisor owns scoped execution and Engine access |
+| JiuwenBox reuse | Reuse compatible tool/sandbox lifecycle and job-control mechanisms through an adapter; its bubblewrap sandbox is distinct from our OCI carrier and outer VM |
+| Shared services | Inference and other configured services have authenticated network endpoints; they may be co-located or remote and survive one lab stopping |
+| Outside control | Host/provider VM start, shutdown and forced stop remain available independently of the guest's AI4R; project deletion remains separate |
+
+## Open-source reuse after the October 27 hunt
+
+[[Designs/Sandbox Open Source Reuse]] owns the detailed shortlist, official documentation links, limitations and qualification order. Prefer documented interfaces and recovery/operations instructions over a small unexplained implementation. VM-per-lab and native JiuwenSwarm compatibility remain selected. New named components are recommendations to qualify, not installed or tested integrations.
+
+Use native JiuwenSwarm Skills/tools/MCP/workflows and creation/evolution hooks for agent and Factory CC composition. On a supported host, use the existing provider API or libvirt with cloud-init for VM lifecycle/bootstrap. Use systemd for stable lab services and Docker SDK/API, Compose and BuildKit for OCI ownership/builds, retaining selective JiuwenBox reuse. The stable supervisor is configuration plus a narrow job-ownership/reconciliation adapter; systemd stopping a service does not automatically stop Docker-daemon-owned jobs.
+
+LiteLLM is now the recommended shared-model gateway candidate because its documented aliases, virtual keys and limits remove custom access plumbing. Key management needs PostgreSQL, and some distributed features add Redis. Confirm required OSS features and license at the pinned release. Keep exact experimental model bindings in the lab adapter; do not let load-balancing/fallback silently change models. Private models remain lab-only and outside the shared gateway. Avoid a mandatory duplicate JiuwenBox proxy hop unless it serves a demonstrated need.
+
+Inside Factory CCs, reuse Docling for parsing, a Paper2Agent conversion/verification recipe where compatible, pytest for fixed functional/task checks, Testcontainers for real service dependencies when needed, BuildKit for images and ORAS for non-image assets in an existing OCI registry. Keep native Skill/tool bindings instead of building another registry/runtime. Quarto can render reports from retained evidence. restic can back up consistent application exports to an independent repository. MLflow is optional for run comparison/UI, initially scoped to a lab, and does not replace accepted-artifact authority or backups.
+
+Coder and Temporal have useful documentation but add control-plane/workflow responsibilities; defer until a concrete access/provisioning or durability gap justifies them. OpenHands can be scoped as a coding CC rather than replacing JiuwenSwarm. No reduction in bugs or engineering time is measured by this hunt. Qualify (1) execution ownership/stop, (2) scoped gateway and model pinning, (3) one native factory bundle, and (4) evidence-preserving report/restore before wider adoption.
+
+## System views and model placement
+
+The [current presentation and diagram index](Sandbox%20Briefing/presentation/README.md) contains the complete deployment, AI4R internals, continuing cycle, overlapping investigations, CC intake, shared inference, private model and recovery views. These supersede the old presentation story and its workload example. The comparison drawings remain historical alternatives.
+
+Shared model inference is a normal configured API service. The lab selects an endpoint profile containing URL, protocol/features, model identity and scoped credentials. A local model server can expose a compatible API on the same or another host. vLLM is a concrete serving candidate, not a mandatory backend. Tool calling, streaming and context behavior need compatibility checks. Sharing reduces duplicated model allocations in principle; real savings, quotas, queues and capacity require measurement. Stopping one lab must leave other clients and shared services available.
+
+For model development or fine-tuning, the lab may run a private model with its own datasets, weights and checkpoints. Other sandboxes receive no endpoint or storage access. Enforce network and authorization boundaries and exclude private endpoints from shared service discovery. A VM does not imply accelerator access: the selected provider must qualify the lab's compute/device allocation. Unsupported hardware profiles remain unavailable. Private sharing requires a separate explicit decision.
+
+
+### Model access contract for containerized CCs
+
+Both AI4R and CC containers use a stable lab-scoped model interface. CC authors declare a logical role/model alias and feature requirements (tool calling, modality, structured output, context capacity), optionally an exact model/version. Lab configuration maps those requirements to compatible available endpoints. At launch the runtime injects the reachable client/base URL and scoped access configuration. Container localhost refers to the container, so the injected route must actually reach the guest-side service or authorized remote gateway. Provider secrets stay outside CC images.
+
+Resolve and record the actual model identity/version, route configuration and inference settings per invocation. Moving the same endpoint/model should not require rebuilding a CC. Changing model identity is an explicit new binding under compatible policy; exact-model experiments cannot silently substitute another model. Missing compatible routes produce visible wait/failure. Availability alone does not establish feature compatibility. Models private to one lab are visible only in that lab's routing configuration and remain inaccessible to other labs.
+
+This logical routing responsibility need not become another custom service. Use native lab adapters and injected configuration; LiteLLM is the recommended shared-gateway candidate to qualify where multi-lab credential/routing management is needed. JiuwenBox's inference proxy provides request routing/key injection; [LiteLLM's public model mappings](https://docs.litellm.ai/docs/proxy/model_management) provide another reuse precedent. LiteLLM is now recommended for qualification; no deployment or integrated compatibility is claimed tested. The contract extends the earlier endpoint-profile view to explicitly cover CC authors and configured model aliases.
+
+Acceptance: run a containerized CC through an allowed alias, move its endpoint without changing CC code, verify the recorded model pin, reject incompatible/unauthorized routes, protect private models, and preserve per-lab quotas and other clients during lab stop. Integration remains unverified.
+
+### OpenJiuwen compatibility and contributions
+
+OpenJiuwen compatibility is an explicit engineering target. Start from its supported extension/provider interfaces and the actual dependency pin. Keep AI4R-specific contracts behind narrow adapters, document necessary extensions, and avoid coupling the research loop to a workspace platform's choices. Selective reuse permits replacing an unsuitable implementation while retaining compatible interfaces where practical. It does not imply that every upstream backend already satisfies our containment, persistence or acceptance requirements.
+
+Compatibility must be demonstrated for the selected versions: tool I/O and failures, job cancellation and actual termination, retained state/restart, and scoped access. Source presence or a no-op base lifecycle method is not a passing integration result. Do not inherit destructive default teardown as the durable lab's stop behavior.
+
+Useful generic fixes, adapters, reusable components and research findings can become contribution candidates for upstream OpenJiuwen, with reproducible examples/tests and the required dependency information. Adoption into our central AI4R release and acceptance by upstream OpenJiuwen are separate processes. This direction authorizes neither publishing a contribution nor claiming upstream endorsement or tested compatibility.
+
+
+
+A sandbox lab is a durable research project in which AI4Research can investigate a goal, learn that its first approach was wrong, and choose better next experiments without losing useful work. The sandbox supplies bounded execution and recovery; AI4R supplies the research decisions; capability capsules supply the tools and specialist work. The design succeeds only if that combination makes our research more useful at an acceptable cost.
+
+The central change is **persistent goals, revisable strategy, and durable execution**. We keep AI4R's capability and checking machinery and change when future work becomes committed. Plan to the next meaningful uncertainty boundary, observe the result, then decide what follows. Several justified independent tasks can still run together.
+
+This replaces the previous sandbox explanation and delivery order. The deployment boundary and selective JiuwenBox reuse are selected; detailed M2 mechanisms remain proposals, not implemented adaptive execution or an amendment to M1. Start with the [research-loop diagram](Sandbox%20Lab%20Diagrams/04-adaptive-work.png), then the [delivery plan](Lab%20Capsule%20and%20Factory%20Design%20Plan.md). Other deployment/package diagrams are supporting detail.
+
+## Research outputs
+
+Labs produce reports and discoveries/findings alongside reusable capabilities. Research and reporting CCs assemble interim or final reports with supporting evidence, methods and uncertainty, including useful negative or inconclusive results. Findings feed retained knowledge and subsequent investigations. Reports and evidence persist in lab data and are available through the lab interface or authorized export; the deliverable box is not another service or automatic public publication. Hypotheses and generated reports do not automatically become validated discoveries. Capability adoption remains a separate path.
+
+## The AI4R problem this solves
+
+A continuing research project discovers assumptions, failures and missing capabilities as it works. Committing every future experiment before those discoveries makes later work depend on guesses. The lab operating model gives each project retained state, independently evolvable AI4R and bounded execution so it can select useful next work, retry locally and overlap independent investigations. These are intended benefits to test, not measured gains.
+
+At the inspected M1 checkpoint, `Scheduler.run` receives the Compiler Brief, obtains a static or Planner proposal, calls the protected binder's `freeze`, and executes that plan. The bounded planning correction/linked continuation handles specified planning failures; it is not ongoing scientific replanning. The source does **not** establish that initial intent compilation happens after planning. The remaining issue is that a compiled brief cannot contain the findings of investigation that has not yet run. Later clarification may also change the task. [Source evidence](#evidence-and-reuse).
+
+## Three kinds of state, within the existing runtime
+
+| State | Contains | Changes when |
+|---|---|---|
+| Research objective | Human direction, completion criteria, authoritative constraints and permissions; separately labelled hypotheses and open questions | The human revises intent, or authorized clarification resolves it; observations update knowledge without becoming user instructions |
+| Working strategy | Current explanation of how to reach the goal, assumptions, unresolved subgoals and next investigation boundary | Material evidence changes the approach, a prerequisite fails, or progress stalls |
+| Execution record | Concrete CC invocations, inputs, versions, assigned checks, effects, job status and results | The runtime dispatches and records work; a revision creates new work rather than rewriting an executed attempt |
+
+These are records and responsibilities in AI4R, not three new services. The strategy may describe distant work provisionally. Only the next justified batch becomes an executable DAG with fixed invocation contracts. The project objective outlives those batches and individual agent sessions.
+
+![Adaptive research with bounded execution](Sandbox%20Lab%20Diagrams/04-adaptive-work.png)
+
+## How the loop works
+
+1. **Clarify and constrain.** Resolve enough intent, resources, cost and completion criteria to choose useful work. Substantive web investigation waits for permission. Missing information blocks dependent work; unrelated permitted work can continue. In unattended mode, an unanswered required clarification produces a visible waiting state rather than a guessed answer.
+2. **Plan a bounded investigation.** Select existing operations and a batch whose relevance follows from current knowledge. State what result would change the strategy. An investigation boundary is explicit: do not invent the downstream experiment before its prerequisite findings exist.
+3. **Bind and execute.** Existing protected machinery checks types, required inputs, effects, resources, budgets and mandatory checks. The dispatcher rechecks current permission and resource availability. The infrastructure controller runs the authorized work and retains its outcome.
+4. **Assess the result.** Host checks and the selected review profile assess assigned obligations. Acceptance of an artifact does not establish that the research objective is achieved. A negative or inconclusive result can be useful and accepted; a crash or missing artifact remains an operational failure.
+5. **Continue or revise.** Routine observations update knowledge without invoking a full planner. Reconsider strategy at a declared investigation boundary, changed user direction/permissions, invalidated assumption, missing prerequisite, unrecoverable failure, or idle work with unmet goals. A bounded no-progress review catches missed triggers. Stop when completion criteria are supported, the budget is spent, or a blocker requires intervention.
+
+Begin with explicit boundaries and deterministic trigger rules. A capability can suggest that a result matters, but its suggestion is an observation, not permission to mutate the plan. Evaluate a semantic staleness detector only if the first trial shows that fixed rules miss valuable changes or cause excessive planning. Planning calls, checks, failures and repair attempts all consume the cumulative project budget. Enforce a revision/no-progress bound and report why work stopped.
+
+Specialists can adjust methods inside their assigned objective, budget and effects. They escalate discoveries that change shared assumptions, completion criteria or another branch. A central planner need not micromanage source selection or every analysis step. Larger composite capabilities remain subject to the same external obligations and limits.
+
+## Revising work without corrupting results
+
+The initial migration is a new bounded batch after a completed investigation, with explicit import of accepted, still-relevant artifacts. This is an extension of current execution, not a claim that the M1 scheduler already accepts arbitrary cross-run outputs. Its same-run proof checks need an explicit M2 transfer contract.
+
+If concurrent research later needs revisions within a running project, the Planner proposes a scoped patch against a specific plan and knowledge revision. The runtime commits it atomically only if that revision is still current, dependencies are acyclic, inputs remain valid, and permissions, checks and cumulative budgets are satisfied. Reject a stale proposal and recompute from current state. Patch validation controls execution legality; it does not prove scientific wisdom.
+
+| Existing work | Revision behavior |
+|---|---|
+| Unstarted | Withdraw or replace before dispatch; rebind against current state |
+| Running and independent | Keep original contract and let it finish; do not change its version in place |
+| Running and affected | Fence new dependent work; cancel if necessary and supported, otherwise reconcile completion and quarantine its output from the active strategy |
+| Completed and still relevant | Reuse only with accepted artifact identity, compatible scope/assumptions, implementation and check context |
+| Completed but premise changed | Preserve the historical result, mark its current use invalid and prevent affected descendants from consuming it |
+| Failed or effect uncertain | Retain the attempt; inspect actual job/service state before retrying; never blindly replay an external effect |
+
+An accepted result can become irrelevant without becoming historically false. Cache equality alone cannot establish validity: a prompt can stay unchanged while a dataset, permission, application state or hidden dependency changes. Track the dependencies that matter for reuse, conservatively rerunning affected work when they cannot be established. A revoked permission stops new prohibited dispatch immediately and requests cancellation of affected active work; it cannot undo data already transmitted.
+
+Local qualified CC updates become eligible for new bindings automatically under the lab's compatibility policy. They do not replace active invocations or sessions. A new version is a reason to consider a better method, not a mandatory global replan. The CC factory produces candidates; the RSI owner controls broader improvement and harness changes; independent qualification controls admission. Central AI4R adoption remains separate from local eligibility.
+
+## What the sandbox supplies
+
+A lab retains its own AI4R fork, goal/knowledge records, CC selection, application state and research artifacts. Deployment instances are replaceable. A restart reloads the research state and reconciles outstanding work before dispatch; the planner must not reconstruct everything from conversation alone.
+
+Use one permitted Linux lab VM for the first slice, with its own Docker Engine. Compose hosts the lab AI4R and required application services. A stable VM-local controller owns scoped launch, limits, stop and reconciliation, selectively adapting JiuwenBox where compatible. Agents receive scoped operations and resource handles; the controller owns Engine access and policy. Host/provider control can stop the entire VM if guest control fails. The VM is the selected lab boundary; provider support and any accelerator access still require qualification. Spark remains optional hardware, with preparation elsewhere where practical.
+
+| Existing responsibility | What this proposal requires | Why it matters to research |
+|---|---|---|
+| AI4R Planner/runtime | Project state, next-batch selection, progress assessment and revision | New evidence can change the next experiment |
+| Binder, dispatcher and checks | Fixed invocation contracts, current authorization, independently assigned checks, accepted artifact transfer | Adaptation cannot bypass the checks that make results usable |
+| Lab controller | Resource/deadline limits, scoped files/network, mutable-service leases, external stop and job reconciliation | Runaway or conflicting experiments do not destroy the project |
+| Durable storage | Separate project records, accepted artifacts, application checkpoints, scratch and secrets; verified independent backup/restore | A replaced app or failed experiment does not erase accumulated work |
+| CC factory and qualification | Candidate construction, fixed independent criteria, compatible future eligibility | Acquire missing functionality only when a real research need justifies it |
+
+Containment targets mistakes, faulty harness changes and runaway experiments. Container names and model instructions do not establish isolation. Qualify effective mounts, network policy, process/resource limits and disk behavior on the selected host. Keep control policy and the stable recovery path outside mutable candidate code. Disk pressure stops growth rather than deleting unique findings. Restore must fence the old writer and verify the required data, not merely restart a process. Measurement jobs need an exclusive slot or an explicit co-running-load limitation.
+
+CC packages can expose several named operations over an embedded tool, batch job or managed/attached application. Bind the selected operation to exact implementation, inputs, effects and application identity. An attached endpoint grants no implicit reset/upgrade authority. Stateful applications declare reset/checkpoint semantics and serialize conflicting commands. A durable job handle represents submission/progress, not scientific acceptance. Robotics can validate this later; a small stateful fixture can test protocol behavior first without claiming simulator integration.
+
+Review payloads follow the selected qualified profile. Historical output-only review remains available; the October 26 checkpoint also has opt-in evidence-aware review, with its own limits. This planning change neither silently broadens reviewer access nor treats an older output-only description as the only current mode. [Current review evidence](../Activities/2026-10-26%20M1%20Reliability%20and%20ML%20Readiness%20Checkpoint.md).
+
+## CC sources, factory and native JiuwenSwarm integration
+
+CCs package AI4R agent capabilities: specialist instructions/skills, agent or workflow code, tools, software dependencies and declared model access. A CC may implement one agent, several collaborating agents, a tool or a composite workflow. Research and Factory workflows compose these CCs through native JiuwenSwarm interfaces. The lab adds orchestration, persistent state, execution control and configured model routes. Shared model weights are not implicitly bundled into every capsule. Logical packaging does not require one dedicated process/container per agent; execution isolation follows declared needs. This is the intended architecture, not an installed runtime claim.
+
+The CC Factory is itself a composition of CCs, rather than a fundamentally different component type. Research and factory workflows use the same lab library, native JiuwenSwarm orchestration, execution controller, model routes, permissions, budgets and persistent data. An illustrative factory composes ingest/analyze, build/test and packaging CCs. This is not a fixed component count or a demand for separate containers. A versioned bundle can expose one composite CC interface while its members remain reusable independently. Deployment follows actual dependency, isolation and resource needs.
+
+Checking can also use CC implementations. Independence refers to who assigns criteria and admission authority, not a requirement for another service: a producer cannot redefine its own acceptance rules. Factory CC upgrades, including changes to their own bundle, become candidates for future bindings after independent qualification; active work retains pins. Stable recovery and host/provider control stay explicit. The whole lab includes CC compositions plus orchestration, state and infrastructure, so bundling flexibility does not imply that the VM or trusted controller is an ordinary generated capsule.
+
+The CC Factory is a normal lab-local capability-growth mechanism. A user or AI can request a capsule for a concrete problem, repair or upgrade. Inputs may be data, repositories or papers (Paper2Agent-style executable capability), documented mental models/methods (perspective Skills), or repeated/critical gaps in planning that justify a specialist. A factory can improve existing CCs as well as create new ones. A specialist replaces the generalist for a task only when matched task evidence supports that choice. Perspective Skills implement source-inspired methods; usefulness and fidelity require evaluation rather than assuming they reproduce a person's cognition.
+
+| Origin | Possible storage / distribution | Lab use |
+|---|---|---|
+| Mother AI4R / general capabilities | Versioned source releases and OCI registries | Import selected compatible packages |
+| Domain collections | Domain/team repos, registries or artifact stores | Select role-appropriate dependencies and operations |
+| Lab-created or upgraded CCs | Lab repo, private registry or local image store | Qualify and retain as local tools/specialists |
+
+These are logical sources with different storage backends, not a requirement to build a central registry. Selected source/image versions enter the lab's working capability selection. Native JiuwenSwarm can still use one physical local Skill library and metadata-based per-role visibility. External distribution and local installation are separate concerns.
+
+Use JiuwenSwarm's native Skill discovery/install, scoped visibility, tools/MCP, teams/workflows and skill creation/evolution hooks wherever they fit. The factory emits compatible native guidance/tool bindings plus the implementation and dependencies packaged for execution. `SKILL.md` guidance/assets are not equivalent to an OCI CC; the package connects native interfaces to its pinned execution unit and AI4R contract. Containerize dependency-bearing software; do not create a redundant service merely to expose guidance. Prefer a narrow adapter to a second skill manager or parallel generic evolution framework.
+
+Factory flow: user/AI need and source material, create or upgrade, executable functional checks and task tests, independent qualification, local eligibility, native invocation. Functional verification covers the declared tasks, effects, compatibility and failure behavior. Broader scientific or performance benefit remains a separate measured result. The candidate cannot change its own acceptance criteria. Regression-test upgrades and apply them to future bindings while active work keeps its pins. Model routes remain injected into both AI4R and CC containers.
+
+Locally useful CCs may stay local indefinitely. Strong reusable changes may be proposed to mother AI4R release review. Generic interfaces, fixes and reusable mechanisms may separately be proposed upstream to JiuwenSwarm with reproducible tests. Local qualification, mother AI4R adoption and upstream maintainer acceptance are different decisions. This work performs no publication or merge.
+
+Pinned upstream `02b37f47fbefe80a58e4ed88606120818ca44ac3` source checked: `jiuwenswarm/agents/swarm/providers/{skills,tools,evolution_rails}.py`, `jiuwenswarm/server/runtime/skill/skill_manager.py`, and `docs/en/MCPConfiguration.md`. Skills use one local library plus role visibility; tool providers and MCP connect callable operations; evolution providers wrap native create/evolution rails. These are source-backed integration points, not a tested AI4R packaging result. Existing M1 Planner restrictions remain deliberate until a bounded M2 adapter is qualified. [Official project](https://github.com/openJiuwen-ai/jiuwenswarm).
+
+## Evidence and reuse
+
+Source inspected on October 26: our published M1 `ab0d9c7fe8ceadf45c61d04e94e2dd9b44b867a7`, read from Git objects in the reviewed-integration checkout; installed OpenJiuwen SDK source `9e3390195a9ea15235b2b5f7412cb2aa440622cc`; upstream JiuwenSwarm checkout `02b37f47fbefe80a58e4ed88606120818ca44ac3`. Those identities describe different codebases. No runtime compatibility or speedup was tested for that source review or this architecture-selection update.
+
+| Evidence | Supported design inference | Limit |
+|---|---|---|
+| M1 `research/scheduler.py`: `run`, `binder.freeze`, `_committed_node`; `planning.py`: bounded continuation | Keep existing execution/checking and introduce explicit project/batch boundaries | Current same-run and frozen-plan proofs do not directly permit mutable or cross-batch execution |
+| M1 `research/native.py`: tools/subagents disabled, task loop/planning disabled, `enable_swarmflow=False` for the Planner Leader | Narrow orchestration is deliberate in our adapter | It is not a missing upstream capability; simply enabling flags would bypass the integration design |
+| Pinned SDK `harness/goal/{schema,manager,store}.py` | Persistent goals and budget/progress state offer a reuse candidate | Its completion assessments are not independent scientific acceptance |
+| Pinned SDK `agent_teams/workflow/engine/journal.py`: `call_signature`, `get_cached`; `primitives.py`: `agent`; `runtime.py`: `run_id` | Structural path, content signature and run isolation support selective workflow replay | Prompt/options/schema reuse is not complete research-dependency validation or arbitrary live-DAG patching |
+| [JiuwenSwarm release notes](https://github.com/openJiuwen-ai/jiuwenswarm/releases): persistent goals; SwarmFlow modify/replay with unchanged-operator cache | Investigate upstream goal/replay mechanisms before building equivalent machinery | Release descriptions alone do not prove coexistence with independent live branches |
+| [Magentic-One](https://microsoft.github.io/autogen/stable/user-guide/agentchat-user-guide/magentic-one.html): task and progress ledgers, stall-driven revision | Separate enduring task understanding from progress and next action | Frequent orchestration can cost more; no AI4R benefit follows from its benchmarks |
+| [SyncPlan](https://arxiv.org/abs/2608.01652) and [Learning When to Plan](https://arxiv.org/abs/2509.03581) | Test selective replanning rather than assuming every result deserves a new plan | Their environments and learned mechanisms do not establish transfer to AI4R research |
+| [Temporal workflow messages](https://docs.temporal.io/develop/python/workflows/message-passing) | External events and durable execution have established implementation patterns | A pattern reference; adopting another runtime is not a prerequisite |
+
+The first reuse investigation should exercise the pinned SDK goal/replay paths through a small adapter spike and compare the work needed with extending our existing store and scheduler. Do not replace the framework just to obtain a loop. JiuwenSymbiosis and LangGraph are optional follow-up references; neither is a dependency of this proposal.
+
+
+### JiuwenBox fit after adding CC model routing
+
+Pinned upstream `02b37f47fbefe80a58e4ed88606120818ca44ac3` was inspected again on October 27. [Official overview](https://github.com/openJiuwen-ai/jiuwenswarm/blob/develop/jiuwenbox/README.md). The pin, not the moving branch, grounds the code findings. Appendix slide 15 gives a requirement-to-mechanism table.
+
+| Requirement | Existing JiuwenBox mechanism | What remains for our integration |
+|---|---|---|
+| Tool/file operations | API command and file operations; Python/JS execution with installed runtimes | Bind CC operation contracts, inputs, results and errors |
+| Execution restrictions | Bubblewrap, filesystem/network policy, optional cgroup CPU/memory/PID controls | Qualify host support and effective policy; map container-specific execution through Docker |
+| Job control / stop | Background job controls, separate stop/restart/delete; graceful daemon shutdown and process-group signal escalation | Verify termination and retained state; integrate Docker CC ownership/cancellation |
+| Model API transport | Configured path-prefix routes to endpoints and API-key injection | Inject reachable routes into CCs; resolve logical aliases/features, enforce scoped access and record actual model bindings |
+| Operational persistence | Sandbox lifecycle records and audit events | Research knowledge/results, application checkpoints and independent backup/restore |
+| Whole-lab control | Reusable Linux service inside a lab VM | Host/provider VM stop and durable lab orchestration |
+
+`server/runtime/process.py:stop` first stops tracked background processes, asks the daemon to shut down, waits, then uses SIGTERM and SIGKILL if needed, waiting again. `sandbox_manager.py` saves STOPPED after runtime.stop returns. This establishes actual termination implementation, beyond an API name, but is not an observed deployment test. Background kill can report failure, and resource limits are optional. Verify outcomes rather than treating status labels as proof.
+
+`proxy/inference_privacy_proxy.py:ProxyRoute` binds path prefixes to target endpoints and credentials. This is useful transport and secret injection, not evidence of semantic model-role selection or feature matching. It does not automatically make a container network path reachable or enforce our experiment model pins. Keep those responsibilities in the lab model adapter/configuration, evaluating extensions only when needed.
+
+The stable supervisor remains a responsibility, not a demand for a new daemon. Evaluate reuse of JiuwenBox's execution backend and proxy first, with narrow AI4R/Docker lifecycle integration. Do not impose a second bubblewrap sandbox around every OCI CC without a demonstrated need. Whole-VM control stays outside the guest. No software was installed and no runtime compatibility test was run for this review.
+
+## Evidence that would make this valuable
+
+The first demonstration should contain a material late discovery that invalidates a planned prerequisite. AI4R should revise the dependent next work, retain unrelated valid findings, allow a local retry while independent work continues, and respect the existing scope and budget. Repeat with a scope change, failed prerequisite and process interruption. A driver tests mechanics; only actual Planner-selected changes demonstrate autonomous adaptation.
+
+Compare the same capabilities, task inputs, injected discovery, checking criteria, model configuration and total budget under three planning policies: fixed initial DAG, replanning at every batch boundary, and selective replanning. Use independently assessed research quality, correct responses to changed information, stale-result consumption, reuse of unaffected work, planning/checking cost, total runtime and recovery behavior. Freeze the scoring rules before the runs; report all attempts and a useful negative result if adaptation does not help. Use held-out discovery cases and repeated paired trials before asserting general benefit.
+
+The case for this structure is strongest if selective replanning improves independently verified outcomes on changing-information tasks, preserves static-task quality, and costs less than frequent replanning at comparable quality. Set the acceptable cost and quality tradeoff before measurement. We have not established any of these outcomes yet. One controlled successful revision establishes feasibility only; a short restart trial does not establish day-long autonomy. CC effectiveness and long-duration reliability remain separate evaluations.
+
+The remaining discussion choices are the first uncertainty boundary, the quality/cost tradeoff, which upstream goal/replay pieces fit our checks, and when concurrent live patches become necessary. The [replacement plan](Lab%20Capsule%20and%20Factory%20Design%20Plan.md) orders the work around those questions. Earlier VM, container and factory notes are implementation references only where compatible with this proposal.

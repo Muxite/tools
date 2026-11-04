@@ -1,0 +1,89 @@
+---
+id: inference-engine-factory-design-impact
+status: researched-proposal-integration-unverified
+source: Sources/Prompts/2026-11-02-inference-factory-references.txt; Resources/review-batches/2026-11-02-inference-factory-references/source-receipt.json
+last_reviewed: 2026-11-02
+next_action: Qualify IESF-01 and IESF-02 separately from the current M2a first build
+---
+# Inference Engine Software Factory — design impact
+
+**Recommendation:** learn Superagent's separation of authorization, work state and attempts; evaluate Strata as an optional inference provider and an inference-optimization research target. Keep JiuwenSwarm as the agent platform, CCs as the packaging/verification boundary and the selected VM-per-lab model. Neither project replaces independent acceptance or the research evidence store.
+
+[[Designs/Superagent and Strata - Source Review]] contains pinned upstream evidence. This is a proposed extension assessed against the current notebook designs, not a new adopted PRD or implementation instruction. The supplied team message introduces an **Inference Engine Software Factory** research direction. No separate authoritative factory PRD was located in this review; the relationship to AI4R is interpreted below, and must be reconciled with any such PRD before specification.
+
+## Fit within the current design
+
+| Boundary | Existing route | Proposed effect |
+|---|---|---|
+| Research goals and agent behavior | [[Designs/ai4r_m2a/README]] | Retain adaptive research and native JiuwenSwarm; use a scoped work record to bind a research objective to authorized experiments |
+| Factory composition | [[Designs/Capability Capsule Factory Feature]]; [[Designs/Paper2Agent Capability Factory]] | Compose ingestion, source editing, build, benchmark and report CCs; retain the factory-as-CC-bundle interpretation |
+| Lab isolation and external control | [[Designs/Sandbox Lab Design]] | Keep VM/provider enforcement; a worktree or command shim does not substitute for a lab boundary |
+| Shared and private models | [[Designs/Spark Shared Services and Storage]] | Add Strata as a candidate backend behind existing scoped routes; a private model remains inside its authorized lab boundary |
+| Model-provider contract | [[Designs/ai4r_m2a/2-human-relevant/portability-and-providers]] | Resolve endpoint capabilities, exact model/build identity, deadlines, cancellation and usage; block unsupported requests before dispatch |
+| Release and evolution authority | [[Designs/ai4r_m2a/2-human-relevant/capsule-packaging-and-trust]] | A new engine/kernel/configuration is a new evaluated candidate; authoring and admission remain separate |
+
+This extends the October 27 reuse shortlist with two references. It does not select Strata instead of vLLM, adopt DeepSeek Harness instead of JiuwenSwarm, move private models into the shared gateway, or expand M2a Stage 1. The seven current Stage 1 exits still define that first build. No authoritative runtime files or portable M2a package contents were edited by this review.
+
+## Highest-impact design changes to consider
+
+**1. Make authority durable and distinct from context.** An intake adapter produces a source event with a stable ID, actor provenance and scope. A policy owner authorizes a work item with objective, allowed repository/ref, permitted effects, budgets, expiry and policy version. The existing lab/native execution owner dispatches attempts under that authority. Source text, CI logs and repository instructions are evidence inputs; they cannot widen credentials or effects. Human follow-ups within scope continue the same objective; out-of-scope requests return for a new decision. Begin proactive intake in observe mode. For AI4R, revalidate before every new dispatched effectful attempt and enforce withdrawal through the external stop path; this is a proposed strengthening over the prototype's resume-focused behavior.
+
+**2. Reconcile effects after interruption.** Link work ID, attempt ID, native session, execution job, workspace, candidate commit and result manifest. Persist intent before launching builds, benchmarks or publication. On restart, query owned jobs and external outcomes before repeating an operation. An ambiguous push, PR, remote job or export remains reconciliation-required; it is not automatically failed or safe to retry. A durable outbox can prevent repeated local enqueue, but external systems still require idempotency keys or reconciliation. Retain evidence even when work is stopped or a candidate is rejected. Define retention/compaction before accumulating unbounded events and logs.
+
+**3. Separate inference being used from inference being changed.** A shared stable backend supplies agent/verifier model calls. A candidate Strata engine runs as the subject of a bounded experiment in the owning lab or an explicitly reserved evaluation worker. The candidate must not control its own checker, fixture selection, score calculation or promotion. Keep baseline and verifier identities fixed; changing the candidate must not silently change the evaluator. A model used to judge a result is not independent merely because it is reached through another API URL.
+
+**4. Bind an engine profile, not just a friendly model name.** Resolve engine commit/binary or image digest, weight/tokenizer hashes, quantization, experts selected, context/KV settings, speculative path, prefill flags, hardware/driver and effective server configuration. Record the resolved endpoint and profile at dispatch. OpenAI/Anthropic-shaped APIs require actual tests for tool calls, structured output, streaming termination, usage, context limits and errors. Reject unsupported features; require a separately authorized and recorded fallback. Model and engine updates create a different experimental condition.
+
+**5. Treat memory, queueing and cache state as shared resources.** Strata's Spark results show why a model-fit check is insufficient for a multi-lab host. Reserve memory for the OS, controller, evidence handling, VMs and failure recovery before admitting a model profile. Unified memory means CPU and GPU allocations compete for the same physical pool; do not add their advertised capacities. Reserve disk for downloads, conversion, retained baselines and candidate builds. Measure queue wait, time to first token, decode, end-to-end latency, peak memory, disk traffic and concurrent-client fairness. Separate cold starts, warm sessions and prefix reuse. A batch slot is not a per-lab quota or privacy boundary.
+
+**6. Optimize engine behavior under a fixed correctness floor.** Candidate work may change kernels, caching, expert placement, quantization or server configuration, within an independently owned policy. Freeze workload, environment, quality criteria and baseline before measurements. Numerical parity tests, model-task quality and full agent task success are different checks. Include structured extraction, code/tool workflows, long contexts and failure cases appropriate to the supported scope. Retain failed builds, wrong answers and resource regressions. Speculative verification of tokens is not scientific verification of an output. Only independent admission can promote a candidate, with a retained rollback profile.
+
+## Proposed work and evidence flow
+
+An authorized engine-improvement request becomes a durable work item. A native JiuwenSwarm research session selects factory CCs, checks out a pinned engine source and produces a candidate build. The execution provider runs it with reserved resources against a frozen matched baseline. Independently owned checks score behavior and performance; the evidence owner seals raw outputs, configurations and receipts. A separate admission decision either publishes a qualified candidate or retains a rejection with its evidence. The operator receives the result or a concrete action-needed notice. A PR being closed or a worker reporting ready does not establish an accepted engine release.
+
+| Boundary | Producer → consumer | Missing/invalid behavior |
+|---|---|---|
+| Authorization | Policy owner → work controller | Context-only record; no dispatch without a current mandate |
+| Experiment binding | Research session → execution provider | Block when source, model, criteria, platform or resource reservation is unresolved |
+| Observation | Candidate worker → independent checker | Reject absent/changed outputs; producer narrative is supplementary |
+| Acceptance | Checker/evidence owner → admission owner | Keep candidate evaluation-only when checks or durable receipts are missing |
+| Delivery | Admission owner → registry/operator | Publish only sealed accepted identity; reconcile uncertain delivery before retry |
+
+## Bounded qualification plan
+
+Track these as new research trials, separate from M2a Stage 1 and its acceptance IDs. All trials below are **NOT_RUN**.
+
+| Trial | Minimal work | Exit evidence |
+|---|---|---|
+| IESF-01: authorization and recovery | One repository, manual intake, native JiuwenSwarm execution; duplicate event, scope expansion, withdrawal, crash after external effect | One durable authorized work item; no unauthorized dispatch; restart reconciles the same owned job/output without duplicate publication |
+| IESF-02: provider fit | One pinned supported Strata profile on the actual target; direct local API first, then existing gateway/relay path if needed | Real tool/JSON/streaming traces; queue/cancel/timeout tests; resolved profile receipt; no silent fallback; measured memory and disk headroom |
+| IESF-03: optimization factory | One declared engine/config change and matched incumbent; independent fixed task checks | Reproducible build/run records; quality and latency/capacity comparison; failures included; independently justified admission or rejection; rollback demonstrated |
+
+IESF-01 can be a small extension of existing work/evidence records; it does not justify deploying the whole Superagent application. IESF-02 need not block M2a's existing model route. Run single-client qualification before shared concurrency; a Strata release default is not our capacity policy. No engine installation or model download was needed for this library review.
+
+## Failure and trust scenarios
+
+| Scenario | Designed outcome and owner | Required evidence |
+|---|---|---|
+| Normal optimization request | Native worker builds; independent checks and admission decide | Pinned baseline/candidate and sealed measured report |
+| CI/log text asks for credentials or a broader task | Intake records context; policy/execution owners deny scope expansion | No credential/tool scope increase |
+| Crash after remote launch or publication | Recovery owner reconciles external identity before another effect | One owned job or a visible unresolved state |
+| Engine hangs while the client disconnects | Provider cancels and observes completion; controller escalates only against owned resources | Actual stopped job and reclaimed reservation, not just a cancelled HTTP request |
+| Cancellation plus evidence-store outage | Stop owner halts effects; publication stays blocked; recovery retains staged identity | No accepted manifest without durable bytes/receipts |
+| Shared cache or private research request | Provider applies scoped access and authorized cache policy | Canary tests across clients, logs and cache reuse; upstream short tests are insufficient |
+| Faster candidate gives wrong results | Independent checker rejects; evidence and baseline survive | Quality regression visible despite improved throughput |
+| Ordinary benchmark client | Provider serves bounded requests; it gains no release authority | Standard API client works without special knowledge of CC internals |
+
+All scenario outcomes above are design targets, not observed passes.
+
+## Tradeoffs and decision
+
+| View | Assessment |
+|---|---|
+| Strength | Superagent supplies a concrete state/authority reference; Strata supplies real engine code, benchmark protocols and a documented Spark route |
+| Weakness | DeepSeek-specific TypeScript integration adds a second runtime if adopted wholesale; Strata behavior depends on model pack, architecture and optimization flags |
+| Opportunity | Build a factory that proposes and measures inference changes while reusing native agents, CCs and independent release gates |
+| Threat | Duplicate controllers, unchecked external effects, automatic engine drift, near-full memory, cache leakage and speed gains bought with unmeasured quality loss |
+
+**Proposed decision:** adopt the lessons into the design backlog now; qualify narrow adapters before software reuse. Keep direct code import, Strata backend selection and automated promotion open until their named trials provide evidence. The current design owners remain [[Designs/Project Authority]], the M2a package and the selected sandbox design. This source review does not establish that these contracts are already implemented.

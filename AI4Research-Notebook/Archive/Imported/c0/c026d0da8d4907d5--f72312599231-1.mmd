@@ -1,0 +1,10 @@
+flowchart LR
+    Producer[CC candidate payload] --> Capture[Trusted capture: identity and version]
+    Capture --> Files[Readable immutable artifact]
+    Checks[Deterministic results and verifier assessment] --> Decision[Protected gate decision]
+    Files --> View[Derived UI or Markdown inspection]
+    Decision --> View
+    Accepted[Durable accepted-output record] --> View
+    Raw[Raw logs, prompts, execution and routing observations] --> Bundle[Optional technical evidence area]
+    Bundle --> Export[Audience-scoped manifest and export]
+    View --> Export

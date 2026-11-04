@@ -1,0 +1,122 @@
+---
+id: vm-cc-factory-design-plan
+status: proposed-m2
+source: Sources/Prompts/2026-10-21-vm-capsule-factory-design-plan.txt; Sources/Prompts/2026-10-21-docker-feasibility-review.txt; Sources/Prompts/2026-10-21-m2-scope-clarification.txt; Sources/Prompts/2026-10-21-spark-resource-and-storage-direction.txt
+last_reviewed: 2026-10-21
+next_action: Inventory the Spark and establish host resource admission and shared inference before scaling lab builds
+---
+# M2: VM labs, container capsules and local factories
+
+**M2 direction:** every lab is a Linux VM with an independently evolving AI4R, a local capability factory, Docker images and project resources. Full CC containerization is the target. Selected capsule and platform improvements can return to a tested master AI4R base; publication does not silently update other labs or running plans.
+
+**Feasibility:** technically credible using normal VM provisioning, Docker Engine, Compose and BuildKit. The main work is a container carrier adapter, a narrow privileged broker, persistent factory jobs and release/provisioning automation. GPU access inside each VM needs separate host-specific qualification. [[Designs/Docker Architecture Review and Feasibility|Read the architecture review]] for source-grounded corrections and current evidence.
+
+This is M2 architecture planning. M1 supplies starting code/contracts and a migration baseline; its feature exclusions are not constraints on the M2 target. No new VM, Docker, factory, model or performance trial has been run for this review.
+
+## Spark development target
+
+[[Designs/Spark Shared Services and Storage]] owns the hardware and resource policy: GB10 ARM64, 128 GB unified memory, the supplied 2 TB SSD, one host model store/inference service, and bounded CPU lab VMs. Start with two active labs. GPU passthrough is unsupported in NVIDIA's current Spark documentation, so GPU inference stays on the host; CPU VM support still needs a real host qualification. The earlier generic x86 prototype is not the Spark deployment. The storage budget reserves 20% of usable capacity and includes VM-local image/cache duplicates, registry copies and transient downloads/builds.
+
+## Infrastructure overview
+
+```mermaid
+flowchart TB
+    BASE[Tested M2 base - ARM64 source, images and resource policy]
+    BOOT[ARM64 VM provider and cloud-init]
+    BASE --> BOOT
+    subgraph H[GB10 Spark - 128 GB unified memory and 2 TB SSD]
+        CAP[Capacity controller - quotas, leases and retention]
+        MODEL[One model store and host GPU inference gateway]
+        SHARED[Prepared source store and OCI registry]
+        subgraph A[CPU lab VM A - project P]
+            APP_A[Independent AI4R and factory A]
+            RELAY_A[Scoped model relay A]
+            LOCAL_A[Own broker, Engine, images and capped BuildKit cache]
+            APP_A --> LOCAL_A
+            APP_A --> RELAY_A
+        end
+        subgraph B[CPU lab VM B - project Q]
+            APP_B[Independent AI4R and factory B]
+            RELAY_B[Scoped model relay B]
+            LOCAL_B[Own broker, Engine, images and capped BuildKit cache]
+            APP_B --> LOCAL_B
+            APP_B --> RELAY_B
+        end
+        RELAY_A -->|model handles and requests| MODEL
+        RELAY_B -->|model handles and requests| MODEL
+        SHARED -->|only required snapshots and images| LOCAL_A
+        SHARED -->|only required snapshots and images| LOCAL_B
+        CAP -.-> MODEL
+        CAP -.-> LOCAL_A
+        CAP -.-> LOCAL_B
+    end
+    BOOT --> APP_A
+    BOOT --> APP_B
+    APP_A -.->|candidate source, image and evidence| QUAL[Central independent qualification]
+    APP_B -.->|candidate source, image and evidence| QUAL
+    QUAL --> NEXT[Next tested M2 release]
+```
+
+Persistent AI4R services and CCs are sibling containers under each VM engine. Model weights and GPU workers remain on the Spark host, reached through local scoped relays. Registry/source sharing does not deduplicate VM-local unpacked image layers. BuildKit is build infrastructure; its cache is separate from loaded images. Broker runs as a VM service and is the only product infrastructure granted Docker control. Factory agents and capsules never receive the Docker socket. The model bridge, storage and checks are expanded in the detailed designs.
+
+## Three connected designs
+
+| Design | Decisions now made | Remaining implementation detail |
+|---|---|---|
+| [[Designs/VM Lab Infrastructure Design|VM infrastructure]] | Clean Linux cloud image, cloud-init/bootstrap, local Engine, Compose services, system broker, separate project/evidence storage | First actual provider, pinned package set, tested machine size and access enrollment |
+| [[Designs/Container Capability Capsule Design|Container CCs]] | Short-lived invocation containers, staged file protocol, immutable image identities, scoped model IPC and host-owned gates | Adapt actual tool/agent/verifier APIs, define versioned payloads and runtime profile |
+| [[Designs/Per Lab Capability Factory Design|Per-lab factory]] | Captured build contexts, local Buildx load, separate qualification/admission, candidate exchange and central release | First templates/use case, dependency preparation policy, durable job/cancellation behavior |
+
+## Development order: useful slices before fleet automation
+
+The following are proposed M2 work packages, not invented native task IDs. Register them through the owning repository's TASK/SOP process. No calendar estimates are committed.
+
+| Step | Build | Concrete exit |
+|---|---|---|
+| 0. Spark capacity and shared services | Inventory actual disk/memory/ARM64 VM support; implement reservations, model acquisition and one host inference endpoint | Two lab identities share one model artifact/worker without duplicate downloads; over-budget downloads/builds are refused; host driver stack remains intact |
+| 1. Freeze boundary examples | Invocation/result examples, image-identity record, broker build/launch API and source-to-image manifest | One real existing CC mapped from current Python helper/callable API to files; role/grant/check owners explicit |
+| 2. Tool carrier on one engine | Container entrypoint adapter and host Docker carrier, manually authored image | Real invocation by image ID; correct output ingestion/checks; corrupt output, timeout, cancellation and unauthorized mount rejection |
+| 3. Host broker and durable jobs | Narrow local service, ownership labels, paths/limits, persisted IDs and recovery | No raw Docker authority in agents; restart reconciles live/stopped jobs without duplicate effects; evidence survives cleanup |
+| 4. Repeatable VM deployment | Cloud-init metadata, versioned bootstrap, release manifest, stable Compose stack and readiness command | One clean VM becomes READY and runs step 2 without manual path repair; destroy/recreate reproduces the deployment |
+| 5. Manual factory pipeline | Prepared context, controlled Dockerfile, Buildx export/load, local qualification/catalog | Candidate becomes runnable in Engine, bad candidate rejected, source/image/check lineage recorded, interrupted build reconciled |
+| 6. Generated factory and second lab | AI4R authoring workflow over step 5; instantiate B from the same base | A creates a useful CC; B independently transfers/requalifies it while retaining unrelated source/catalog/project state |
+| 7. Agent/verifier conversion | Invocation-scoped model bridge and verifier image | Actual model call evidence; verifier payload excludes producer inputs; checks/gates retain authority; expand remaining executable CCs |
+| 8. Contribution and platform evolution | Candidate source/image export, central rebuild/qualification, explicit app/factory update and state migration | Separate CC and platform promotions; selective lab update and compatible state rollback; existing pins/evidence retained |
+
+CPU labs with host-managed local inference are the initial Spark profile. GPU benchmark jobs require a separately qualified host accelerator path, not guest passthrough. Every factory repair/download/build uses the shared capacity ledger, with bounded attempts and retained evidence. The first manual image must work before attributing generated-image failures to the factory. CC accuracy experiments continue alongside infrastructure; deployment acceptance does not prove an accuracy gain.
+
+## Release and development identity
+
+A tested base release records OS/architecture constraints, engine/broker/Compose compatibility, app/factory source and image pins, seed CC catalog/checks, protocol versions, migration rules and qualification evidence. Master is the tested-base role, not a required Git branch name or mutable image tag.
+
+Each VM gets a standalone clone/local branch, not a Git worktree metadata directory copied across machines. The worktree analogy describes independent source histories; VM state, image stores and resources need their own manifests/backups. Record current tree bytes including uncommitted changes when building candidates. Fast live-source development is distinguished from immutable release execution.
+
+Local candidate image IDs, registry manifest/index digests and transferred archive hashes have distinct meanings. Published base releases use registry digest/platform references; local factory builds can qualify by full Engine image ID. Publishing adds a distribution relationship, not permission to replace a frozen run's pin.
+
+## Shared end-to-end journey
+
+1. Provision A and B from release R0 with independent projects P/Q, factory versions, image stores and catalogs.
+2. A's factory captures prepared sources and builds C1. Broker explicitly loads its image into A's engine and records its immutable identity.
+3. Independent local checks/admission make C1 eligible for a future A plan. Existing runs stay pinned; B remains unchanged.
+4. A also proposes planner/factory change P1. Capture it as a separate platform candidate and record any C1 compatibility dependency.
+5. Export source, recipe/dependencies, image/evidence and lineage. Central qualification rebuilds and tests the exact artifact it intends to release. A changed digest requires its own qualification.
+6. Publish tested R1, with C1 and P1 separate unless they require a jointly qualified compatibility set.
+7. B explicitly imports compatible C1, rebases to R1, or keeps R0. Requalify affected behavior and migrate state. Rollback restores a compatible source/image/catalog/database set and retains failure evidence.
+
+## Acceptance scenarios and limits
+
+| Scenario | Designed outcome and owner |
+|---|---|
+| Build succeeds but output stayed only in BuildKit cache | Broker rejects runnable-image readiness until explicit load/push-pull succeeds |
+| App submits an app-internal path as bind source | Broker resolves logical resource ID on the VM host; arbitrary path refused |
+| Engine/VM restarts during work | Broker reconciles IDs/labels; preserves outcomes and never silently replays effects |
+| Output claims success but has missing/corrupt artifacts | Host import/check fails; no accepted artifact or admission |
+| Image/model/platform unavailable | Preparation records BLOCKED; no silent substitution |
+| Disk full or evidence write fails | Stop dependent work; no acceptance or destructive cleanup of unexported evidence |
+| Lab modifies its own factory/checks | New candidate release; fixed incumbent qualification outside candidate authority |
+| B cannot access A's private data | Export limitations explicit; central/B qualify only in an authorized environment |
+| Two labs change one CC | Sibling lineage retained; common-baseline comparison and merged-result requalification |
+
+Current evidence is source review and documentation validation plus older bounded synthetic Docker receipts. Real two-VM/factory/restore/platform-update evidence remains to be produced. GPU pass-through and model/provider reproducibility are not inferred from successful containerization.
+
+The development sequence and all three designs are refined by [[Designs/Spark Shared Services and Storage]]. Its resource caps, model leases and retention rules apply during development as well as formal runs.

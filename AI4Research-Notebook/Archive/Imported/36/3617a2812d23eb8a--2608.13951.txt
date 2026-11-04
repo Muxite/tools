@@ -1,0 +1,1534 @@
+
+
+===== page 1 =====
+HELIX: Model–Harness Co-evolution for
+Recursive Self-Improvement
+Tianyu Fan, Chao Huang
+In3 Lab, The University of Hong Kong
+How to build RSI system: Model-Harness Co-evolution
+System state Zt = (Mt, Φt) re-enters the next round as Zt + 1
+Build harnesses
+portfolio for
+model Mₜ
+Interact
+Mₜ ↔ Hᵢ on
+matched tasks
+Verify experience
+sibling outcomes
+and provenance
+Update model
+learn from verified
+sibling data
+Updated model
+Mₜ₊₁ changes the
+capability profile
+RSI return: rebuild Φₜ₊₁ for Mₜ₊₁ → next state Zₜ₊₁
+Abstract
+Scaling agent capability has largely been pursued through one lens: make the model better. Yet a model
+acts through a runtime harness that mediates context, tools, control flow, permissions, and stopping
+decisions. The harness is not a neutral wrapper—it is an active co-determinant of agent behavior. For
+interactive agents, its influence is recursive: it governs how the model executes today and shapes the
+trajectories from which the model learns tomorrow. Treating model and harness as independent artifacts
+severs this feedback loop. We argue that closing it requires model–harness co-evolution as a first-class
+principle. Co-evolution rejects a false asymmetry in which one component evolves while the other stays
+frozen. Harness design governs fixed-model execution and structures the data through which the model
+improves. A stronger model, in turn, may favor a different harness that matches its new capability profile.
+This bidirectional dependency gives harness building a dual purpose: producing stronger immediate
+execution, and generating verified sibling trajectories—paired outcomes capturing successes, regressions,
+near misses, and alternative solutions—as structured training signal for the next model update.
+Recent approaches have begun to connect harness adaptation with model learning, but making this handoff
+source-traceable and auditable across heterogeneous runtime designs remains difficult. We organize our
+approach around build–update–rebuild: build source-traceable harnesses for a fixed model; update the model
+from verified sibling trajectories; rebuild the harnesses for the updated model, whose shifted capability
+profile may favor different runtime designs. Within this paradigm, we present HELIX, a source-traceable
+substrate for dual-purpose harness building. It decomposes OpenCode, Pi Mono, Nanobot, and Hermes
+Agent into typed ports, atoms, recipes, product shells, and runtime policies—making interventions explicit
+rather than implicit in ad-hoc prompting. Pre-execution checks ensure auditability. An evidence plane
+retains traces, test results, policy decisions, and provenance, preserving outcome richness rather than
+collapsing to a single success bit. HELIX exposes 96 ports per product contract and enumerates 45 = 1,024
+coupled recipes, or 46 = 4,096 when acceptance is independently selected. We validate both sides of
+the co-evolution loop. On the execution side, a 65-candidate evolution round finds a fixed harness that
+improves task coverage by 4.0% over Pi, while the complete post-hoc portfolio exposes up to 58.0% more
+coverage. Selected members are then evaluated with repeated runs and the official SWE-bench evaluator.
+On the learning side, a 200-slot sibling slice from this deeper validation yields 438 verified SFT, critic,
+filter, and preference records. The same process that improves execution today generates the data needed
+for tomorrow’s model update. Together, these results position source-traceable harness building as an
+auditable interface between execution-time harness evolution and subsequent model updating. Code is
+released at https://github.com/HKUDS/HELIX.
+arXiv:2608.13951v1  [cs.AI]  14 Aug 2026
+
+
+===== page 2 =====
+HELIX
+Contents
+Contents
+1
+Introduction
+4
+1.1
+Contributions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+5
+2
+Model–Harness Co-evolution
+5
+2.1
+Two coupled feedback timescales
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+5
+2.2
+Two outputs of a harness-evolution round . . . . . . . . . . . . . . . . . . . . . . . . . .
+6
+2.3
+From verified experience to the next system state . . . . . . . . . . . . . . . . . . . . . .
+6
+2.4
+Fixed-harness performance versus portfolio yield
+. . . . . . . . . . . . . . . . . . . . . .
+7
+3
+HELIX System
+8
+3.1
+The harness as an explicit intervention variable . . . . . . . . . . . . . . . . . . . . . . .
+8
+3.2
+Source-traceable ports, atoms, and recipes . . . . . . . . . . . . . . . . . . . . . . . . . .
+8
+3.3
+Pre-execution checks and recipe enumeration
+. . . . . . . . . . . . . . . . . . . . . . . .
+8
+3.4
+Model–harness interaction at runtime
+. . . . . . . . . . . . . . . . . . . . . . . . . . . .
+9
+3.5
+The evidence plane preserves intervention identity
+. . . . . . . . . . . . . . . . . . . . .
+10
+4
+Design Benefits
+10
+4.1
+Bounded modification makes build and rebuild practical . . . . . . . . . . . . . . . . . .
+10
+4.2
+Persistent identity enables cross-round attribution
+. . . . . . . . . . . . . . . . . . . . .
+11
+4.3
+Evidence-linked siblings carry experience into model updating . . . . . . . . . . . . . . .
+11
+5
+Experimental Design
+12
+5.1
+Evaluation goals and research questions
+. . . . . . . . . . . . . . . . . . . . . . . . . . .
+12
+5.2
+LiveCodeBench-derived repair subset . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+13
+5.3
+Selected-member SWE-bench Verified follow-up . . . . . . . . . . . . . . . . . . . . . . .
+13
+5.4
+Shared model and attempt protocol
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+13
+6
+Results
+13
+6.1
+RQ1—Execution today: can evolution surpass the baseline? . . . . . . . . . . . . . . . .
+13
+6.2
+RQ2—Execution breadth from rapid harness evolution . . . . . . . . . . . . . . . . . . .
+14
+6.3
+RQ3—Learning data for the next model update . . . . . . . . . . . . . . . . . . . . . . .
+15
+7
+Discussion
+18
+7.1
+The return from update to rebuild makes improvement recursive
+. . . . . . . . . . . . .
+18
+2
+
+
+===== page 3 =====
+HELIX
+Contents
+7.2
+The model–harness pair has two improvement frontiers . . . . . . . . . . . . . . . . . . .
+19
+7.3
+Portfolio coverage exposes execution headroom and data yield . . . . . . . . . . . . . . .
+19
+7.4
+Verified failures enrich model-update data . . . . . . . . . . . . . . . . . . . . . . . . . .
+19
+8
+Related Work
+20
+8.1
+Recursive self-improvement and model–harness co-evolution . . . . . . . . . . . . . . . .
+20
+8.2
+Harnesses as agent–computer interfaces
+. . . . . . . . . . . . . . . . . . . . . . . . . . .
+20
+8.3
+Automated harness and workflow evolution
+. . . . . . . . . . . . . . . . . . . . . . . . .
+20
+8.4
+Interaction data and executable software benchmarks . . . . . . . . . . . . . . . . . . . .
+21
+9
+Limitations and Threats to Validity
+21
+9.1
+Scope of the evaluation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+21
+9.2
+What causes an improvement . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+21
+9.3
+Effects of attempts and selection
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+21
+9.4
+Limits of automated evaluation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+22
+9.5
+Data scale and model updating . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+22
+9.6
+Safety and maintenance . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+22
+10 Conclusion
+22
+A Selected-Member Follow-up Results
+23
+A.1 Repeated LCB evaluation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+23
+A.2 Official SWE-bench evaluation
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+23
+B Verifier-Grounded Case Traces
+24
+B.1
+Pytest: target success with regressions . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+24
+B.2 Xarray: a clean semantic near miss . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+25
+3
+
+
+===== page 4 =====
+HELIX
+1
+Introduction
+1
+Introduction
+Scaling agent capability is usually framed as a model-improvement problem. Yet a deployed agent is
+an executed model–runtime pair. Between a user request and a final patch lies a substantial runtime:
+system instructions, context construction, session state, tool schemas, permission checks, provider
+adaptation, a turn loop, retry and compaction policies, stopping rules, and verifiers. We call this
+runtime the agent harness. It is not a neutral wrapper. By changing what the model observes, which
+actions it can take, how it recovers from failure, and when it stops, the harness co-determines the
+behavior that the agent can reach.
+Model and harness interact at two time scales. Within a task, the harness constructs the model’s
+observations and action interface; the model proposes messages and actions; and the harness checks
+and executes them, returns environment feedback, and decides whether the interaction should continue.
+Across improvement rounds, verified trajectories from these interactions shape the next model, and
+the changed model becomes the condition under which the harness portfolio is rebuilt. The recursively
+improving unit is therefore the model–harness system rather than the model alone: an updated pair
+re-enters the same process under externally specified tasks, objectives, and verifiers.
+We therefore treat model–harness co-evolution as a first-class principle for recursive self-improvement.
+Each harness-evolution round has two outputs. The first is stronger execution for the current model:
+evolution can identify a better fixed harness and expose further coverage across a rapidly built portfolio.
+The second is data for the next model update: matched successes, regressions, near misses, and
+alternative solutions become verified sibling trajectories. These outputs are not separate goals. The
+same harness interventions that change execution today structure the learning signal available tomorrow.
+The harness is therefore a behavior operator for the current model and a curriculum operator for its
+successor.
+Recent work has already demonstrated trace-driven harness adaptation and joint harness–model
+optimization [2, 3]. HELIX targets a complementary systems requirement: preserving intervention
+identity and verified evidence when runtime behavior is recomposed across heterogeneous harness
+families. We organize this handoff as three stages:
+1. Build. For a fixed model, construct and evaluate explicit, source-traceable harness candidates on
+matched tasks.
+2. Update. Turn the resulting verified sibling trajectories into learning records and use them to update
+the model.
+3. Rebuild. Evolve the harness again for the updated model, whose capability profile may prefer a
+different runtime design.
+Making build–update–rebuild repeatable requires more than ad-hoc prompt or tool changes. Modern
+harnesses are large, tightly coupled systems, so an intervention must remain explicit, executable, and
+auditable as components are changed. HELIX provides this substrate. It decomposes OpenCode, Pi
+Mono, Nanobot, and Hermes Agent into typed ports, atoms, recipes, product shells, and runtime
+policies. Pre-execution checks validate declared compositions, while an evidence layer retains traces,
+test results, policy decisions, provenance, and outcome labels through execution.
+Our evaluation follows one portfolio through increasing depth. A complete 65-candidate LCB evolution
+matrix identifies a stronger fixed harness and exposes up to 58.0% more post-hoc portfolio coverage
+than Pi. Selected members then receive repeated-run and official SWE-bench validation, whose sibling
+artifacts yield 438 SFT, critic, filter, and preference records. Together, these results connect harness
+4
+
+
+===== page 5 =====
+HELIX
+2
+Model–Harness Co-evolution
+evolution for the current model to the data handoff that drives the next co-evolution round.
+1.1 Contributions
+This paper makes three contributions:
+1. An auditable formulation of system-level recursive improvement. We make model–harness
+co-evolution explicit as build–update–rebuild, with a task-level interaction loop and a cross-round
+return from verified experience to model updating and harness rebuilding.
+2. A bounded harness-modification substrate. HELIX represents source-derived runtime behavior
+as typed ports, atoms, recipes, product shells, and policies, then preserves each declared intervention
+through pre-execution checks, assembly, and evidence capture.
+3. A verified experience handoff. We show how rapid harness evolution exposes stronger and
+complementary task outcomes, and how the same matched rollouts materialize as SFT, critic, filter,
+and preference records for model updating.
+2
+Model–Harness Co-evolution through Build–Update–Rebuild
+The feedback loop introduced above becomes a repeatable process only when the harness is treated
+as both an execution policy and a data-generation policy. We treat the model–harness pair, rather
+than the model alone, as the state being improved. A round becomes recursive when its verified
+outcomes determine both the data used to update the model and the evidence used to rebuild the next
+harness portfolio. Because tasks, objectives, and verifiers remain externally specified, this is a bounded,
+verifier-grounded form of system-level recursive improvement.
+2.1 Two coupled feedback timescales
+Let the system state at round t be Zt = (Mθt, Φt), where Mθt is the current model and Φt = {Hϕi}i
+is the harness portfolio built for it. Within a task, model and harness form a fast interaction loop:
+Hϕi constructs context and exposes actions, Mθt returns messages and tool calls, and Hϕi checks and
+executes those actions before returning the next observation or stopping. Across rounds, a slower
+improvement loop converts the resulting evidence into a model update and a rebuilt portfolio.
+Let x ∼D be a task, Mθ a model with parameters θ, and Hϕ a harness with configuration and
+implementation parameters ϕ. A run produces a trajectory
+τt,i,x,k ∼P(τ | x, Mθt, Hϕi, k) ,
+(1)
+where t indexes a co-evolution round, i a harness candidate, and k an attempt. The trajectory includes
+model messages, tool calls and results, session events, workspace effects, and stopping decisions. A
+verifier observes the task, trajectory, workspace delta, test evidence, and policy evidence:
+yt,i,x,k = V (x, τt,i,x,k, ∆Wt,i,x,k, Tt,i,x,k, Pt,i,x,k) .
+(2)
+The label y need not be binary. It may distinguish resolved, target-miss, regression, no-action, policy
+violation, patch-noise, or evaluator gap.
+Because Hϕ changes both the reachable trajectory and
+the evidence retained afterward, the fast interaction loop determines both current behavior and the
+experience available to the slower improvement loop. A harness-evolution round must therefore be
+evaluated for execution and learning-data value together.
+5
+
+
+===== page 6 =====
+HELIX
+2
+Model–Harness Co-evolution
+2.2 Two outputs of a harness-evolution round
+For a fixed model, one deployment objective selects a harness that optimizes verified reward while
+accounting for runtime cost C and policy risk P:
+Jdeploy(Mθt, Hϕ) = Ex,k [R(y, τ) −λC(τ) −µP(τ)] .
+(3)
+The weights λ and µ make explicit that “solves more tasks” is not the only deployment objective. A
+harness that succeeds through excessive tool calls, unsafe permissions, or flaky retries can be inferior to
+a slightly less accurate but predictable one.
+Fixed-harness utility is only the first output. Holding model and task fixed, the evaluated candidates
+also create a sibling set
+St,x = {(Hϕi, τt,i,x,k, yt,i,x,k)}i,k .
+(4)
+This matched grouping is more informative than an undifferentiated replay buffer. A resolved patch
+paired with a no-action sibling isolates a failure to turn analysis into execution. Two resolved siblings
+with different patch hygiene create a minimality preference. A target-passing patch with a regression
+creates a critic negative that cannot be identified from the target test alone.
+A harness-evolution round therefore evaluates a portfolio rather than only its eventual winner. Let Qdata
+reward verified task novelty, contrasting outcomes, semantic proximity, and artifact quality among the
+trajectories produced by a candidate set C, and let St(C) denote its task-indexed sibling groups. A
+dual-purpose objective can be written schematically as
+C⋆
+t = arg max
+C⊆Ht
+
+α max
+H∈C Jdeploy(Mθt, H) + βQdata(St(C)) −γCbuild(C)
+
+.
+(5)
+The first term asks which fixed harness is useful now. The second asks what the full candidate portfolio
+reveals for learning. The objectives need not select the same candidate: a losing harness can supply a
+clean critic negative, while two successful harnesses can supply a minimality preference. This paper
+does not collapse the terms into one tuned scalar; it measures their observable proxies separately.
+2.3 From verified experience to the next system state
+Let Et = {St,x}x∈D denote the verified, task-indexed evidence from a round. A dataset builder G maps
+this evidence to training records, and an update operator U changes the model:
+Dt = G(Et),
+θt+1 = U(θt, Dt).
+(6)
+The update operator may implement supervised fine-tuning, preference optimization, verifier or critic
+training, reinforcement learning, or router/reranker learning. HELIX supplies the verified sibling inputs
+through rollout execution, verification, and evidence capture. A task-specific exporter instantiates G
+over curated sibling groups.
+The same evidence also returns to the harness side. It can guide which component combinations are
+retained, pruned, or proposed when the portfolio is rebuilt for the updated model:
+Φt+1 = B(Φt, Et; Mθt+1),
+Zt+1 = (Mθt+1, Φt+1) = R(Zt).
+(7)
+Here U and B need not use the same records: Dt carries supervision for the model, while component-level
+successes, failures, and incompatibilities in Et provide evidence for the next build. The return to Zt+1
+is what distinguishes improvement recursion from a one-off runtime refinement.
+6
+
+
+===== page 7 =====
+HELIX
+2
+Model–Harness Co-evolution
+The rebuild step is necessary because harness utility is conditional on the model: the relevant objective
+is J(Mθ, Hϕ). Model updates can change error recovery, schema adherence, context sensitivity, stopping
+behavior, and the value of specific tools. The equality
+arg max
+ϕ
+J(Mθt+1, Hϕ) = arg max
+ϕ
+J(Mθt, Hϕ)
+(8)
+need not hold.
+Consequently, permanently attaching a harness built for Mθt to Mθt+1 can leave
+performance on the table. Conversely, training a model on trajectories from only one harness can
+over-specialize it to that harness’s tool vocabulary and termination behavior. Rebuilding after each
+model update makes both dependencies observable.
+Figure 1 separates the two timescales. Within a task, model and harness alternate between mediated
+observations and actions. Across rounds, one evidence branch reports execution for the current system,
+while the other organizes sibling contrasts for the update and subsequent rebuild.
+Two Timescales of Model–Harness Recursive Improvement
+Task-level interaction produces behavior; verified experience updates the model–harness system across rounds.
+WITHIN-TASK INTERACTION  ·  repeated model ↔ harness turns
+Model Mt
+messages, actions,
+and tool calls
+Harness Hi ∈Φt
+context, tool results, permissions,
+retry, compaction, and stop
+Sibling trajectories
+matched model and task;
+different declared harnesses
+Verify & audit
+outcome, regression, artifact,
+and policy evidence
+Execution output
+fixed-harness utility
+for the current model
+Verified sibling data
+SFT, critic, filter,
+and preference records
+Model update
+SFT / preference / RL;
+critic, router, reranker
+Updated model Mt + 1
+changed capability profile;
+preferred harness can move
+context / feedback / control
+messages / actions
+execution now
+experience for update
+rebuild for Mt + 1
+evidence guides retention / pruning / proposal
+CROSS-ROUND RECURSIVE IMPROVEMENT
+Verified experience updates the model and informs the next portfolio; the updated model–harness pair re-enters the same process.
+Figure 1: Two timescales of model–harness recursive improvement. Within a task, Hi supplies context,
+tool results, permissions, and control decisions to Mt, while Mt returns messages and actions. Across rounds,
+verified sibling trajectories supply the update signal for Mt+1, whose changed capability profile conditions the
+next harness rebuild.
+2.4 Fixed-harness performance versus portfolio yield
+Fixed-harness performance and portfolio breadth require different reported quantities. For a verifier
+v ∈{0, 1}, the observed fixed-harness task coverage with K attempts is
+CovK(H) =
+1
+|D|
+X
+x∈D
+⊮
+
+max
+1≤k≤K v(τH,x,k) = 1
+
+.
+(9)
+For a candidate set C produced in a build round, post-hoc oracle coverage is
+OracleCovK(C) =
+1
+|D|
+X
+x∈D
+⊮
+
+max
+H∈C
+1≤k≤K
+v(τH,x,k) = 1
+
+.
+(10)
+7
+
+
+===== page 8 =====
+HELIX
+3
+HELIX System
+Equation 10 measures potential positive-outcome yield or the routing ceiling of an observed candidate
+portfolio. It is deployable only if a router can choose the successful candidate before seeing the answer.
+We therefore report fixed coverage, successful attempt slots, and oracle coverage as separate quantities.
+With current execution separated from portfolio yield, we next describe how HELIX builds explicit
+harness interventions and preserves the evidence needed for both outputs.
+3
+HELIX: Explicit and Auditable Harness Evolution
+HELIX operationalizes the harness side of build–update–rebuild. It turns a monolithic runtime into
+explicit, source-traceable interventions whose identities persist through declaration, compilation, execu-
+tion, and evidence capture. This section describes the representation, pre-execution checks, runtime,
+and evidence layer that make both build and rebuild auditable.
+3.1 The harness as an explicit intervention variable
+HELIX represents a harness as a structured composition rather than a single product label:
+H =
+ Hshell, Hsession/hooks, Hconfig, Hprompt, Htools,
+Hturn, Haccept, Hpolicy
+.
+(11)
+These eight dimensions cover both the model-facing interface and the environment-facing control
+plane. The shell exposes SDK, CLI, TUI, or web entrypoints; CLI-Anything provides a concrete
+example of an agent-facing CLI harness for existing software [1]. Session and hooks control lifecycle
+and extension events. Config normalizes provider and product behavior. Prompt and tools define the
+model’s observations and action vocabulary. The turn loop governs provider/tool iteration, continuation,
+retry, and compaction. Acceptance determines what evidence is sufficient to stop. Runtime policy
+constrains permissions and execution.
+3.2 Source-traceable ports, atoms, and recipes
+HELIX uses six entities to preserve intervention identity. A port defines a stable capability slot. Common
+atoms provide product-neutral behavior, while personality atoms preserve source-specific semantics
+behind the same ports. A pack expands a convenient group of atoms. A recipe binds atoms, strategies,
+policies, and shells into one declared candidate, and a product shell exposes that candidate through
+an SDK, CLI, TUI, or web surface. The compiler and lockfile retain the full expansion used by each
+rollout.
+The contracts derive behavior from OpenCode, Pi Mono, Nanobot, and Hermes Agent [18, 19, 20, 21].
+Each full product contract exposes 96 ports, bindings, and swap points. The same interfaces also
+support a neutral Minimal contract used for compact runtime and conformance checks.
+3.3 Pre-execution checks and recipe enumeration
+The recipe compiler expands a declared composition, resolves dependencies and port bindings, and emits a
+deterministic lockfile for runtime assembly. Conformance, boundary, and source-purity checks flag invalid
+or ambiguous compositions before live evaluation. Together, these steps make candidate interventions
+executable and auditable without treating arbitrary modules as semantically interchangeable. Coupling
+8
+
+
+===== page 9 =====
+HELIX
+3
+HELIX System
+HELIX: declared composition and evidence path
+Solid arrows show executable assembly; dashed artifacts are derived or explicitly applied, not automatic runtime gates.
+OpenCode
+source-derived behavior
+Pi Mono
+source-derived behavior
+Nanobot
+source-derived behavior
+Hermes Agent
+source-derived behavior
+Atomization
+shell  •  session/hooks  •  config  •  prompt  •  tools  •  turn loop  •  acceptance  •  runtime policy
+Catalog atoms + declared recipe selections
+common atoms  •  personality atoms  •  metadata recipe / harnessCombo assignments
+Compiler + compatibility assembler
+validate graph; select product-specific or hybrid execution surface
+Assembled runtime & product surfaces
+SDK / CLI / TUI / Web + services → session, tools, workspace
+Derived 96-port assembly contract
+bindings, resources, lockfile, provenance; verifier artifact
+Separate conformance & audits
+schema • boundary lint • source-purity report; explicitly applied
+Evidence plane
+runtime trace  •  workspace diff  •  verifier status
+cost/cadence  •  flow graph  •  redacted split artifacts
+System scale: 631 unique product atom IDs; 1,156 product-contract occurrences; 1,332 including the neutral Minimal contract.
+Figure 2: HELIX architecture. Source-derived behavior is represented behind stable ports and assembled into
+declared runtime candidates. Solid arrows show executable assembly; dashed paths show derived or explicitly
+applied evidence. The figure distinguishes unique atom identifiers from contract-expanded occurrences.
+session with hooks and acceptance with the turn loop leaves five independent source choices, defining
+45 = 1,024 candidates; selecting acceptance independently yields 46 = 4,096. We enumerate this
+finite intervention space and use deterministic smoke screening to select candidates for live evaluation.
+These operations support repeatable build and rebuild while keeping every evaluated rollout linked to
+its intended intervention. The live experiment evaluates the structured 65-candidate slice defined in
+Section 5.2, not all 1,024 or 4,096 possible recipes.
+Figure 2 summarizes the declared composition model, audit commands, compatibility assembly path,
+and evidence layer.
+3.4 Model–harness interaction at runtime
+Each trajectory alternates between harness mediation and model action. The harness constructs the
+current observation and action interface, the model proposes a response, and the harness checks and
+executes its actions before returning environment feedback. The assembled runtime implements this
+interaction as a shared multi-step loop:
+1. create or restore the session, run input and before-start hooks, and persist the user message;
+2. normalize the request and build prompt/context under the selected product personality;
+3. stream a provider step, normalize assistant parts, and collect proposed tool calls;
+9
+
+
+===== page 10 =====
+HELIX
+4
+Design Benefits
+4. run tool preflight and permission checks, execute serial or parallel batches, apply result hooks, and
+truncate or retry where required;
+5. evaluate acceptance evidence and the provider finish reason;
+6. inject a continuation when required, or stop at acceptance, request boundary, or the configured step
+limit; and
+7. persist the transcript and session state, return the runtime trace, and let the task-parity/evaluation
+layer snapshot workspace effects.
+Context compaction, tool input normalization, permission strategy, continuation cadence, and assistant-
+part protocols can all change a trajectory without changing model weights. Conversely, the model’s
+messages and actions determine which harness transitions, tools, and stopping checks are reached next.
+This bidirectional interaction is the concrete mechanism behind the coupled distribution in Equation 1:
+neither component produces the observed trajectory in isolation.
+3.5 The evidence plane preserves intervention identity
+Each run is joined to its recipe and lockfile, logged model–task–attempt identity, runtime trace,
+workspace effects, verifier outcome, and policy evidence. The resulting envelope keeps the declared
+intervention attached to every performance comparison and exported record.
+HELIX makes harness evolution explicit and auditable
+Declared recipes become executable interventions whose identities persist from compilation
+through runtime evidence. The same identity supports fixed-runtime comparison and matched
+sibling-data construction, providing the build-to-update handoff required by model–harness
+co-evolution.
+4
+Design Capabilities for Auditable Recursive Improvement
+Section 3 described how HELIX represents, assembles, and executes harness interventions. The value of
+this design is not merely that it produces more candidates. It changes the unit at which a harness can
+evolve, keeps each change attached to the evidence it produces, and turns the resulting comparisons
+into model-update data. From an RSI perspective, these mechanisms provide three capabilities needed
+to repeat the cycle: bounded modification of runtime behavior, attributable observation of its effects,
+and transfer of verified experience into the next update.
+4.1 Bounded modification makes build and rebuild practical
+Editing a harness couples many concerns: changing a tool interface can also disturb session behavior,
+provider adaptation, stopping rules, or the product shell. Repeating that process for every candidate
+makes both initial construction and later rebuilding expensive engineering operations. HELIX instead
+makes the recipe the unit of evolution. Source-derived atoms preserve existing behavior behind stable
+ports, while the compiler and shared execution and evidence paths are reused across candidates.
+The resulting design space is both broad and meaningful. A candidate selects known behavior families
+at declared capability slots rather than combining anonymous code fragments or duplicating a complete
+10
+
+
+===== page 11 =====
+HELIX
+4
+Design Benefits
+runtime. After a model update, the same contracts can be reused while recipes are revised for the new
+capability profile. Build and rebuild therefore become repeatable component-level operations, making
+rapid portfolio construction feasible without treating every candidate as a new agent implementation.
+For recursive improvement, this is a bounded modification surface: the system can revise its runtime
+policy through declared substitutions without relying on unconstrained self-rewriting.
+4.2 Persistent identity enables cross-round attribution
+A score is difficult to interpret when a candidate name hides the configuration and code that actually
+ran. Wrapper leakage, implicit defaults, or an invalid binding can make the executed harness differ
+from the intended intervention. HELIX carries the expanded recipe and lockfile through compatibility
+assembly and joins them to the model–task–attempt identity and runtime evidence. Conformance,
+boundary, and source-purity checks expose undeclared behavior that would otherwise silently change
+the candidate’s meaning.
+This persistent identity makes an outcome useful beyond a leaderboard row. The declared composition
+and logged execution conditions can be reconstructed, a gain or regression can be associated with an
+inspectable component set, and incompatibilities can guide the next round of candidate construction.
+The result is not simply “version A beats version B,” but evidence about a declared harness design that
+can be deployed, diagnosed, or rebuilt. Across rounds, the same identity also separates two otherwise
+confounded questions: how an updated model behaves under a held harness, and how rebuilt harnesses
+change behavior for that updated model. Recipe, model, task, and attempt identity therefore provide
+the lineage needed to attribute recursive changes to the model, the harness, or their interaction.
+4.3 Evidence-linked siblings carry experience into model updating
+Harness modification produces trajectories, but trajectories alone are not yet structured learning data.
+Runs from unrelated configurations are difficult to compare when their intervention identity, workspace
+effects, or evaluation evidence has been lost. HELIX retains these fields in one evidence envelope and
+groups runs for the same model and task across declared harness interventions. Matched sibling groups
+are therefore produced by construction rather than recovered afterward from heterogeneous logs.
+This structure increases the learning value of each evolution round. A sibling group can distinguish
+a clean resolution from a regression, a semantic near miss, a no-action run, or a noisier alternative
+solution while preserving which harness produced each outcome. Table 1 summarizes how the resulting
+contrasts support different model-update objectives. The portfolio thus acts as a curriculum operator
+for its current model: it elicits multiple behaviors on matched tasks, while external execution evidence
+grounds which of those self-generated experiences should be learned from, contrasted, or filtered.
+11
+
+
+===== page 12 =====
+HELIX
+5
+Experimental Design
+Verified pattern
+Export
+Data Description
+Resolved, path-clean, min-
+imal patch
+Clean SFT example
+A concise successful trajectory/trace.
+Resolved versus regression,
+target miss, or no action
+Critic example; outcome pref-
+erence
+why local progress is not sufficient for task
+resolution.
+Clean versus noisy re-
+solved siblings
+Filter example/preference pair
+for a certain scenario
+Separate solution correctness from artifact
+quality.
+Different clean resolutions
+Alternative SFT examples;
+minimality/cost preference
+Preserve solution diversity while preferring a
+smaller or cheaper trajectory.
+Table 1: Evidence-linked siblings support multiple learning objectives. The benefit is not a particular
+export format: intervention identity and outcome evidence remain attached as the same rollouts are reused for
+SFT, critic, filter, or preference learning.
+Persistent task and sibling identity also allows the exporter to keep every sibling group in one train/dev
+split, preventing paired or near-identical trajectories from leaking across the split boundary.
+Together, these capabilities connect all three stages of co-evolution. Bounded component reuse makes
+build and rebuild repeatable; persistent identity makes cross-round effects attributable; and evidence-
+linked siblings turn the current system’s interaction experience into provenance-preserving data for the
+update stage. We next evaluate the execution and learning outputs enabled by this design.
+5
+Experimental Design: Two Outputs of Fixed-Model Harness Evolution
+5.1 Evaluation goals and research questions
+We evaluate one 65-candidate evolution portfolio under a shared model label, then deepen the evidence
+for selected members through repeated-run, cross-benchmark, and artifact-quality analysis.
+We therefore ask these three research questions:
+▶RQ1: Execution beyond the baseline. Under a shared model label, can evolution find a
+source-pure fixed harness that surpasses the baseline, and what happens when selected members
+receive deeper evaluation?
+▶RQ2: Execution breadth from rapid evolution. Beyond the best fixed harness, what additional
+task coverage and sibling diversity does the complete evolved portfolio expose?
+▶RQ3: Learning data for the next update. What diversity of verified sibling outcomes does
+evolution produce, and how can selected-member validation turn its more deeply labeled sibling
+trajectories into SFT, critic, filter, and preference records?
+RQ1 asks whether the evolved population contains a stronger fixed runtime. RQ2 keeps the whole
+population and measures the behavior exposed beyond that winner. RQ3 follows selected siblings
+through stronger outcome and patch-quality labels into model-update data.
+12
+
+
+===== page 13 =====
+HELIX
+6
+Results
+5.2 LiveCodeBench-derived repair subset
+The main evolution evaluation uses 100 fixtures derived from livecodebench/code_generation_lite
+[11]: 26 easy, 24 medium, and 50 hard. Each fixture asks the agent to modify a local solution.py. All
+LCB-derived results use trace-strict status: a successful slot requires an observed normalized bash call
+that executes test_solution.py with python or python3, together with the corresponding passing
+output.
+The main evolution matrix contains Pi Mono and 64 Pi-centered source-pure recipes. The recipes
+enumerate the 43 choices for session/hooks, config, and tools while retaining the Pi prompt, turn loop,
+and acceptance behavior. Every one of the 65 candidates runs once on every task, producing 6,500 slots.
+This complete matrix is the primary evidence for fixed-candidate comparison and portfolio breadth.
+A repeated-run follow-up selects Pi and two OpenCode-family members from the same 65-candidate
+portfolio. These source-pure interventions were chosen for deeper mechanism analysis, not as the
+top two candidates in the one-attempt matrix. Each receives ten attempts per task, producing 3,000
+slots. The follow-up measures both tasks with at least one success and successful slots, which capture
+repeated-run reliability. Detailed rows are reported in Appendix A.
+5.3 Selected-member SWE-bench Verified follow-up
+The cross-benchmark follow-up samples 55 instances from SWE-bench [12]. It transfers selected members
+of the same portfolio: Pi, the two leading fixed candidates in the one-attempt LCB matrix, and the
+two OpenCode-family members used in the repeated-run follow-up. Each receives two attempts per
+instance, producing 550 slots. The maximum is 200 agent steps, local concurrency is one, and task
+resolution is labeled by the official SWE-bench evaluator. This matrix supplies the official outcomes,
+patches, and sibling traces used for data analysis in RQ3.
+5.4 Shared model and attempt protocol
+Run metadata identifies MiniMax-M2.7-highspeed with deterministic=false for all SWE-bench and
+LiveCodeBench rollouts.
+6
+Results: Execution Today and Learning Data Tomorrow
+The results follow one evidence chain. We first analyze all 65 candidates, then use selected-member
+follow-ups to test repeated-run behavior, transfer to an official evaluator, and deepen the labels needed
+for data materialization.
+6.1 RQ1—Execution today: can evolution surpass the baseline?
+Complete evolution matrix.
+Across all 65 candidates, Pi solves 50/100 tasks. The best and second-
+best fixed candidates solve 52/100 and 51/100, respectively. The winner uses Hermes session/hooks
+with the remaining components from Pi; the runner-up combines Hermes session/hooks and config
+with Nanobot tools and the Pi core. The best fixed result is a 4.0% relative improvement over Pi, so
+RQ1 has a positive but narrow answer: evolution finds a stronger fixed harness, but only two of 64
+non-baseline candidates exceed Pi.
+13
+
+
+===== page 14 =====
+HELIX
+6
+Results
+1
+10
+20
+30
+40
+50
+60
+65
+Candidate rank (sorted by fixed-candidate coverage)
+0
+10
+20
+30
+40
+50
+60
+Trace-strict tasks solved / 100
+Pi: 50/100
+best fixed: 52/100
+portfolio-level union (not a fixed score): 79/100
++29 tasks beyond Pi
+23 non-baseline candidates solve 0 tasks
+Each candidate runs once on every task; ranks are used only for display. The portfolio union is coverage across candidates, not another fixed candidate.
+Complete 65-candidate LCB evolution round
+Figure 3: The complete 65-candidate distribution is shown. Bars show trace-strict fixed-candidate
+coverage under one attempt per task and are sorted only for display. Pi solves 50/100 tasks, two candidates
+exceed it, and the 23 zero-score non-baseline candidates are marked along the axis. The 79/100 post-hoc union is
+portfolio coverage, not the score of another fixed candidate.
+Selected-member validation.
+In the repeated LCB follow-up, the selected OpenCode-family
+members each cover 75/100 tasks versus 72/100 for Pi. Their successful-slot totals are 549 and 546
+versus 529 for Pi. Coverage records whether a task succeeds at least once, whereas slots measure
+reliability across all attempts. Although the attempt budgets differ, these rows deepen the evidence
+rather than rerank the one-attempt matrix.
+On SWE-bench, the selected-member follow-up changes the preferred fixed harness. The two candidates
+that lead the one-attempt LCB matrix each resolve 44/55 instances, matching Pi, while the selected
+OpenCode-family members resolve 46/55. The strongest selected member records 86 resolved slots
+versus 81 for Pi. Exact candidate rows for both follow-ups appear in Appendix A.
+Finding 1: harness evolution improves execution today
+The complete 65-candidate matrix contains a fixed harness that surpasses Pi (52/100 versus
+50/100). Selected-member follow-ups also contain stronger fixed harnesses under repeated LCB
+evaluation (75/100 versus 72/100) and official SWE-bench evaluation (46/55 versus 44/55),
+but the preferred member changes with the protocol. Harness evolution can therefore improve
+execution without implying one universal winner across environments.
+Finding 1 establishes the first execution result: evolution can produce a stronger fixed runtime for
+the current model. We next retain the wider evolved portfolio and ask how much additional behavior
+becomes reachable beyond that single candidate.
+6.2 RQ2—Execution breadth from rapid harness evolution
+The complete 65-candidate portfolio covers 79/100 tasks, 29 more than the Pi row in the same one-
+attempt matrix, and contains 1,014 trace-strict successes across 6,500 slots. This 58.0% relative coverage
+gain is a post-hoc union over the evolved portfolio, not a deployable fixed-harness score. Its value is the
+additional behavior and sibling outcomes exposed by rapid evolution.
+The same matrix also shows why evolution requires selection. Only two of 64 non-baseline candidates
+14
+
+
+===== page 15 =====
+HELIX
+6
+Results
+exceed Pi, while 23 solve no task. Blind composition is therefore a poor deployment strategy; typed gates,
+cheap screens, adaptive selection, and eventually a learned router are needed to exploit complementarity
+without paying for every candidate.
+The selected-member SWE follow-up provides an official-evaluator check of the same phenomenon. Its
+post-hoc union covers 49/55 instances, compared with 46/55 for the best fixed member and 44/55 for
+Pi. This is additional evidence of complementarity and potential positive-data yield, not an online
+routing result.
+Finding 2: rapid evolution expands execution and sibling diversity
+Evolution requires selection. Only two of 64 evolved LCB candidates outperform Pi and
+23 solve no task. Arbitrary component composition is therefore unreliable; typed gates, cheap
+screening, and adaptive selection are necessary parts of harness evolution.
+Evolution creates complementary coverage and data. The best fixed LCB candidate moves
+from 50/100 to 52/100, whereas the complete portfolio covers 79/100. The selected-member SWE
+union similarly exceeds its best fixed member, 49/55 versus 46/55. These post-hoc gaps are not
+deployable scores. They show that rapid evolution uncovers task-specific successes and failures
+that can support routing and provide diverse sibling data for model updating.
+The additional outcomes in Finding 2 are the raw material for the learning side of co-evolution. RQ3
+asks which sibling contrasts become structured records for the next model update.
+6.3 RQ3—Learning data for the next model update
+From portfolio outcomes to usable labels.
+The 65-candidate matrix supplies broad trace-strict
+outcome diversity, but additional coverage is only potential data yield. A rollout becomes a plausible
+learning record only after outcome validity, regression behavior, patch hygiene, and intervention identity
+are examined. The selected-member SWE validation provides these deeper labels. Across its 550
+evaluated slots, 543 contain nonempty patches. Official statuses are 411 resolved, 132 gaps, and seven
+empty patches. Of the nonempty patches, 486 modify production code only, 57 touch tests, and 248
+contain symlink/path noise. Among the 411 resolved slots, 363 are production-only, but only 205 are
+both production-only and path-clean; 48 resolved patches touch tests. Official resolution is therefore
+necessary but not sufficient for a clean training positive.
+Sibling contrasts reveal supervision.
+The aggregate funnel measures quantity; paired cases identify
+the supervision carried by that yield. We draw three SWE-bench contrasts from the official-evaluator
+follow-up and two LCB-derived contrasts from the repeated-run follow-up. The former are the primary
+data cases; the latter provide supporting evidence about repair closure and harness-evolution fragility.
+Table 2 states the selection logic before interpretation. Appendix B provides the verifier-grounded
+traces for the Pytest and Xarray contrasts.
+15
+
+
+===== page 16 =====
+HELIX
+6
+Results
+Case
+Matched contrast
+Why it is useful
+SWE sphinx-10673
+Pi 0/2; other siblings 7/8 resolved;
+selected gap patch 6,661 bytes vs.
+resolved patch 758 bytes
+A baseline-miss/sibling-hit contrast that links
+candidate complementarity to a clean official-
+evaluator positive.
+SWE pytest-5787
+Matrix 2 resolved / 8 gaps; se-
+lected Pi patch passes 2/2 F2P
+but fails two P2P tests, selected
+sibling passes both sets
+Shows why target-test success alone is an unsafe
+positive and supplies a regression-aware critic/pref-
+erence pair.
+SWE xarray-6461
+Matrix 9 resolved / 1 gap; same
+OpenCode shell/tools and attempt
+index, Pi config yields an 837-byte
+gap while OpenCode config yields
+a 778-byte resolve
+Both patches are single-file, production-only, path-
+clean, and regression-free; the observed hygiene is
+held constant while semantic outcomes differ.
+LCB v6-025-abc391-f
+Trace-strict: Pi 0/10 vs. Open-
+Code session/hooks/config/tools
+4/10; first candidate success at
+attempt 2
+Representative candidate repairs after two failed
+bash calls, rewrites, then executes a passing veri-
+fier: a supporting closure path.
+LCB v6-088-arc191-d
+Trace-strict: Pi 7/10 vs. the two
+recompositions 2/10 and 4/10
+Both substitutions regress on the same task, pre-
+venting a monotonic “more active harness is bet-
+ter” story.
+Table 2: Cases drawn from selected-member validation matrices. Selection deliberately includes gains,
+losses, semantic near misses, and regression evidence. Counts are descriptive outcomes from non-deterministic
+rollouts, not single-factor causal estimates.
+Sphinx: harness evolution yields a new verified positive.
+For sphinx-doc__sphinx-10673,
+both Pi attempts miss the target while seven of the other eight sibling slots resolve.
+The se-
+lected 758-byte OpenCode-config patch handles Sphinx’s virtual index documents directly in
+TocTree.parse_content(), passes the target test, and preserves all regression tests. The selected
+6,661-byte Pi patch changes three files and still misses the target. The case illustrates that a broader
+patch is not necessarily closer to the correct semantic basin. It is the clearest end-to-end example of
+candidate complementarity becoming a clean positive and a resolved-versus-miss preference contrast.
+Pytest: target success with regressions is still a negative.
+For pytest-dev__pytest-5787,
+the selected Pi patch passes both FAIL_TO_PASS tests but breaks test_xdist_longrepr_to
+_str_issue_241 and test_deserialization_failure. The selected OpenCode-config sibling
+passes all 123 PASS_TO_PASS tests as well as both targets. The official evaluator therefore labels
+the former gaps-found and the latter resolved. This is a high-value critic negative: target-only
+evaluation would assign the wrong label. Appendix B.1 traces the paired inspection, patch, validation,
+and official-evaluator outcomes in detail.
+Xarray: clean does not imply correct.
+For pydata__xarray-6461, the sole gap and selected
+resolved sibling are both clean by patch-source criteria. The gap falls back to the condition’s attributes
+when the scalar x input has no attribute dictionary; the resolved patch falls back to an empty dictionary,
+preserving the requested keep_attrs semantics. Since the provider is non-deterministic and each
+candidate has only two attempts, this case illustrates a configuration-aligned semantic contrast but
+does not prove that the config atom caused it. Appendix B.2 shows the decisive fallback difference and
+its official test outcome.
+16
+
+
+===== page 17 =====
+HELIX
+6
+Results
+LCB closure and its counterexample.
+On v6-025-abc391-f, the representative Pi trace writes
+once and ends after a failing execution. The recomposed trace writes, encounters two bash failures,
+rewrites, executes the test, and receives the task-specific passing result. This is consistent with a
+repair-closure mechanism. Across all 1,000 slots, the config-changing recomposition records 20 more
+trace-strict successes and 34 fewer schema-shaped errors than Pi, but also 17 more bash-error attempts,
+0.171 more tool calls per slot, and about 7.8 seconds more duration per slot. The Pi-config recomposition
+records 17 more trace-strict successes, 36 fewer schema errors, 22 fewer tool-error attempts, 0.042 more
+tool calls, and about 5.4 seconds more duration per slot. The mixed signs rule out a simple “more tools”
+mechanism. On v6-088-arc191-d, both recompositions regress despite representative successful traces
+sharing the same read–read–write–bash shape as Pi; the available trace categories do not explain the
+stochastic solution-quality difference. These trace-based cases support closure and fragility claims, not
+the primary clean-positive data claim.
+Pi prompt, turn loop, and acceptance are held fixed in the two LCB recompositions, so those results
+provide no evidence for replacing those dimensions. Even among changed dimensions, cases do not isolate
+a single atom: session/hooks, provider plugins, tools, optional config, and compatibility behavior move
+together. The case set is best understood as mechanistic evidence for harness-conditioned trajectories
+and as a source of graded sibling labels.
+These paired cases show which supervision can be recovered from sibling trajectories: clean positives,
+regressions, semantic near misses, and preferences between alternative patches. The next analysis checks
+whether the export actually contains training records with these distinctions.
+Materializing training records.
+From the selected-member SWE validation, a 200-slot slice
+spanning 20 instances and ten sibling slots per instance materializes 438 rows across several training
+purposes:
+Output dataset
+Records
+Share of 438
+Clean SFT
+63
+14.38%
+Cleanup-needed SFT
+56
+12.79%
+Critic negatives
+52
+11.87%
+Filter samples
+113
+25.80%
+Preference pairs
+154
+35.16%
+Total multi-purpose rows
+438
+100.00%
+Table 3: Verified training-data accounting from selected-member SWE validation. The export
+contains 438 derived rows, not 438 independent rollouts; one verified sibling can contribute to more than one
+objective.
+The 154 preference pairs comprise 46 minimal-cleanup versus larger-cleanup pairs, 44 clean versus noisy
+resolved pairs, 32 minimal-clean versus larger clean pairs, 14 resolved versus regression pairs, 14 resolved
+versus target misses, and four resolved versus no-action pairs. The split contains 16 train instances and
+four dev instances with no instance crossing the boundary. The materialized full-mix split contains 339
+train and 99 dev rows.
+Figure 4 visualizes the same reported row counts by training purpose.
+17
+
+
+===== page 18 =====
+HELIX
+7
+Discussion
+0
+25
+50
+75
+100
+125
+150
+175
+Verified derived rows
+Clean SFT
+Cleanup-needed SFT
+Critic negatives
+Filter samples
+Preference pairs
+63
+56
+52
+113
+154
+Curated from selected-member validation: 20 SWE-bench cases and 200 slot-level rows; train/dev splitting is by instance.
+Verified data accounting: 200 sibling slots → 438 derived rows
+Figure 4: Verified multi-purpose rows from the selected-member sibling slice. The audit maps verifier
+and patch-quality labels to more than clean SFT: failed, noisy, and alternative-success siblings supply critic,
+filter, and preference categories.
+Finding 3: sibling contrasts become model-update records
+The distinctions exposed by the paired cases are not only post-hoc interpretations. The selected-
+member export maps 200 curated sibling slots into 438 structured records: successful, failed, noisy,
+and alternative trajectories become SFT, critic, filter, and preference data. Harness evolution
+therefore provides a concrete data handoff for model updating, rather than only identifying a
+better runtime.
+Together, Findings 1–3 establish the two outputs of a harness-evolution round: expanded execution for
+the current model and verified sibling data for the update. The discussion reconnects these outputs
+through build–update–rebuild.
+7
+Discussion: From One Evolution Round to Recursive Self-Improvement
+7.1 The return from update to rebuild makes improvement recursive
+The recursion in build–update–rebuild is not recursion over model calls or subagents within one
+execution. It is the return of an updated model–harness state to the same improvement process. Three
+directed dependencies make that return explicit: the harness shapes the trajectory (ϕt →τt); verified
+trajectories shape the next model (τt →θt+1); and the updated capability profile changes the conditions
+for rebuilding the harness (θt+1 →ϕt+1).
+The evidence from a round therefore has two destinations. Verified sibling contrasts provide supervision
+for the model, while component-level successes, failures, and incompatibilities inform retention, pruning,
+and proposal on the harness side. After the model update, repeating harness evolution under the new
+capability profile tests whether the preferred context, tools, recovery behavior, or stopping policy has
+moved. A harness that was weak for Mθt may become useful for Mθt+1, while a previously strong
+harness may no longer be the best interface.
+This view also makes recursive progress measurable. Across rounds, evaluation should track the model
+18
+
+
+===== page 19 =====
+HELIX
+7
+Discussion
+change under a held harness, shifts in harness ranking under the updated model, changes in the task
+and failure distribution, and the amount and quality of verified sibling experience produced by the
+rebuilt portfolio. These comparisons can guide the next portfolio, update objective, and routing policy
+while keeping model-side and harness-side changes separately attributable.
+7.2 The model–harness pair has two improvement frontiers
+The two outputs are optimized differently within one round but coupled across rounds: execution selects
+a useful runtime for the current model, while the portfolio retains the contrasts that drive the next
+update.
+The main evolution matrix and its selected-member validations support a conditional view of observed
+capability:
+observed agent capability = f(model, harness, task, budget, verifier).
+(12)
+This does not diminish the model; it locates the model inside the system that turns tokens into
+environment effects. It also means that harness evolution has two empirical frontiers rather than one
+universal winner. The full LCB matrix contains a 52/100 fixed candidate and a 79/100 portfolio union,
+while deeper validation changes which member is preferred. The larger and more consistent effect is
+therefore a change in which tasks and trajectories close. That change has informational value even
+when the candidate is not selected for deployment.
+The performance frontier rewards a fixed harness that is accurate, reliable, safe, and affordable. The
+data frontier rewards a portfolio that produces novel verified positives, informative failures, clean
+alternatives, and useful contrasts. These objectives can disagree: the best deployed harness need not be
+the best exploration policy, and a failed candidate can still supply a well-labeled negative.
+7.3 Portfolio coverage exposes execution headroom and data yield
+Portfolio coverage is not the score of one fixed harness, but it captures two consequences of rapid
+evolution.
+First, it measures data yield. If a candidate portfolio produces a verified success for a task missed by
+the baseline, it has created a positive candidate trajectory even when no online router exists. Outcome,
+regression, and hygiene gates must still determine whether it is suitable for distillation. In this use,
+compute is spent during data construction rather than every deployment request.
+Second, it bounds the opportunity for routing. The gap between the best fixed candidate and an oracle
+union is the maximum improvement available to a selector over the observed portfolio and attempt
+budget. Realizing that gap requires a pre-outcome signal: task features, early trace features, a cheap
+critic, or a staged policy that can abandon an unpromising harness. The current experiments evaluate
+no such selector, so router performance remains an open question.
+7.4 Verified failures enrich model-update data
+Under trace-strict status, the 65-candidate matrix contains 23 zero-score candidates. It would be easy
+either to discard them as failed engineering or to retain them indiscriminately as negative training data.
+Both choices lose information. In a co-evolution framework, they serve two possible purposes:
+▶They identify invalid or semantically incompatible regions that stronger conformance gates should
+prune before live evaluation.
+19
+
+
+===== page 20 =====
+HELIX
+8
+Related Work
+▶When the candidate is valid but behaves poorly, its trajectories become negatives for compatibility
+critics, early-failure predictors, or recipe proposal policies.
+However, low-quality runs must not overwhelm training. A harness failure can teach artifacts of a broken
+interface rather than robust problem solving; an apparently successful run can encode a regression or
+verifier exploit. Data builders should therefore retain harness identity, verifier rationale, outcome vector,
+and failure class so examples can be routed to the right objective, weighted, or excluded.
+8
+Related Work
+The proposed cycle connects four lines of work: recursive self-improvement, runtime interfaces that
+shape agent behavior, automated evolution of agent systems, and learning from environment interaction.
+8.1 Recursive self-improvement and model–harness co-evolution
+Recursive self-improvement spans different objects and degrees of loop closure, from bounded behavior
+refinement to changes in model policies, evaluators, and the research process itself [4]. Gödel Machines
+provide a strong self-referential formulation in which a system rewrites its own code after proving that
+the change improves utility [5]. Darwin Gödel Machine replaces proof-based rewriting with empirical
+variation, benchmark selection, and an archive of agent-code variants [6]. These works treat the
+improvement target broadly and motivate asking which state returns to the next round.
+Recent work applies this question directly to harnesses. Recursive Harness Self-Improvement iteratively
+revises a prompt-level specification of the agent loop using pairwise feedback over its revision history
+[3]. HarnessX v3 combines typed, trace-driven harness adaptation with cross-harness GRPO and a
+mixed-policy replay buffer in a joint harness–model loop [2]. Against this established background,
+HELIX focuses on a complementary systems layer: recomposing behavior derived from heterogeneous
+open-source harnesses while preserving source identity from the declared recipe through runtime evidence
+and verifier-labeled sibling records. This makes the bounded model–harness state transition inspectable
+rather than relying on arbitrary self-rewriting.
+8.2 Harnesses as agent–computer interfaces
+ReAct interleaves language reasoning with environment actions [16], while Toolformer demonstrates
+self-supervised learning of when and how to call external APIs [17]. SWE-agent makes the interface
+itself an experimental object: its agent–computer interface changes how a model navigates repositories,
+edits files, and runs tests [10]. These works establish that agent behavior depends on more than static
+next-token prediction. HELIX extends the intervention surface from prompt/tool use to the complete
+runtime in Equation 11, including session semantics, configuration, turn control, acceptance, and policy.
+We build on this premise rather than claiming priority for treating runtime design as part of the agent.
+8.3 Automated harness and workflow evolution
+AutoFlow generates natural-language agent workflows and iteratively optimizes them [9]. Automated
+Design of Agentic Systems (ADAS) proposes automatically evolving agent designs and demonstrates
+Meta Agent Search, where a meta agent writes new code-defined agents [7].
+AFlow casts code-
+represented workflow optimization as Monte Carlo tree search [8]. These systems report the quality
+20
+
+
+===== page 21 =====
+HELIX
+9
+Limitations and Threats to Validity
+of discovered workflows or agent programs. Our evaluation additionally treats trajectories from non-
+selected candidates as an explicit output linked to matched siblings and graded execution evidence. A
+non-winning candidate can therefore contribute a regression example, semantic near miss, artifact-quality
+negative, or preference contrast.
+8.4 Interaction data and executable software benchmarks
+LiveCodeBench provides a continuously updated evaluation for code capabilities [11]; SWE-bench
+turns real GitHub issues into executable repository-level tasks [12]. SWE-Gym supplies software-
+engineering training environments and trajectories for agents and verifiers [13], while SWE-smith scales
+synthetic software-engineering task construction across repositories [14]. Learn-by-Interact constructs
+agent training data from environment interaction trajectories and applies it to training and in-context
+adaptation [15].
+Taken together, prior work improves runtime interfaces, evolves workflows, or learns from interaction
+data. HELIX connects these strands through a source-traceable build-to-update handoff. The same
+declared interventions yield evidence about current execution and matched sibling records for subsequent
+model updating, making the connection explicit and auditable at the level of source-derived harness
+components and matched sibling records.
+9
+Limitations and Threats to Validity
+9.1 Scope of the evaluation
+The main evolution matrix uses 100 AtCoder tasks and checks only their public tests. It therefore does
+not measure hidden-test or official LiveCodeBench performance. The tasks are the first 100 eligible
+examples rather than a random sample. The selected-member SWE follow-up covers 55 Verified tasks.
+All evaluations concern coding agents, so the results may not apply to other types of agents.
+9.2 What causes an improvement
+Each evolved harness changes several components at once. We can measure the effect of the whole
+harness, but we cannot tell which individual component caused the change. Future experiments should
+change one component at a time while keeping the others fixed.
+9.3 Effects of attempts and selection
+Coverage usually increases when more attempts or harnesses are tried. Oracle coverage is calculated
+after seeing all outcomes, so it does not represent a harness choice made before deployment. The
+65-candidate matrix uses one attempt per candidate–task pair, while the selected-member LCB and
+SWE validations use ten and two attempts, respectively. Their rankings are therefore not directly
+comparable, and selecting members for deeper evaluation can introduce selection effects. Future work
+should use separate tasks for evolution and final evaluation, repeat every candidate under a common
+budget, and compare methods under the same total compute.
+21
+
+
+===== page 22 =====
+HELIX
+10
+Conclusion
+9.4 Limits of automated evaluation
+Tests do not capture every requirement. A patch may pass while changing tests, making unnecessary
+edits, or exploiting the evaluator. A correct patch may also fail because of a timeout or a broken
+environment. We keep several labels to make these cases visible, but some still require human review.
+9.5 Data scale and model updating
+This paper materializes model-update data but does not train an updated model. First, the verified
+sibling dataset must be scaled beyond the current evaluation before model updating can be evaluated
+convincingly. HELIX can automate candidate execution, verification, and data export at larger scale,
+but generating broad portfolios and repeated rollouts still requires substantial token budgets. Second,
+closing the loop requires more than additional data: it also requires training methods suitable for RSI
+that can learn from heterogeneous sibling signals while controlling regressions and preserving general
+capability across rounds. Both cost-efficient data scaling and reliable recursive model updating remain
+important directions for completing multi-round build–update–rebuild experiments.
+9.6 Safety and maintenance
+Agents can run unsafe commands, change files, and leak secrets through traces. Combining components
+from different harnesses can also create unsafe permissions. Experiments should therefore use isolated
+workspaces, limited permissions and network access, and trace redaction.
+Because the upstream
+harnesses change over time, their integrations and safety checks must be tested again after an update.
+10
+Conclusion
+Recursive self-improvement for an interactive agent should improve the executed system, not the model
+in isolation. At round t, the harness portfolio Φt changes which behaviors Mt can reach and which
+experiences it produces. The resulting verified experience can update the model to Mt+1; because that
+update changes the capability profile, it can also change which harness is preferred. The recursively
+improving state is therefore Zt = (Mt, Φt), and the return from Zt to Zt+1 is the defining structure of
+model–harness co-evolution.
+Model, harness, and data therefore form a coupled improvement system. The model’s capability profile
+determines which harnesses are effective; each harness changes how the model acts and which experiences
+it produces; and those experiences become the data that shapes the next model. HELIX makes this
+three-way influence usable for RSI by evolving harnesses around the current model and preserving
+verified differences among their trajectories as model-update data. Harness evolution then serves not
+only current execution but also the next round of system improvement.
+Build–update–rebuild turns this three-way influence into an RSI process. Harness evolution produces
+verified experience; model training absorbs that experience; and the updated model returns to harness
+evolution rather than inheriting a permanently fixed runtime. Scaling experience, applying reliable
+model updates, and comparing held with rebuilt harnesses across rounds are the next steps toward
+repeated Zt →Zt+1 improvement. HELIX makes this recursive transition auditable.
+22
+
+
+===== page 23 =====
+HELIX
+A
+Selected-Member Follow-up Results
+A
+Selected-Member Follow-up Results
+Every candidate below is already a member of the 65-candidate evolution portfolio. These tables report
+their deeper evaluation.
+A.1 Repeated LCB evaluation
+Selected member
+Tasks ≥1/10
+Successful slots
+Pi Mono
+72/100
+529/1,000
+OpenCode session/hooks/config/tools; other modules Pi
+75/100
+549/1,000
+OpenCode session/hooks/tools; other modules Pi
+75/100
+546/1,000
+Table 4: Repeated-run validation of selected portfolio members. All LCB outcomes use trace-strict
+status. Tasks count at least one successful attempt out of ten; slots count successful attempts out of 1,000. “Pi
+core” denotes Pi prompt, turn loop, and acceptance; the third row also retains Pi config.
+A.2 Official SWE-bench evaluation
+Selected member
+Nonempty
+Resolved slots
+Gaps
+Empty
+Tasks ≥1/2
+Pi Mono
+108/110
+81
+27
+2
+44/55
+Hermes session/hooks + Pi remainder
+108/110
+81
+27
+2
+44/55
+Hermes session/hooks/config + Nanobot tools + Pi
+core
+109/110
+80
+29
+1
+44/55
+OpenCode session/hooks/tools + Pi config/core
+109/110
+83
+26
+1
+46/55
+OpenCode session/hooks/config/tools + Pi core
+109/110
+86
+23
+1
+46/55
+Selected-member post-hoc union
+49/55
+Table 5: Official-evaluator validation of selected portfolio members. Each member has two slots per
+task. “Resolved slots” counts successful attempts; the final column counts tasks with at least one resolved
+attempt. The union is portfolio coverage, not fixed-harness performance.
+23
+
+
+===== page 24 =====
+HELIX
+B
+Verifier-Grounded Case Traces
+B
+Verifier-Grounded Case Traces
+The following tables reconstruct the two paired cases from the persisted rollout transcript, extracted
+patch, and official SWE-bench evaluator output. They retain the chronological, decision-relevant
+steps—inspection, edit, in-rollout checks, and official validation—while omitting repeated file reads and
+repeated model narration.
+B.1 Pytest: target success with regressions
+Both runs identify the missing serialization of chained exceptions and pass the two target tests. Their
+patches differ in backward compatibility: the Pi patch replaces the existing longrepr schema for
+chained exceptions, whereas the evolved sibling extends it. Table 6 exposes where that difference enters
+the trace and how the official evaluator changes the label.
+Trace stage
+Pi baseline, attempt 1
+Evolved sibling, attempt 1
+Run identity
+pi-mono; 43 observed tool calls in 355 seconds.
+OpenCode session/hooks/config/tools with Pi
+prompt/turn; 54 observed tool calls in 377 sec-
+onds.
+Inspection
+Searches for report serialization, then repeat-
+edly reads src/_pytest/reports.py and
+src/_pytest/_code/code.py. It correctly identifies
+ExceptionChainRepr.chain as the missing infor-
+mation.
+Reads the same implementation files and also
+inspects testing/test_reports.py, including
+the existing serialization contract that accesses
+top-level reprtraceback.
+Patch
+Changes only src/_pytest/reports.py
+(6,400 bytes). For a chained exception, it emits
+a new longrepr object containing only chain and
+sections.
+Changes src/_pytest/_code/__init__.py
+and src/_pytest/reports.py (6,854 bytes). It
+exports ExceptionChainRepr, preserves reprcrash,
+reprtraceback, and sections, and adds the full
+chain.
+In-rollout checks
+Writes a custom chained-exception script and
+observes successful round trips. Attempts to run
+repository tests stop at the local environment
+guard requires pytest-2.0; the compatibility
+tests are therefore not closed inside the rollout.
+Attempts testing/test_reports.py and
+encounters the same environment guard, then
+performs custom import and chain round-trip
+checks. These checks exercise the new path but
+do not substitute for the official regression set.
+Official targets
+Both FAIL_TO_PASS tests pass (2/2).
+Both FAIL_TO_PASS tests pass (2/2).
+Official regressions
+and label
+121/123 PASS_TO_PASS tests pass. The two
+failures, test_xdist_longrepr_to_str_issue_241
+and test_deserialization_failure, raise
+KeyError:
+reprtraceback. Label: gaps-found;
+data role: regression-aware critic negative.
+123/123 PASS_TO_PASS tests pass. Label:
+resolved; data role: clean positive and preference
+winner.
+Table 6: Condensed Pytest paired trace. Both patches solve the target, but only the evolved sibling
+preserves the pre-existing serialization schema.
+Decisive Pytest schema difference
+Pi:
+longrepr = {"chain": chain, "sections": sections}
+Sibling: longrepr = {"reprcrash": reprcrash,
+"reprtraceback": reprtraceback,
+"sections": sections,
+"chain": chain}
+The official regression failures are therefore not incidental test noise. They directly query a field removed
+by the Pi patch, even though that patch already passes both newly introduced target tests. This is why
+the paired trajectories form a useful resolved-versus-regression supervision pair.
+24
+
+
+===== page 25 =====
+HELIX
+B
+Verifier-Grounded Case Traces
+B.2 Xarray: a clean semantic near miss
+The Xarray pair holds the OpenCode session/hooks/tools, Pi prompt/turn, and attempt index fixed
+while changing the config atom. Both patches are clean, single-file edits to the same expression, and
+both pass their ad hoc checks. Table 7 shows why their official labels nevertheless diverge.
+Trace stage
+Pi-config sibling, attempt 2
+OpenCode-config sibling, attempt 2
+Run identity
+24 observed tool calls in 130 seconds; 837-byte
+patch.
+27 observed tool calls in 122 seconds; 778-byte
+patch.
+Diagnosis
+Locates where() in xarray/core/computation.py,
+traces attribute collection through apply_ufunc,
+and reproduces the IndexError for scalar x with
+keep_attrs=True.
+Locates the same expression and reproduces the
+same IndexError.
+Patch
+If attrs[1] is unavailable, falls back to attrs[0]
+when present, which can be the condition’s at-
+tributes.
+If attrs[1] is unavailable, returns an empty
+dictionary because scalar x has no attributes to
+preserve.
+In-rollout checks
+Runs several direct Python examples and re-
+ports them as passing; its scalar example uses an
+attribute-empty condition. The repository test
+command cannot run because that interpreter has
+no pytest module.
+Runs direct Python examples covering scalar and
+DataArray inputs and reports them as passing.
+The repository test command encounters the
+same missing pytest module.
+Official target
+The added test_where_attrs case uses condition
+attributes {’attr’:
+’cond’} and scalar x. The
+patch returns those condition attributes instead of
+{}, so FAIL_TO_PASS is 0/1.
+The same test receives {} as required, so
+FAIL_TO_PASS is 1/1.
+Official regressions
+and label
+247/247 PASS_TO_PASS tests pass. Label:
+gaps-found; data role: clean semantic negative.
+247/247 PASS_TO_PASS tests pass. Label:
+resolved; data role: clean positive and preference
+winner.
+Table 7: Condensed Xarray paired trace. Patch hygiene and local examples are matched; the official target
+isolates the fallback semantic that separates the near miss from the resolved patch.
+Decisive Xarray fallback difference
+Gap:
+attrs[1] if len(attrs) > 1 else
+(attrs[0] if len(attrs) == 1 else {})
+Resolved: attrs[1] if len(attrs) > 1 else {}
+This pair explains why patch cleanliness alone is insufficient as a training label. The negative is
+structurally clean and preserves every regression test, yet encodes the wrong fallback semantics for the
+target behavior.
+25
+
+
+===== page 26 =====
+HELIX
+References
+References
+[1] Yuhao Yang, Tianyu Fan, and Chao Huang. CLI-Anything: Towards Agent-Native Computer Use.
+arXiv:2606.03854, 2026. https://arxiv.org/abs/2606.03854.
+[2] Tingyang Chen, Shuo Lu, Kang Zhao, Weicheng Meng, Hanlin Teng, Tianhao Li, Chao Li, Xule
+Liu, Jian Liang, Zhizhong Zhang, Yuan Xie, Heng Qu, Kun Shao, and Jian Luan. HarnessX:
+A Composable, Adaptive, and Evolvable Agent Harness Foundry.
+arXiv:2606.14249v3, 2026.
+https://arxiv.org/abs/2606.14249v3.
+[3] Hyunin Lee, Jinglue Xu, Jeffrey Seely, Donghyun Lee, Matei Zaharia, and Yujin Tang. Recursive
+Harness Self-Improvement. arXiv:2607.15524, 2026. https://arxiv.org/abs/2607.15524.
+[4] Mingguang Chen, Licheng Wang, and Bo Qu. Recursive Self-Improvement in AI: From Bounded
+Self-Refinement to Autonomous Research Loops. arXiv:2607.07663, 2026. https://arxiv.org/abs/26
+07.07663.
+[5] Jürgen Schmidhuber. Gödel Machines: Self-Referential Universal Problem Solvers Making Provably
+Optimal Self-Improvements. arXiv:cs/0309048, 2003. https://arxiv.org/abs/cs/0309048.
+[6] Jenny Zhang, Shengran Hu, Cong Lu, Robert Lange, and Jeff Clune. Darwin Gödel Machine:
+Open-Ended Evolution of Self-Improving Agents. arXiv:2505.22954, 2025. https://arxiv.org/abs/25
+05.22954.
+[7] Shengran Hu, Cong Lu, and Jeff Clune. Automated Design of Agentic Systems. International
+Conference on Learning Representations, 2025. arXiv:2408.08435. https://arxiv.org/abs/2408.084
+35.
+[8] Jiayi Zhang, Jinyu Xiang, Zhaoyang Yu, Fengwei Teng, Xiong-Hui Chen, Jiaqi Chen, Mingchen
+Zhuge, Xin Cheng, Sirui Hong, Jinlin Wang, Bingnan Zheng, Bang Liu, Yuyu Luo, and Chenglin
+Wu. AFlow: Automating Agentic Workflow Generation. International Conference on Learning
+Representations, 2025. arXiv:2410.10762. https://arxiv.org/abs/2410.10762.
+[9] Zelong Li, Shuyuan Xu, Kai Mei, Wenyue Hua, Balaji Rama, Om Raheja, Hao Wang, He Zhu, and
+Yongfeng Zhang. AutoFlow: Automated Workflow Generation for Large Language Model Agents.
+arXiv:2407.12821, 2024. https://arxiv.org/abs/2407.12821.
+[10] John Yang, Carlos E. Jimenez, Alexander Wettig, Kilian Lieret, Shunyu Yao, Karthik Narasimhan,
+and Ofir Press. SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering.
+Advances in Neural Information Processing Systems 37, 2024. arXiv:2405.15793. https://arxiv.or
+g/abs/2405.15793.
+[11] Naman Jain, King Han, Alex Gu, Wen-Ding Li, Fanjia Yan, Tianjun Zhang, Sida Wang, Armando
+Solar-Lezama, Koushik Sen, and Ion Stoica. LiveCodeBench: Holistic and Contamination Free Eval-
+uation of Large Language Models for Code. International Conference on Learning Representations,
+2025. arXiv:2403.07974. https://arxiv.org/abs/2403.07974.
+[12] Carlos E. Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, and Karthik
+Narasimhan. SWE-bench: Can Language Models Resolve Real-World GitHub Issues? International
+Conference on Learning Representations, 2024. arXiv:2310.06770. https://arxiv.org/abs/2310.067
+70.
+26
+
+
+===== page 27 =====
+HELIX
+References
+[13] Jiayi Pan, Xingyao Wang, Graham Neubig, Navdeep Jaitly, Heng Ji, Alane Suhr, and Yizhe Zhang.
+Training Software Engineering Agents and Verifiers with SWE-Gym. Proceedings of the 42nd
+International Conference on Machine Learning, PMLR 267:47717–47737, 2025. arXiv:2412.21139.
+https://proceedings.mlr.press/v267/pan25g.html.
+[14] John Yang, Kilian Lieret, Carlos E. Jimenez, Alexander Wettig, Kabir Khandpur, Yanzhe Zhang,
+Binyuan Hui, Ofir Press, Ludwig Schmidt, and Diyi Yang. SWE-smith: Scaling Data for Soft-
+ware Engineering Agents. Advances in Neural Information Processing Systems 38, Datasets and
+Benchmarks Track, 2025. arXiv:2504.21798. https://arxiv.org/abs/2504.21798.
+[15] Hongjin Su, Ruoxi Sun, Jinsung Yoon, Pengcheng Yin, Tao Yu, and Sercan Ö. Arık. Learn-by-
+interact: A Data-Centric Framework for Self-Adaptive Agents in Realistic Environments. Interna-
+tional Conference on Learning Representations, 2025. arXiv:2501.10893. https://arxiv.org/abs/25
+01.10893.
+[16] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan, and Yuan
+Cao. ReAct: Synergizing Reasoning and Acting in Language Models. International Conference on
+Learning Representations, 2023. arXiv:2210.03629. https://arxiv.org/abs/2210.03629.
+[17] Timo Schick, Jane Dwivedi-Yu, Roberto Dessì, Roberta Raileanu, Maria Lomeli, Eric Hambro,
+Luke Zettlemoyer, Nicola Cancedda, and Thomas Scialom. Toolformer: Language Models Can
+Teach Themselves to Use Tools. Advances in Neural Information Processing Systems 36, 2023.
+arXiv:2302.04761. https://arxiv.org/abs/2302.04761.
+[18] Anomaly. OpenCode source repository. https://github.com/anomalyco/opencode.
+[19] Earendil Works. Pi Mono source repository. https://github.com/earendil-works/pi.
+[20] HKUDS. Nanobot source repository. https://github.com/HKUDS/nanobot.
+[21] Nous Research. Hermes Agent source repository. https://github.com/NousResearch/hermes-agent.
+27

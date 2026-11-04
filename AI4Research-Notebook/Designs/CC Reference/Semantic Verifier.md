@@ -1,0 +1,22 @@
+---
+id: m1-cc-semantic-verifier-reference
+status: historical-source-reference
+source: AI4Research-Development/jiuwenswarm-m1/jiuwenswarm/research_assets/compiler/verifier.declaration.json; research/gate.py; research/checks/verifier.py; research/runner.py
+last_reviewed: 2026-10-23
+next_action: Use Current Baseline for later source status; re-review affected role bytes before applying this historical contract
+---
+# Semantic verifier
+
+**Historical source scope:** this page describes the `98bd9d9` implementation, compared only through `d3d7f56`. This review updates its freshness label and navigation, not the underlying source audit. Use [[Resources/Current Baseline]] for later inspected source and candidate identities; the details below are not a complete reference for `809351f8` or the separate Builder candidate. The later optional Generalist publishes a host-authenticated task projection in its exact output under an explicit contract; [[Activities/2026-10-23 Capsule Branches and Factory Direction]] records that exception. It does not grant reviewers access to original inputs or hidden tests.
+
+`research.verifier` independently assesses the producer's exact output against its pinned capsule declaration and a separately frozen checking profile. Its boundary is declaration plus exact output only. It must not receive producer task inputs, source bundle, or hidden answer key. That boundary prevents the reviewer from repeating the producer's task and is a required study invariant.
+
+**Ports and input boundary.** `subject_declaration` is the exact pinned capsule declaration; `subject_output` is the unchanged output bytes (`verifier.declaration.json`). The result `verifier_assessment` is host assembled from the untrusted model reply. The review manifest can bind run refs and observations for provenance; the semantic prompt's evidence is the declaration and exact output, with criterion scope restricted to `declaration_and_output`. `library.py` rejects profiles that ask the semantic reviewer to judge input fidelity/source support. Input-dependent mechanical checks are a separate host path (`checks/compiler.py`, `checks/verifier.py`, `runner.py`).
+
+**Call, limits, and isolation.** The verifier has its own one-call/60-second/no-tool/no-network budget, separate child binding, isolated fresh context, and approved model bridge. It returns findings by criterion; protected host code assembles and validates exact criterion coverage and verdict/findings consistency. The reviewer has no authority to release the artifact or weaken mandatory checks.
+
+**False-acceptance/false-rejection challenge.** The custodian should create declaration/output pairs with independent correctness labels. Include byte-identical visible payloads where semantic decision should be correct acceptance, correct rejection of an unsupported/wrong output, and a correct output that must not be rejected. Keep malformed assessment schema, missing criteria, conflicting verdict, timeout, and interrupted call as separate mechanical/operational cases. Score semantic reviewer accuracy separately from deterministic verifier predicates and final gate action. An operational failure never counts as a semantic rejection or as a correct abstention.
+
+**Limit.** The reviewer cannot infer whether factual claims match unseen task inputs. That must be addressed by independent scorer/oracle and protected input-aware host checks, not by expanding semantic reviewer context. A high acceptance rate alone is not reviewer quality.
+
+**Evidence.** [[Designs/CC Reference/Source Map]] links the verifier declaration/prompt, `SemanticVerifier`, reviewer binding, host predicates, and focused test files. Exact M1 challenge execution has not been performed for this study.

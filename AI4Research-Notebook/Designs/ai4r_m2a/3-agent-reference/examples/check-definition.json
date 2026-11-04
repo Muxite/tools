@@ -1,0 +1,33 @@
+{
+  "schema_version": "2.0.0-m2a.2",
+  "id": "calculation.output.v1",
+  "version": "1",
+  "checker_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "stage": "post_execution",
+  "kind": "deterministic",
+  "owner": "independent_policy",
+  "entrypoint": "example_checks:recompute",
+  "applicability_rule": "Required for every calculation.calculate invocation.",
+  "required_evidence_contracts": [
+    "calculation.request.v1",
+    "calculation.result.v1"
+  ],
+  "allowed_evidence_scopes": [
+    "bound inputs",
+    "sealed candidate outputs"
+  ],
+  "limits": {
+    "max_attempts": 2,
+    "max_wall_seconds": 120,
+    "max_cost_units": 10,
+    "cost_unit": "declared_provider_credit",
+    "max_child_depth": 0
+  },
+  "failure_behavior": "reject",
+  "qualification_fixture_refs": [
+    {
+      "uri": "fixture:checker-heldout",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ]
+}

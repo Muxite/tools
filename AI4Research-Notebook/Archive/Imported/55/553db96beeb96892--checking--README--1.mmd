@@ -1,0 +1,10 @@
+flowchart TB
+  R[Accepted requirements and protocol] --> B[Protected binding]
+  L[Admitted CC and check library] --> B
+  P[Policy, scopes, limits] --> B
+  B -->|attach pinned check bundle and profile; reject omissions| F[Freeze complete bindings]
+  F --> X[Shared resolver and runner]
+  X --> G[Per invocation check sequence]
+  G --> V[Host verdict and durable release]
+  Q[Fixed preparation identities and templates] --> B
+  F -->|later planned nodes| X

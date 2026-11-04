@@ -1,0 +1,19 @@
+flowchart TB
+    Human[Team member: validate a change] --> Launcher
+    AI[Authorized AI agent: validate assigned work] --> Launcher
+    CI[CI job or external schedule: repeat validation] --> Launcher
+    Launcher[Host launcher using Docker Compose]
+    Launcher -->|Start and clean up owned environment| App
+    Launcher -->|Start finite validation job| Runner
+    Browser[User browser] <-->|Host loopback only: 127.0.0.1:5173| AppPort[Host port 5173 to container port 5173]
+    subgraph Environment[Private Compose validation environment]
+        Runner[Test runner container]
+        App[AI4Research container: service DNS and port 5173]
+        AppPort <-->|Host publication| App
+        Inputs[(Visible case inputs)] -->|Read only| Runner
+        Runner -->|Private network and authenticated client contract| App
+        App -->|Permitted exported evidence| Runner
+        App --> State[(Private application state)]
+        Runner --> Reports[(Retained validation reports)]
+    end
+    Reports --> Review[Team or CI: inspect outcomes and failure evidence]

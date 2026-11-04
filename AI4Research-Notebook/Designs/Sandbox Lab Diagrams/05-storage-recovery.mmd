@@ -1,0 +1,31 @@
+flowchart TB
+    subgraph LAB["Stable lab identity"]
+        INSTANCE["Replaceable deployment<br/>AI4R and application processes"]
+        META["Transactional records<br/>Goals, jobs, catalog and bindings"]
+        FILES["Durable project data<br/>Sources, resources and service volumes"]
+        EVIDENCE["Retained evidence<br/>Artifacts, assessments and provenance"]
+        INSTANCE --> META
+        INSTANCE --> FILES
+        INSTANCE --> EVIDENCE
+    end
+    CHECKPOINT["Consistent checkpoint<br/>Manifest and required bytes"]
+    BACKUP["Verified independent backup<br/>Different device or service"]
+    FENCE["Fence old writer<br/>Block if ownership is uncertain"]
+    RESTORE["New deployment, same lab ID<br/>Verify compatibility and reconcile jobs"]
+    READY["Readiness verified<br/>Accept new work"]
+    META --> CHECKPOINT
+    FILES --> CHECKPOINT
+    EVIDENCE --> CHECKPOINT
+    CHECKPOINT --> BACKUP
+    BACKUP --> FENCE
+    FENCE --> RESTORE
+    RESTORE --> READY
+    class INSTANCE work
+    class META,FILES,EVIDENCE,CHECKPOINT,BACKUP data
+    class FENCE,RESTORE,READY control
+
+    classDef work fill:#e8f1ff,stroke:#3568a8,color:#142d4e,stroke-width:1.5px
+    classDef control fill:#fff1d7,stroke:#a66d16,color:#513406,stroke-width:1.5px
+    classDef qualify fill:#eee8fa,stroke:#7854a0,color:#35204d,stroke-width:1.5px
+    classDef data fill:#e5f3eb,stroke:#3c8160,color:#163e2a,stroke-width:1.5px
+    classDef external fill:#f0f2f5,stroke:#65758a,color:#273547,stroke-width:1.5px

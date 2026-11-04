@@ -1,0 +1,95 @@
+---
+id: design-ai4research-capability-growth
+status: proposed
+source: Sources/Prompts/2026-10-21-paper2agent-system-direction.txt; Resources/review-batches/2026-10-21-paper2agent/architecture-source-review.md; maintained jiuwenswarm design at 889682f0afc3d06c2ad88e71534483a31d2eb560; Activities/2026-10-23 Required M1 Planner.md; Resources/Current Baseline.md
+last_reviewed: 2026-10-23
+next_action: Compare the proposed factory with integrated generic Planner contracts; amend only actual product-contract changes and prototype within authorized M2 scope
+---
+# AI4Research capability growth and Paper2Agent
+
+## Source scope and later planning correction
+
+The original M1 assessment below used the October 21 pinned sources. Later inspected `809351f8` includes required typed planning with generic compatible DAGs and one bounded structural correction; scientific work retains its Evaluation/Delivery release obligations. See [[Activities/2026-10-23 Required M1 Planner]], [[Activities/2026-10-23 Final M1 Merge]], and [[Resources/Current Baseline]]. This removes a blanket fixed-shape diagnosis, not the remaining factory lifecycle, acquisition, build-permission, admission, or composite-design work. No current-body audit or live factory execution was performed by this note refresh.
+
+## Decision in brief
+
+**Yes: Paper2Agent is a valuable pattern to adapt, and its stages are plausible capabilities.** Source discovery and authorized acquisition are especially reusable beyond paper-to-tool generation. Paper2Agent's staged transformation, source-linked evidence, independent checks, and packaging can inform an AI4Research capability factory and future composite capabilities (CCs). A later composite representing the whole flow as a DAG could make that work reusable and plannable.
+
+The caveat is architectural timing and authority. The maintained M1 design provides bounded `agent` and `tool` CCs and defers creation and execution of composite CCs. M1 therefore cannot claim to run a Paper2Agent-shaped composite today. The near-term path is a small, flat capability-factory pilot that first compares its needs with the integrated generic Planner, reuses compatible native stages, and routes candidate outputs through independent admission. Amend profile/terminal or plan/binding contracts only where a demonstrated product-integrated requirement exceeds them; independent M2 prototypes can proceed within their authorized scope. First establish that it fills a demonstrated gap and define stage contracts and evidence. A composite is a follow-on design decision, not permission to dispatch nested agents or alter M1.
+
+The user's longer-term objective is broader than this factory: AI4Research should learn from research and development and eventually improve the system as a whole. That direction should guide architecture, but it is not an M1 capability or an authorization for an agent to rewrite its live substrate. Make the system improve through independently evaluated, versioned changes, with protected checks and explicit promotion. Do not weaken those controls to make self-improvement appear more autonomous.
+
+## Connection to the maintained system
+
+The current architecture has a useful stable core: the protected JiuwenSwarm/OpenJiuwen substrate owns binding, scheduling, execution, checks, gates, library authority, and records. Paper2Agent should contribute candidate workflow patterns and source-derived resources around that core; it should not replace the host, become an ungoverned second authority, or move policy into prompts. Keep three objects distinct:
+
+1. **Versioned workflow profiles and plans** express task-specific policy over the same protected substrate. At minimum, define research, capability-factory, and system-change profiles. The research profile retains its required research stages and one final Delivery leaf. Factory and system-change profiles need their own terminal output types, stage requirements, typed bindings, and budgets; they should not be forced to end in a research Delivery or Evaluation node. Profiles constrain a general planner without becoming a second runtime authority.
+2. **Stage CCs and future composites** perform bounded, declared work. A Paper2Agent-shaped composite may eventually expose one outer contract while expanding to a pinned set of member CC versions and edges.
+3. **Resources and candidate products** include pinned papers, repository snapshots, code, datasets, manifests, reference outputs, verification records, skills, MCP packages, and candidate CCs. Resource presence or generation does not grant admission or execution permission.
+
+The future pilot should begin with a flat DAG of separately admitted stages. The original October 21 assessment treated a fixed research shape and one Delivery leaf as general limitations. The later required typed Planner supports generic compatible graphs; scientific work still requires its Evaluation/Delivery path, and composite dispatch remains deferred. Check the proposed factory's actual terminal types, permissions, lifecycle and binding needs against those integrated contracts before identifying amendments. Product-integrated changes to owning obligations follow the maintained design process; an independently authorized M2 prototype need not first change M1. If later composition is justified, the protected binder should expand the outer composite to a fixed member closure, ports, effects, budgets, member checks, and aggregate acceptance. The outer node must not hide different dependencies or permissions, dynamically fetch a new member, recursively compose without a bound, or bypass individual member policy. M1's deferred-composition decision remains intact until an authorized design amendment changes it.
+
+```text
+authorized paper/repo input
+          |
+  source discovery and acquisition (separate reusable preparation workflow)
+          |                                      paper review
+ pinned source + provenance ------------------------+
+          |                                      |
+ environment/reference runs -> task & operation selection
+          |                                      |
+          +---------------- candidate wrapper / reading resource
+                                                 |
+                       independent source/fidelity checks
+                                                 |
+                              clean install + runtime/package checks
+                                                 |
+                                 candidate package -> normal admission
+```
+
+Paper-only work can deliver a reviewed reading resource; repository-only work can produce candidate tools while stating that paper evidence was unavailable. A missing license, data, credential, dependency, or reference execution should become a visible blocker or narrowed scope, not a completion claim. Source discovery/acquisition is a good independent capability because other workflows can reuse it. However, the current PRD 3.1.2 disallows direct repository cloning at intake, and the maintained design's R5 ruling requires a prepared dependency catalog; D45 keeps Builder offline. A general authorized acquisition/preparation workflow is a **proposed amendment**, not existing intake behavior. It must preserve authorization, provenance, license findings, revision pins, and custody before Builder consumes a prepared snapshot.
+
+## Contract assessment, requested delta, and historical owner allocation
+
+| Current contract / boundary | User-requested delta | Native responsibility and disposition |
+|---|---|---|
+| M1 CCs are bounded agent/tool units; D21 defers composite creation/execution. | Model reusable Paper2Agent stages as capabilities and eventually expose the whole flow as a composed DAG CC. | M1-001 owns composition/native adapter and runtime/dependency qualification. Start as a flat pilot; a composite requires an explicit future design decision and member-level enforcement. |
+| Inspected integrated source supports generic typed graphs; scientific work retains Evaluation/Delivery requirements. Accepted plans are frozen for execution. | Assess research, capability-factory, and system-change needs over the same protected substrate, with explicit terminal types, permissions and lifecycle. | Historical allocation: M1-003 Intent/Requirements, M1-004 research/Delivery, M1-005 planning. Verify actual current ownership and contracts before changes; generic planning alone does not implement a factory or new release policy. |
+| M1-002 owns store, library, binding, runner, checks/gates, and evidence custody. Candidate generation is separate from standing/admission. | Make admission/library work benefit from paper/repository evidence and reusable generated candidates. | Extend evidence inputs through a governed candidate route; generated CCs remain unadmitted until normal declarations, pins, compatible checks, and admission pass. M1 manual activation/promotion remains. |
+| Semantic Verifier sees the pinned declaration and exact output only; protected host checks have separate input access. | Learn from Paper2Agent's fresh source reading and actual upstream comparisons. | Preserve the verifier boundary. Put source tracing, changed-input comparison, runtime calls, and fidelity predicates in distinct protected checks/evaluators. A learned reviewer is not proof that a scientific result is correct. |
+| M1-008 RSI is offline/bounded; current target scope is Screening with `may_change`. D21/D46 retain human activation and promotion. | Improve the whole system, including capabilities, composites, plans, planner, retrieval, and runtime. | Treat each target as a separately versioned change package and separately evaluated release. PRD 4.4.3/4 currently does not authorize whole-workflow or multi-capsule evolution in M1. PRD 4.2.10 future governed harness evolution does not erase that limit. Preserve the frozen referee (4.4.5) and model-weight restriction (4.4.7). |
+
+These are historical responsibility allocations, not current task assignments or new acceptance criteria; the old M1 records are archived at inspected `809351f8`. Establish current ownership through target-repository instructions and preserve existing identities rather than invent replacements in this proposal. Any change to a PRD obligation or authority boundary needs the product/design process, not a notebook edit.
+
+## Capability factory and whole-system improvement
+
+Paper2Agent can inform two related but different things. The **factory** is an authoring/admission workflow that turns pinned scientific inputs into reviewable resources and candidate capabilities. Its stages can become plannable CCs when they have stable contracts, demonstrated reuse, and independent checks. The **composite** is a future presentation/execution unit for a governed DAG of those stages. It offers a reusable user-level capability without erasing members' identities, pins, evidence, or effects. Begin with the factory's stage boundaries and contracts; only introduce the composite feature if orchestration is repeated enough to justify its additional runtime and governance surface.
+
+This is also a path toward system-wide improvement, but not by having a running research plan rewrite itself. When a run encounters a missing capability, record a structured gap with source/evidence and impact. Route it into a separate factory or development journey. The factory can propose a new capability or change package; that candidate goes through isolated checks and an independently governed admission/release process. A future run may then create a **new plan snapshot** using the new eligible version. Existing plans, runs, evidence, and referee identity stay immutable. Platform and evaluator changes also remain possible, but as separate releases: freeze an acceptance epoch's incumbent checks/referee, qualify the candidate against that epoch and held-out evidence, then use an independently controlled migration, promotion, and rollback decision. Never let the candidate redefine its own acceptance epoch or replace its referee during evaluation. This permits the platform to improve over time while preventing a task from changing its own rules or dependencies mid-execution.
+
+Potential improvement targets span CCs, new capabilities, composites, plan profiles, planning/retrieval behavior, and runtime/harness components. They do not all need to be represented as CCs. Model each asset in its native form and connect them through explicit versioned dependencies. Automated eligibility or promotion is conditional future work; M1's manual admission/activation remains unchanged.
+
+## Learning from Paper2Agent, with checks intact
+
+The useful patterns are a source-rich task inventory, inspecting tutorials and concrete upstream entry points, running upstream behavior before wrapping it, thin adapters, fresh independent verification, actual runtime calls, and package validation after clean extraction. Paper review, code selection, wrapper checking, and delivery should retain separate evidence so a successful package build cannot be mistaken for a scientific result.
+
+The main adaptation hazards are equally useful lessons. Agent-host skills and handoffs are not a host-independent runtime contract. Inventory success or successful packaging does not prove wrapper fidelity or scientific correctness. Selected-tool checks do not prove whole-repository correctness. Paper-derived documentation does not validate methods or code quoted in a paper. Dependencies, data, hardware, licenses, credentials, and network access may prevent reproducibility or redistribution. Source-rich development may use repair/retry loops, but AI4Research must not silently import arbitrary retries into protected execution. The integrated typed Planner explicitly permits one bounded structural correction, preserving diagnostics; the separate Builder candidate proposes its own bounded test/repair loop. Other D49/D50 execution boundaries retain their stated scope. Repairs outside an explicitly authorized loop require a new governed attempt, with failed evidence and budgets preserved. The architecture should record these limitations rather than letting agent confidence or polished artifacts imply stronger assurance.
+
+For a bounded comparison, evaluate direct repository use, a plain wrapper with checks, and a CC-admitted wrapper with the same checks where feasible. Include positive and negative cases, changed inputs, failure behavior, false rejection of valid outcomes, fresh install, unauthorized effects, and provenance. Compare planning traces under the effective library snapshot before attributing omissions to planner starvation. Track the whole-system parent and candidate against the same held-out checks; do not infer gain from a stage-level pass. No Paper2Agent execution or M1 runtime trial was performed for this proposal.
+
+| SWOT | Assessment |
+|---|---|
+| Strength | Source-bound stages could turn repeated research-to-tool work into reusable, reviewable capabilities and evidence. |
+| Weakness | Composite dispatch, general source preparation and durable factory lifecycle remain separate design/implementation gaps; generic typed planning alone does not supply them. |
+| Opportunity | A flat pilot can measure whether better library resources and stage decomposition improve useful planning and candidate quality. |
+| Threat | Treating generated artifacts as admitted tools, or letting a candidate change the live referee/host, would undermine accuracy and reproducibility. |
+
+## Follow-on boundaries and sources
+
+The follow-on work should pass explicit exits in sequence: (1) compare proposed profiles, terminal types, acquisition policy and binding needs with integrated Planner contracts, PRD V10 and maintained decisions; (2) select one repeated use case and inventory native stage/CC coverage; (3) write candidate stage contracts and evidence outputs, with source preparation policy and a separate admission route; (4) implement a flat lab prototype within its authorized M2 scope, obtaining amendments first for any product-integrated obligation changes; (5) compare it with the native workflow under matched checks, including failure and negative cases; and (6) consider composite dispatch only if the pilot shows repeated orchestration value and member-level enforcement can be demonstrated. If no repeated gap is demonstrated, retain the patterns as design knowledge rather than adding runtime machinery.
+
+See [[Paper2Agent Capability Factory]] for the candidate stage workflow and product/resource distinctions; [[Agent Reading and Freshness]] for the efficient library route and source authority; [[Project Authority]] for current ownership and M1 readiness; and [[../Resources/review-batches/2026-10-21-paper2agent/architecture-source-review|the bounded architecture source review]] for the reviewed scope and exact source receipt. The user request is preserved verbatim in [[../Sources/Prompts/2026-10-21-paper2agent-system-direction.txt]]. This note is an interpretation and proposal only. It does not establish integration approval, implementation, tested results, or architecture adoption.
+
+## Durable project-level improvement
+
+[[Designs/Durable Project Labs]] extends the M2 direction to long-lived startup/research projects with persisted knowledge/data, model switches and bounded improvements to lab code, capabilities and workflows. Candidate qualification, protected evidence and rollback remain outside mutable candidate code. This broadens the design beyond M1 helper-level RSI without changing its current admission policy or claiming the broader loop is implemented.

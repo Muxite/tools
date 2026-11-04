@@ -1,0 +1,48 @@
+{
+  "schema_version": "0.3.0-proposal",
+  "id": "strata.candidate-reader",
+  "version": "0.1.0",
+  "state": "draft",
+  "purpose": "If the chosen layout requires a new reader, expose the candidate pack reader as a reusable capability.",
+  "tags": [
+    "strata",
+    "candidate",
+    "reader"
+  ],
+  "takes": {
+    "status": "required",
+    "items": [
+      {
+        "name": "candidate-pack",
+        "contract": {
+          "uri": "fixture:candidate-pack-schema",
+          "sha256": "77f7c17827fdd6097d966ed03c5f7ae01e3630c274a019bf344a58087759f4d6"
+        }
+      }
+    ]
+  },
+  "gives": {
+    "status": "suggested",
+    "items": [
+      {
+        "name": "expert-tiles",
+        "contract": {
+          "uri": "fixture:expert-tiles-schema",
+          "sha256": "94921009ec74073c11cc244125190517f05eb727f310d1138f98cd0b4b6136dc"
+        }
+      }
+    ]
+  },
+  "needs": {
+    "status": "unknown",
+    "question": "Which reader ABI and platform does the factory-selected representation require?"
+  },
+  "changes": {
+    "status": "required",
+    "items": []
+  },
+  "guarantees": {
+    "status": "unknown",
+    "question": "Which independent reconstruction and routing fixtures qualify the reader?"
+  }
+}

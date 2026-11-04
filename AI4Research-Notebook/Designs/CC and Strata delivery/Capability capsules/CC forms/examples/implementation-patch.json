@@ -1,0 +1,94 @@
+{
+  "schema_version": "0.2.0-proposal",
+  "form": "implementation",
+  "identity": {
+    "id": "cc.strata.storage-candidate",
+    "revision": 1,
+    "issuer": "fixture-research-team"
+  },
+  "purpose": "Synthetic contract example. Artifact, result-tree and product references and numerical gates are illustrative; only the baseline Strata Git commit is inspected.",
+  "tags": [
+    "strata",
+    "gb10"
+  ],
+  "relations": [
+    {
+      "predicate": "implements",
+      "target": {
+        "uri": "change-request.json",
+        "sha256": "83d5cde39d755159f7010833caa71a71aa1e65222ac8346ad4b4f68c1cf20e10",
+        "media_type": "application/vnd.ai4r.cc+json"
+      }
+    }
+  ],
+  "profiles": [],
+  "payload": {
+    "summary": "Synthetic candidate changing loader and representation.",
+    "deliveries": [
+      {
+        "format": "git-patch",
+        "base": {
+          "repository": "https://github.com/Niko1221/Strata.git",
+          "commit": "c62d5e3a15b40ea51c96aae9e8d36928965f53ab"
+        },
+        "patch": {
+          "uri": "fixture:strata-change.patch",
+          "sha256": "0b344ffe1712396c07dc56f7f4bd6a6c8f3221ea9b8899de95b4fe3ee2be7480",
+          "media_type": "text/x-diff"
+        },
+        "apply_mode": "git-apply-index-exact-base",
+        "result_tree": "1111111111111111111111111111111111111111"
+      }
+    ],
+    "build": {
+      "recipe": {
+        "uri": "fixture:build-recipe",
+        "sha256": "659a2463a56b12a40c553975ad71ae8a6e781780d3a3b53a28532380ae7f06c6",
+        "media_type": "application/json"
+      },
+      "builder_image": "fixture.invalid/build@sha256:df6b07176a9b17cc4c9afc257bd404732e7d09b76436c7890f7b7be14e579794",
+      "target_profile": {
+        "uri": "fixture:gb10-profile",
+        "sha256": "b9761aea2750ef5275a11e7a430344ef6863e5941beb57bdedbe94d2debd2665",
+        "media_type": "application/json"
+      },
+      "dependency_lock": {
+        "uri": "fixture:deps",
+        "sha256": "f93464a48a2b9281080b555fac1081b1852154552800cbc6a2440ad1e3629033",
+        "media_type": "application/json"
+      }
+    },
+    "source_snapshot": {
+      "repository": "https://github.com/Niko1221/Strata.git",
+      "commit": "2222222222222222222222222222222222222222"
+    },
+    "builder_checks": [
+      {
+        "name": "compile",
+        "status": "not-run",
+        "evidence": {
+          "uri": "fixture:compile-not-run",
+          "sha256": "2ac590a9a23b95bb2acaeb9c7f284b50545dd21efe4236586583c796d7ca016a",
+          "media_type": "application/json"
+        }
+      }
+    ],
+    "compatibility": {
+      "changed_interfaces": [
+        "proposed expert-pack reader"
+      ],
+      "migration_notes": "Create a new immutable candidate pack. Preserve baseline artifacts.",
+      "reader_requirements": [
+        "declared compatible reader ABI"
+      ]
+    },
+    "limitations": [
+      "Fixture only. No patch, image or performance result is supplied."
+    ],
+    "provenance": {
+      "uri": "fixture:build-provenance",
+      "sha256": "824cf8b9ca8210437e5fdf9f1a6aa6e2d3eddbce6211c6229289ff6762456624",
+      "media_type": "application/json"
+    }
+  }
+}

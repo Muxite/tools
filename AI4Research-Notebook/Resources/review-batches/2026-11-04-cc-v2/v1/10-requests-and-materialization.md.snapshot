@@ -1,0 +1,126 @@
+---
+id: cc-requests-and-materialization
+status: proposed-runtime-unverified
+source: November 4 upstream integration and deferred implementation request
+last_reviewed: 2026-11-04
+next_action: Specify and implement the request profile in the Factory owner
+---
+# Requests, templates and executable releases
+
+## 1. Three distribution forms
+
+Use one operation vocabulary at different stages of readiness. Keep readiness explicit.
+
+| What is sent | Meaning | What the recipient does |
+|---|---|---|
+| Premade CC release | Complete contract and immutable executable bindings. | Verify, install, bind resources, call an operation. |
+| CC request | A desired contract, fixed requirements and explicit implementation decisions still open. | Accept the scoped work, resolve decisions, implement and return a resolution with deliverables. |
+| CC template | A reusable desired contract with explicit variation points and, optionally, pinned starter materials. | Instantiate a request with caller choices, then materialize a release. |
+
+The user's **runtime CC** corresponds to a template materialized in the user's environment. The coder can supply missing code, build it and fill implementation bindings. The result becomes executable only after materialization and validation. An actual running instance is a release plus a bound call and attempt; it is a different lifecycle concept.
+
+## 2. Shared meaning and distinct validation
+
+`does`, `takes`, `gives`, `needs`, `changes` and `guarantees` retain their declaration meanings. A request does not invent another input/output vocabulary. A request document is an ordinary typed artifact accepted by a Factory operation, not an executable declaration with nulls tolerated everywhere.
+
+```mermaid
+flowchart TB
+    template["Reusable CC template"] --> request["Request: fixed contract and open choices"]
+    request --> implement["Coder in bounded workspace"]
+    implement --> resolved["Resolved declaration and implementation"]
+    resolved --> build["Factory build and validation"]
+    build --> release["Immutable CC release"]
+    release --> admission["Consumer admission and resource binding"]
+    admission --> instance["Call and execution attempt"]
+    instance --> receipt["Outputs and receipt"]
+    request -.-> resolution["Resolution: decisions and deliverable references"]
+    release --> resolution
+```
+
+The `cc: "1"` installable grammar is unchanged. Requests/templates use the separate proposed `cc-request/1` record below. Consumers that do not support it reject it as an unsupported record, rather than attempting to execute it.
+
+## 3. Small request record
+
+All fields below belong to the request root. Unknown fields are rejected in this initial profile. `Ref` retains `{uri,sha256}` and the byte-digest meaning from the core protocol.
+
+| Field | Type | Required/default | Meaning and validation |
+|---|---|---|---|
+| `format` | string | Required | Exactly `cc-request/1`. |
+| `kind` | string | Required | `request` or `template`; templates must be instantiated before dispatch. |
+| `id` | string | Required | Nonempty issuer-local correlation ID; immutable content digest identifies a specific revision. |
+| `desired` | object | Required | A partial author-form CC declaration using the core fields. Provided values are fixed. |
+| `open` | object | Required; may be empty | JSON Pointer to `{owner,question}`. Each pointer selects one absent declaration field, relative to `desired`; its parent must exist. No overlaps, array-index holes or unknown field names. |
+| `materials` | array of Ref | Optional, default `[]` | Available source, recipes or context. Each is immutable and separately access-controlled. |
+| `constraints` | array of Ref | Optional, default `[]` | Versioned requirement/check documents governing resolution. A required document must be understood before accepting the work. |
+
+`owner` is `requester` or `implementer`. It assigns who proposes the answer, not execution permission. Nonempty `question` explains the missing decision. Resource budgets, credentials and workspace grants belong to the bound Factory call, not this reusable request.
+
+Omission outside `open` means the normal declaration default or an invalid missing required field. Empty collections keep their declared meaning. `null`, wildcard permissions, mutable tags and fake digests are not unresolved-value syntax. A whole `carrier` can be absent and open; once supplied, its recipe must be fully pinned.
+
+For brevity, this example has no external materials. It asks a coder to supply an implementation and carrier for the exact same CPU contract used in the README.
+
+```yaml
+format: cc-request/1
+kind: request
+id: team.trim.001
+desired:
+  cc: "1"
+  id: text.trim
+  version: 1.0.0
+  does: Remove leading and trailing ASCII spaces. An all-space input returns an empty string.
+  takes: {text: string}
+  gives: {trimmed: string}
+open:
+  /carrier:
+    owner: implementer
+    question: Supply a pinned implementation image or complete pinned build recipe.
+  /run:
+    owner: implementer
+    question: Supply the verified process entrypoint for the implementation.
+```
+
+Caller view: the requester fixes the input, output and behavior. The implementer chooses packaging and entrypoint. No external effects are permitted by this desired contract. Building requires a separately authorized Factory execution context. The request is complete as a work description; it is intentionally incomplete as an installable CC.
+
+## 4. Resolution rules
+
+1. Validate fixed fields and pointer structure before accepting work. Report the exact missing or conflicting field.
+2. Persist the original request bytes and digest. Clarification creates a new revision linked to its predecessor.
+3. Fill exactly the open fields, with no modifications to fixed content. Record answers by pointer. If a new effect or input is necessary, return a proposed revised request; do not silently expand the contract.
+4. Normalize and fully validate the completed declaration using the core compiler. Resolve references, check profiles, build/inspect the implementation and verify entrypoints.
+5. Return a resolution record referencing the request, answers, resolved author declaration, build provenance and immutable release. Qualification and installation remain consumer decisions.
+
+The proposed `cc-resolution/1` record has required fields `format`, `request: Ref`, `answers: object`, `declaration: Ref`, `build: Ref`, `release: Ref`. Answer keys must equal the request's open pointer set. The declaration reference identifies completed author-form bytes; the release identifies the compiler's release manifest. Optional `parent: Ref` links a prior resolution. No other fields are accepted in this initial profile.
+
+A resolution cannot claim completion with unresolved code or an image tag. Implementer self-tests may accompany build evidence; they do not replace an independent guarantee checker. Identical requests may yield several distinct releases. Build success does not establish reproducible builds unless independently checked.
+
+## 5. Late implementation without runtime ambiguity
+
+| Situation | Required treatment |
+|---|---|
+| Code absent | Request remains buildable work, not callable capability. Materialization must produce code and a verified binding. |
+| Code present, image absent | Build from pinned source/recipe; capture the resulting executable digest. |
+| User edits generated code | Produce a new source snapshot and release; keep the previous release immutable. |
+| Interpreter executes a user script | Script is a pinned input to a generic execution CC, or part of a newly built release. Declare filesystem/process/network effects and bounds. |
+| Remote coding agent needs a decision | Use a scoped input-required interaction. A response changes only an open decision; changed fixed requirements require revision. |
+| Tool requires unexpected dependency or privilege | Resolve through an authorized requirement change or return a blocked result. No hidden package installs or privilege escalation. |
+| Environment changes after build | Re-admit against actual provider/ABI. An old successful build does not establish current eligibility. |
+
+The core image binding remains the current executable profile. A native executable/provider binding would require its own versioned profile and conformance tests. The [Factory product handoff](11-factory-lab-handoff.md) already permits native engine products without changing CC executable bindings.
+
+### Recommended next binding profile
+
+Requiring an image for every locally generated script or native coding tool would create unnecessary packaging work. Introduce a versioned native binding profile before claiming universal coding-agent support. Its minimum responsibilities are: a content-addressed executable/script bundle; a pinned interpreter/runtime or verified host-provider identity; an argument-vector entrypoint; target compatibility; and the same admission, effect, deadline and receipt rules. Host-local paths alone cannot identify a release. Shell strings must not become implicit execution bindings.
+
+Use that profile for local native tools and persistent workspace providers; retain OCI for isolated packaged execution. Both should normalize to a resolved implementation binding selected by the host. This is an identified limitation of the current image-only release schema, not an already supported alternative. Its schema and provider enforcement must be implemented and tested together; an optional metadata field must not bypass the existing release validator.
+
+## 6. Requests for software products
+
+A request to make an inference engine is not necessarily a request to make a reusable tool. The existing Factory brief remains the input for a software product. It can include CC requests for reusable profilers or builders when needed. Both are typed inputs to the same Factory workflow and use the same artifact/provenance conventions.
+
+This keeps the important zero-CC outcome: Factory can return one qualified engine candidate and no new reusable capsules. A CC can carry, produce or consume a request without making the request itself executable.
+
+## 7. Compatibility and implementation status
+
+This extension supersedes the earlier unstructured-draft treatment: incomplete contracts now have a proposed explicit request/template form. It does not weaken the rule that releases contain no unresolved mandatory semantics. Small existing CCs need no additional author fields.
+
+The local request fixture check exercises open-field filling, fixed-field preservation and core normalization. It is not a production request compiler, constraint interpreter, signature verifier or deployed Factory integration.

@@ -1,0 +1,86 @@
+{
+  "reviewer": "adversarial_protocol",
+  "date": "2026-11-04",
+  "scope": "README.md, 01-declaration.md, 03-calls-and-receipts.md, reference/ccv2.py, reference/mcp_server.py, tests and portable/MAPIE fixtures",
+  "production_files_edited": false,
+  "reproduce": "python AI4Research-Notebook/Resources/review-batches/2026-11-04-cc-v2/adversarial-protocol-repro.py",
+  "evidence_file": "adversarial-protocol-evidence.json",
+  "findings": [
+    {
+      "id": "AP-01",
+      "severity": "P1",
+      "title": "Sealed native release can execute mutable external implementation without identifying it",
+      "locations": ["reference/ccv2.py:215", "reference/ccv2.py:380", "README.md:11", "01-declaration.md:86"],
+      "attempted_declaration": {"bindings": {"default": {"kind": "native", "command": ["{python}", "C:/TEMP/external.py"]}}},
+      "scenario": "Author uses an existing local Python script instead of duplicating it into the package. Seal once, call with external.py returning 1, edit external.py to return 2, then call with a new execution key under the original release.",
+      "observed": "Both calls succeed, both provenance.source_release values are identical, outputs.value changes 1 to 2. Neither release manifest nor receipt identifies external.py bytes. Host Python hash is recorded, which does not fix the script bytes.",
+      "evidence_key": "external_source",
+      "impact": "Release identity cannot be interpreted as implementation identity for accepted native declarations. This is independent of OS sandboxing and independent of malicious code: a normal working-directory edit causes drift.",
+      "minimal_general_fix": "Define the normal native entrypoint as bundle-contained source plus an explicitly host-selected runtime; reject accidental external source paths at admission or materialize them into the bundle before sealing. If external native implementations remain supported, mark their identity as unresolved/unpinned rather than claiming their bytes are fixed, and record observed executable/source identities where possible. State separately that transitive imports, ambient installed dependencies, host tools and deliberately dynamic code remain outside the source-closure guarantee unless a runtime/environment policy pins them. Merely requiring a {bundle} substring cannot prove arbitrary native code closure."
+    },
+    {
+      "id": "AP-02",
+      "severity": "P1",
+      "title": "Observation failure prevents durable final receipt and strands the invocation",
+      "locations": ["reference/ccv2.py:446", "reference/ccv2.py:448"],
+      "attempted_declaration": {"bindings": {"default": {"kind": "jiuwenswarm", "agent": "coder"}}, "takes": {"workspace": "handle"}, "changes": ["workspace.read", "workspace.write"]},
+      "scenario": "A registered native delegate opens an existing workspace file with Windows CreateFileW shareMode=0, keeps the handle live, and returns a valid successful result. Host attempts post-execution snapshot.",
+      "observed": "Host.call raises PermissionError(13, 'Permission denied') from finally. Host.status(key) remains state=running, reason=STARTED, empty outputs/provenance, despite the delegate having returned. Duplicate requests observe this stale initial receipt forever; no final observation-failure record is persisted.",
+      "evidence_key": "workspace_finally",
+      "impact": "Ordinary temporary file locking or snapshot I/O failure becomes a recovery and call-identity failure, obscuring completed work. No untrusted native sandbox assumption is needed.",
+      "minimal_general_fix": "Guard each observation independently, append explicit observation-error/coverage information, retain outputs and execution lineage, choose an honest state when effect reconciliation is unavailable, and always attempt persistence in an outer finally. Persist dispatch/owner metadata before execution so a genuine crash can also be distinguished from an active call. Never replay the execution solely because observation failed."
+    },
+    {
+      "id": "AP-03",
+      "severity": "P1",
+      "title": "model.invoke silently grants unrestricted image networking",
+      "locations": ["reference/ccv2.py:393", "03-calls-and-receipts.md:86"],
+      "attempted_declaration": {"binding_kind": "image", "changes": ["model.invoke"]},
+      "attempted_call": {"inputs": {}, "grants": ["model.invoke"]},
+      "scenario": "Construct a call to an image capability that may invoke a model but has no network.request declaration or grant.",
+      "observed": "Adapter's Docker command omits --network none when model.invoke alone is granted. Docker therefore receives no network-disable control. Receipt still reports only model.invoke declared/granted.",
+      "evidence_key": "model_network",
+      "evidence_limit": "subprocess.run was mocked to capture command construction; no live Docker execution or network connection is claimed.",
+      "impact": "Conflicts with the documented image baseline 'No network without a network grant' and collapses two independently declared effects.",
+      "minimal_general_fix": "Enable image networking only for an explicit network.request grant. A remote-model capability should declare both effects; a local model needs no network. A future scoped model broker could implement model.invoke separately without opening general networking."
+    },
+    {
+      "id": "AP-04",
+      "severity": "P2",
+      "title": "Valid boolean JSON Schema crashes MCP tool listing",
+      "locations": ["reference/mcp_server.py:23", "reference/ccv2.py:94"],
+      "attempted_declaration": {"takes": {"options": {"kind": "json", "schema": true}}},
+      "scenario": "An author expresses an explicitly unconstrained JSON input with schema:true. normalize accepts the declaration; then the MCP adapter generates its input schema.",
+      "observed": "tool_schema raises TypeError: 'bool' object is not iterable at schema.update(...). A single legal port prevents the capsule's tools being listed.",
+      "evidence_key": "boolean_schema",
+      "minimal_general_fix": "Preserve supported JSON Schema forms rather than merging them as dictionaries. Compose intrinsic text constraints and user schemas with allOf as needed; true can normalize to {}, false must retain rejection semantics. Do not introduce required domain schemas or narrow broad JSON to fix this adapter issue."
+    },
+    {
+      "id": "AP-05",
+      "severity": "P2",
+      "title": "Required partial-output explanation is discarded from caller result",
+      "locations": ["reference/ccv2.py:428", "reference/ccv2.py:431", "03-calls-and-receipts.md:44"],
+      "attempted_result": {"outcome": "partial", "reason": "Only first 10 of 100 pages scanned", "outputs": {"value": 10}},
+      "observed": "Receipt state=succeeded, completeness=partial, reason=PARTIAL_OUTPUT, diagnostics=[]. The supplied explanation appears nowhere in the returned receipt. It survives only in raw attempt stdout logs, which callers should not have to locate and parse.",
+      "evidence_key": "partial_reason",
+      "impact": "Consumer cannot tell the coverage boundary or decide whether the partial result is useful. Author must duplicate the same explanation into an ad hoc output port to make it visible.",
+      "minimal_general_fix": "Keep the host machine reason and preserve tool reason separately in a bounded, explicitly non-authoritative result detail/diagnostic. Validate and redact as appropriate; do not convert the tool's statement into a verified coverage claim."
+    },
+    {
+      "id": "AP-06",
+      "severity": "P2",
+      "title": "README's first validation command fails on its documented package argument",
+      "locations": ["README.md:67", "reference/ccv2.py:533", "reference/ccv2.py:155"],
+      "attempted_call": "python reference/ccv2.py validate reference/examples/portable",
+      "observed": "Uncaught PermissionError: [Errno 13] Permission denied for the directory on this Windows host. validate expects the declaration file while the README says PACKAGE and seal expects the package directory.",
+      "minimal_general_fix": "Accept a package directory for validate by resolving cc.yaml, matching seal, or change the command to PACKAGE/cc.yaml. Convert ordinary missing/unreadable input errors into concise structured diagnostics instead of a traceback."
+    }
+  ],
+  "qualified_observations": [
+    "The simple shorthand JSON/text/artifact/handle vocabulary and optional domain schema already support low-burden declarations. No need for more author-facing type systems was found.",
+    "Native trusted-local execution explicitly has no OS isolation. Reading ambient files, network use, child processes, and modifying a writable release store cannot be prevented by receipt validation alone. These are not reported as missing native sandbox features.",
+    "MCP dispatch removes _cc_key from arguments and creates random keys when absent. The current direct server does not itself prove model-versus-host origin. Per parent, an upstream trusted invocation wrapper will reject reserved model arguments and insert stable invocation identity before client retry. With that wrapper implemented and tested, the relevant guarantee belongs to the wrapper integration; a fresh generic MCP invocation without an ID is a new call, not evidence of a retry defect.",
+    "MAPIE example loads pickle after digest verification. A digest proves byte identity, not safe deserialization or trusted producer origin. The fixture's comment about release-store digest does not enforce that origin: artifact_path accepts arbitrary local files with matching hashes. Restrict the example to explicitly trusted model artifacts or use a safer model representation; do not describe hashes as authentication.",
+    "Receipts contain declared/granted/observed and an assurance string, but no explicit enforced-controls or observation-limits field. Native absence of observations cannot support no-effects claims. Image command construction can support narrow configured-control evidence, but the mocked probe does not establish live enforcement."
+  ]
+}

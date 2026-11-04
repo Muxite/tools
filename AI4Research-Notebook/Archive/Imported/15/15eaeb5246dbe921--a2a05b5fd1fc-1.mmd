@@ -1,0 +1,17 @@
+flowchart TB
+    Browser[Browser: submit objective] --> Intake[Capture exact input and run identity]
+    subgraph App[One application container]
+        Intake --> Compiler[Intent compiler CC: Intent IR]
+        Compiler --> Capture[Persist candidate and observed execution]
+        Capture --> T1{Deterministic structure and identity checks}
+        T1 -->|valid| Verifier[Intent verifier CC: submitted IR fidelity and usability]
+        T1 -->|invalid or unavailable| Gate[Protected host gate]
+        Verifier -->|typed verdict, findings and reasons| Validate[Validate assessment and exact subject]
+        Validate --> Gate
+        Gate -->|mandatory obligations pass| Commit[Durably commit accepted Intent and decision]
+        Gate -->|failed, unclear or unusable| Halt[Record halt and actionable reason]
+        Commit --> View[Readable IR, verdict and status]
+        Halt --> View
+    end
+    View --> Browser
+    Commit -.-> Later[Later build: Requirements CC; excluded from this slice]

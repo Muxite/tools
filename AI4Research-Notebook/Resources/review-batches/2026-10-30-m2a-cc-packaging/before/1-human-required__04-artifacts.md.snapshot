@@ -1,0 +1,32 @@
+---
+id: ai4r-m2a-1-human-required-04-artifacts
+status: proposed-runtime-unverified
+source: ai4r_m2a/3-agent-reference/source-manifest.json
+last_reviewed: 2026-10-29
+next_action: Implement against the acceptance matrix and attach measured evidence
+---
+# 4. Long-running research leaves durable, inspectable artifacts
+
+[Package home](../README.md) · [Next: build and done](05-build-and-done.md)
+
+**A run is not finished because the agent says “done.”** A finished research delivery includes readable findings and a machine-readable manifest pointing to checked evidence. An interrupted run still leaves a checkpoint and an honest partial report.
+
+![Artifact custody and restart](../diagrams/05-artifacts.svg)
+
+The project stores a goal and versioned contract, editable agenda, hypotheses/assumptions, experiment ledger, evidence graph, job handles and budget ledger. JiuwenSwarm's session mechanism carries the agent; durable project state preserves progress across session compaction, crashes and later model changes. Every consequential decision records its input evidence and contract revision.
+
+| Artifact | Required content |
+|---|---|
+| `report.md` | Question, method, supported findings, uncertainty, failed/negative trials, limitations, links to evidence |
+| `manifest.json` | Delivery identity/status, immutable output references, producing receipts, completeness against obligations |
+| `receipts/` | Input/output hashes, release/provider/check pins, check verdicts, effects, usage and failure reasons |
+| `protocols/` and experiment ledger | Bound criteria, splits, seeds, baseline, trial history and revisions |
+| `artifacts/` | Actual requested code, data, figures, tables, logs or other domain deliverables |
+| `reproduce/` | Environment lock, permitted snapshots, executable replay/replication instructions and known limits |
+| `checkpoint.json` | Last durable event, pending work, job/reconciliation handles and remaining limits |
+
+An artifact moves through staging, sealing and independent checking before acceptance. The store verifies bytes and persists evidence before publishing an accepted manifest. Consumers resolve immutable references, not “latest” mutable paths. Logs and rejected outputs remain useful diagnostics but never silently become accepted scientific evidence.
+
+On restart, reconcile pending jobs and effects before scheduling new work. Completed valid evidence can be reused if its assumptions, contract and environment still apply. A cancelled or unresolved experiment cannot count as completed. A project that is infeasible may deliver a valid explanation and partial evidence, but is scored separately from achieving the requested scientific outcome.
+
+**Acceptance:** kill and restart during each publication boundary; no accepted output disappears, unverified output is not published, and an uncertain external operation is not duplicated. A clean machine can inspect the delivery and run the declared reproduction procedure within its stated limits. See M2A-07, 08 and 09. [Detailed state rules](../2-human-relevant/artifacts-and-recovery.md).

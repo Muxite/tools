@@ -1,0 +1,84 @@
+---
+id: coder-prompt-benchmark-runner
+status: ready-to-send
+source: Sources/Prompts/2026-10-22-runner-code-observability.txt; Sources/Prompts/2026-10-22-shorten-runner-prompt.txt; Sources/Prompts/2026-10-22-two-image-runner-layout.txt; Sources/Prompts/2026-10-22-ai4r-runner-scope.txt
+last_reviewed: 2026-10-22
+next_action: Build ai4r and benchmark-runner images; run tasks and persist artifacts to the user's output mount
+---
+# benchmark-runner
+
+## For human and AI
+
+- **One repository, two images:** AI4R builds `ai4r` for the app and `benchmark-runner` for the separate CLI sidecar.
+- **Does:** Runs supplied tasks and declared code, shows progress, and records logs, execution events, artifacts, timing and available resource usage for human assessment.
+- **Your paths:** You choose the case directory, input files/directories and host output directory. The runner saves files automatically to that mounted output directory.
+- **Persists:** Collected files survive removal of both containers. Container writable layers consume disk and are disposable; they are not automatically memory-only.
+- **Keeps separate:** Runner code stays out of the app image. Humans judge task quality. Spark setup is optional.
+
+## Implement in this order
+
+Build the runner in AI4R, our AI4Research branch of JiuwenSwarm. Deliver a working CLI inside `benchmark-runner`, not a design-only proposal. Focus on **running tasks on our system and preserving evidence**.
+
+Read branch instructions, the current M1 task/spec records, deployment instructions, and design files named `benchmark-runner.md` (Platform benchmark runner), `automation.md`, and the sidecar/test-runner `README.md` pages. The previously inspected branch was `ai4r_M1`; verify the current checkout before editing. Follow the native task/spec process. Record amendments for this requested parallel, human-reviewed mode without breaking other existing modes.
+
+### 1. Reuse code and build two images
+
+Reuse `research_sidecar` client, ledger, reconciliation, evidence and cleanup helpers plus `deploy/m1` Docker/Compose assets. Preserve scoped access, path/hash checks, write-once evidence and ownership checks. Keep app permission/effect enforcement in the app; permission snapshots and channel file-delivery settings do not grant export or tool authority.
+
+Build exactly two application images with Compose service roles **`ai4r`** and **`benchmark-runner`**, normally one container each. Copy app code/dependencies into the former and runner CLI/queue/collection code into the latter. Small neutral contracts may be shared. Exclude external cases, answers, datasets, credentials, caches and results from both build contexts. The existing app wheel includes sidecar modules: fix packaging and verify installed contents. Expose the existing sidecar as `benchmark-runner` and remove required score/referee mounts for this mode.
+
+Use Compose, a private network, non-root processes and least privilege. The sidecar contains its worker pool; no extra worker container or host-installed runner is required. Neither container gets the Docker socket. A small host helper may handle Compose lifecycle only. Product startup works without the sidecar.
+
+### 2. Complete the shared execution interface
+
+Use and document one versioned authenticated interface: **readiness/capabilities and build identity; input registration/upload; submit with stable client request ID; reconcile by that ID; observe status/progress; cancel owned runs; list/download artifacts and confirm collection/retention**. Artifacts need stable IDs, safe relative paths, sizes and hashes. Prefer existing routes and implement missing operations rather than inventing endpoints.
+
+**Modify the main app where necessary to support this task.** Update native contracts and focused checks; implementation gaps are unfinished work. Preserve app verification and effect controls, build/pin changes before campaigns, and never patch a running target to obtain a result.
+
+The runner accepts endpoint, credential reference and expected identity through configuration. Another hypothetical system implementing this interface must work without system-name branches or app-internal imports. Internal stages/gates are optional observations. Reject incompatible versions/missing required capabilities; optional metrics remain unavailable. Implement AI4R now and use a small independent fixture to check portability; do not build another product integration.
+
+### 3. Mount user paths and persist actual files
+
+Require user-selected case, input and output host paths. Resolve them on the Docker daemon's host, including remote deployments. Mount cases/inputs read-only into the sidecar and the output directory read-write, for example `/cases`, `/inputs`, `/results`. Validate file types, ownership, UID/GID access, overlapping roots and real container access. Fail on missing/unwritable output mounts instead of falling back to container-local storage. Create explicitly requested new directories without replacing existing contents.
+
+Held-out cases come from elsewhere. Preserve supplied case identities/hashes; use separate generic smoke fixtures during development. Send only authorized task text/files to `ai4r`, never private criteria, answers or the whole case store.
+
+The app produces files in its per-run workspace. **An app path is not readable from the runner container:** list and stream actual artifact bytes through the interface into a unique campaign/case/repeat folder under the output mount. Preserve nested paths. Persist the ledger and collection manifest there too. Do not mount app-private state into the runner.
+
+Collect available immutable files during execution where supported and finalize every terminal run, including failures/cancellation/timeouts. Stream large files; check space; reject traversal, symlinks, unsafe archive entries and conflicting names. Write temporary files, verify sizes/hashes, durably flush and atomically publish. Retry interrupted collection without rerunning research or replacing verified evidence. Track execution and collection separately; missing files, disk full and permission/network errors remain explicit partial/failed collection states.
+
+Retain app-side pending run records/artifacts until collection confirmation or documented retention expiry. Use bounded app-owned persistent staging for restart recovery where needed. Never silently delete uncollected artifacts. Saved host outputs require no later manual copy and survive removal of both containers.
+
+### 4. CLI, queue and isolation
+
+Provide CLI-only `doctor`, `run`, `status`, `resume`, `cancel`, `export`, `cleanup`, useful help, readable progress and versioned `--json`. Keep logs on stderr and machine-readable output on stdout. Document configuration precedence and exit codes for execution/configuration/prerequisite errors, not task correctness.
+
+Load versioned YAML/JSON cases and campaigns with inputs/setup, steps, repeats, deadlines, budgets and bounded concurrency. Reuse a transactional store such as SQLite for case/repeat jobs, leases, request/run IDs and queue state. Run independent sessions concurrently within the single app's supported capacity; implement necessary admission/isolation and queue excess work. No app replicas or research-DAG redesign are required.
+
+Support case-declared executable setup/collection scripts as well as app task execution. Run trusted user-authorized runner scripts in per-job sidecar workspaces; execute generated or untrusted task code through the app's existing isolated execution path. Use explicit commands, working directories, environment allowlists, deadlines and resource limits; capture stdout, stderr, exit codes and produced files. Do not run artifact code automatically in the sidecar or execute anything in user source folders. Script failures are execution observations, not correctness judgments.
+
+Reconcile uncertain submissions after restart; never blindly resubmit. Preserve failed/blocked/cancelled/timed-out jobs and continue unrelated work according to policy. Document Ctrl-C and resume behavior; cancellation targets only owned runs. Missing human action must be reported rather than hanging indefinitely.
+
+Namespace Compose resources, ports and workspaces so campaigns and normal app use coexist. Atomically create owned campaign subdirectories; refuse collisions. Explicit resume verifies the matching manifest/ownership and preserves old evidence and human annotations. Never overwrite user files or administer the original checkout. Cleanup removes only proven owned disposable resources, retains outputs/persistent state and refuses foreign resources; no global pruning. If build selection is exposed, resolve once in owned source storage and record immutable identities.
+
+Reuse configured services/authentication. Keep secrets out of images/logs/exports. Bound caches, logs, downloads, workers and disk/memory use; build each image once and reuse dependency layers. Record contention/queue waits; exclusive hardware measurements serialize. Optional `spark-benchmark-setup.md` prepares that host; this runner works on other compatible Docker hosts.
+
+### 5. Export and verify the complete path
+
+Provide live CLI status and retained observability: timestamped logs/events, stage transitions, command/tool invocations and exposed results, errors, retries, cancellation, queue/execution/collection timings, and available CPU, memory, disk/I/O, GPU and model usage. Correlate records by campaign/case/repeat/run/step; record sampling interval, scope and contention. Reuse existing telemetry and extend the app interface for missing required observations. Optional metrics advertise capability/unavailability; never fabricate them. Keep exportable structured traces and summaries, redact secrets, and apply audience restrictions without losing declared evidence silently. No monitoring platform, extra container or Docker socket is required.
+
+Automatically retain inputs/setup and hashes, app/image/configuration identities, request/run IDs, available events, outputs/artifacts, app-produced decisions, terminal reasons, timing/usage and limitations. Export JSON records, CSV matrix and readable Markdown/HTML with **Inputs and Setup**, **Actual Output and Observations**, artifact links and blank **Assessment**, **Evidence references**, **Review notes**. Regenerate reports from saved records without reruns or lost annotations. Include permitted artifacts/hashes and explicit omissions; missing usage is not zero. Keep scientific negatives distinct from infrastructure failures.
+
+Humans assess correctness. Do not implement automatic task scores, task PASS/FAIL, a judge or winner. App verdicts are observations; private criteria and answers never reach task/model context.
+
+Deliver incrementally: first one real task → app artifact → mounted host file; then durable parallel queue, recovery and reports. Reuse existing tooling; no web UI, new scheduler platform, VM provisioning or factory work. Keep brief decisions/progress/next steps for context recovery. Finish independent work while host access/authentication is pending and report precisely which real checks remain incomplete.
+
+Verify with focused connected checks:
+
+- Two image contents, installed container CLI/help/JSON, authenticated interface and user-selected mounts.
+- Concurrent tasks/campaign isolation, executable steps with stdout/stderr/exit evidence, deadlines, cancellation, restart and uncertain submission without duplicates.
+- Nested artifact collection, interrupted retry, partial failed-run outputs and disk/permission failure.
+- Remove both containers; verify saved host files/hashes remain. Existing sentinel files/reports stay unchanged; foreign cleanup is refused.
+- Correlated live/retained telemetry, unavailable-metric labels, secret redaction, safe report regeneration and interface portability using the independent fixture.
+
+Provide a short build/start/doctor/run/status/export runbook with resume/cancel/cleanup examples. Distinguish mocks, static checks, actual containers and model-backed execution; never claim unrun checks passed.

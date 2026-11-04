@@ -1,0 +1,20 @@
+{
+  "experiment": "exclusive",
+  "repo": "C:\\Users\\m50066326\\huawei\\AI4Research-Lab-Validation\\host-0d43064b32\\fixture",
+  "revision": "e81b2af5f19939abd06537ce67e3c489f50e69a7",
+  "image": "alpine@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8",
+  "evidence_root": "C:\\Users\\m50066326\\huawei\\AI4Research-Notebook\\Resources\\verification\\lab-host\\host-0d43064b32",
+  "command": [
+    "/bin/sh",
+    "-c",
+    "printf '%s' 'E' > /evidence/marker.txt; printf '%s' 'E' > /workdata/volume-marker.txt; if (printf bad >> /workspace/source.txt) 2>/dev/null; then printf BAD > /evidence/source-check.txt; else printf READ_ONLY > /evidence/source-check.txt; fi; test ! -e /var/run/docker.sock && printf NO_SOCKET > /evidence/socket-check.txt; ip route > /evidence/routes.txt; echo ready; trap 'exit 0' TERM; while :; do sleep 1; done"
+  ],
+  "limits": {
+    "memory": "64m",
+    "cpus": 0.25,
+    "pids": 32
+  },
+  "scheduling": {
+    "exclusive": true
+  }
+}

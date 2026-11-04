@@ -1,0 +1,105 @@
+---
+id: agent-reading-and-source-freshness
+status: active
+source: ../AGENTS.md; Project Authority.md; jiuwenswarm/docs/architecture/design-package/README.md
+last_reviewed: 2026-10-26
+next_action: Read the replacement sandbox explanation and delivery plan before older implementation references
+---
+# Agent reading route and source freshness
+
+**Current replacement route:** [[Designs/Labs and Capability Capsules]] → [[Designs/Sandbox Lab Design]] → [[Designs/Lab Capsule and Factory Design Plan]]. Start with the adaptive loop and source evidence. The first value test is a changed experiment after new findings, preserving valid work. Older VM/factory handoffs are implementation references, not the current delivery order.
+
+**M2 sandbox route updated October 26:** Start at [[Designs/Sandbox Lab Design]], then [[Designs/Sandbox Lab Diagrams/README]]. The CC proposal is [[Designs/M2 Lab Capsules and Factory Proposal]]. Earlier VM/factory handoffs need reconciliation with the new operation/adoption/planning boundaries before implementation; robotics is not a prerequisite.
+
+## Latest M2 handoff and source update
+
+The October 23 [[Resources/Handoffs/m2-labs/README|implementation handoffs]] contain reusable infrastructure details, not the current delivery order. They record inspected source `809351f8`; use [[Resources/Current Baseline]] for later M1 evidence and the replacement plan for M2 sequencing. Reconcile affected contracts before implementation.
+
+
+## Current delivery reading route
+
+For source identities, branch ownership and inherited versus new evidence, start at [[Resources/Current Baseline]], then [[Activities/2026-10-23 Final M1 Merge]] or [[Activities/2026-10-23 Builder Upgrade]] for their exact candidate checks. [[Activities/2026-10-23 Delivery and Verification Status]] is an earlier checkpoint. Earlier captured source and host observations stay dated; do not infer that a local feature branch was deployed because the deployment branch was pushed.
+
+
+This page is a short route into the AI4Research knowledge library. It does not replace the maintained PRD, architecture, native task register, or runtime stores. Use it to find the owner for a question, then make claims from that owner’s current receipt.
+
+## Fast route
+
+Start with [Home](../Home.md), [Project Overview](../Project%20Overview.md), [current intent](../Sources/Implementation%20Intent.md), and [Library Completeness](../Resources/Library%20Completeness.md). That gives the current objective, authority warnings, and known gaps. For a specific question, continue only to its owner:
+
+| Question | Read next |
+|---|---|
+| What did the user request? | [Prompt Register](../Sources/Prompt%20Register.md) and linked exact prompt receipts; [Implementation Intent](../Sources/Implementation%20Intent.md) is interpretation, not the prompt itself. |
+| What is required and what architecture is current? | [Project Authority](Project%20Authority.md), then `jiuwenswarm/docs/product/README.md` and `jiuwenswarm/docs/architecture/design-package/README.md`; inspect the relevant decision and contract. |
+| What did the inspected core capsules and host boundaries do? | [CC Reference](CC%20Reference.md) and its [Source Map](CC%20Reference/Source%20Map.md) describe pinned historical source. Use [Current Baseline](../Resources/Current%20Baseline.md) and later Planner/Builder receipts for newer status; re-read actual owner bytes for current behavior. |
+| What is implemented, runnable, verified, or accepted? | [Current Baseline](../Resources/Current%20Baseline.md), [M1 Readiness](../Resources/M1%20Readiness.md), then target-repository instructions and actual current task evidence. The older M1 register is archived at inspected `809351f8`. |
+| What should the coder change? | [Amendments](../Amendments/README.md), then the package’s evidence and manifest. Packages are proposals until the native process records disposition. |
+| How might Paper2Agent inform a capability factory? | [Paper2Agent Capability Factory](Paper2Agent%20Capability%20Factory.md) and [AI4Research Capability Growth](AI4Research%20Capability%20Growth.md), then the [bounded source review](../Resources/review-batches/2026-10-21-paper2agent/architecture-source-review.md) and [source receipt](../Resources/review-batches/2026-10-21-paper2agent/source-receipt.json). |
+
+Do not read the entire archive to answer a current implementation question. `Archive/Imported` and linked historical collections are source history; their contents do not override current user direction, PRD, maintained architecture, or native task evidence.
+
+## Keep three kinds of library separate
+
+“Library” refers to three different things here; do not collapse them:
+
+1. **Notebook knowledge library:** this vault’s navigable explanations, history, receipts, and links. It helps agents find and interpret evidence. It is not executable runtime state and cannot approve a change.
+2. **Runtime executable CC registry/library:** the maintained design’s versioned declarations, implementation closures, standing/eligibility, and compatible check-bundle associations that the M1 binder and runner can select and pin. The registry is runtime authority only through its protected policy and exact frozen bindings.
+3. **Versioned research-resource stores:** domain artifacts such as papers, source repositories, datasets, fixtures, code, or evidence records. These are inputs/resources with their own provenance, access controls, and custody. Being present in either library does not make a resource an admitted CC or a verified scientific claim.
+
+The notebook’s `Design Library` is a collection of design sources and references. Its name does not make it the executable CC library.
+
+## Freshness and authority contract
+
+Every maintained summary should identify its source path, immutable revision when the source is versioned, SHA-256 for reviewed file bytes, review scope, and limitations. A source change invalidates only summaries and claims that depend on that source; it does not update them automatically and does not adopt a proposal into architecture. Re-read the affected owner and update its receipt or mark it stale. The notebook currently has no automatic source synchronization or change-triggered invalidation service.
+
+| Source class | Authority / owner | Freshness receipt | What a change requires |
+|---|---|---|---|
+| User prompt or correction | User; captured in `Sources/Prompts` and Prompt Register | Exact supplied text, capture method, hash, and links to interpretation | Preserve new wording separately, including correction/repetition. Revisit dependent interpretation and packages; never infer unprovided history. |
+| Product requirements | Received PRD V10, identified by `jiuwenswarm/docs/product/README.md` and design `reference/product-input.md` | Exact filename, received identity/date, byte count and SHA-256; branch navigation pointers checked | Reconcile stale or conflicting pointers with native owners before changing product obligations. A hash change alone does not reveal the meaning of the change. |
+| Maintained architecture | `jiuwenswarm/docs/architecture/design-package/` | Git revision plus per-file SHA-256 and bounded review scope | Refresh affected contract summaries and native agreements. A design change does not prove implementation or runtime acceptance. |
+| Code and tests | Current native M1 checkout/task records | Git commit, changed-path range, source/test paths and hashes, commands/environment/results where run | Reinspect changed implementation and relevant callers/tests. Tests existing in the tree are not test results. |
+| User-generated/history sources | Notebook links and preserved source collections | Original path, disposition, source hash, extraction/capture method | Update historical interpretation only when new evidence is supplied; never promote historical proposals by filename or apparent recency. |
+| Generated notebook summary or review | Named notebook page / batch record | Its own revision/hash, source receipt list, reviewer/model, scope, date, and limitations | Rebuild or explicitly mark stale if an input receipt changes. Generated text is a derived view, never a new authority. |
+| CC/resource record | Maintained runtime library/admission and resource custody owners | Exact declaration/body/check pins, eligibility or admission decision, provenance and custody references | New versions require their protected process and compatibility evidence; retain old pins for existing plans and records. Notebook edits do not change runtime standing. |
+
+A hash confirms byte identity only. It does not establish that the document is authoritative, complete, implemented, run, or accepted. No summary can guarantee perfect or exhaustive coverage; state the actual reviewed scope and unresolved gaps.
+
+## Current interpretation gaps to preserve
+
+- The ultimate whole-system self-improvement direction across research, design, coding, and runs is current user intent; M1 architecture does not implement that complete loop. For labs, this includes creating/modifying CCs and developing harness changes for sustained autonomy. M1 RSI is bounded, off the hot path, mutation-limited, and focused on named targets; it is not authority to self-modify the whole product. Record the broader goal as user direction/open architecture work, not an M1 requirement invented by the notebook.
+- Reusable acquisition steps and composite/factory capabilities are plausible future architecture: paper/source intake, evidence extraction, claim checking, and composing tested capabilities could be reusable stages. M1’s maintained design explicitly defers composite CC creation/execution and places composition/fusion later. Treat any proposed acquisition pipeline or factory as a candidate design that must identify a demonstrated gap, independent obligations, and native decision path.
+- A narrow catalog or small number of enabled candidates does not establish planner failure. Capture the effective library snapshot, policy, resources, selectable candidates, proposal, and binder rejection reasons before diagnosing starvation.
+- The semantic verifier’s current boundary is the pinned declaration and exact output only. Preserve that boundary. Input-dependent fidelity/source predicates belong in protected host checks; do not widen reviewer context to make the reviewer repeat the producer’s task.
+- Historical proposal, implementation source, test source, a passing component check, integrated runtime evidence, and product acceptance are distinct evidence levels.
+
+See the source-specific [Paper2Agent review receipt](../Resources/review-batches/2026-10-21-paper2agent/architecture-source-review.md) for the stale evidence-note path and bounded review details.
+
+## M1 handoff and M2 sandbox route
+
+For benchmark execution tooling, use [[Resources/Coder Prompts/benchmark-runner]] and its named design owners. For optional immediate Spark deployment, use [[Resources/Coder Prompts/spark-benchmark-setup]]; it works directly on the host without VM/factory prerequisites. For the separate M2 architecture, use [[Designs/Lab Capsule and Factory Design Plan]] then [[Designs/Spark Shared Services and Storage]]. Do not require completion of M2 architecture to deploy the current app or run benchmarks.
+
+## Updated benchmark-runner authority
+
+[[Resources/Coder Prompts/benchmark-runner]] is the latest human-authorized scope: source/tooling in our AI4Research branch of JiuwenSwarm, sequential task execution and control/data collection for human judgment. Implementation follows that branch's process. Runtime does not overwrite user files or mutate original projects/live state. Developers and delegated agents may execute configured campaigns; the earlier independent-repository interpretation is superseded.
+
+## Exact immediate deployment
+
+The current [[Resources/Coder Prompts/benchmark-runner]] handoff builds `ai4r` and `benchmark-runner` images from AI4R. Read it for image contents, external case/input mounts, authenticated artifact transfer and persistence in a user-selected host output directory. The CLI runs in the separate control/data runner container; a host helper only handles Compose lifecycle. [[Resources/Coder Prompts/spark-benchmark-setup]] uses the same two-container contract.
+
+## Spark benchmark-host direction
+
+[[Activities/2026-10-22 Spark Benchmark Host Direction]] is the latest operating consideration for future Spark and M2 sandbox prompts: build/prepare on development infrastructure, transfer selected images and inputs to Spark, execute and inspect there, then return verified data. The sent benchmark-runner prompt remains unchanged; this is not implementation evidence.
+
+## Long-lived lab direction
+
+For durable startup/hackathon/research environments, start with [[Designs/Durable Project Labs]], then [[Designs/VM Lab Infrastructure Design]] and [[Designs/Spark Shared Services and Storage]]. Lab identity differs from its replaceable VM/container instance; model switches and lab evolution retain run provenance. This is M2 design work, separate from the immediate benchmark prompts.
+
+## Repository-owned benchmark deployment implementation
+
+Use [[Resources/Current Baseline]] for the latest inspected implementation identities and [[Activities/2026-10-23 Final M1 Merge]] for its runbook and evidence. [[Activities/2026-10-22 Integrated Benchmark Operator]] retains the earlier implementation location and workflow history. It supersedes instructions requiring private workstation operator scripts. Runtime data and installed hashed repository programs are distinct from handwritten private dependencies. Live Docker/SSH/ARM64/Spark readiness is not established by local fixture tests.
+
+## Earlier October 23 core planning correction checkpoint
+
+For the earlier typed DAG correction and branch status, read
+[[Activities/2026-10-23 Required M1 Planner]] before the historical optional
+capsule branch handoff. The core Planner is required M1 functionality.

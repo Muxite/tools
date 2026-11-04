@@ -1,0 +1,13 @@
+flowchart LR
+    output["Output"] -->|recorded by| receipt["Receipt"]
+    receipt -->|references| boundCall["Bound call and attempt"]
+    boundCall -->|pins instrument| cc["CC release"]
+    cc -->|resolved executable| tool["Tool image"]
+    build["Factory build record"] -->|subject| cc
+    boundCall -->|pins inputs| subject["Attempt subject manifest"]
+    subject --> engine["Candidate engine identity"]
+    subject --> data["Model and workload identities"]
+    subject --> env["Environment and lease"]
+    engine --> parent["Factory parent image"]
+    engine --> delta["Patch or configuration delta"]
+    engine --> restart["Binary identity and restart event"]

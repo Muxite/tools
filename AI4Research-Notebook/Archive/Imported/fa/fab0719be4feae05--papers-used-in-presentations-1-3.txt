@@ -1,0 +1,43 @@
+Papers used in presentations 1, 2 and 3 (Capability Capsule / architecture), compiled 2026-09-25
+=====================================================================================================
+
+Presentations:
+  P1 = Capability Capsule - Presentation.pptx (as presented 2026-09-23, 26 slides)
+  P2 = Capability Capsule - Layer 2.pptx (2026-09-24). Its 19 core slides name no paper. Every paper below reaches it
+       through Appendices B and C, which carry the post-presentation deck (appendix slides 76-77 list all 23)
+  P3 = Architecture - Sep to Oct - Presentation 3.pptx (2026-09-25). Cites no papers
+
+Each paper is in tundle/ai4research/papers/ as "<id> - <name>.pdf/.txt". Summaries are in papers/summaries/,
+except SkillProbe and GraSP, which have none.
+
+Format: arXiv id | short name | full title | used in | what it showed, in one line
+Where it says "P1 slide N", the one-line summary is taken from P1's evidence table.
+
+--- Cited in P1 (11), and in P2 through its appendices ---
+2605.24050 | More Skills, Worse Agents? | More Skills, Worse Agents? Skill Shadowing Degrades Performance When Expanding Skill Libraries | P1 slide 22; P2 appx | growing a library to 202 skills cut the pass rate by 0.21, 0.14 of it from choosing a look-alike skill: the chooser is the bottleneck, so filter by code first
+2606.07904 | Contract2Tool | Contract2Tool: Learning Preconditions and Effects for Reliable Tool-Augmented LLM Agents | P1 slide 22; P2 appx | filtering a 100-tool registry by learned preconditions and effects gave 0.980 success at ~2.5k tokens, against 0.775 at ~26k when every tool is shown
+2604.00392 | Beyond Task Completion | Beyond Task Completion: A Verification-vs.-Conformance Gap in Tool-Evolving Agents (EvolveTool-Bench) | P1 slide 22; P2 appx | 215 of 222 agent-built tools scored 0 on held-out tests of their claimed job: passing a task is not doing the job, so admission needs someone else's held-out check
+2604.01687 | CoEvoSkills | CoEvoSkills: Self-Evolving Agent Skills via Co-Evolutionary Verification | P1 slide 22; P2 appx | skills evolved against a verifier that never saw the source reached 71.1%, against 53.5% for human-curated skills (41.1% with pass/fail feedback only)
+2607.07436 | The Blind Curator | The Blind Curator: How a Biased Judge Silently Disables Skill Retirement in Self-Evolving Agents | P1 slide 23; P2 appx | a biased judge silently stops a curator retiring skills, while cap evictions hide it: judges must earn a standing on planted defects
+2609.16313 | Cognitive Admission Control | Cognitive Admission Control: Risk-Conditioned Assurance for Consequential Actions in Agentic Distributed Systems | P1 slide 23; P2 appx | a deterministic admission controller gave 0 harmful effects in 390 trials: typed verdicts, defer on unknown, and no score
+2608.05810 | When Self-Evolution Backfires | When Self-Evolution Backfires: Pre-Commit Gating against Skill Contamination in LLM Agents | P1 slide 23; P2 appx | an ungated growing library fell to 50% at 179 skills, while a gate before commit gave 72% with 37: gate before commit, do not clean up after
+2607.23332 | AllocBench | AllocBench: Measuring Online Tool Allocation Capability in LLM Agents | P1 slide 23; P2 appx | models build tools at first sight when waiting scores better: build on recurrence, not first sight
+2607.02345 | SkillFuzz | SkillFuzz: Fuzzing Skill Composition for Implicit Intents Discovery in Open Skill Marketplaces | P1 slide 23; P2 appx | benign skill sets steer planners to goals nobody asked for (1,188 found): composition risk is in no single capsule
+2605.10990 | Skill Drift Is Contract Violation | Skill Drift Is Contract Violation: Proactive Maintenance for LLM Agent Skill Libraries | P1 slide 23 (notes only); P2 appx | contracts on what skills depend on catch drift with 0 false alarms and precise repair tickets
+2608.25512 | Cordis | A Programming Paradigm for Spatiotemporal Composability | P1 slide 24; P2 appx (and ref slide 72) | components added, replaced, reverted and removed at run time within stated limits: the basis for install and uninstall mid-run
+
+--- In P2 only, through its appendices (from the post-presentation deck) ---
+2504.07079 | SkillWeaver | SkillWeaver: Web Agents can Self-Improve by Discovering and Honing Skills | P2 appx | agents improve themselves by synthesising, practising and testing their own skills
+2505.22954 | Darwin Godel Machine | Darwin Gödel Machine: Open-Ended Evolution of Self-Improving Agents | P2 appx | a self-modifying agent removed the logging its checker read: the checker, and its signal, must be out of the builder's reach
+2510.23601 | Alita-G | Alita-G: Self-Evolving Generative Agent for Agent Generation | P2 appx | self-built capability libraries help, if someone else checks them
+2601.08815 | Agent Contracts | Agent Contracts: A Formal Framework for Resource-Bounded Autonomous AI Systems | P2 appx | budgets declared as contracts; they bind between calls, not within one
+2602.22302 | Agent Behavioral Contracts | Agent Behavioral Contracts: Formal Specification and Runtime Enforcement for Reliable Autonomous AI Agents | P2 appx | an agent's behaviour declared as a contract and enforced at run time
+2603.21019 | SkillProbe | SkillProbe: Security Auditing for Emerging Agent Skill Marketplaces via Multi-Agent Collaboration | P2 appx | skills in marketplaces behave differently from what they declare
+2604.17870 | GraSP | GraSP: Graph-Structured Skill Compositions for LLM Agents | P2 appx | skills composed as a graph with edges between capabilities
+2606.03056 | SkillDAG | SkillDAG: Self-Evolving Typed Skill Graphs for LLM Skill Selection at Scale | P2 appx | typed skill graphs for selecting skills at scale; conflicts between skills cannot be read from their text
+2605.06365 | Execution lineage | From Agent Loops to Deterministic Graphs: Execution Lineage for Reproducible AI-Native Work | P2 appx | hash each run's inputs and predecessors so a change invalidates exactly the runs downstream
+2606.26924 | RelAIBuild | A Deterministic Control Plane for LLM Coding Agents | P2 appx | the control plane around coding agents is code, not a model
+2605.19576 | Library Drift | Library Drift: Diagnosing and Fixing a Silent Failure Mode in Self-Evolving LLM Skill Libraries | P2 appx | self-evolving skill libraries degrade silently when curated only by watching outcomes
+2608.01050 | Don't Offer What Can't Be Done | Don't Offer What Can't Be Done: Deterministic Executability Gating for LLM Skill Selection at Scale | P2 appx | check preconditions in code before the model chooses, and re-check on fresh state
+
+Totals: 23 distinct papers (P1 11, P2 23, P3 0). All 23 are in papers/, and 21 have a summary in papers/summaries/.

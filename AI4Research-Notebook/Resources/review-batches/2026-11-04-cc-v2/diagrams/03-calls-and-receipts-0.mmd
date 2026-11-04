@@ -1,0 +1,10 @@
+sequenceDiagram
+    participant A as Agent
+    participant H as Host
+    participant P as Adapter
+    A->>H: Capability and plain inputs
+    H->>H: Reserve key, verify release, bind grants and budgets
+    H->>P: Staged inputs and bounded call
+    P-->>H: Result and observed execution facts
+    H->>H: Validate outputs, seal artifacts, run requested checks
+    H-->>A: Durable receipt

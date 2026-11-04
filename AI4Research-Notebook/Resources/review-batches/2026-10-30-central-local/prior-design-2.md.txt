@@ -1,0 +1,60 @@
+# Lab projects and containerized capability capsules
+
+Design amendment for approval, October 30, 2026. This is the infrastructure support boundary for the user's in-progress **ai4r_m2a** direction. It does not modify that package, define a replacement capsule schema, or claim runtime compatibility. No runtime code is changed.
+
+## Coherent goal
+
+Lab Manager gives independent research projects durable environments. Each lab can evolve its own AI4R, select reusable capability releases, keep research evidence and propose changes for human review. AI4R/M2a makes the research and capability decisions. Lab Manager provides lifecycle, communication and recovery around that activity.
+
+**A lab is a project ownership boundary, not one large container.** Its resources include an AI4R worker, lab-owned CC job/service containers, optional applications/private model services and persistent source/state. An ordinary container setup on our machine remains the proposed baseline.
+
+## Image, capsule, capability and instance
+
+| Term | Meaning |
+|---|---|
+| Capability | A declared operation: a tool, skill, MCP method, specialist or workflow |
+| Capability capsule | A portable package of related capabilities, declarations, checks/verifiers, effects/guards, guidance and pinned dependencies |
+| CC image | The immutable Docker/OCI distribution and execution carrier for a capsule release; selected by digest |
+| CC container | A running instance of that release, as a short-lived job or a longer-lived service |
+
+One image can expose several capabilities and produce many independent instances. Different labs can reuse the same immutable image layers while keeping inputs, credentials, mutable files and results separate. Model/API and other external dependencies remain explicit; packaging does not eliminate them.
+
+The declared CLI, MCP and Python interfaces must use the same guarded runtime. An image does not make portability or quality automatic: external use must work without importing private AI4R research state, and required checks must remain enforced. M2a owns those requirements and their qualification.
+
+## Proposed execution arrangement
+
+The worker and CC containers are **siblings on the host runtime**. There is no requirement for Docker inside Docker, and agents/capsules do not receive the host Docker socket.
+
+1. Lab AI4R/M2a selects an eligible capability and binds its release, inputs, checks, effects and providers.
+2. Its execution-provider interface asks a trusted host executor to run scoped work. The executor can be a module in existing host infrastructure rather than another mandatory service.
+3. The executor starts or connects to the correct image instance, enforces actual filesystem/network/resource scope, and returns a stable job/service handle. Containers are associated with lab ID and invocation identity.
+4. M2a's guarded runtime and applicable independent checks assess the outputs. A process exit or successful launch is not scientific acceptance. Observations, receipts and artifacts remain attributable to the original call.
+5. Lab Manager can inspect/stop/recover all resources owned by that project, without interpreting the scientific task.
+
+Compose can own the fixed worker/application services. A selected host execution provider can own dynamic CC instances through the container runtime. **Every concrete resource has one lifecycle controller.** Dynamic jobs must not also be treated as competing Compose-managed services or adopted as orphans. Lab Manager coordinates the whole lab through these explicit owners. This refines the earlier shorthand “one lifecycle owner per lab”; it does not authorize two controllers over the same container.
+
+The communication adapter for research requests stays separate from this execution-provider boundary. Sending a research outcome to AI4R is not the same operation as invoking a capsule. Existing JiuwenBox/OpenSandbox interfaces may be reused where they meet the required contract, but neither is assumed to supply complete OCI capsule lifecycle and M2a effect enforcement without qualification.
+
+## Add, use, withdraw and improve
+
+- **Attach:** M2a registers a selected admitted release in the lab's capability pool. Infrastructure makes its image/provider dependencies available. Compatibility, effects, permissions and qualification determine eligibility.
+- **Use:** launch isolated jobs when appropriate, or reuse a declared service such as an MCP server. Preserve exact release and provider identity for every call. One capability call need not always create a fresh container.
+- **Withdraw:** stop new selection and handle active calls under explicit cancellation/drain policy. Stop/remove the appropriate instances and their isolated dependency environments. Preserve receipts and declared persistent state. Do not uninstall another lab's dependencies or delete a shared image while it remains referenced.
+- **Experiment/RSI:** keep candidate capsule source and outputs in the lab. A changed capsule/check/dependency creates a new image/release rather than mutating the admitted shared release. Explicitly authorized build/execution providers can support these experiments; M2a owns admission, historical-evidence rules and optimization permissions. Lab Manager neither invents RSI policy nor automatically promotes the result.
+
+The immutable image contains release content and pinned check implementations. Evolving usage, contextual success/failure history, trust projections and requalification evidence live in persistent records keyed to release and environment. They must not be overwritten on image replacement. Image pins help reproduction; full reproduction also requires relevant inputs, settings, model/provider identities and seeds, plus disclosure of unavailable historical dependencies.
+
+Advanced spatiotemporal composition is deferred. The initial infrastructure must support clean attachment/withdrawal, isolated dependencies, stable invocation tracking and recoverable artifacts.
+
+## Responsibilities and first qualification
+
+| Owner | Responsibility |
+|---|---|
+| Lab Manager | Lab catalog, worker/service lifecycle coordination, native research relay, project-wide stop/recovery and human-directed export |
+| Lab AI4R/M2a | Adaptive research, capability eligibility/selection, checks and qualification, contextual history, trust/reevaluation and artifact acceptance |
+| Host execution provider | Scoped container effects, exact image selection, stable jobs, observation/cancellation/reconciliation and declared persistent mounts |
+| Human | Design approval and manual adoption into mother AI4R |
+
+The first integration can follow M2a Stage 1: calculation and reporting capsules. Demonstrate separate labs using a pinned release, independent writable state, checked outputs, artifact retention, restart reconciliation and clean withdrawal. Also show a candidate release remaining separate from the admitted one. Actual M2a/provider compatibility is **not yet qualified** by these diagrams.
+
+The presentation leads with this coherent lab design. Feature derivations from existing AI4R, Compose, M2a/JiuwenBox, Lor and ArkenOS come later. Hardware capacity/cost material is removed from the deck; model placement remains an explicit software interface rather than a hardware-sizing discussion.

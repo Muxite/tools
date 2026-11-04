@@ -1,0 +1,80 @@
+---
+id: coder-prompt-spark-benchmark-setup
+status: ready-to-send
+source: Sources/Prompts/2026-10-22-spark-benchmark-setup-approved-plan.txt
+last_reviewed: 2026-10-22
+next_action: Implement and verify optional direct-host Spark deployment in the AI4Research branch
+---
+# spark-benchmark-setup
+
+## For human
+
+- **What it is:** A setup task to run our existing AI4Research system and benchmark tooling on the DGX Spark reliably.
+- **Provides:** Repeatable Docker/Compose setup, isolated AI4R and baseline containers, working connections and storage controls.
+- **Keeps separate:** The benchmark runner owns cases, scheduling, comparisons and exports. The longer-term VM and capsule-factory designs remain separate work.
+- **Optional:** Benchmarks can run on another compatible Docker host. This setup is a convenience, not a benchmark prerequisite.
+- **Models:** Use the existing model connection first. Add shared local inference only when a selected benchmark needs it.
+- **Human access:** Someone must provide Spark access and complete any required Codex login. The agent should finish independent work while waiting.
+- **Protects:** Preserve existing projects, NVIDIA services, models and results. No global Docker pruning or replacement of user files.
+
+## For AI: objective and boundaries
+
+Implement a small, repeatable deployment path for the current app and benchmark tooling on the actual DGX Spark. Put scripts, deployment configuration and documentation in our AI4Research branch of JiuwenSwarm, using its native task/spec process. Keep generated state and secrets out of source control. Deliver a useful working setup before adding infrastructure features.
+
+Read `AGENTS.md`, the current M1 `TASKS.md`, relevant deployment task/spec files, `deploy/m1` instructions and the companion prompt `benchmark-runner.md`. The previously inspected branch was named `ai4r_M1`; verify the actual checkout, branch, changes and source commit. Read the design pages named `automation.md`, `benchmark-runner.md` (Platform benchmark runner), and the sidecar/test-runner `README.md` pages for the supported client and export boundaries. Do not assume paths from another machine.
+
+This task owns **host preparation and deployment integration**. The companion benchmark prompt owns case loading, parallel scheduling, branch selection, comparisons, evidence and file export. Reuse its implementation and configuration contract; do not create a second scheduler, result store or adapter framework. Keep the runner usable on other compatible hosts without a Spark-specific dependency.
+
+Deploy directly on the host using existing Docker/Compose assets. VMs, a new registry, capsule containerization, a capsule factory and a capacity-controller service are outside this delivery. The longer-term infrastructure designs are context, not prerequisites. Fix necessary build, configuration, mount and startup problems in this task. Record broader application/API work under the existing implementation workflow and coordinate the interface with benchmark-runner; do not bypass app gates or duplicate its implementation.
+
+## 1. Inspect and prepare the actual host
+
+Start with a read-only inventory: OS and architecture, filesystem capacity/free bytes/inodes, memory, GPU/driver/runtime status, Docker/Compose/builder versions, available permissions, existing workloads, ports, image/cache usage and model locations. The supplied target has 128 GB unified memory and a 2 TB SSD; use actual measured capacity and existing usage for decisions.
+
+Preserve the working NVIDIA driver stack and unrelated services. Reuse working Docker tooling. Install only missing prerequisites needed for this deployment through the host's supported procedure and available authorization; document changes. Do not reinstall drivers, repartition storage or migrate an existing Docker data root to complete this setup. If host access or permissions are unavailable, finish scripts, configuration and local checks, and report the exact remaining host step.
+
+Use the host's actual architecture for images and dependencies. Prefer a supported native image/build; identify incompatible dependencies explicitly rather than silently relying on emulation or claiming a build succeeded. Record image identity and platform. Use runner-owned source copies and pinned commits for benchmark targets, leaving original user checkouts and dirty work intact.
+
+## 2. Reuse Compose and isolate targets
+
+Extend the existing deployment with a small configuration/profile or overlay where needed. Keep ordinary app startup independent of benchmarking. Provide setup, readiness, start, stop and owned cleanup commands, reusing existing commands when suitable. Include a short runbook and a secret-free example configuration. Do not invent a parallel deployment framework.
+
+Run AI4R and upstream JiuwenSwarm/OpenJiuwen in separate target containers with separate mutable app state, workspaces, authentication/session state and endpoints. Apply the same isolation to AI4R A/B targets. Reuse runner ownership identities and lifecycle handling when available. Standalone setup uses its own explicit owner; do not create a second copy of resources already owned by a campaign. A selected upstream baseline must retain its upstream identity.
+
+Resolve bind sources on the Spark where the Docker daemon runs. Create only deployment-owned paths, validate file-versus-directory types and UID/GID access, and prevent accidental empty Docker-created mount directories. Inputs are read-only; output/state paths are target-specific. Reject path traversal, symlink/junction escapes and foreign ownership. Avoid fixed container names, shared mutable volumes and conflicting ports. Verify actual network routes and scoped API credentials. Workers use target service addresses, not their own localhost. Expose only necessary private/operator endpoints; do not expose the Docker API or give product containers the Docker socket.
+
+Setup must be repeatable: create missing owned resources, validate existing owned resources and preserve persistent data. Refuse conflicting or foreign resources instead of adopting or overwriting them. Stop preserves state. Cleanup removes only identified disposable owned resources and keeps results, credentials and persistent data by default. Never use global prune or `down --volumes` as routine cleanup.
+
+## 3. Keep storage and model use bounded
+
+Place mutable deployment data under a configured owned root. Keep models, repositories, datasets, credentials and generated results out of image layers/build contexts. Reuse pinned dependency layers and build each required image once; avoid retained tar archives and duplicate exports for every iteration.
+
+Before downloads, pulls, builds and campaign admission, check the affected filesystem's physical usage and expected peak additional space, including staging, unpacking and export overlap. Preserve **20% of measured filesystem capacity as headroom**: refuse new growth estimated to exceed 80% usage. Existing pressure does not authorize deletion of user data. Report the deficit and available safe options. Recheck during long operations and bound unknown-size transfers or leave them blocked. Use simple scripts/preflight checks and existing limits; do not build the future capacity-controller service or claim these checks enforce quotas on unrelated processes.
+
+Configure finite build-cache retention, rotated container logs and bounded temporary downloads using supported settings for the actual versions. Document effective limits and ownership. On a shared builder, avoid changing global GC policy; use an owned builder or leave shared settings intact and report the limitation. Retain evidence separately from disposable logs. No broad cleanup of existing models, images, volumes or results.
+
+Use the existing configured model connection first. Do not download models as a setup demonstration. If a selected benchmark requires local inference, qualify one supported runtime on the actual Spark and add one shared service/store for the required model revision. Keep weights outside app images and avoid a copy per target. Reuse an existing compatible artifact safely, pin the effective model/runtime/settings, and protect writable session state. Verify each container can reach the service through the supported app configuration. Bound model concurrency and memory use from measured capacity; serialize resource-exclusive measurements through the runner's existing mechanism. Local inference is not a gate when the selected campaign uses the existing remote model connection.
+
+## 4. Verify connections and hand off to benchmark-runner
+
+Use supported app readiness and authenticated client calls, not container liveness alone. Confirm target build/instance identity, required operations, mount access and model prerequisites. Document the actual supported Codex setup/login path for each target, without inventing commands or copying a developer's home directory. Tokens remain in scoped secret files or supported credential storage and never enter logs, images or reports. Missing human authentication leaves model-backed checks incomplete while independent setup work continues.
+
+Emit a secret-free handoff using the runner's existing configuration shape. Include target endpoints as seen by the relevant caller, repository/commit and image identities, platform, owned storage paths, credential references, limits and readiness observations. Keep secret references restricted to their authorized consumer; reports contain neither secret values nor credential copies. If the runner's contract is incomplete, record the minimum agreed fields in its native spec and use one shared contract instead of creating a Spark-only competing format.
+
+If benchmark-runner is unfinished, deploy and test available app components and report what remains. Do not claim campaign readiness or build a replacement runner. If it is available, run a small generic campaign through it and preserve its actual export. Humans still assess task quality; this setup only verifies deployment and transport behavior.
+
+## 5. Completion evidence
+
+Deliver scripts/configuration, the example and runbook, and a concise record of changes, commands, outcomes, blockers and next steps. Keep that record sufficient to resume after context loss. Stay focused on getting the existing system running reliably.
+
+On the actual Spark, verify:
+
+- Required images run on the host platform, and the app passes its supported readiness checks.
+- AI4R and baseline targets have working scoped client connections and separate writable state; one target's restart does not disrupt the other.
+- Representative container inputs are readable and outputs land in the intended owned location. Pre-existing sentinel files and another deployment remain unchanged.
+- Repeated setup and stop/start preserve state, avoid duplicate resources and refuse naming/ownership conflicts.
+- Capacity checks refuse an over-budget operation without filling the disk. Storage reporting and cleanup preserve retained outputs and unrelated resources.
+- Missing Codex login is reported with a supported next step. After login, verify an actual model call when required.
+- When runner and credentials are available, a small campaign produces real retained records and exportable artifacts. Otherwise mark that check explicitly incomplete.
+
+Label documentation/static checks, local mocks, actual Spark container checks and model-backed campaign checks separately. Never report source inspection or a mock as successful Spark deployment. This task does not establish the longer-term VM/factory architecture or the scientific correctness of benchmark results.

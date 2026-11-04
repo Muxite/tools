@@ -1,0 +1,23 @@
+flowchart TB
+ Browser[User browser on the LAN or VPN] <-->|session token in every request header| Web[Web UI and control API]
+ subgraph App[App container]
+ Web --> Binder[Protected binder: checks, pins and freezes the plan]
+ Web <--> State[Run-state module]
+ Binder --> Scheduler[Scheduler: Kahn order]
+ Scheduler --> Runner[CC runner and SwarmFlow]
+ Runner --> Checks[Protected check runner]
+ Checks -->|all mandatory checks passed| Verify[Verifier CC]
+ Checks -->|a check failed or is unavailable| Gate[Protected gate host]
+ Verify --> Gate
+ Gate -->|decision committed| State
+ State --> Scheduler
+ Library[(CC library)] -.-> Binder
+ Library -.-> Runner
+ Runner --> Routing[RouterPort: Codex by default]
+ Routing --> Bridge[Audited model bridge]
+ Runner --> POC[Confined executor]
+ end
+ Bridge <--> Model[Configured model endpoint]
+ State <--> DB[(SQLite state)]
+ Runner --> Files[(Artifacts and raw evidence)]
+ POC --> Workspace[(POC workspace)]

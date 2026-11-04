@@ -1,0 +1,76 @@
+---
+id: design-project-authority
+status: active
+source: Resources/review-batches/2026-10-21-history/coverage.json; maintained PRD/design and dated planning records linked below
+last_reviewed: 2026-10-23
+next_action: Use dated source receipts and target-repository instructions; reconcile the PRD pointer conflict before product-obligation changes
+---
+# Project authority and approval register
+
+Use this page to distinguish product requirements, maintained design, coordination plans, personal historical directives, implementation records, and current user intent. A filename containing “approved” is not sufficient evidence that a product decision was authorized.
+
+## Working library and current source route
+
+The working personal knowledge library is `C:/Users/m50066326/huawei/AI4Research-Notebook`; start at [[Home]] and [[Active Stage]]. It indexes the maintained product/design repository and implementation checkouts rather than replacing them. `outputs/` contains delivery copies, not a second maintained library.
+
+For source and evidence, use [[Resources/Current Baseline]]. Latest previously observed remote source is `809351f8`; the local implementation checkout is a separate Builder candidate at `79ffb21d`. Neither identity implies current remote state or runtime acceptance. The [cleanup source receipt](../Resources/review-batches/2026-10-23-library-cleanup/authority-source-receipt.json) records this read-only reconciliation. Current user intent may extend the design agenda; notebook interpretations do not silently amend received product requirements.
+
+## Authority order
+
+1. **Current user instructions** define the requested work. The present request authorizes notebook maintenance; broader implementation authorization belongs to its exact task-specific instructions. No instruction establishes measured gain without evidence. The captured request and interpretation are in [Implementation Intent](../Sources/Implementation%20Intent.md) and its linked prompt receipt.
+2. **Received PRD V.10** owns product requirements and outcomes. The current [product receipt](../../jiuwenswarm/docs/product/README.md) identifies the verbatim October 15 PRD; prior PRD copies and planning interpretations are historical inputs.
+3. **The maintained `jiuwenswarm` design package** owns architecture and implementation-facing details under the PRD. [AGENTS.md](../../jiuwenswarm/AGENTS.md) says it is the sole maintained architecture and directs readers to the PRD and package. The [package overview](../../jiuwenswarm/docs/architecture/design-package/README.md) names its status system and says design decisions are standards, not runtime passes.
+4. **Native M1 tasks and evidence** govern what is registered and what has actually been implemented or verified. Dated snapshots and the latest inspected-source route are recorded in the [current baseline receipt](../Resources/Current%20Baseline.md). Its source assertions remain source-reported until independently tested. Old working copies and previous receipts do not establish current code completeness.
+5. **Personal planning, old directives, handoffs, presentations, and scratch designs** explain rationale and evolution. They do not amend the PRD or maintained design unless an authorized decision has been incorporated there.
+
+## Current user intent and verification boundary
+
+The user prioritizes accuracy. CC declarations state a job and give independent held-out tests and deterministic checks a target; hashes, fingerprints, and observations establish identity or behavior but do not alone prove correctness. The semantic verifier sees only the pinned declaration and exact output, never the producer’s task input. Protected host/deterministic fidelity and runtime checks may inspect input separately. Mandatory gates remain protected; the planner may propose additional compatible gates. These are present user requirements in [Implementation Intent](../Sources/Implementation%20Intent.md), aligned with design decisions D20/D24; do not revive earlier input-visible verifier proposals.
+
+A correct scientific `FAIL` or `INCONCLUSIVE` is a valid result, unlike process crash, missing credentials, or unavailable evidence. Blocking a bad output is prevention; blocking a correct output is false rejection. Claims that CC improves accuracy require a controlled comparison; they are not established by design, observation, or test count.
+
+## Decision and proposal register
+
+| Topic | Evidence and disposition | Authority status |
+|---|---|---|
+| Capsule wrapper and declaration-first checking | Early Sept 2026 presentation and Sept 22 workshop slides proposed declarations, held-out tests, independent admission, immutable versions, and split build/use lifecycles. These motivate current CC design; the slides say the proposal was not yet built or measured. | Historical design proposal; rationale retained, not approval receipt. |
+| “Nothing that decides is a capsule” → “capsules everywhere” | Sept 23 personal directive was explicitly superseded by Sept 29 directive: any workflow node may be a capsule, including gate/verifier/delivery nodes; library, admission, librarian and record stores remain outside as non-nodes. See [Directives](../../tundle/obby/Directives.md#L82). | Explicit supersession within personal design history. Current implementation must follow maintained package/PRD, not the old rule. |
+| Verifier sees declaration and exact output | Maintained D20 is labeled “Authorized semantic-review scope change”; D24 defines output-only criteria and openly records that semantic review does not establish fidelity. Host checks and benchmark cases carry separate obligations. | Current recorded design decision, subject to PRD deviation and its stated limited assurance. |
+| Accuracy-first behavior and protected gates | Current user intent and design package require never passing bad output forward; work CC, verifier, deterministic checks, and gate host have distinct responsibilities. Planner can add compatible checks, not remove required ones. | Current direction plus maintained design. |
+| M1 human activation | Current D21 says M1 human activation remains; D46 says activation begins in RSI sandbox and adoption into live runs requires manual promotion plus a new static template. | Current maintained design. |
+| November automatic eligibility | Private CC-PLAN-07 in the October coordination plan says eligible candidates may become selectable for future plans without a separate human activation step, explicitly subject to confirmation in aligned M2 PRD/design. That conflicts with D21/D46 if read as overriding M1/current policy. | Planning proposal/conditional future change, not approved product amendment; preserve conflict as open until M2 PRD/design records disposition. |
+| User-reported one-shot M1 build | The October 21 user prompt says the M1 codebase resulted from sending design package, PRD, and verification package to Codex 6.1 Sol Ultra for a one-shot build. The prompt supplies no date or run receipt. | User-reported provenance; date/configuration/result receipt not independently established here. Keep distinct from the separately documented October 16 worker-data comparison trial. |
+| October 16 comparison trial | CC-PLAN-08 says the comparison cannot establish a Spec Kit winner. CC-PLAN-13 records generic Leader/SwarmFlow, four fixed roles, worker-data replay, no integrated AI4Research Planner or conversation, and declaration/output-only semantic checking. | Source-recorded experimental boundary. Do not claim it was the user's one-shot code build, a product approval, implementation pass, or full fidelity evidence. See [plan](../../AI4Research_private_planning/cc-plan-approved-revision-2026-10-14-r2/plan.md#L3). |
+| “Approved” private planning package | Its preamble says product requirements and architecture remain governed by the supplied PRD and maintained full design. No authorizing receipt was located in the bounded review. | Stated coordination scope retained; provenance of the approval label is unverified. It does not promote the package to product authority. |
+| September 29 handoff and schema directives | Handoff records that review was next; directive describes a full-coverage rebuild and a single-source-of-truth move, but remains a personal handoff record. | Historical review state; no inference that every page received team/product approval. |
+
+## Source-pointer conflict and historical snapshot caution
+
+**Material receipt conflict, still present at inspected `809351f8`:** its `docs/product/README.md` identifies the October 13 PRD. The earlier captured M1 register and `source-baseline.json` allocated October 15 V10; those records are now under `docs/code/Missions/archive/M1/` in that inspected revision. The separate maintained design checkout's product navigation identifies V10. These pointers are not reconciled by choosing whichever file was read last. V10 is the implementation register's captured input; the branch's stale navigation must be resolved through the owning records before a product-obligation change. The 270,791-byte implementation V10 snapshot includes a terminal LF difference from the 270,790-byte canonical source; record exact bytes separately from meaning.
+
+The October 21 detached checkout at `AI4Research-Development/jiuwenswarm-m1-review-d3d7f56` is captured in [Current Baseline](../Resources/Current%20Baseline.md). It updates the native [M1 task register](../../AI4Research-Development/jiuwenswarm-m1-review-d3d7f56/docs/code/Missions/M1/TASKS.md) from the earlier `98bd9d9` checkout. The recorded 35-path delta changes web/authentication/deployment and M1-001/M1-006 records; the CC body, check-bundle, runner, and native-adapter files inspected in the earlier review are byte/source unchanged in that comparison. Do not combine old test counts or readiness statements with the new snapshot as if they were produced against it. New task-register assertions describe required work and status; they are not equivalent to a run, test, or acceptance result. That captured TASKS register was populated (r45), but its receipt said integrated candidate NOT_BUILT and final system evidence NOT_RUN. These are dated register assertions, not the latest integrated source status; later integration checks retain their own candidate and scope in [[Resources/Current Baseline]]. Source presence and test sources do not establish acceptance or a CC accuracy gain.
+
+## Decision rule for amendments
+
+An amendment draft is not accepted architecture. Each proposed coder-facing change must point to the maintained PRD clause, current design decision/contract, concrete observed gap, and native task identity. If it changes an obligation or authority boundary, it needs an explicit authorized product decision and an update in the owning design/PRD process. If it only clarifies an implementation contract, preserve existing acceptance identities and request source-backed acceptance evidence. Do not silently carry personal directives, old workshop rules, or conditional planning assumptions into code instructions.
+
+Coverage is bounded. The review batch documents the selected source files and hashes; it does not claim exhaustive PRD clause verification, complete approval-chain reconstruction, or a fresh test/build of the latest code.
+
+## Historical native responsibility map (October 21 capture)
+
+At the October 21 checkpoint, the populated [captured task register](../../AI4Research-Development/jiuwenswarm-m1-review-d3d7f56/docs/code/Missions/M1/TASKS.md) allocated the following owners. These are implementation responsibilities, not proof of AC completion. These entries are historical allocation, not a verified current task structure: at `809351f8` the M1 records reside in `docs/code/Missions/archive/M1/`. Read target-repository instructions and its actual current task process before implementation; do not invent replacement TASK/AC/IF identities from this notebook.
+
+| Native owner | Responsibility | Code/evidence route |
+|---|---|---|
+| M1-001 | Native composition, runtime/dependency qualification and shared ports | Native adapter/bridge; M1-001 tasks |
+| M1-002 | Store, library, binding, runner, checks/gates and evidence custody | Shared Enforcement reference; M1-002 tasks |
+| M1-003 | Uploaded inputs through Intent and Requirements to accepted Brief | Compiler references; M1-003 tasks |
+| M1-004 | Search through Delivery, environment/POC/scientific results | Research-stage references; M1-004 tasks |
+| M1-005 | Planner proposals and protected planned execution | Planner reference; M1-005 tasks |
+| M1-006 | Control API, CLI/web/TUI, installation, account/input inspection | Captured 35-file delta and M1-006 tasks |
+| M1-007 | Separate router selection and bounded IPC; bridge retains dispatch | Routing agreement and M1-007 tasks |
+| M1-008 | Offline candidate evolution, independent referee and manual promotion | Current design D21/D46 and M1-008 tasks |
+| M1-QA | Independent tooling cases, protected scoring and evidence adapters | QA tasks; separate from product release gate |
+| M1-SYSTEM | Same-candidate integrated journeys and acceptance evidence | Captured system tasks; final evidence NOT_RUN at that checkpoint |
+
+[[Designs/CC Reference/Source Map|The source map]] supplies clickable code/check/test paths. The proposed accuracy amendment primarily touches M1-QA and consumes M1-002/003/004/005 interfaces; actual current allocation must be established in the target repository, not inferred from this historical map.

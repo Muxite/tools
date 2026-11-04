@@ -1,0 +1,73 @@
+---
+id: m2-handoff-index
+status: historical-handoff-requires-reconciliation
+source: Sources/Prompts/2026-10-23-m2-component-handoffs.txt; source-map.json
+last_reviewed: 2026-10-23
+next_action: Follow the replacement adaptive research plan before selecting compatible implementation details
+---
+# M2 lab infrastructure handoffs
+
+**October 26 supersession notice:** This folder preserves the October 23 bounded implementation handoff. Read the [current sandbox proposal](../../../Designs/Sandbox%20Lab%20Design.md) and [new diagram set](../../../Designs/Sandbox%20Lab%20Diagrams/README.md) before specifying changes. Multi-operation packages, automatic compatible local adoption, deployment profiles and the proposed incremental-planning interface refine earlier assumptions. Reconcile the affected contracts in the owning repository; these older handoffs alone do not specify those changes.
+
+## For human and AI
+
+- Three connected handoffs: durable VM labs, container capsule carriers, and a local factory per lab.
+- These are earlier implementation references. Select compatible details through the [replacement delivery plan](../../../Designs/Lab%20Capsule%20and%20Factory%20Design%20Plan.md); no VM, carrier or factory implementation is claimed here.
+- Develop/build on a workstation, CI or qualified development VM. Spark is primarily restricted benchmark hardware, with 128 GB unified memory and the supplied 2 TB SSD.
+- Existing M1 Docker benchmarking stays independent. Normal `up`/`start` invokes no sudo; do not add VM provisioning to that path.
+- Start with one useful slice. A registry, fleet manager, full capacity service and local model server are not bootstrap prerequisites.
+
+## Reading order
+
+1. [Implementation status](implementation-status.md): actual baseline and verification limits.
+2. [Shared contracts](contracts-and-boundaries.md): identities, custody, resource policy and release rules.
+3. Choose [VM labs](vm-labs.md), [container capsules](container-capsules.md) or [local factories](local-factories.md).
+4. [Validation](validation.md): shared acceptance scenarios and completion reporting.
+
+The required documentation graph is contained in this folder. `source-map.json`
+records inspected source paths/hashes and external technical references. No
+private scripts or runtime state are required reading. Implementers still need
+the actual target repository, its current instructions, maintained PRD/design and
+native specification process. Preserve existing TASK/AC/IF identities; these
+filenames are work packages, not new native task IDs.
+
+```mermaid
+flowchart TB
+    DEV[Workstation or qualified build host] -->|pinned images and selected data| LAB[Durable lab VM]
+    LAB --> APP[Independent AI4R and local factory]
+    APP -->|typed authorized jobs| BROKER[Lab broker]
+    BROKER --> CC[Short-lived capsule containers]
+    CC --> E[Sealed outputs and independent checks]
+    E -->|candidate export| CENTRAL[Central qualification]
+    CENTRAL -->|explicit adoption for new runs| LAB
+    DEV -->|existing two-image workflow| SPARK[Spark benchmark host]
+    SPARK -->|verified results| DEV
+```
+
+VM labs describe the durable project topology; Spark is not presumed able or
+permitted to host them. Use an already provisioned VM/provider endpoint first.
+Read-only discovery may identify a blocker; do not install a hypervisor, request
+root, alter drivers or call a container a VM to make a check pass. Carrier and
+manual packaging work can proceed on a qualified Docker host without a VM.
+
+## Useful delivery sequence
+
+1. Freeze shared file/identity examples and inspect one existing capsule.
+2. Independently develop one durable lab lifecycle on an available provider and one stateless tool container on Docker.
+3. Prove manual capture/build/load/qualification before adaptive factory authoring.
+4. Connect the lab-local factory/broker, then demonstrate independent import into a second lab.
+5. Add agent/verifier carriers, shared local inference or broader RSI after their own checks pass.
+
+Keep capsule carriers, VM lifecycle, factory lifecycle and deployment changes on
+focused branches where practical. Ship checked-in commands/examples and actual
+observations. No auto-promotion, silent state migration or dependence on a new
+infrastructure service merely to run the existing benchmark system.
+
+## Tradeoffs to preserve
+
+| Lens | Consequence |
+|---|---|
+| Strength | Independent durable labs and pinned carriers support reproducible software execution and selective adoption. |
+| Weakness | Guest image stores, build caches and versioned data consume real duplicate disk; VM/provider and adapter work still need implementation. |
+| Opportunity | Prove a tool carrier and manual factory on development Docker before provider access or Spark scaling is available. |
+| Threat | Uncertain effects, stale writers, self-certified factory output or model/image growth can destroy trust and capacity; explicit custody, fencing, budgets and independent admission are required. |

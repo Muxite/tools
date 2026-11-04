@@ -1,0 +1,35 @@
+flowchart TB
+    BASE[Tested M2 base - ARM64 source, images and resource policy]
+    BOOT[ARM64 VM provider and cloud-init]
+    BASE --> BOOT
+    subgraph H[GB10 Spark - 128 GB unified memory and 2 TB SSD]
+        CAP[Capacity controller - quotas, leases and retention]
+        MODEL[One model store and host GPU inference gateway]
+        SHARED[Prepared source store and OCI registry]
+        subgraph A[CPU lab VM A - project P]
+            APP_A[Independent AI4R and factory A]
+            RELAY_A[Scoped model relay A]
+            LOCAL_A[Own broker, Engine, images and capped BuildKit cache]
+            APP_A --> LOCAL_A
+            APP_A --> RELAY_A
+        end
+        subgraph B[CPU lab VM B - project Q]
+            APP_B[Independent AI4R and factory B]
+            RELAY_B[Scoped model relay B]
+            LOCAL_B[Own broker, Engine, images and capped BuildKit cache]
+            APP_B --> LOCAL_B
+            APP_B --> RELAY_B
+        end
+        RELAY_A -->|model handles and requests| MODEL
+        RELAY_B -->|model handles and requests| MODEL
+        SHARED -->|only required snapshots and images| LOCAL_A
+        SHARED -->|only required snapshots and images| LOCAL_B
+        CAP -.-> MODEL
+        CAP -.-> LOCAL_A
+        CAP -.-> LOCAL_B
+    end
+    BOOT --> APP_A
+    BOOT --> APP_B
+    APP_A -.->|candidate source, image and evidence| QUAL[Central independent qualification]
+    APP_B -.->|candidate source, image and evidence| QUAL
+    QUAL --> NEXT[Next tested M2 release]

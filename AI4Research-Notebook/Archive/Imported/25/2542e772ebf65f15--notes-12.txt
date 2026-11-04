@@ -1,0 +1,7 @@
+TIME 0:45
+SAY: The Darwin Gödel Machine is a coding agent that improves itself. It keeps an archive of every version of itself and never removes one. Each round it picks a version, that version edits its own code, and the new version gets tested on a coding benchmark and added to the archive if it still works. Over 80 rounds, with Claude 3.5 Sonnet doing the rewriting, it goes from 20% to 50% on SWE-bench. The important part is that the benchmark score is what drives it.
+IF ASKED:
+- Self-improvement is not cheap: 1 SWE-bench run of this loop cost about USD 22,000, against about USD 10,000 for either baseline
+- The archive loop itself is fixed and cannot be modified by the agent
+- Only versions that still compile and can still edit code are kept
+- A parent is picked in proportion to its score over 1 plus its number of working children, so a weak version stays selectable

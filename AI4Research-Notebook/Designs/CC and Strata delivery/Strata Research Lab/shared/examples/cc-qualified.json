@@ -1,0 +1,149 @@
+{
+  "schema_version": "0.3.0-proposal",
+  "id": "strata.lab-tools",
+  "version": "1.0.0",
+  "state": "qualified",
+  "purpose": "Inspect the native expert-pack index and measure inference on an existing local Strata endpoint. Synthetic qualified declarations; image and evidence identities are placeholders.",
+  "tags": [
+    "inference",
+    "benchmark",
+    "strata",
+    "inspection"
+  ],
+  "takes": {
+    "status": "required",
+    "items": [
+      {
+        "name": "workload",
+        "contract": {
+          "uri": "fixture:workload-schema",
+          "sha256": "fe89e8f2a9770f7663c47b44b6ac32249804222ed45249b0fc1a4e2bdc5748e1"
+        }
+      },
+      {
+        "name": "pack",
+        "contract": {
+          "uri": "fixture:pack-input",
+          "sha256": "20df460932e0c4175e1d93bb043878fcdbed1618f05ea10277337806dc60a585"
+        }
+      }
+    ]
+  },
+  "gives": {
+    "status": "required",
+    "items": [
+      {
+        "name": "observations",
+        "contract": {
+          "uri": "fixture:observations-schema",
+          "sha256": "710f025cbad41787fee9889cef2392b492cc282bbd99f10a8501de9face2c53d"
+        }
+      },
+      {
+        "name": "inventory",
+        "contract": {
+          "uri": "fixture:inventory-output",
+          "sha256": "659b0510e05be111c60ebb2eb494c6ef8e818aee1c303d70b379a1aad302f0b8"
+        }
+      }
+    ]
+  },
+  "needs": {
+    "status": "required",
+    "items": [
+      {
+        "provider": "strata-api",
+        "constraint": "Loopback endpoint with agreed inference/status API on a reserved GB10 host",
+        "min_memory_mib": 1024,
+        "device_class": "gb10"
+      },
+      {
+        "provider": "native-index",
+        "constraint": "Read-only pinned Strata native pack and its declared shard layout",
+        "reader_abi": "strata-native-index-v3",
+        "min_memory_mib": 128
+      }
+    ]
+  },
+  "changes": {
+    "status": "required",
+    "items": [
+      {
+        "scope": "attempt.artifacts",
+        "action": "write raw per-request measurements"
+      }
+    ]
+  },
+  "guarantees": {
+    "status": "required",
+    "items": [
+      {
+        "id": "output-schema",
+        "definition": {
+          "uri": "fixture:check-output-schema",
+          "sha256": "1aa37b007787b293e80dfd79e6397a33dc2611ed8dc6e733d0c8065e6f94ef8a"
+        }
+      },
+      {
+        "id": "index-bounds",
+        "definition": {
+          "uri": "fixture:native-index-bounds",
+          "sha256": "a58930157cfb8d6ded0b0061a07b163ce3851466264f63b7640c6925797da4bb"
+        }
+      }
+    ]
+  },
+  "carriers": [
+    {
+      "format": "oci-image",
+      "platform": "linux/arm64",
+      "image": "fixture.invalid/benchmark@sha256:9b083a97196866f7233e6e2948a46f4dc7fecb102dff2170d4e55a6ea8e8e30e"
+    }
+  ],
+  "operations": [
+    {
+      "id": "measure",
+      "description": "Collect per-request data with the pinned tools/dgx_bench.py wrapper",
+      "entrypoint": "/opt/cc/measure",
+      "carrier_index": 0,
+      "takes": [
+        "workload"
+      ],
+      "gives": [
+        "observations"
+      ],
+      "checks": [
+        "output-schema"
+      ],
+      "needs": [
+        "strata-api"
+      ],
+      "changes": [
+        "attempt.artifacts"
+      ]
+    },
+    {
+      "id": "inspect",
+      "description": "Inspect v3 native_experts.txt offsets and shard bounds for an upstream pack",
+      "entrypoint": "/opt/cc/inspect",
+      "carrier_index": 0,
+      "takes": [
+        "pack"
+      ],
+      "gives": [
+        "inventory"
+      ],
+      "checks": [
+        "index-bounds"
+      ],
+      "needs": [
+        "native-index"
+      ],
+      "changes": []
+    }
+  ],
+  "qualification": {
+    "uri": "fixture:independent-qualified-inspector-and-benchmark",
+    "sha256": "e1c54349c1b0c95ad1b19b209ca1f4012714df1cd9ea689bb9850bbb98328e5d"
+  }
+}

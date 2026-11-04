@@ -1,0 +1,10 @@
+flowchart TB
+    DEV[Workstation or qualified build host] -->|pinned images and selected data| LAB[Durable lab VM]
+    LAB --> APP[Independent AI4R and local factory]
+    APP -->|typed authorized jobs| BROKER[Lab broker]
+    BROKER --> CC[Short-lived capsule containers]
+    CC --> E[Sealed outputs and independent checks]
+    E -->|candidate export| CENTRAL[Central qualification]
+    CENTRAL -->|explicit adoption for new runs| LAB
+    DEV -->|existing two-image workflow| SPARK[Spark benchmark host]
+    SPARK -->|verified results| DEV

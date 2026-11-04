@@ -1,0 +1,7 @@
+TIME 1:00
+SAY: The bottom band is DeepSeek Harness. There's no core to patch: even the agent loop is a plugin, and unloading a plugin removes everything it registered. That is the time half of composability. The space half is that components declare what they depend on, so 2 can be active at once without disturbing each other. Those 2 properties are what let me add and retire a capability during a run. Committed data is versioned, anything a model sees is logged, and sandbox policy is separate from the operating system. On top sit the layers people already know: skills, tools, MCP and A2A. Each answers a different question, and none answers whether a capability may run and what it will do to the system. That's the capsule: a manifest around any of them.
+IF ASKED:
+- The composability paper warns that a faulty self-modification can disable the very process needed to recover, which is the argument for protected components later
+- Unloading cannot undo writes outside the process, such as files or network calls
+- A remote A2A peer can never be verified statically, so an A2A capsule would always need approval
+- Loading dynamic packages is opt-in and off in the default preset

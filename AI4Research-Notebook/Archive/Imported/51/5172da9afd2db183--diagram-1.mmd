@@ -1,0 +1,10 @@
+flowchart TB
+  ID[Exact CC version and invocation] --> RUN[Protected runner and capture hooks]
+  RUN --> OBS[Invocation observation]
+  RUN --> RAW[(Raw per-call evidence)]
+  OBS --> GATE[Gate host adds decision evidence]
+  GATE --> REC[Completed Capsule Run Record]
+  OBS --> BUNDLE[Run Bundle: platform evidence writer]
+  RAW --> BUNDLE
+  REC --> POST[Separate derived records and exports]
+  BUNDLE --> POST

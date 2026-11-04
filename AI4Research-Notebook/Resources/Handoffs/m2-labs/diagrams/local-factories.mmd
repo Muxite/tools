@@ -1,0 +1,10 @@
+flowchart TB
+    REQUEST[Prepared sources or bounded gap] --> CONTRACT[Freeze promises and independent checks]
+    CONTRACT --> AUTHOR[Bounded adaptive authoring]
+    AUTHOR --> CONTEXT[Immutable context and dependency preparation]
+    CONTEXT --> BUILD[Broker build on permitted host]
+    BUILD --> LOAD[Target load and image inspection]
+    LOAD --> TEST[Independent real-call qualification]
+    TEST -->|pass| SUBMIT[Submit to admission owner]
+    TEST -->|fail or unknown| RETAIN[Retain failure without promotion]
+    SUBMIT -->|explicit activation| CATALOG[Eligible for future plans]

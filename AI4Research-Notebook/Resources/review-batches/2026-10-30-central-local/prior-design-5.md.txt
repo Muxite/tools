@@ -1,0 +1,153 @@
+---
+id: sandbox-design-presentation
+status: dense-system-first-design-review
+source: Sources/Prompts/2026-10-27-cc-sources-factory-native.txt; Designs/Sandbox Lab Design
+last_reviewed: 2026-10-30
+next_action: Approve the lab design and communication-adapter boundary before further implementation
+---
+# Sandbox design presentation
+
+**Latest direction, October 30: four detailed main slides, complete architecture first.** The live deck contains only these four slides. The prior deck, including old supporting pages, is retained as a native snapshot in the dated review batch. Main reading order:
+
+1. Complete system: central/mother AI4R, Lab Manager, both labs, CC instances, persistent state, image library, shared inference and human contribution.
+2. Capsule images, guarded calls, scoped host execution, persistent evidence and attach/use/withdraw lifecycle.
+3. Cross-system request, native research, CC execution, artifact and recovery flow.
+4. Reuse sources, responsibility boundaries and approval conditions.
+
+The main diagrams use explicit ownership boundaries and separate research, execution, model, state and human-review paths. No hardware-cost material was restored. Current renders are in `review-dense-20261030`; the prior native deck snapshot and source receipt are retained in the dated review batch. This is a presentation consolidation, not a runtime implementation or M2a schema change.
+
+## Prior ten-slide version
+
+
+**Current, October 30: design for approval.** [Live editable deck](https://chatgpt.com/space/page_7a233186a3548191869c85106fc552b4).
+
+The ten main slides now lead with goals and design:
+
+1. Independent labs and reusable capabilities.
+2. Central AI4R, Lab Manager and independent labs.
+3. AI4R worker, scoped host execution and lab-owned CC containers.
+4. One pinned capsule image, many independent instances.
+5. Attach, use and withdraw capsules without losing evidence.
+6. Simple native research workflow.
+7. Human review and manual contribution.
+8. Clear responsibility boundaries.
+9. Feature sources: existing AI4R, Compose, M2a, JiuwenBox, Lor and ArkenOS.
+10. Design decisions and first integration scope.
+
+The capacity-cost and detailed GPU-phase slides were removed, including from the hidden appendix. OpenSandbox and other reference details remain supporting slides. The in-progress M2a library is not modified. Its source files and the pasted chat are captured in the dated source receipt; this briefing only specifies the environment/provider support needed around it.
+
+[Container ownership diagram](review-m2a-20261030/slide-3.png) · [Image versus instances](review-m2a-20261030/slide-4.png) · [Capsule support note](../../../../AI4Research-Development/jiuwenswarm-m1-current/docs/architecture/lab-manager/capsule-support.md)
+
+All ten main slides are rendered and visually reviewed. The prior deck and entrypoints are preserved in the October 30 review batch. No runtime files or M2a library files were changed.
+
+## Prior October 29 briefing
+
+
+**Latest phase correction:** design approval only. The live deck now has twelve main slides, including explicit host/lab placement, adapter responsibilities, an OpenSandbox alternative and native request recovery. Research communication, runtime control and model traffic are separate interfaces. The OpenSandbox server proxy’s native bearer limitation is stated; a direct discovered endpoint is the proposed route in that alternative. The four superseded diagram slides were captured in a hashed native snapshot before replacement. No runtime code was changed for this clarification.
+
+**Current, October 29:** the [live editable presentation](https://chatgpt.com/space/page_7a233186a3548191869c85106fc552b4) now selects the single-host Compose Lab Manager, superseding the older VM-per-lab presentation below. It has ten visible slides: requirements; Lor; ArkenOS; complete architecture; writable lab anatomy; lifecycle/relay; GPU phases; manual contribution; reuse; demonstration/qualification. Option comparisons and earlier diagrams remain hidden supporting/history slides. The Lor and ArkenOS investigation states the public-code limits and the methods selected for reuse.
+
+[Current architecture preview](review-compose-20261029/slide-4.png) · [GPU phases](review-compose-20261029/slide-7.png) · [[Designs/Sandbox Lab Design]]
+
+All ten main slides and the changed comparison table were rendered and visually reviewed. The maintained generator is in the implementation review output, not the old rev11 generator. Current evidence distinguishes local fixtures/real Docker from actual native-model, Linux/ARM64 and GPU qualification.
+
+[Current adapter boundary diagram](review-approval-adapter-20261029/slide-7.png) · [Current source/state mounts](review-approval-adapter-20261029/slide-5.png)
+
+## Historical October 27 delivery
+
+The files and description below preserve the earlier VM design; they are not the selected deployment.
+
+
+[PowerPoint: AI4Research Sandbox Design rev11](output/AI4Research%20Sandbox%20Design%20rev11.pptx). [Live editable deck](page://page_7a233186a3548191869c85106fc552b4).
+
+Nine main slides and six hidden appendix slides, reduced from seventeen total. The complete lab system is the primary diagram. The source/factory view now shows general, domain and lab-owned storage; user/AI and source-driven factory creation/upgrades; independent qualification; local use; and separately reviewed contributions. Native JiuwenSwarm Skill/tool/evolution mechanisms are the preferred integration surface.
+
+The purpose-first opening, attributed Karpathy quote, recurring research cycle, lab VM ownership, private/shared model policy and independent stop paths remain. The workload example remains removed. Parallel work and scoped retry are folded into the cycle; the dedicated navigation slide is removed. The upstream original figure and our native integration mapping remain adjacent for comparison.
+
+| Slide | Content |
+|---|---|
+| 1 | Purpose and AI4R value |
+| 2 | The complete lab system |
+| 3 | Inside the lab AI4R |
+| 4 | Continuing research cycle |
+| 5 | CC sources, factory bundle and local reuse |
+| 6 | Model routing for AI4R and CCs |
+| 7 | Private models |
+| 8 | Persistence, stop and recovery |
+| 9 | Reuse-first proposed stack and our integration boundary |
+| 10 | Original OpenJiuwen system diagram |
+| 11 | Native JiuwenSwarm integration |
+| 12 | Open-source component evidence and integration limits |
+| 13 | Acceptance scenarios |
+| 14 | Larger platforms: value and adoption cost |
+| 15 | JiuwenBox requirements fit |
+
+## Core diagram previews
+
+### The complete lab system
+
+![The complete lab system](review-rev11/slide-2.png)
+
+### Inside the lab AI4R
+
+![Inside the lab AI4R](review-rev11/slide-3.png)
+
+### Continuing research cycle
+
+![Continuing research cycle](review-rev11/slide-4.png)
+
+### CC sources, factory bundle and local reuse
+
+![CC sources, factory bundle and local reuse](review-rev11/slide-5.png)
+
+### Model routing for AI4R and CCs
+
+![Model routing for AI4R and CCs](review-rev11/slide-6.png)
+
+### Private models
+
+![Private models](review-rev11/slide-7.png)
+
+### Persistence, stop and recovery
+
+![Persistence, stop and recovery](review-rev11/slide-8.png)
+
+The Factory is explicitly a bundle of lab CCs, not a new execution layer. The factory view expands illustrative ingestion, build/test and packaging CCs and shows their shared lab execution/model routing. Research and factory workflows use the same CC machinery. A bundle can expose a composite CC interface while its parts remain reusable. Checkers can be CCs; independent criteria and admission authority still apply.
+
+## Native integration and evidence
+
+JiuwenSwarm source pin `02b37f47fbefe80a58e4ed88606120818ca44ac3` provides Skill discovery/install, a local library with role visibility, config/tool/MCP integration and native skill create/evolution rails. The factory should emit compatible guidance and tool bindings with packaged implementation. A Skill is not an OCI image; a CC adds pinned execution and AI4R obligations. Qualify these adapters rather than introducing a parallel skill manager. Detailed source scope and limits are on slides 11–15 and in notes.
+
+Mental-model Skills provide source-inspired perspectives and methods. Claims of faithful person emulation or superior decisions require evidence. Functional qualification covers specified task behavior, compatibility and regression criteria. It does not establish general research benefit. A specialist replaces a generalist only after a matched assessment supports it. Local usefulness does not automatically publish a CC. Mother AI4R release adoption and generic JiuwenSwarm upstream contribution are separate review paths.
+
+Both AI4R and CCs use injected model routing. Endpoint relocation can preserve code and model identity; model substitution follows explicit policy. Private models remain lab-scoped. JiuwenBox offers execution, stop and proxy mechanisms; Docker owns OCI and the provider owns VM power control. Integration, actual termination, privacy, GPU support and research improvements remain unverified.
+
+- JiuwenSwarm: https://github.com/openJiuwen-ai/jiuwenswarm . Exact source paths are retained in notes and the dated source receipt.
+- JiuwenBox: https://github.com/openJiuwen-ai/jiuwenswarm/blob/develop/jiuwenbox/README.md . Graceful shutdown and signal escalation are source-backed, not a deployment test.
+- Karpathy publisher transcript: https://www.dwarkesh.com/p/andrej-karpathy , October 17, 2025. Persistent external state addresses continuity, not weight-level continual learning.
+- OpenJiuwen Figure 2: https://arxiv.org/html/2608.27969v1 , August 28, 2026. The original diagram is reproduced with attribution; similarity does not validate our complete deployment.
+- Stable-interface precedent: https://www.anthropic.com/research/managed-agents , April 8, 2026.
+- Serving/routing precedents: https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/ and https://docs.litellm.ai/docs/proxy/model_management . No gateway product is newly selected.
+- Host controls: https://docs.docker.com/engine/security/ , https://docs.docker.com/engine/containers/resource_constraints/ and https://libvirt.org/manpages/virsh.html . Effective configuration requires qualification.
+
+## Reusable source
+
+`factory_bundle.mjs` updates the current fifteen-slide deck with the explicit Factory composition; `export_bundle.mjs` exports the reviewed state. `cc_factory_native.mjs` contains the current diagram/native integration callbacks and one-time compaction of the prior seventeen-slide deck. Do not rerun `compact` against an already compacted deck. It uses native helpers from `system_deck.mjs`. Earlier callbacks describe the previous ordering and should not be replayed over the current deck. The earlier `export_native.mjs` exports the reviewed saved state to PowerPoint and embeds the attributed original image. The external live session supports PNG previews but not direct PPTX export. Current renders are in `review-rev11/`; earlier renders and exports remain as revision history. Page ID: `page_7a233186a3548191869c85106fc552b4`.
+
+Slide 6 placement correction: private model and lab configuration sit explicitly inside the VM boundary; shared inference stays outside. `private_model_placement.mjs` holds this targeted edit and `export_placement.mjs` exports rev7.
+
+Reports and discoveries are explicit outputs on slides 1–4, with a deliverable box on the overall diagram and retained reports/evidence feeding the cycle. `research_outputs.mjs` applies this targeted update; `export_reports.mjs` exports rev8. No slides were added.
+
+Agent packaging clarification: slides 2, 3, 5, 6, 9 and 11 explicitly identify CCs as packages for AI4R agents, skills, tool code and workflows. `agent_cc_clarity.mjs` applies the update; `export_agent_cc.mjs` exports rev9. Still fifteen slides.
+
+## Visual conventions in rev10
+
+Blue identifies research/orchestration; violet CC packages/composition; cyan model access; green persistent state; amber execution/control; slate checks; rose reports/discoveries. The core diagram includes a role legend. Solid arrows show requests, results, control or data; dashed arrows show configured references/imports, contribution proposals or optional escalation. Labels and boundaries also communicate each role.
+
+The internals diagram routes dispatch through binding/checks, returns job results to checking, and passes factory candidates through qualification before admission to the library. Imported packages enter lab selection/qualification before execution. These clarify the existing acceptance responsibilities rather than claiming new runtime functionality. The library supplies future selection and active work remains pinned. Larger native text, stronger strokes and larger arrowheads preserve editable diagram content. Fifteen slides remain.
+
+`visual_routing.mjs` applies the visual pass and final label repairs; `export_visual.mjs` exports the reviewed live state. All slides were rendered and inspected, with remaining label wraps repaired. Current renders are in `review-rev11/`. The upstream original figure retains its original colors; our callouts follow the deck conventions. This review is not a native PowerPoint application test or a runtime validation.
+
+## October 27 open-source hunt
+
+[[Designs/Sandbox Open Source Reuse]] is the detailed decision note. Slides 2, 5, 6, 8 and 9 now name documented reuse candidates; slides 12–14 show evidence, remaining tests and platform adoption gates. Native JiuwenSwarm remains the integration surface. LiteLLM is a recommended gateway candidate with explicit PostgreSQL/feature/model-binding costs. Docling/Paper2Agent/pytest/BuildKit/ORAS/Quarto are tools or recipes used by CCs, not mandatory new control services. restic needs consistent exports and independent storage; MLflow remains optional. The deck stays at fifteen slides. `open_source_reuse.mjs` applies this revision and `export_open_source.mjs` exports rev11. No installations or runtime tests were performed for the hunt.

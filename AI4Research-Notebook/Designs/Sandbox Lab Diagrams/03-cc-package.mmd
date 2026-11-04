@@ -1,0 +1,31 @@
+flowchart TB
+    subgraph PKG["Immutable CC package version"]
+        DECL["Package manifest<br/>Lineage and compatibility set"]
+        OPS["Named operations<br/>Purpose, ports, effects and preconditions"]
+        BODY["Implementation artifacts<br/>Adapters, images or member packages"]
+        PROFILE["Application profile<br/>Embedded, managed or attached"]
+        CHECKS["Independent check association<br/>Operation and package journeys"]
+        DECL --> OPS
+        DECL --> BODY
+        DECL --> PROFILE
+        DECL --> CHECKS
+    end
+    BIND["Bind one invocation<br/>Exact package and selected operation"]
+    RESOURCE["Lab application binding<br/>Instance, session, lease and state schema"]
+    CALL["Execute bounded attempt<br/>Retain identity and observations"]
+    OPS --> BIND
+    BODY --> BIND
+    CHECKS --> BIND
+    PROFILE --> RESOURCE
+    RESOURCE --> BIND
+    BIND --> CALL
+    class DECL,BIND control
+    class OPS,BODY,PROFILE,CALL work
+    class CHECKS qualify
+    class RESOURCE data
+
+    classDef work fill:#e8f1ff,stroke:#3568a8,color:#142d4e,stroke-width:1.5px
+    classDef control fill:#fff1d7,stroke:#a66d16,color:#513406,stroke-width:1.5px
+    classDef qualify fill:#eee8fa,stroke:#7854a0,color:#35204d,stroke-width:1.5px
+    classDef data fill:#e5f3eb,stroke:#3c8160,color:#163e2a,stroke-width:1.5px
+    classDef external fill:#f0f2f5,stroke:#65758a,color:#273547,stroke-width:1.5px

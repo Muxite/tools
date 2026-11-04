@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant R as Requester
+    participant F as Factory coding agent
+    participant S as Artifact store
+    participant L as Lab agent
+    participant H as Qualified Spark host
+    participant E as Evaluator
+    R->>F: Product brief and optional CC requests
+    F->>F: Implement, pin source, build and self-test
+    F->>S: Product, materials and build provenance
+    F-->>L: Product reference and Factory receipt
+    L->>S: Fetch and verify required bytes
+    L->>H: Admit, stage, restart exact candidate
+    H-->>L: Loaded binary/configuration and generation
+    L->>H: Invoke pinned measurement CC
+    H->>S: Raw evidence and attempt receipt
+    L->>E: Evidence, candidate identity and frozen policy
+    E-->>R: Pass, fail or inconclusive comparison

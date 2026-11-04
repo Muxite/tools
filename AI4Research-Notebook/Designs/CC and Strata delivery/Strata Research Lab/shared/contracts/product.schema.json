@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai4r:design:0.3:product",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "record_type": {
+      "const": "factory-product"
+    },
+    "schema_version": {
+      "const": "0.3.0-proposal"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "brief": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+    },
+    "deliveries": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "urn:ai4r:design:0.3:common#/$defs/oci"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "format": {
+                "const": "git-commit"
+              },
+              "source": {
+                "$ref": "urn:ai4r:design:0.3:common#/$defs/source"
+              }
+            },
+            "required": [
+              "format",
+              "source"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "format": {
+                "const": "git-patch"
+              },
+              "base": {
+                "$ref": "urn:ai4r:design:0.3:common#/$defs/source"
+              },
+              "patch": {
+                "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+              },
+              "expected_tree": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              }
+            },
+            "required": [
+              "format",
+              "base",
+              "patch",
+              "expected_tree"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "format": {
+                "const": "git-bundle"
+              },
+              "bundle": {
+                "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+              },
+              "source": {
+                "$ref": "urn:ai4r:design:0.3:common#/$defs/source"
+              }
+            },
+            "required": [
+              "format",
+              "bundle",
+              "source"
+            ]
+          }
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "build": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/recipe"
+    },
+    "provenance": {
+      "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+    },
+    "delivered_ccs": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:ai4r:design:0.3:common#/$defs/ref"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "record_type",
+    "schema_version",
+    "id",
+    "brief",
+    "deliveries",
+    "build",
+    "provenance",
+    "delivered_ccs",
+    "limitations"
+  ]
+}

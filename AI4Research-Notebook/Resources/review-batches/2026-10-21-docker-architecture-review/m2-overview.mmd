@@ -1,0 +1,39 @@
+flowchart TB
+    BASE[Tested M2 base - app, factory, CC and deployment pins]
+    BOOT[VM provider and cloud-init bootstrap]
+    BASE --> BOOT
+    subgraph A[Lab VM A - project P]
+        direction TB
+        APP_A[Compose - AI4R and local factory A]
+        BROKER_A[Host broker A]
+        DOCKER_A[Local Docker Engine A]
+        BUILD_A[BuildKit builder and cache A]
+        IMG_A[Engine local image store A]
+        CC_A[CC invocation containers A]
+        APP_A -->|typed jobs| BROKER_A
+        BROKER_A --> DOCKER_A
+        DOCKER_A --> BUILD_A
+        BUILD_A -->|explicit load| IMG_A
+        DOCKER_A --> CC_A
+        IMG_A --> CC_A
+    end
+    subgraph B[Lab VM B - project Q]
+        direction TB
+        APP_B[Compose - AI4R and local factory B]
+        BROKER_B[Host broker B]
+        DOCKER_B[Local Docker Engine B]
+        BUILD_B[BuildKit builder and cache B]
+        IMG_B[Engine local image store B]
+        CC_B[CC invocation containers B]
+        APP_B -->|typed jobs| BROKER_B
+        BROKER_B --> DOCKER_B
+        DOCKER_B --> BUILD_B
+        BUILD_B -->|explicit load| IMG_B
+        DOCKER_B --> CC_B
+        IMG_B --> CC_B
+    end
+    BOOT --> APP_A
+    BOOT --> APP_B
+    APP_A -.->|source, image and evidence candidates| QUAL[Central independent qualification]
+    APP_B -.->|source, image and evidence candidates| QUAL
+    QUAL --> NEXT[Next tested M2 release and registry pins]

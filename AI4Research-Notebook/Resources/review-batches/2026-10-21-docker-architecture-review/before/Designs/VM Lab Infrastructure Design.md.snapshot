@@ -1,0 +1,75 @@
+---
+id: vm-lab-infrastructure-design
+status: proposed
+source: Sources/Prompts/2026-10-21-vm-capsule-factory-design-plan.txt
+last_reviewed: 2026-10-21
+next_action: Define the lab manifest, permission matrix and provision-to-restore lifecycle
+---
+# VM lab infrastructure
+
+Parent: [[Designs/Lab Capsule and Factory Design Plan]]. Initial proposed architecture, not a runtime result.
+
+## Topology
+
+```mermaid
+flowchart TB
+    BASE[Central tested AI4R releases]
+    REG[Shared image registry and candidate exchange]
+    QUAL[Central qualification and release]
+    subgraph A[Lab VM A - project P]
+        AI[AI4R A and local factory A]
+        BUILD[VM-local build broker]
+        RUN[VM-local runner and checks]
+        STORE[Local images and durable project state]
+        AI --> BUILD
+        AI --> RUN
+        BUILD --> STORE
+        STORE --> RUN
+    end
+    subgraph B[Lab VM B - project Q]
+        BI[AI4R B and local factory B]
+        BS[Own builder, runner, images and state]
+        BI --> BS
+    end
+    BASE --> AI
+    BASE --> BI
+    REG --> STORE
+    REG --> BS
+    AI -->|candidate source and evidence| QUAL
+    BI -->|candidate source and evidence| QUAL
+    QUAL --> BASE
+    QUAL --> REG
+```
+
+The lab manager is operator infrastructure outside evolving AI4R instances. It provisions VMs, assigns storage/compute and captures exports. Each VM owns its Docker engine/image store, AI4R checkout, factory job state, runtime state and project resources. An already prepared lab can use cached images without a central factory. Network-dependent models and data retain their own availability requirements.
+
+The factory belongs logically to AI4R. Local build and launch brokers enforce narrow requests outside authoring agents' write authority. Choose service packaging during detailed deployment design while preserving these ownership boundaries. Capsule containers receive neither the Docker socket nor general VM-management credentials. A VM administrator can alter the lab, so central qualification remains outside its authority and treats lab evidence as submitted evidence.
+
+[Rendered topology](../Resources/review-batches/2026-10-21-vm-capsule-design-plan/vm-lab-topology.png) (generated from the Mermaid block above).
+
+## Resource and authority matrix
+
+| Boundary | Owner and proposed access |
+|---|---|
+| VM lifecycle, quotas, network, backup destinations | Lab operator/manager; scoped requests where required |
+| Checkout and project resources | Local AI4R development workspace; revisioned code and separate mutable datasets |
+| Build and launch | Local brokers consume pinned contexts/recipes or bound invocations |
+| Model/GPU access | Operator allocation and scoped bridge; record grants and actual environment |
+| Local CC eligibility | Protected admission owner; separate decision from factory output |
+| Tested central base publication | Central custodian; labs submit candidates without release credentials |
+
+Agents may propose changes to protected components; installing them is an operator-managed lab update. Acceptance checks remain fixed while judging the update. Local results cannot certify central promotion.
+
+## Lifecycle, state and restore
+
+Provision a pinned base and independent checkout/catalog/image store. Prepare authorized sources and compute/model access. Freeze a manifest before a run; subsequent changes create another revision. On interruption, reconcile container/process state without blindly replaying effects. Export manifests, source deltas, logs, reports and hashes before cleanup.
+
+Backups include source history/uncommitted deltas, runtime database/artifacts, catalog/admission records, factory jobs and image availability. Specify an application-consistent checkpoint procedure; a VM disk snapshot alone is insufficient evidence. Test restore into a fresh VM. Never duplicate live run identities or credentials into an apparently independent lab. Roll back migrations with a compatible source/catalog/state snapshot and preserve failed-attempt evidence separately.
+
+Use distinct lab/project identities for networks, volumes and evidence paths. Shared immutable caches can reduce storage; exclude cross-lab writable state from the initial design. Distinguish ordinary GPU scheduling from exclusive performance measurements. Set quotas and retention from actual capacity, with no capacity assumed here.
+
+## Trial and failure outcomes
+
+Demonstrate two VMs using one starting base but independent projects, AI4R/factory versions, images and histories. Stop A during a build and run; restore without corrupting B or duplicating an external operation. Export evidence, reconstruct pins in B or a clean qualification VM, then explicitly update and roll back.
+
+Storage exhaustion or failed evidence persistence stops dependent work and prevents acceptance/cleanup of unexported results. Missing image/model/GPU becomes a recorded blocked prerequisite, never an unannounced substitute. Registry outage permits prepared local work; transfers remain pending. Record actual behavior before claiming containment or reproducibility. [[Designs/Lab Progression|Existing synthetic Docker evidence]] does not satisfy the VM trial.

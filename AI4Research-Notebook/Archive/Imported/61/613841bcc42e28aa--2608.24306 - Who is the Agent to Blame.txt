@@ -1,0 +1,2671 @@
+
+
+===== page 1 =====
+Who is the Agent to Blame?
+Localizing Faithfulness and Citation Mistakes in Agentic Deep Research
+Eran Hirsch1
+David Wan2
+Han Wang2
+Elias Stengel-Eskin3
+Mohit Bansal2
+Ido Dagan1
+1Bar-Ilan University
+2UNC Chapel Hill
+3University of Texas at Austin
+eran.hirsch@biu.ac.il
+{davidwan, hwang, mbansal}@cs.unc.edu
+esteng@utexas.edu
+dagan@cs.biu.ac.il
+Abstract
+Deep research (DR) systems produce long-
+form cited reports by orchestrating multiple
+agents that search and synthesize information
+from the web. Citations are the primary mech-
+anism for evaluating the faithfulness of these
+reports, yet current DR systems exhibit poor
+citation recall. Moreover, improving citation
+recall is challenging because DR systems are
+complex multi-agent architectures where infor-
+mation passes through agents like a telephone
+game, and both content and citations can get
+corrupted along the way. We propose an eval-
+uation method that pinpoints which agent in-
+troduced each error by locally testing agent
+invocations for faithfulness and verifiability rel-
+ative to their own inputs. Furthermore, we pro-
+pose a four-type taxonomy to categorize the
+discovered errors: hallucination, uncited input
+reliance, uncited output, or insufficient cita-
+tions. Applying our method to three top-ranked
+open-source DR systems, we obtain actionable
+diagnostics. Almost every agent makes a lot
+of mistakes with the exception being those that
+summarize a single document. We find that
+the dominant error type varies systematically
+across agents, where the orchestrator mistakes
+are mostly citation-related. We find that 84.7%
+of final-report errors in AI-Q originate at the or-
+chestrator, roughly 31% of them hallucinations
+and the rest citation mistakes. Guided by these
+insights, we demonstrate that two simple in-
+terventions raise citation recall by 5% without
+degrading output quality.1
+1
+Introduction
+Deep research (DR) systems autonomously search
+the web and synthesize long-form cited reports in
+response to a user request. Similar to how humans
+perceive the factuality of online text (Redi et al.,
+1Code available at https://github.com/eranhirs/
+who-is-the-agent-to-blame
+2019), citations are a primary mechanism for ver-
+ifying and measuring the factuality of DR reports
+(Han et al., 2026; Patel et al., 2025; Skarlinski et al.,
+2024; Du et al., 2025), making citation reliability
+a central design concern for developers of DR sys-
+tems. The standard metric for citation quality, ci-
+tation recall – the fraction of claims supported by
+their cited sources (Zhang et al., 2025; Gao et al.,
+2023) – reveals that current DR systems perform
+poorly (Han et al., 2026; Patel et al., 2025).
+However, improving citation recall is challeng-
+ing, particularly with current complex DR system
+architectures (Wang et al., 2024; Li et al., 2025b;
+Team et al., 2025; Asai et al., 2026), where infor-
+mation passes through multiple agents, like in a
+“telephone game” (Figure 2). As content crosses
+agent boundaries, and often gets compressed, both
+core information as well as citations may get cor-
+rupted (Laban et al., 2026).
+Aiming to provide DR developers with a bet-
+ter understanding of citation recall errors and their
+sources, we propose a novel evaluation method-
+ology that addresses two primary goals.
+First,
+we evaluate the citation performance of individual
+agent invocations, with respect to their own inputs.
+This allows two kinds of evaluation: (a) measur-
+ing the average citation performance of each agent
+component in the DR system, as well as (b) trac-
+ing which individual agents are responsible for the
+eventual citation errors that are present in the final
+DR report. Second, when an agent makes a mistake,
+we identify the type of error made; this could be
+a hallucination (not supported by any source; He
+et al., 2025), relying on input that was itself uncited
+in a prior agent step (uncited input reliance), carry-
+ing no citations to the current agent’s own output
+(uncited output), or having citations that do not
+fully cover its sources (insufficient citations).
+We apply our framework to three top-ranked
+open-source DR systems, Nvidia AI-Q (Nvidia,
+2026), MS-Agent (ModelScope, 2026), and Tra-
+1
+arXiv:2608.24306v1  [cs.CL]  25 Aug 2026
+
+
+===== page 2 =====
+Note
+Sampled 
+sentence
+Sampled 
+sentence
+Sampled 
+sentence
+Input
+Average Agent Performance
+Tracing System-level Errors
+Report 
+“LLM X is trained on 1.2T tokens [3].”
+Faithful
+Uses cited info
+Has citations
+Cites sufficiently
+Does cited source [3] support the sentence?
+Orchestrator
+Researcher
+Global citation recall test (prior work)
+Note
+Sampled 
+sentence
+Searcher
+Faithful
+Uses cited info
+Has citations
+Cites sufficiently
+Sampled 
+sentence
+Faithful
+Uses cited info
+Uncited output
+Summary
+Report
+All sentences in the report
+Sampled 
+sentence
+Faithful
+Uses cited info
+Has citations
+Insufficient citations
+Input
+Faithful
+Uses cited info
+Has citations
+Cites sufficiently
+Orchestrator
+Hallucination
+Searcher
+Source 
+Documents
+Researcher
+Searcher was found as the agent that 
+introduced a faithfulness error
+Input
+Input
+Input
+Input
+No
+Figure 1: Our two evaluation goals for DR systems (Section 3). Left: Our framework samples sentences per agent
+to produce statistics on how many mistakes it makes, and of what kind. Right: For each sentence in the final report,
+our framework localizes citation recall errors to the agent that introduced them and classifies errors by type. Dashed
+arrows represent the original information flow in the DR system; solid lines represent our evaluation process.
+jectoryKit (Lugoloobi, 2026). We use examples
+from the dominant DeepResearch Bench (Du et al.,
+2025) and obtain informative findings. For exam-
+ple, at the agent level, we find that most agents
+make a lot of mistakes, except those that summarize
+a single document. Also, that in the two stronger-
+model systems the dominant failure mode shifts
+from hallucination at the shallower agents to cita-
+tion errors at the orchestrator, while the smaller-
+model system hallucinates at every stage. At the
+system level, 84.7% of final-report errors in AI-
+Q are attributed to the orchestrator (main) agent,
+where the majority of these are citation-related and
+a sizable 31% of the orchestrator’s own errors are
+hallucinations. To illustrate the usefulness of such
+diagnostics, we demonstrate two simple interven-
+tions: (1) instruct the orchestrator to avoid using
+uncited information, and (2) replace synthesized
+researcher notes with raw source snippets. These
+interventions successfully raise citation recall by
+5% and citation precision by 3% to 7% percentage
+points, without reducing output quality.
+Overall, our contributions include:
+1. A formal, human-validated method for evalu-
+ating a single agent invocation, which locally
+tests faithfulness and verifiability and enables
+both agent-level and system-level analyses
+(Figure 1).
+2. A four-type error taxonomy that distinguishes
+failure modes across agent boundaries.
+3. An empirical study revealing prominent error
+sources and types in three recent competitive
+open DR systems (Sections 5 and 6).
+4. A demonstration of two targeted interventions,
+guided by our diagnostics, which substantially
+improve citation quality (Section 7).
+2
+Background
+DR systems are multi-agent systems that orches-
+trate web search, summarization, and long-form
+report writing. Figure 2 contrasts two open-source
+instances: Nvidia AI-Q (Nvidia, 2026) and MS-
+Agent (ModelScope, 2026). These systems are
+ranked #1 and #2, respectively, in the dominant
+DeepResearch Bench open-source leaderboard (Du
+et al., 2025) as of May 2026.
+Despite imple-
+mentation differences, they share logical roles: a
+web search engine that retrieves source pages; a
+searcher that compresses the retrieved content into
+doc- or search-level summaries and snippets; a re-
+searcher that writes natural-language notes with
+citations, based on the searcher’s output; and an
+orchestrator that assembles content into the final
+cited report. Beyond these shared roles, AI-Q has
+a planner agent that creates the outline and rubrics,
+while MS-Agent has the orchestrator write the plan
+before any web search has been performed. An-
+other difference is that MS-Agent has a reporter
+writing one chapter at a time. Both systems have
+an iterative phase where the orchestrator edits the
+final report. The two systems also differ in the
+model assigned to each role: AI-Q pairs a frontier
+model at the planner and orchestrator with a small
+open-weights model at the researcher, whereas MS-
+Agent grades model capability with the depth of the
+agent, from GPT-5 nano at the searcher to GPT-5
+mini at the reporter and GPT-5 at the orchestrator
+(Table 7). This heterogeneity turns out to matter for
+the errors each agent makes (Section 5). We addi-
+tionally evaluate TrajectoryKit (Lugoloobi, 2026),
+2
+
+
+===== page 3 =====
+Report 
+Orchestrator
+Searcher
+(Tavily)
+Search-level
+summary &
+snippets
+Researcher
+w/o citations
+Nvidia AI-Q
+Web Search
+(Tavily)
+Source
+Planner
+Outline,
+Rubrics
+Report 
+Orchestrator
+Searcher
+Doc-level
+summary & 
+snippets
+MS-Agent
+Web Search
+(Exa+Jina)
+Source
+Researcher
+Search 
+plan
+(optional) Shared ﬁle-system
+Reporter
+Chapter 1
+Chapter N
+…
+Note
+Summary
+Note
+Note
+Note
+Figure 2: Abstract information flow scheme of two
+state-of-the-art open-source DR systems, Nvidia AI-
+Q (Nvidia, 2026) and MS-Agent (ModelScope, 2026).
+Each color represents a different agent type and each
+colored block represents a different agent invocation.
+Both systems share the same logical agents of searchers,
+researchers, and an orchestrator, as is common in open-
+source deep research systems (see Section 2). All sys-
+tems, including TrajectoryKit (Lugoloobi, 2026), which
+we also evaluate, are described in detail in Section I.
+ranked #3 on the same leaderboard, which instan-
+tiates the same logical roles. Unlike the other two
+systems, TrajectoryKit runs its agents on a substan-
+tially smaller open-weights model gpt-oss-20b
+(OpenAI et al., 2025), so its model capability does
+not vary with the depth of the agent. Other deep re-
+search systems share similar design principles (Li
+et al., 2025b,a). Across all of these architectures,
+the telephone-game failure modes described in Sec-
+tion 1 can arise at many points: when information
+crosses between agents, when an agent’s history is
+truncated or summarized, and even between subse-
+quent writing steps within a single agent. Our work
+develops evaluation methodologies to trace these
+errors.
+The hallucination problem in LLMs motivated a
+growing body of work on attributed text generation
+(Gao et al., 2023; Han et al., 2026; Zhang et al.,
+2025), where output sentences are paired with sup-
+porting citations. In DR specifically, citation recall
+is the standard factuality metric for the entire report
+(Han et al., 2026; Patel et al., 2025; Du et al., 2025;
+Li et al., 2026). For each sentence, citation recall
+checks whether a citation is needed (Zhang et al.,
+2025) and, if so, whether the associated citations
+support the claim. Our work goes beyond aggre-
+gate citation recall by differentiating specific error
+types and tracing them to the responsible agent.
+3
+Evaluation Framework
+We propose a framework to assist DR developers in
+identifying the weak parts of their system design in
+terms of faithfulness and citation mistakes, as mea-
+sured by citation recall. Our approach is to provide
+error categorization and localization, measuring
+what kind of errors occurred and which agent is to
+blame.
+The building block of our evaluation framework
+is a method to evaluate the output of a single agent
+invocation with respect to the inputs that it received
+(Section 4). In contrast to the standard method for
+evaluating citation recall (Gao et al., 2023) which
+globally evaluates sentences in the final output re-
+port and their citations against the source docu-
+ments, our method locally evaluates the output of
+an agent invocation relative to its own inputs. This
+local approach enables us to pinpoint an error to
+a specific agent. In addition, this local approach
+makes faithfulness tests more tractable, since we
+evaluate an output only relative to its inputs, rather
+than against potentially hundreds of full source
+documents.
+Using this local agent invocation evaluation
+method, our framework addresses two complemen-
+tary evaluation goals (depicted in Figure 1): the
+agent-level evaluation, which evaluates an agent’s
+average performance across all of its sampled invo-
+cations (Section 5), and the system-level evaluation,
+which traces only the errors that reach the final re-
+port back to their origin (Section 6). These two
+evaluation types are complementary, because not
+every output of an agent is eventually used by the
+final report. In the agent-level evaluation, we re-
+port the average percentage of mistakes that the
+agent makes, as well as an error distribution of
+those mistakes. In the system-level evaluation, we
+report the percentage of actual mistakes in the DR
+report, their origin, and error categories. In analogy
+to system vs. unit testing, system-level evaluation
+tells us about the errors that made it to the final
+report, but can hide mistakes that specific agents
+made. Agent-level evaluation tells us about the
+errors that an agent makes, but not whether these
+errors affected the final report.
+4
+Evaluating an Agent Invocation
+To better understand citation recall mistakes pro-
+duced by deep research systems (Sections 5 and 6),
+we start by describing how to evaluate a single
+agent invocation. We propose a method designed
+3
+
+
+===== page 4 =====
+Hallucination
+Step 1: Extract 
+spans from the 
+inputs provided to 
+the agent such 
+that, combined, 
+they fully support 
+the target sentence
+Supporting 
+spans
+Step 2: For 
+each 
+supporting 
+span, 
+identify its 
+citations
+Supporting 
+spans w/ 
+citations
+Uncited 
+input 
+reliance
+Uncited 
+output / 
+insufficient 
+citations
+Correct
+Step 3: Is target 
+sentence 
+supported by 
+the spans that 
+have citations?
+Step 5: Is target 
+sentence supported 
+by the input spans 
+whose citations are 
+fully included in the 
+target sentence 
+citations?
+If not found
+No
+No
+Yes
+Yes
+Target 
+sentence
+Outputs 
+produced 
+by the 
+agent
+Inputs
+Inputs 
+provided to 
+the agent
+Target 
+sentence w/ 
+citations
+Step 4: For 
+the target 
+sentence, 
+identify its 
+citations
+Figure 3: Overview of our algorithm for evaluating information errors in a synthesized target sentence within a
+single agent invocation. Each box corresponds to one step of the method described in Section 4.2.1.
+to identify the correctness of the agent’s output text,
+relative to its inputs, in terms of faithfulness (i.e.,
+no hallucinations relative to the input) and verifia-
+bility (i.e., citation markers in the output match the
+citation markers in the input).
+4.1
+Settings
+The scope of our method is the evaluation of a sin-
+gle agent invocation. We extract all the inputs that
+the agent received, possibly from many separate
+LLM invocations (e.g., a single agent invocation
+can include many web searches). In addition, we
+extract all the outputs that the agent invocation cre-
+ated, possibly from many LLM invocations (e.g.,
+a single agent invocation can include writing to
+many files). Examples of such agent invocations
+are depicted in Figure 2. This extraction phase re-
+quires a different implementation per DR system
+(Section I).
+From the agent’s perspective, it is assumed that
+the inputs are faithful to the sources, and that each
+input info unit is supported by the citations associ-
+ated with it. The method is not concerned with mis-
+takes that were possibly inherited from prior agent
+invocations. Accordingly, the agent’s responsibility
+is to produce output info units that are faithful to
+the cited input info units, while carrying forward
+all associated citations. If there are some input info
+units that are not associated with any citations, they
+should not be utilized by the agent.
+4.2
+Evaluation Method
+The inputs to our algorithm are the extracted inputs
+and outputs of the agent invocation (Section 4.1).
+The output of our algorithm is a list of errors that
+the agent introduced. We differentiate between two
+types of agent invocation outputs: extracted snip-
+pets and synthesized information. Extracted snip-
+pets are spans of text that appear verbatim in some
+raw document. Synthesized information units are
+generated by the agent model to paraphrase, sum-
+marize, or consolidate raw documents and snippets.
+The error categories differ by output type.
+For synthesized outputs, each input and output
+carries information and, optionally, attributing cita-
+tion markers (e.g., [N]). Conceptually, the follow-
+ing things can go wrong: (1) the output is unfaithful
+to the input (hallucination); (2) the output is faith-
+ful to the input but draws on input that was itself
+uncited (uncited input reliance); (3) the output is
+faithful to cited input but carries no citations at
+all (uncited output); or (4) the output has citations
+but fails to include the complete set of citations of
+the input it relied on (insufficient citations). For
+snippet outputs, which by definition belong to a sin-
+gle identified document, citation is inherited from
+the source identity, so the only concern is whether
+extracting the snippet removed important context,
+rendering it uninterpretable or hallucinated (snippet
+missing context). We describe the method for each
+output type separately: synthesized information in
+Section 4.2.1 and snippets in Section 4.2.2.
+4.2.1
+Evaluation for Synthesized Information
+The algorithm, explained below, is visualized in
+Figure 3 (see Section A for the pseudo-code). Be-
+cause DR systems typically attach citations at the
+sentence level, we segment each synthesized output
+information unit into sentences and run the algo-
+rithm on each sentence independently, returning
+4
+
+
+===== page 5 =====
+one of the four error labels above or no mistake.
+The algorithm, a sequence of attribution and entail-
+ment tasks, proceeds as follows, where each step
+corresponds to a box in Figure 3:
+• Step 1 – Faithfulness test. An LLM extracts
+all supporting spans from the information pro-
+vided by prior agent invocations; spans should
+be exhaustive, even if redundant or only par-
+tially supporting. If the extracted spans do
+not fully support the target sentence, either
+because no spans were found or because they
+support it only in part, this indicates a hal-
+lucination (terminal verdict). Otherwise, the
+output is faithful to its inputs and we proceed
+to the verifiability tests.2
+• Steps 2–3 – First verifiability test (uncited
+input reliance). Given that the output is faith-
+ful, we now check whether it relies on uncited
+input. Because citations in DR outputs are
+often not attached to every sentence, an LLM
+first identifies which citations are assigned to
+each input span (Step 2). We then remove
+uncited spans and test whether the remaining
+cited spans still entail the target sentence (Step
+3). If not, the output is classified as uncited
+input reliance (terminal verdict).
+• Steps 4–5 – Second verifiability test (cita-
+tion alignment). Finally, we check whether
+the target sentence’s own citations are com-
+plete, in the sense that they carry all necessary
+citations from the cited input spans. An LLM
+first identifies the target sentence’s citations
+(Step 4). We then check alignment: if the
+target sentence carries no citations at all, we
+conclude it is an uncited output (terminal ver-
+dict). If it does have citations, we keep only
+input spans whose citations are a subset of
+the target’s citations and re-run the entailment
+test. If this subset no longer supports the tar-
+get sentence, we conclude that the target has
+insufficient citations (terminal verdict). Other-
+wise the output is correct.
+Algorithm implementation.
+All our steps are
+based on existing prompts from prior work. The
+2We include two validations for the extracted spans: (a)
+spans must appear verbatim in the input texts, and (b) an
+entailment check verifies that the union of spans supports
+the target sentence. On failure, we retry with self-critique
+feedback. If the retry budget is exhausted, we record the case
+as evaluation failed and filter it out.
+Step 1 span extraction prompt is based on the
+prompt used for Localized Attribution Queries
+(Hirsch et al., 2025). The Steps 2 and 4 citation
+classification is based on the approach introduced
+by DEER (Han et al., 2026) to semantically identify
+which citations are related to a sentence or span.
+All other prompts are entailment tests based on the
+LongCite prompt (Zhang et al., 2025). The LLM
+used as the judge is gpt-5-mini-2025-08-07
+(Singh et al., 2026). The full prompts are provided
+in Section B.
+4.2.2
+Evaluation for Extracted Snippets
+Zhang et al. (2023) identified that a snippet ex-
+tracted from a larger source can remove necessary
+context, creating uninterpretable or even halluci-
+nated information. Accordingly, we run a single
+entailment test that asks whether the source docu-
+ment supports the entire snippet. If the test passes,
+the snippet is considered correct. If not, it receives
+the error label snippet missing context.
+4.3
+Human Assessment of Method
+Implementation Performance
+In order to assess the reliability of our automated
+agent invocation evaluation procedure, we asked
+humans to perform the same classification task as
+our algorithm in Figure 3. Each annotation task
+showed the annotator a target sentence (in the re-
+port context) and the agent invocation’s inputs, and
+asked them to pick one of six labels (no citation
+needed, hallucination, uses uncited info, uncited,
+insufficient citations, no issues), the last five cor-
+responding to the method’s terminal verdicts for
+synthesized information. The full annotation guide-
+lines are included in Section E.
+Setup.
+We sampled 50 sentences from AI-Q ex-
+amples and had each sentence annotated indepen-
+dently by two annotators drawn from a pool of four.
+In case of disagreements, a third annotator arbi-
+trated and made the final call. The annotators were
+all graduate students with prior experience reading
+academic literature and using deep research sys-
+tems. Annotators received an orientation session
+and completed calibration tasks before beginning
+the main annotation.
+Results.
+The inter-annotator agreement before ar-
+bitration was Cohen’s κ=0.71 (substantial) (Cohen,
+1960; Landis and Koch, 1977). We then compared
+the arbitrated labels with the method’s verdicts,
+5
+
+
+===== page 6 =====
+yielding 76% exact matches and κ=0.62 (substan-
+tial).
+In Section F we validate the supporting spans,
+using the same annotation effort. The localization
+process agrees with the annotators on 75% of the
+relevant sentences. This validates the system-level
+analysis (Section 6), whose recursion follows these
+spans back from the final report to the agent that
+introduced the error.
+5
+Evaluating Average Agent Performance
+The goal of this evaluation is to extract average
+performance statistics per agent. Ideally, we would
+evaluate all the sentences of all agent invocations
+per agent, but that would be intractable. Instead,
+we sample sentences without repetition from all the
+invocations of each agent type in each example.
+For each sentence sampled, we first classify if a
+citation is needed (Redi et al., 2019; Zhang et al.,
+2025). If not, we discard it. We use the LongCite
+“is citation needed” prompt (Section B.4).3 For
+each sample, we then run the agent invocation eval-
+uation method described in Section 4.2. Finally,
+for each agent, we report its mistake rate and the
+distribution of error types.
+5.1
+Experimental Setup
+We apply our method to the three state-of-the-
+art open-source deep research systems described
+in Section 2: Nvidia AI-Q (Nvidia, 2026), MS-
+Agent (ModelScope, 2026), and TrajectoryKit (Lu-
+goloobi, 2026). The LLMs used by each agent
+are listed in Table 7 (appendix). We evaluate on
+20 examples from DeepResearch Bench (Du et al.,
+2025). For each example, we sample up to 10 sen-
+tences per agent, yielding roughly 200 sentences
+per agent, with exact counts presented in Table 1.
+5.2
+Results
+Per-agent correct and mistake percentages for all
+three systems are reported jointly in Table 1. The
+per-agent error distribution for AI-Q is shown in
+Figure 4; the corresponding MS-Agent and Tra-
+jectoryKit distributions are in Figures 13 and 14
+(placed in the appendix).
+Agents that summarize a single document make
+the fewest mistakes.
+Almost every agent in the
+3Agents that extract snippets are sampled at the invocation
+level and not the sentence level. They also do not include the
+is-citation-needed filter.
+Component
+#
+Correct %
+Mistakes %
+AI-Q
+Orchestrator
+193
+69.1
+30.9
+Planner∗
+121
+78.0
+22.0
+Researcher
+200
+29.2
+70.8
+Searcher (Synthesized)
+192
+38.0
+62.0
+Searcher (Snippets)
+189
+96.2
+3.8
+MS-Agent
+Orchestrator
+183
+83.2
+16.8
+Reporter
+190
+38.4
+61.6
+Researcher
+170
+53.4
+46.6
+Searcher (Synthesized)
+110
+99.1
+0.9
+Searcher (Snippets)
+110
+93.6
+6.4
+TrajKit
+Orchestrator
+176
+7.5
+92.5
+Researcher
+200
+50.0
+50.0
+Searcher (Synthesized)
+154
+85.1
+14.9
+Table 1: Agent-level performance for Nvidia AI-Q,
+MS-Agent, and TrajectoryKit. ∗For the planner agent,
+“uncited output” is not considered as an error, because
+this is by design (Figure 2).
+three systems makes significant mistakes on a sub-
+stantial share of its sampled sentences. The clear
+exceptions are the searcher components that com-
+press one document at a time: the AI-Q searcher
+snippets (3.8%), the MS-Agent searcher snippets
+and synthesized summaries (6.4% and 0.9%, re-
+spectively), and the TrajectoryKit searcher synthe-
+sized summaries (14.9%). AI-Q’s searcher syn-
+thesized summaries also perform a summariza-
+tion, but over all documents returned for a query
+rather than one, and their mistake rate rises to
+62.0%. The remaining spread within the single-
+document group can be attributed to the underly-
+ing model rather than the architecture, as Trajecto-
+ryKit’s gpt-oss-20b digests (14.9%) are an order
+of magnitude worse than MS-Agent’s otherwise
+identical per-document summaries (0.9%).
+Deeper agents hallucinate less.
+Agents deeper
+in the information flow, which receive information
+that was synthesized more times, hallucinate less
+than shallower ones. Only 31% of the AI-Q orches-
+trator’s mistakes are hallucinations, against 79%
+for its researcher. MS-Agent shows the same con-
+trast even more sharply: none of the orchestrator’s
+mistakes are hallucinations, against 78% for the
+reporter and 92% for the researcher.
+A plausible explanation is the capability of the
+underlying model rather than depth in itself, as the
+shallower agents run substantially weaker LLMs
+than the orchestrator in both systems (see Table 7
+in the appendix). TrajectoryKit is consistent with
+this explanation: it runs the same model at every
+stage and correspondingly shows no shift, with
+hallucinations accounting for most of the mistakes
+6
+
+
+===== page 7 =====
+Hallucination
+Uncited Input
+Reliance
+Uncited Output
+Insuff. Cites
+0
+20
+40
+31%
+8%
+42%
+19%
+Orchestrator (59)
+Hallucination
+0
+20
+40
+60
+80
+100
+100%
+Planner (20)
+Hallucination
+Uncited Output
+Insuff. Cites
+0
+20
+40
+60
+80
+100
+79%
+8%
+12%
+Researcher (136)
+Hallucination
+0
+20
+40
+60
+80
+100
+100%
+Searcher
+(Synthesized) (119)
+Snippet Missing
+Context
+0
+20
+40
+60
+80
+100
+100%
+Searcher
+(Snippets) (7)
+Figure 4: Agent-level error distribution for each agent of the Nvidia AI-Q DR system, showing the breakdown of
+the error portion from Table 1. The corresponding distributions for the MS-Agent and TrajectoryKit DR systems are
+in Figures 13 and 14 (appendix).
+at each of its agents.
+6
+Tracing System-level Errors
+We propose a system-level evaluation to trace and
+localize global citation recall errors to the specific
+agents that created them and to categorize them into
+specific error types. We first describe an algorithm
+for the evaluation (Section 6.1) and then discuss
+the results (Section 6.2).
+6.1
+Tracing Algorithm
+We first have to find which sentences have cita-
+tion recall issues globally. Then, for each such
+sentence, we run multiple local tests recursively,
+starting from the agent that created the final report,
+until we identify which agent introduced the error.
+6.1.1
+Calculating Citation Recall in DR
+The implementation of the global citation recall
+in Step 1 follows standard practice (Zhang et al.,
+2025) of answering two questions: (1) whether the
+target sentence needs a citation, and (2) whether
+it has citations that support it. Similar to the local
+algorithm, we use a citation-identification prompt
+(drawn from DEER (Han et al., 2026)) to seman-
+tically find which citations are aligned with the
+target sentence. The LLM judge for all prompts is
+gpt-5-mini-2025-08-07 (Singh et al., 2026).
+Because DR systems can hallucinate URLs (On-
+weller et al., 2026), we use the tracing log to
+build a ground-truth list of retrieved URLs and
+filter out any hallucinated citations.
+We also
+adopt a no-crawl design, extracting raw documents
+from the tracing log instead of re-crawling, which
+sidesteps crawl-fragility issues (disagreement be-
+tween crawlers, paywalls, dynamic content).
+6.1.2
+Finding the Agent to Blame
+Given a target sentence in the final report that has
+global citation recall errors, we now recursively
+iterate over agent invocations and try to find the
+agent invocation to blame by running local tests.
+We first run the local agent invocation test from
+Section 4.2, which checks whether the agent’s out-
+put is faithful to and correctly cited against its in-
+puts. If the test detects an error, we attribute it to
+this agent and return. Otherwise, we choose one or
+more targets to recurse into and return their found
+errors. Specifically, if the target sentence has no
+errors, this means that the local algorithm from
+Section 4.2 must have identified spans that fulfill
+the following conditions: (1) they support the tar-
+get sentence, (2) they have citations, and (3) their
+citations are included in the target sentence. For
+each such span, we check if it originates from a raw
+document, which would indicate that we reached
+the end of the recursion without finding any agent
+to blame. Otherwise, we recurse into the agent in-
+vocation that produced the span, applying the same
+procedure to the sentence containing it. The recur-
+sion terminates when an error is found or a raw
+document is reached. The final output is a list of
+found errors.
+6.2
+Results
+The experimental setup for this evaluation uses the
+same sample from Section 5. The global citation
+recall for AI-Q is 58.7%, for MS-Agent is 28.5%,
+and for TrajectoryKit is 7.1%. Statistics on agents
+that were blamed for creating errors are reported
+jointly in Table 2. The per-category error distribu-
+tion for AI-Q is shown in Figure 5; the correspond-
+ing MS-Agent and TrajectoryKit distributions are
+in Figures 15 and 16. Table 5 (appendix) provides
+7
+
+
+===== page 8 =====
+Hallucination
+Uncited Input
+Reliance
+Uncited Output
+Insuff. Cites
+0
+20
+40
+60
+30%
+11%
+48%
+11%
+Orchestrator (200)
+Hallucination
+Insuff. Cites
+0
+25
+50
+75
+37%
+63%
+Researcher (35)
+Hallucination
+0
+25
+50
+75
+100
+100%
+Searcher
+(Synthesized) (1)
+Figure 5: System-level error distribution for Nvidia AI-
+Q. The corresponding distributions for MS-Agent and
+TrajectoryKit are in Figures 15 and 16 (appendix).
+System
+Component
+% of errors
+AI-Q
+Orchestrator
+84.7
+Researcher
+14.8
+Searcher (Synthesized)
+0.4
+MS-Agent
+Orchestrator
+52.6
+Reporter
+47.4
+TrajectoryKit
+Orchestrator
+100.0
+Table 2:
+System-level error-origin distribution for
+Nvidia AI-Q, MS-Agent, and TrajectoryKit. For each
+system, the share of confirmed final-report errors at-
+tributed to each agent.
+representative examples for each mistake category
+produced by our algorithm.
+The majority of mistakes start at the orchestra-
+tor.
+For AI-Q, 84.7% of final-report errors were
+attributed to the orchestrator, for MS-Agent 52.6%,
+and for TrajectoryKit 100%. For the first two sys-
+tems this is despite the orchestrator having one of
+the lowest agent-level error rates (30.9% for AI-Q
+and 16.8% for MS-Agent in Table 1), which illus-
+trates the value of system-level evaluation on top of
+agent-level evaluation. TrajectoryKit is the oppo-
+site case: its orchestrator is also its weakest agent
+(92.5%), so the two levels of evaluation agree.
+Final output mistakes are mostly citation-
+related errors.
+For AI-Q 70% of the mistakes are
+citation-related mistakes at the orchestrator level,
+and for MS-Agent 99%. This is consistent with
+the results of the agent-level evaluation. For MS-
+Agent, we find that the final report sometimes con-
+tains citations to IDs of the reporter’s notes instead
+of source documents (see Section I). TrajectoryKit
+is the exception: only 4% of its orchestrator errors
+are citation-related, as discussed below.
+Hallucinations are a notable share of AI-Q’s
+final-report errors.
+Beyond citation-related er-
+rors, a substantial fraction of errors that reach AI-
+Q’s final report are hallucinations. Hallucinations
+account for roughly 31% of AI-Q’s final-report er-
+rors (30% of the orchestrator’s 200 errors and 37%
+of the researcher’s 35), with most originating at the
+orchestrator. For MS-Agent, hallucinations are far
+less of an issue, at roughly 11%. This is notable
+because hallucinations are arguably more severe
+than citation-related errors.
+The smaller-model system fails in a different
+way.
+For TrajectoryKit, 95% of its final-report
+errors are hallucinations. Manual inspection shows
+a recurring failure mode in which the orchestrator
+attaches a fabricated precise statistic to a source
+that does not state it. This is consistent with its
+markedly lower citation recall, even though its out-
+put quality on the RACE metric (Du et al., 2025) is
+competitive with MS-Agent’s. This reinforces the
+model-capability explanation from the agent-level
+evaluation (Section 5): the dominant error type
+is governed less by the multi-agent architecture,
+which the three systems largely share, than by the
+capability of the underlying model.
+How errors propagate across agents.
+Although
+the orchestrator is the most common origin, a sub-
+stantial share of final-report errors starts elsewhere
+(Table 2), which means several subagents prop-
+agate mistakes received as input up to the final
+report. Table 6 in the Appendix walks through
+three representative chains that illustrate example
+patterns: a searcher fabricates a claim that the re-
+searcher and the orchestrator faithfully propagate;
+the orchestrator abstracts a researcher’s fabricated
+claim while keeping its citations; and unsupported
+statistics travel verbatim with a citation that never
+supported them.
+7
+Interventions to Improve Citation
+Recall
+In this section, we show how insights from our eval-
+uation can help improve DR systems. We demon-
+strate how simple changes, not implemented by the
+8
+
+
+===== page 9 =====
+original developers, can improve citation quality
+on AI-Q. Future work could include more complex
+fixes, such as using our evaluation’s diagnostics as
+a corrective feedback signal during generation.
+We propose two fixes for AI-Q based on our
+evaluation’s findings. The first fix follows from our
+average agent performance results: the searcher
+snippets, each extracted from a single document,
+are the most reliable artifact in the system (3.8%
+mistakes), whereas the researcher notes that cur-
+rently reach the orchestrator are produced by its
+least reliable agent (70.8%) and consolidate several
+documents at once. This motivates the following
+fix: in the orchestrator inputs, we replace the syn-
+thesized researcher agents’ notes with the snippets
+of the URLs they cite, so that each unit the or-
+chestrator reads is a single-document extract rather
+than a multi-document synthesis. This enables the
+orchestrator to directly access the raw document
+snippets, and we expect that it will reduce the num-
+ber of citation-related errors. For the second fix, we
+focus on our finding that the final output mistakes
+are mostly citation-related errors. Accordingly, we
+append to the orchestrator prompt the following
+instruction: “do NOT use information which is not
+backed by citations.” We expect that this will have
+an effect both on the reliance on uncited input, as
+well as on the uncited output. We evaluate each of
+these two changes independently.
+Experimental setup.
+We evaluate on 50 exam-
+ples from DeepResearch Bench, covering all of
+its English queries, and report the RACE quality
+metric (Du et al., 2025). In addition, we report the
+standard citation recall metric, as described in Sec-
+tion 6. Finally, we also calculate citation precision
+using the citation precision prompt from LongCite
+(Zhang et al., 2025).
+Results.
+Table 3 shows that for AI-Q, both inter-
+ventions substantially increase citation recall by 5%
+without significantly changing output quality. Both
+also increase citation precision by 3% to 7%. The
+two interventions perform comparably on recall.
+To further analyze the citation guidance interven-
+tion, we run our system-level tracing method (Ta-
+ble 4; Figure 17 in the appendix). We find that the
+orchestrator’s share of errors drops from 84.7%
+to 77.0% after the intervention. In addition, we
+find that the orchestrator’s citation-related errors
+after the intervention drop from 70% to 60%,
+compared to the citation-related errors made before
+the intervention (Figure 5). Overall, our interven-
+System
+RACE
+C. Recall
+C. Precision
+AI-Q
+52.6±0.4
+64.5±3.9
+87.6±3.0
++ replace w/ snippets
+52.4±0.7
+69.7±4.1
+94.1±2.0
++ citation guidance
+52.6±0.6
+69.6±3.2
+91.0±2.3
+Table 3: Results for simple AI-Q DR system modifica-
+tions based on our evaluation findings. Values after ±
+are standard errors of the mean.
+System
+Component
+% of errors
+AI-Q + citation guidance
+Orchestrator
+77.0
+Researcher
+23.0
+Table 4: System-level error-origin distribution for AI-Q
+after the citation guidance prompt change. Compare
+against Table 2: the orchestrator’s share decreases from
+84.7% to 77.0%, while the researcher’s share increases
+from 14.8% to 23.0%.
+tion was able to reduce orchestrator citation-related
+error as expected, resulting in a stronger DR sys-
+tem across all metrics. Future work could further
+attempt to reduce orchestrator errors, or divert the
+focus to fixing researcher-induced errors.
+8
+Conclusion
+We presented a methodology for diagnosing cita-
+tion recall errors in deep research systems along
+two complementary axes:
+what kind of error
+occurred, and which agent introduced it.
+Our
+central finding is that the dominant error type
+varies systematically across agents: in the two
+stronger-model systems, the orchestrator halluci-
+nates less and its mistakes are mostly citation-
+related, whereas the smaller-model system fabri-
+cates content at every stage. At the system level,
+the orchestrator, despite having one of the lowest
+agent-level error rates, is responsible for 84.7% of
+final-report errors in AI-Q. These diagnostics trans-
+late directly into targeted fixes: even a one-sentence
+prompt intervention raises citation recall by 5% and
+citation precision by 3–7% without reducing output
+quality. A natural follow-up is post-hoc mitigation
+that feeds the system-level verdicts back into the
+DR loop as a critique signal, and we expect this ap-
+proach to generalize to other multi-agent attributed
+generation settings.
+Limitations
+LLM-as-a-judge reliability.
+The faithfulness
+and verifiability checks of our algorithm (Section 4)
+rely on LLM-as-judge prompts adapted from prior
+work. We mitigate this concern in two ways: first,
+9
+
+
+===== page 10 =====
+all checks are attribution and entailment tests drawn
+from prior work (Section 4.2); second, a human
+annotation study (Section 4.3) shows substantial
+agreement between annotator consensus and algo-
+rithm verdicts.
+Attributing error types to model capability.
+Our observation that the dominant error type tracks
+the capability of the model an agent runs (Sec-
+tions 5 and 6.2) is observational rather than con-
+trolled. Isolating the factor would require running
+the same system with the same model across roles,
+which we leave to future work.
+Scope of evaluated content.
+We evaluate cita-
+tions on running-text sentences only. Tabular con-
+tent (numeric cells with trailing citation markers)
+is excluded from both the recall headline and the
+system-level analysis.
+Ethical Considerations
+Our work contributes to the goal of improving faith-
+fulness and verifiability of deep research systems,
+advocating for better evaluation methods. How-
+ever, errors in the different steps of the proposed
+methodology can mislead developers into drawing
+incorrect conclusions about the quality of the deep
+research system, either overstating or understating
+its reliability.
+In the human evaluation (Section 4.3), each an-
+notation task took about 10 minutes on average,
+for roughly 6 hours of work per annotator. Anno-
+tators were paid $35 per hour, which we consider
+adequate compensation for this expertise level and
+country of residence.
+AI-writing tools assisted the writing of the paper
+to improve clarity and coherence. Any writing
+change was carefully requested from the AI writing
+tool and edited by the authors before incorporating
+it into the paper.
+Acknowledgments
+This work was supported in part by the Israel
+Science Foundation (grants no.
+2827/21 and
+3182/25), NSF-AI Engage Institute DRL2112635,
+NSF-CAREER Award 1846185, and a Google PhD
+Fellowship. The views contained in this article are
+those of the authors and not of the funding agency.
+Special thanks to Jan Buchmann, Shmuel Amar,
+Uri Katz, and Aviya Maimon for their valuable
+discussions at various stages of the project.
+References
+Akari Asai, Jacqueline He, Rulin Shao, Weijia Shi,
+Amanpreet Singh, Joseph Chee Chang, Kyle Lo,
+Luca Soldaini, Sergey Feldman, Mike D’Arcy, and 1
+others. 2026. Synthesizing scientific literature with
+retrieval-augmented language models. Nature, pages
+1–7.
+Jacob Cohen. 1960. A coefficient of agreement for
+nominal scales. Educational and Psychological Mea-
+surement, 20:37 – 46.
+Mingxuan Du, Benfeng Xu, Chiwei Zhu, Xiaorui Wang,
+and Zhendong Mao. 2025. Deepresearch bench: A
+comprehensive benchmark for deep research agents.
+arXiv preprint. To appear in Proceedings of ICLR
+2026.
+Tianyu Gao, Howard Yen, Jiatong Yu, and Danqi Chen.
+2023. Enabling large language models to generate
+text with citations. In Proceedings of the 2023 Con-
+ference on Empirical Methods in Natural Language
+Processing, pages 6465–6488, Singapore. Associa-
+tion for Computational Linguistics.
+Janghoon Han, Heegyu Kim, Changho Lee, Dahm Lee,
+Min Hyung Park, Hosung Song, Stanley Jungkyu
+Choi, Moontae Lee, and Honglak Lee. 2026. Deer: A
+benchmark for evaluating deep research agents on ex-
+pert report generation. Preprint, arXiv:2512.17776.
+Jacqueline He, Howard Yen, Margaret Li, Shuyue Stella
+Li, Zhiyuan Zeng, Weijia Shi, Yulia Tsvetkov, Danqi
+Chen, Pang Wei Koh, and Luke Zettlemoyer. 2025.
+Precise information control in long-form text gen-
+eration. In The Thirty-ninth Annual Conference on
+Neural Information Processing Systems.
+Eran Hirsch, Aviv Slobodkin, David Wan, Elias Stengel-
+Eskin, Mohit Bansal, and Ido Dagan. 2025. LAQuer:
+Localized attribution queries in content-grounded
+generation. In Proceedings of the 63rd Annual Meet-
+ing of the Association for Computational Linguistics
+(Volume 1: Long Papers), pages 15355–15370, Vi-
+enna, Austria. Association for Computational Lin-
+guistics.
+Philippe Laban, Tobias Schnabel, and Jennifer Neville.
+2026. Llms corrupt your documents when you dele-
+gate. Preprint, arXiv:2604.15597.
+J Richard Landis and Gary G. Koch. 1977. The mea-
+surement of observer agreement for categorical data.
+Biometrics, 33 1:159–74.
+Ruizhe Li, Mingxuan Du, Benfeng Xu, Chiwei
+Zhu, Xiaorui Wang, and Zhendong Mao. 2026.
+Deepresearch bench ii: Diagnosing deep research
+agents via rubrics from expert report.
+Preprint,
+arXiv:2601.08536.
+Xiaoxi Li, Jiajie Jin, Guanting Dong, Hongjin Qian,
+Yongkang Wu, Ji-Rong Wen, Yutao Zhu, and
+Zhicheng Dou. 2025a. Webthinker: Empowering
+large reasoning models with deep research capability.
+10
+
+
+===== page 11 =====
+In The Thirty-ninth Annual Conference on Neural
+Information Processing Systems.
+Zijian Li, Xin Guan, Bo Zhang, Shen Huang, Houquan
+Zhou, Shaopeng Lai, Ming Yan, Yong Jiang, Pengjun
+Xie, Fei Huang, Jun Zhang, and Jingren Zhou.
+2025b. Webweaver: Structuring web-scale evidence
+with dynamic outlines for open-ended deep research.
+Preprint, arXiv:2509.13312.
+William Lugoloobi. 2026. Trajectorykit: A local-first
+agentic framework.
+ModelScope.
+2026.
+modelscope/ms-agent.
+https://github.com/modelscope/ms-agent.
+NVIDIA. 2025.
+Nemotron 3 Nano:
+Open, effi-
+cient mixture-of-experts hybrid Mamba-Transformer
+model for Agentic reasoning. Technical report.
+Nvidia.
+2026.
+Nvidia-AI-Blueprints/aiq.
+https://github.com/NVIDIA-AI-Blueprints/aiq.
+Hailey Onweller, Elias Lumer, Austin Huber, Pia Ram-
+chandani, Vamse Kumar Subbiah, and Corey Feld.
+2026. Cited but not verified: Parsing and evaluat-
+ing source attribution in llm deep research agents.
+Preprint, arXiv:2605.06635.
+OpenAI, :, Sandhini Agarwal, Lama Ahmad, Jason
+Ai, Sam Altman, Andy Applebaum, Edwin Arbus,
+Rahul K. Arora, Yu Bai, Bowen Baker, Haiming Bao,
+Boaz Barak, Ally Bennett, Tyler Bertao, Nivedita
+Brett, Eugene Brevdo, Greg Brockman, Sebastien
+Bubeck, and 108 others. 2025. gpt-oss-120b & gpt-
+oss-20b model card. Preprint, arXiv:2508.10925.
+Liana Patel, Negar Arabzadeh, Harshit Gupta, Ankita
+Sundar, Ion Stoica, Matei Zaharia, and Carlos
+Guestrin. 2025. Deepscholar-bench: A live bench-
+mark and automated evaluation for generative re-
+search synthesis. In NeurIPS 2025 Workshop on
+Evaluating the Evolving LLM Lifecycle: Benchmarks,
+Emergent Abilities, and Scaling.
+Miriam Redi, Besnik Fetahu, Jonathan Morgan, and
+Dario Taraborelli. 2019. Citation needed: A tax-
+onomy and algorithmic assessment of wikipedia’s
+verifiability. In The World Wide Web Conference,
+WWW ’19, page 1567–1578, New York, NY, USA.
+Association for Computing Machinery.
+Aaditya Singh, Adam Fry, Adam Perelman, Adam Tart,
+Adi Ganesh, Ahmed El-Kishky, Aidan McLaughlin,
+Aiden Low, AJ Ostrow, Akhila Ananthram, Akshay
+Nathan, Alan Luo, Alec Helyar, Aleksander Madry,
+Aleksandr Efremov, Aleksandra Spyra, Alex Baker-
+Whitcomb, Alex Beutel, Alex Karpenko, and 467
+others. 2026. Openai gpt-5 system card. Preprint,
+arXiv:2601.03267.
+Michael D. Skarlinski, Sam Cox, Jon M. Laurent,
+James D. Braza, Michaela Hinks, Michael J. Ham-
+merling, Manvitha Ponnapati, Samuel G. Rodriques,
+and Andrew D. White. 2024.
+Language agents
+achieve superhuman synthesis of scientific knowl-
+edge. Preprint, arXiv:2409.13740.
+Tongyi DeepResearch Team, Baixuan Li, Bo Zhang,
+Dingchu Zhang, Fei Huang, Guangyu Li, Guoxin
+Chen, Huifeng Yin, Jialong Wu, Jingren Zhou, and 1
+others. 2025. Tongyi deepresearch technical report.
+arXiv preprint arXiv:2510.24701.
+Yidong Wang, Qi Guo, Wenjin Yao, Hongbo Zhang, Xin
+Zhang, Zhen Wu, Meishan Zhang, Xinyu Dai, Min
+Zhang, Qingsong Wen, Wei Ye, Shikun Zhang, and
+Yue Zhang. 2024. Autosurvey: Large language mod-
+els can automatically write surveys. In The Thirty-
+eighth Annual Conference on Neural Information
+Processing Systems.
+Jiajie Zhang, Yushi Bai, Xin Lv, Wanjun Gu, Danqing
+Liu, Minhao Zou, Shulin Cao, Lei Hou, Yuxiao Dong,
+Ling Feng, and Juanzi Li. 2025.
+LongCite: En-
+abling LLMs to generate fine-grained citations in
+long-context QA. In Findings of the Association
+for Computational Linguistics: ACL 2025, pages
+5098–5122, Vienna, Austria. Association for Compu-
+tational Linguistics.
+Shiyue Zhang, David Wan, and Mohit Bansal. 2023.
+Extractive is not faithful: An investigation of broad
+unfaithfulness problems in extractive summarization.
+In Proceedings of the 61st Annual Meeting of the
+Association for Computational Linguistics (Volume
+1: Long Papers), pages 2153–2174, Toronto, Canada.
+Association for Computational Linguistics.
+A
+Algorithm Pseudo-code
+Algorithm 1 provides the pseudo-code for the
+single agent invocation evaluation procedure de-
+scribed in Section 4. Algorithm 2 provides the sim-
+pler procedure used for snippet outputs. The helper
+routines EXTRACTSUPPORTINGSPANS (Step 1),
+CITATIONSOF (Steps 2 and 4), and ENTAILS
+(Steps 1, 3, and 5) are LLM calls; see Section B for
+the full prompts.
+B
+Prompts
+This appendix lists the prompts used in the algo-
+rithm of Section 4.2, the agent-level analysis of
+Section 5 and the system-level analysis of Sec-
+tion 6. Section C then briefly describes the modi-
+fications applied to AI-Q for the application study
+(Section 7); we omit the full third-party prompts
+and only describe the changes.
+B.1
+Step 1: Span Extraction
+Figure 6 shows the prompt used for the LLM call in
+Step 1 of Section 4. Given a target sentence and the
+documents output by the parent agent invocations,
+it extracts verbatim supporting spans and emits
+both a per-document support verdict and an overall
+verdict. The prompt is adapted from the Localized
+Attribution Queries prompt of Hirsch et al. (2025).
+11
+
+
+===== page 12 =====
+Algorithm 1 Evaluating a single agent invocation on a target sentence.
+Require: Target sentence s; input info units I available to the agent invocation (already extracted from
+the trace; see Section I); retry budget K.
+Step 1: Faithfulness test (with self-critique retries).
+1: fb ←∅
+▷feedback for retries
+2: for k = 1, . . . , K do
+3:
+S ←EXTRACTSUPPORTINGSPANS(s, I, fb)
+4:
+if S = ∅then return HALLUCINATION
+5:
+end if
+6:
+if not ALLVERBATIM(S, I) then
+7:
+fb ←“some spans are not verbatim”; continue
+8:
+end if
+9:
+if ENTAILS(S S, s) then break
+▷output is faithful
+10:
+end if
+11:
+fb ←“union of spans does not entail s”
+12: end for
+13: if retries exhausted without success then return EVAL_FAILED
+14: end if
+Step 2: Input spans citation classification.
+15: Cσ ←CITATIONSOF(σ) for each σ ∈S
+Step 3: Uncited input reliance test.
+16: Scited ←{ σ ∈S : Cσ ̸= ∅}
+17: if not ENTAILS
+S Scited, s
+
+then return USED_UNCITED
+18: end if
+Step 4: Target sentence citation classification.
+19: Cs ←CITATIONSOF(s)
+Step 5: Citation alignment.
+20: if Cs = ∅then return UNCITED
+21: end if
+22: Saligned ←{ σ ∈Scited : Cσ ⊆Cs }
+23: if not ENTAILS
+S Saligned, s
+
+then return INSUFFICIENT_CITATIONS
+24: end if
+25: return CORRECT
+Algorithm 2 Evaluating a snippet output unit.
+Require: Snippet o with source URL u; raw doc-
+ument du retrieved for u in the log L.
+1: if not ENTAILS(du, o) then return SNIP-
+PET_MISSING_CONTEXT
+2: end if
+3: return CORRECT
+When verification of the extracted spans fails (ei-
+ther some spans are not verbatim, or the union does
+not entail the target sentence under the entailment
+check in Figure 8), the prompt is re-issued with
+the relevant feedback fragment from Figure 7. We
+allow up to five retry attempts before falling back
+to a hard failure.
+B.2
+Steps 1, 3 and 5: Entailment Test
+Figure 8 shows the entailment prompt, adapted
+from Zhang et al. (2025) to accept multiple docu-
+ments and full document texts (rather than chun-
+ked passages). This prompt is used for the union-
+entailment check that validates Step 1, for the en-
+tailment tests of Steps 3 and 5, for snippet evalua-
+tion (Section 4), and for the citation-recall check
+of Section 6.
+For the union check of Step 2, the entailment
+prompt is composed with the extension in Figure 9.
+The extension requires the model to additionally
+emit a description what is missing; this descrip-
+tion seeds the {reasoning} slot of the self-critique
+feedback (Figure 7) on the next span-extraction at-
+tempt.
+12
+
+
+===== page 13 =====
+Span Extraction Prompt (Step 2)
+You are an expert at identifying supporting evidence in source documents.
+You will be given a question, a statement from an AI-generated answer, and a list of numbered source documents. Your task
+is to evaluate whether the statement is supported across the documents (allowing multi-hop reasoning across documents)
+and extract the verbatim spans that support it.
+Respond with three pieces of information:
+1. overall_decision – Looking at the documents AS A WHOLE (multi-hop is allowed across documents), decide:
+• [[Supported]]: All factual claims in the statement are supported by the union of the documents (possibly
+combining evidence from multiple documents).
+• [[Not supported]]: One or more factual claims in the statement are not supported even when all documents are
+combined.
+2. documents – For each numbered source document, return an entry with:
+• document_index: the 1-based index of the document as numbered in the prompt.
+• support_type: how this single document on its own supports the statement:
+– [[Fully]]: This document alone supports all factual claims in the statement.
+– [[Partially]]: This document supports some factual claims but not all.
+– [[No]]: This document does not support any factual claim in the statement.
+• spans: For [[Fully]] or [[Partially]] documents, the minimal set of verbatim spans from THIS document that
+cover the claims it supports. For [[No]] documents, return an empty list.
+CRITICAL: Your extracted spans will be verified by exact string matching against the document they were extracted from.
+A span that does not appear verbatim in its source document, even with minor rewording, will be rejected.
+• Copy text EXACTLY as it appears in the document, including any unusual formatting, line breaks, or citation markers.
+• Do NOT paraphrase, reconstruct from memory, or “clean up” the source text. If the source has a typo or odd
+formatting, copy it as-is.
+• Each span you extract for document_index=N must come from the text of document N, not from any other document.
+The question, statement, and documents are inserted into the following template, with the retry feedback appended at
+{feedback_section}:
+<question>{question}</question>
+<statement>{statement}</statement>
+<documents>{documents}</documents>
+{feedback_section}
+Respond with the required JSON format.
+Figure 6: Step 2 span-extraction prompt, adapted from the Localized Attribution Queries prompt of Hirsch et al.
+(2025). The {feedback_section} slot is populated by the templates in Figure 7 on retry attempts.
+B.3
+Steps 2 and 4: Citation Classification
+Figure 10 shows the citation classification prompt,
+adapted from the DEER citation classification
+scheme (Han et al., 2026). This prompt is used
+in Steps 2 and 4 of Section 4 and in the system-
+level analysis (Section 6) to semantically identify
+which citations are aligned with a given sentence
+or span.
+B.4
+Citation Recall: Need-Citation Test
+For the citation-recall test in Section 6 (Step 1), we
+also check whether a sentence requires a citation in
+the first place. This prompt (Figure 11) is adapted
+from Zhang et al. (2025).
+C
+Modifications to AI-Q
+The application study (Section 7) applies two inter-
+ventions to AI-Q: (1) a prompt change forbidding
+the use of uncited information by the orchestrator,
+and (2) replacing AI-synthesized researcher out-
+puts with the raw snippets of the URLs they cite.
+We describe the implementation below rather than
+reproducing the full third-party prompts.
+AI-Q prompt change.
+A single sentence is ap-
+pended to the orchestrator’s prompt: “However,
+do NOT use information which is not backed by
+citations.” The sentence is added inside the orches-
+trator’s “Critical Rules” section, immediately after
+the existing instruction to fall back to best-effort
+13
+
+
+===== page 14 =====
+Self-Critique Retry Feedback
+The retry feedback is assembled from three named fragments.
+• Wrapper (EXTRACTION_FEEDBACK_SECTION) wraps the feedback body:
+<feedback>
+A previous extraction attempt failed for the following reasons:
+{feedback_body}
+</feedback>
+• Verbatim-match failure (EXTRACTION_FEEDBACK_UNFOUND_SPANS): Some spans did not appear verbatim in the
+document they were extracted from. You MUST copy spans exactly as they appear in the source document, character-
+for-character. {missing_spans}
+• Union-entailment failure (EXTRACTION_FEEDBACK_CLAIM_LEVEL_FAILED): The claim-level validator (LongCite
+is_support) decision did NOT align with your per-document verdicts:
+– Your per-doc support_types (most-permissive aggregation across documents): [[{extracted_strength}]]
+supported.
+– Validator’s decision on the union of spans: {longcite_decision}.
+These must agree on the strength of support. Validator’s description of what’s missing or in conflict: “{reasoning}”.
+Either (a) extract more or better verbatim spans so the union actually reaches the strength your per-doc verdicts
+claim, (b) revise per-doc support_type assignments (e.g., downgrade [[Fully]] to [[Partially]], or upgrade a
+[[Partially]] to [[Fully]]) so they reflect what the spans actually support, or (c) revise overall_decision to
+[[Not supported]] if no such spans exist in the documents.
+Figure 7: Self-critique retry feedback templates injected into {feedback_section} of Figure 6.
+analysis when search tools return insufficient data.
+AI-Q snippet replacement.
+The researcher sub-
+agents normally hand the orchestrator a synthesized
+note with the raw search-engine snippets of the
+cited URLs appended at the end. Our intervention
+drops the synthesized note body and keeps only the
+appended “Raw Source Snippets” section, which
+is assembled from the citation registry.
+Post-intervention
+system-level
+breakdown.
+Figure 17 shows the full per-agent, per-category
+system-level error distribution for AI-Q after
+applying the citation guidance prompt change.
+Table 4 reports the corresponding error-origin
+distribution. The headline numbers extracted from
+this figure are discussed in Section 7.
+D
+Example Errors per Category
+Table 5 shows representative target sentences
+flagged by our tracing evaluation (Section 6) for
+each mistake category, with the highlighted portion
+indicating the problematic span and the explanation
+describing why the verdict was assigned.
+Table 6 complements these single-invocation ex-
+amples with three full propagation chains from the
+AI-Q runs, showing how an error introduced by
+one agent invocation interacts with the behavior of
+the agents that depend on it.
+E
+Human Annotation Guidelines
+Figure 12 includes verbatim the guidelines given to
+the human annotators whose agreement with our al-
+gorithm is reported in Section 4.3. Each annotation
+task showed the annotator the target sentence (in a
+Report tab) and the input info units available to the
+writing agent (in an “Information providers” tab),
+and asked them to pick one of six labels. Over an
+initial online orientation meeting, each annotator
+completed two calibration tasks before beginning
+the main annotation, and annotators were informed
+that their annotations would be used and published
+as part of an academic research project.
+Labels 2–6 correspond directly to the algorithm’s
+terminal verdicts in Section 4.2.1: hallucination,
+uncited input reliance, uncited output, insufficient
+citations, and correct. Label 1 (N/A) corresponds
+to sentences that the algorithm filters out via the
+need-citation prompt of Section B.4.
+F
+Validating the Supporting Spans
+Section 4.3 validates the classification produced
+by the local test. This appendix validates its other
+output, the supporting spans: the input spans the
+algorithm identifies as supporting a target sentence.
+Why these two outputs suffice.
+The system-
+level tracing of Section 6 adds no model-based
+14
+
+
+===== page 15 =====
+Entailment Prompt (Is-Supported)
+You are an expert in evaluating text quality. You will receive a user’s question about one or more uploaded documents, a
+factual statement from an AI assistant’s response based on these documents, and the documents. Your task is to carefully
+assess whether this statement is supported by the documents. Please use the following scale to generate your rating:
+• [[Fully supported]]: Most information in the statement is supported by or extracted from the documents.
+• [[Partially supported]]: More than half of the content in the statement is supported by the documents, but a small
+portion is either not mentioned or contradicts the documents. For example, if the statement has two key points and
+the documents supports only one of them, it should be considered [Partially supported].
+• [[No support]]: The statement is largely unrelated to the documents, or most key points in the statement do not align
+with the content of the documents.
+Ensure that you do not use any information or knowledge outside of the documents when evaluating. Please provide a json
+object with your decision.
+{question, statement, documents}
+Figure 8: Is supported prompt adapted from the LongCite (Zhang et al., 2025).
+Union-Entailment Extension
+Additionally, your JSON response MUST include an unsupported_content field:
+• For [[No support]] or [[Partially supported]]: describe specifically what facts in the statement aren’t covered
+by the spans, or what extra information the statement asserts beyond what the spans say. Be precise, this message
+will be shown to the model that selected the spans so it can correct the extraction on a retry attempt.
+• For [[Fully supported]]: leave as an empty string.
+Figure 9: Extension appended to the prompt in Figure 8 for the Step 2 feedback loop.
+judgment beyond the local test. Each recursive
+step reuses the supporting spans that the local al-
+gorithm of Section 4 already produced: the spans
+determine which agent invocation to descend into
+(Section 6.1), and the descent itself involves no ad-
+ditional model calls. The error-prone components
+of the pipeline are therefore the local test’s classifi-
+cation and its supporting spans, so validating both
+directly validates the system-level tracing built on
+top of them.
+Annotation.
+In the same human evaluation de-
+scribed in Section 4.3, annotators also recorded
+which input spans they used to support their clas-
+sification. For each such sentence we compare the
+input spans marked by the annotators against those
+returned by the localization process, counting them
+as agreeing when they select the same supporting
+input sentences.
+Results.
+For 75% of the relevant target sentences,
+the localization process agrees with the annotators
+on the input sentences that support the target sen-
+tence. As expected, this closely tracks the 76%
+exact-match rate on the classification task reported
+in Section 4.3, indicating that the two outputs of
+the local test are reliable to a similar degree.
+G
+More Experimental Details
+DeepResearch Bench (Du et al., 2025) spans 22
+domains and includes questions in both English
+and Chinese. In our experiments, we used only
+English examples and leave multilingual evaluation
+to future work. The diagnostic analyses (Sections 5
+and 6) use 20 examples (numbered 51–70), and the
+intervention study (Section 7) extends this to all 50
+English examples (numbered 51–100).
+The
+LLM
+model
+used
+as
+the
+judge
+is
+gpt-5-mini-2025-08-07 (Singh et al., 2026).
+H
+Licenses
+All artifacts used in this work are released under
+permissive open-source licenses, and our use is
+consistent with their intended use.
+• DeepResearch Bench (Du et al., 2025): both
+the codebase and the accompanying dataset
+are released under the Apache License 2.0.
+15
+
+
+===== page 16 =====
+Agent & Type
+of error
+Target sentence with citations
+Explanation
+Orchestrator –
+Hallucination
+A Japan-focused cross-sectional study finds measurable
+consumer willingness-to-pay for food defense and food
+hygiene, supporting a plausible channel for higher
+value-per-unit food consumption (safer supply chains,
+trusted brands, convenience-oriented services).
+[https://www.i-jmr.org/2023/1/e43936]
+The two highlighted parts of the claim are not supported
+by the input info units. Interestingly, some of these
+points are actually discussed in the cited URL,
+suggesting familiarity of the model with these issues.
+Orchestrator –
+Uncited input
+reliance
+Attention inspection (when using transformer-like
+models) can provide a form of structured saliency by
+showing which time steps or features the model
+“attended” to; recent portfolio ML frameworks
+highlight interpretability/efficiency trade-offs using
+attention structures.
+[https://www.nature.com/articles/s41598-025-26337-x]
+The information highlighted was provided by an uncited
+researcher synthesis:
+“- Attention mechanisms within transformer-style
+architectures generate saliency maps that highlight
+which market variables (e.g., volatility, momentum,
+macro indicators) the network focuses on at each
+rebalancing step, supporting visual debugging and
+regime-specific analysis.”
+Orchestrator –
+Uncited output
+In 1992 he indicates Berkshire expects to keep most
+major holdings regardless of how they are priced relative
+to intrinsic value.
+The orchestrator paraphrased a researcher note that cited
+the Berkshire 1992 shareholder letter but dropped the
+citation entirely. The researcher’s note read:
+“We will keep most of our major holdings, regardless of
+how they are priced relative to intrinsic business value
+[https://www.berkshirehathaway.com/letters/1992.html].”
+Orchestrator –
+Insufficient
+citations
+It also documents tranching and average duration
+patterns: liquidity tranche around 10 months and
+investment tranche around 27 months (with
+non-tranched portfolios around 26 months).
+[.../Inaugural-RAMP-Survey-on-the-Reserve-
+Management-Practices-of-Central-Banks-Results-and-
+Observations.pdf]
+The information highlighted was provided by a
+researcher synthesis with a different World Bank
+citation:
+“Tranching is widely used; the liquidity tranche has an
+average duration of 10 months, the investment tranche
+27 months, while portfolios without tranches average 26
+months duration, indicating higher risk tolerance
+([.../IDU-f1aeb421-97fb-4a82-a223-
+0ecbbe0bdbb8.pdf]).”
+Researcher –
+Insufficient
+citations
+PwC US announced a three-year, $1 billion investment
+to expand and scale its AI capabilities, embedding
+GPT-class models such as OpenAI’s GPT-4/ChatGPT
+into internal workflows and client solutions; this
+represents roughly 0.5 % of annual fee income.
+[.../pwc-us-makes-billion-investment-in-ai-
+capabilities.html]
+The cited PwC press release supports the $1 billion
+investment claim. The highlighted percentage figure is
+absent from that source and was provided by other input
+documents (a LinkedIn post and a PwC article) whose
+citations the researcher did not include.
+Table 5: Examples for each mistake category produced by our sentence-level evaluation algorithm.
+• Nvidia AI-Q (Nvidia, 2026): released under
+the Apache License 2.0.
+• MS-Agent (ModelScope, 2026): released un-
+der the Apache License 2.0.
+• TrajectoryKit (Lugoloobi, 2026): released
+under the MIT License.
+I
+System-specific Logic
+Our evaluation framework (Section 3) requires ex-
+tracting the inputs and outputs of each agent invo-
+cation from the system’s execution trace. Because
+AI-Q, MS-Agent and TrajectoryKit differ in their
+trace formats, agent organization, and citation con-
+ventions, each system requires a dedicated adapter
+that maps the raw trace into the shared data struc-
+tures consumed by our algorithm. Despite these
+differences, the evaluation algorithm itself (Sec-
+tion 4.2) runs identically on all three systems: each
+adapter only needs to expose, per agent, the inputs
+and outputs. Below we describe the system-specific
+extraction logic; Table 8 provides a summary.
+Agent naming.
+The agent names used in each
+system’s codebase differ from the abstract roles
+used in this paper (Figure 2).
+In AI-Q, what
+we call the “researcher” is internally named
+searcher-agent, and what we call the “searcher”
+corresponds to the Exa Search + Jina + Content Op-
+timizer module. In MS-Agent, the orchestrator role
+is split between a reporter_tool subagent (which
+writes the initial report draft) and the top-level or-
+chestrator (which issues post-edits); our adapter
+attributes errors to the specific phase that intro-
+duced them. In TrajectoryKit, what we call a “re-
+searcher” is a conduct_research subagent (inter-
+nally a worker), and what we call its “searcher” is
+the orchestrator’s summarize_webpage tool, which
+produces the synthesized per-page digests.
+16
+
+
+===== page 17 =====
+The searcher differs significantly between sys-
+tems.
+In AI-Q the searcher is the <Answer>
+block produced by the Tavily search API itself
+(include_answer="advanced") and summarizes
+all documents returned for one query. In MS-Agent
+it is a single user message, with no system prompt,
+sent to a separate, smaller model (gpt-5-nano) by
+the content optimizer inside the web-search tool,
+once per document, over at most 50K characters,
+and skipped entirely for pages shorter than 2K char-
+acters. In TrajectoryKit it is a system and user mes-
+sage pair sent to the same gpt-oss-20b that the
+agents themselves run on, once per document, over
+at most 200K characters, from inside the orchestra-
+tor’s summarize_webpage handler. We neverthe-
+less evaluate these nodes exactly as we evaluate
+agents, because each performs the same compres-
+sion of retrieved documents whose citation behav-
+ior our framework measures.
+I.1
+AI-Q
+Trace parsing and event attribution.
+Our imple-
+mentation adds code to to produce a flat sequence
+of numbered JSON event files (0000_*.json,
+0001_*.json, ...), each tagged with a kind
+(tool_call, tool_result, or llm) and an agent
+identifier. This facilitates the analysis of the out-
+puts.
+Orchestrator inputs.
+The orchestrator’s inputs
+are all returned subagent outputs plus the source
+registry. Subagent outputs are recovered via two
+channels: the task tool result (the subagent’s final
+message) and orchestrator read_file calls on files
+the subagent wrote. Our adapter tracks both and
+attributes each file read to the subagent that last
+wrote the requested path.
+Researcher inputs.
+Each researcher’s inputs are
+the web-search tool responses it received, which
+contain XML-style <Document
+href="...">
+blocks (verbatim snippets from source pages) and
+<Answer> blocks (synthesized by the Tavily search
+API). Our adapter splits these into separate evalua-
+tion targets: <Document> snippets are evaluated as
+extracted content (Section 4.2.2), while <Answer>
+blocks are evaluated as synthesized content (Sec-
+tion 4.2.1).
+Searcher outputs.
+The web-search tool is
+Tavily,
+configured
+to
+return
+the
+top
+three
+results
+for
+a
+query
+together
+with
+an
+an-
+swer field (include_answer="advanced"). The
+<Document> blocks are the per-result page content
+the service returns, and the <Answer> block is that
+answer field, produced once per query over the
+results returned for it. It is the only synthesized-
+searcher output among the three systems that cov-
+ers several documents at once rather than a single
+page.
+Planner preprocessing.
+AI-Q’s planner emits a
+JSON plan rather than prose. Because our span-
+extraction and entailment prompts expect natural
+language, the adapter converts the JSON to Mark-
+down: keys become section headers and values
+become body text. This conversion handles three
+observed JSON shapes (whole-text JSON, fenced
+code blocks, and concatenated JSON regions).
+Source registry.
+The orchestrator can call
+get_verified_sources, returning a numbered
+list of all URLs verified during the run (format-
+ted as [N] Title: URL). Each entry is treated as
+an extracted snippet, enabling the algorithm to de-
+tect when the orchestrator cites a URL based solely
+on its registry title rather than on full document
+content.
+I.2
+MS-Agent
+Trace parsing.
+For MS-Agent we produce a
+numbered event stream similar to AI-Q.
+Reporter and orchestrator split.
+MS-Agent’s
+final report is produced in two phases:
+a
+reporter subagent writes the initial draft via
+write_file, and the orchestrator issues incremen-
+tal replace_file_contents edits.
+Evidence
+note
+architecture.
+MS-Agent’s
+searchers produce structured evidence notes, each
+with a unique hex ID, content sections (title,
+content, contradicting evidence, summary), and
+a metadata list of source URLs with quality
+tiers. Downstream agents cite these notes using
+[Note: <hex>] markers rather than standard URL
+citations.
+Researcher synthesis.
+Each researcher’s final re-
+sponse to the orchestrator contains a JSON synthe-
+sis with fields for status, task summary, findings,
+and a report. This synthesis cites the notes the
+searcher authored using [Note: <hex>] markers.
+Searcher outputs.
+MS-Agent’s search pipeline
+uses Exa search followed by a content optimizer
+that produces a summary and key excerpts per URL.
+The optimizer runs inside the web-search tool as a
+17
+
+
+===== page 18 =====
+single prompt to a separate, smaller model, given
+the page content alone and truncated to 50K charac-
+ters; pages shorter than 2K characters bypass it en-
+tirely and are carried through verbatim in place of a
+summary. Key excerpts are evaluated as extracted
+snippets (Section 4.2.2), while summaries are eval-
+uated as synthesized content (Section 4.2.1).
+I.3
+TrajectoryKit
+Trace parsing and event attribution.
+For Tra-
+jectoryKit we produce a numbered event stream
+similar to AI-Q.
+Orchestrator inputs.
+The root orchestrator is
+given a restricted,
+virtual tool set:
+it can
+delegate a research task (conduct_research),
+rewrite its draft (refine_draft), re-read earlier
+drafts, publish the draft (research_complete),
+think, and summarize a single known URL
+(summarize_webpage).
+It never searches or
+fetches documents itself. Its inputs are therefore
+the final responses of its researcher subagents,
+delivered as conduct_research tool results, to-
+gether with the page digests returned by its own
+summarize_webpage calls.
+Unlike MS-Agent,
+there is no shared file system and no source reg-
+istry, so this tool-result channel is the only route by
+which subagent content reaches the orchestrator.
+Researcher inputs.
+Each conduct_research
+subagent receives a fresh context and the full tool
+set: web search plus the fetch tools fetch_url,
+read_page,
+read_pdf,
+extract_tables and
+fetch_cached. The researcher’s inputs are the tool
+responses it received. A researcher’s output does
+not have [N] markers, so it is attributed structurally
+to the URLs that researcher surfaced through its
+own search and fetch results.
+Searcher outputs.
+Searcher output takes two
+forms. The first, search_web, is Google through
+the Serper API, returning a numbered listing of
+title, URL and snippet per result. We do not treat
+these entries as an evaluation target, because un-
+like the snippet leaves of AI-Q and MS-Agent we
+don’t have access to the raw document that the sys-
+tem retrieved, so the test that scores extracted con-
+tent has no reliable reference. The second form is
+the orchestrator’s summarize_webpage tool, which
+fetches one URL and runs a single prompt over its
+content, truncated to 200K characters, on the same
+gpt-oss-20b the agents themselves run on, option-
+ally steered by a focus argument.
+Citation format.
+The orchestrator’s draft is a
+living document that each refine_draft call re-
+places in full, and research_complete publishes
+the latest version. On publication, TrajectoryKit
+rewrites the [N] markers in the report body into
+Markdown links of the form [[N]](url), resolved
+against the report’s ## Sources section (formatted
+as [N] Title: URL). Our adapter normalizes these
+links, and the full-width-bracket variant the model
+occasionally emits, back to plain [N] markers, after
+which the report format is identical to AI-Q’s and
+the same reference-section parsing applies.
+Absence of a planner.
+TrajectoryKit’s closest
+analogue to AI-Q’s planner is a single chain-
+analysis call issued before the orchestrator loop
+starts, which decomposes the question into ordered
+subtasks. Because it runs before any retrieval, it
+consumes no documents and produces no citations,
+so it is not an evaluation target and TrajectoryKit
+contributes no planner row to our analyses.
+Fallback writer.
+If the orchestrator exhausts
+its turn budget without publishing, TrajectoryKit
+writes the report outside the main loop: first by
+forcing a final answer within the orchestrator’s own
+context, and, failing that, by spawning a dedicated
+synthesizer subagent over the accumulated research
+data. We attribute the final report to the orchestrator
+in either case.
+I.4
+Citation Attribution Modes
+Agents use one of three citation attribution modes
+depending on their output format:
+• Semantic: citations are identified per-sentence
+using the DEER classification scheme (Sec-
+tion B.3).
+• Structural: citations are inherited from the
+structural context. For example, the source
+URLs of a referenced note.
+• Extracted: the output is a verbatim excerpt
+of a single source, so the citation is the iden-
+tity of the page it was taken from. Used for
+the searcher snippet leaves of AI-Q and MS-
+Agent, whose claims are checked by a ver-
+batim test against the full crawled document
+rather than by an entailment test.
+The mode follows from the output format rather
+than from the agent’s position in the information
+flow, so the same role can be attributed differently
+18
+
+
+===== page 19 =====
+across systems. For example, AI-Q’s researcher
+notes carry explicit [N] markers that resolve to
+URLs, so they can be classified per sentence. An
+MS-Agent evidence note instead lists its sources
+as note metadata rather than inline, so each of its
+sentences inherits that note’s source list. Similarly,
+in TrajectoryKit there are no inline markers, so sen-
+tences inherit the union of the URLs that researcher
+surfaced through its own search and fetch calls.
+Structural attribution is the conservative choice in
+both cases: crediting a sentence with every source
+its author had at hand errs toward finding support
+rather than toward flagging a citation error.
+I.5
+The Citation of Notes in MS-Agent
+Unlike AI-Q, which uses standard [N] citation
+markers that map directly to URLs, MS-Agent’s
+intermediate outputs cite structured evidence notes
+using markers such as [Note: 02e74b]. Each note
+is a structured object with content sections and a
+list of source URLs with quality tiers. For example,
+a searcher synthesis might contain:
+Berkshire
+stresses
+conservative
+leverage,
+large
+cash/float
+cushions,
+and a decentralized structure trusting
+operating managers. [Note: 02e74b]
+These note markers are not standard URL citations
+and would be meaningless to end users reading the
+final report. Notes in turn have structured source
+metadata (e.g., {"title":
+...,
+"sources":
+[{"url": "..."}]}).
+Our adapter handles note citations differently
+depending on their position in the information flow:
+Intermediate agents.
+For the reporter and
+searcher synthesis, citing a note is considered ac-
+ceptable. The downstream orchestrator has access
+to the notes and their source URLs, and is expected
+to resolve note citations into proper URL citations
+before producing the final report.
+Final report.
+If the final report cites a note
+marker, we drop this citation because it carries
+no meaning for the reader. This could result in
+citation-related errors if the note did support the
+content.
+Conflict objects.
+MS-Agent’s reporter may also
+cite conflict objects using [conflict_<hex>]
+markers. Each conflict records a discrepancy be-
+tween sources with a description, resolution, and
+list of evidence note IDs. The adapter resolves con-
+flict citations through the referenced notes’ source
+URLs, adding one additional level of indirection to
+the resolution chain.
+19
+
+
+===== page 20 =====
+Citation Classification Prompt
+You are an expert fact-checker. Your task is to classify the provided target sentence from a research report into one of the
+following categories.
+Reports may use any citation style: numbered markers like [1] or [1][3], author-year references like (Kim, 2024), markdown
+links like [title](url), or other formats. Identify whatever citation style the report uses.
+Class Definitions:
+• A: Cited. Sentence that includes explicit citations (e.g., [1] or (Kim, 2024)) directly within it.
+• B: Uncited – Same Section/Paragraph. Sentence whose supporting citations appear within the same section or
+paragraph. Crucially, the Evidence Position MUST be in the same section or paragraph. If the evidence is in a
+previous section, it is Class C.
+• C: Uncited – Previous Section/Paragraph. Sentence whose supporting citations appear in previous sections or
+paragraphs. The Evidence Position MUST be in a previous section.
+• D: Uncited – Recap/Structural. Simple mentions of introduction, conclusion, abstract, or structural summaries.
+• E: Uncited – Citation not Required. Widely accepted facts, common knowledge, author’s own findings, subjective
+claims, methodological contributions, etc. WARNING: Conclusions, results, or findings of the report are NOT Class
+E. They are specific claims that require evidence (Class A/B/C) or are uncited (Class F).
+• F: No-Citation – Unknown Source. Specific factual assertions that require verification but lack any identifiable
+supporting source in the text. If a claim is specific (e.g., “X has a value of Y”, “X is Z% of GDP”) and has no citation
+attached to it or the sentence immediately preceding/following it that covers this fact, it is Class F. Do not assume a
+nearby citation covers it unless it clearly does.
+Instructions:
+1. Read the Report Context to understand the global context.
+2. Analyze the Target Sentence and its relationship with the context and citations:
+• Step 1: Specificity Check. Contains numbers, statistics, named datasets, specific results? →Likely Class A,
+B, C, or F.
+• Step 2: Citation Check.
+– Citation in same sentence? →Class A.
+– Citation in same paragraph/section? →Class B.
+– Citation in previous section? →Class C.
+• Step 3: Uncited Check.
+– Specific fact but no citation? →Class F.
+– General knowledge/methodology/author opinion? →Class E.
+– Structural summary? →Class D.
+3. Determine citation_identifiers:
+• For Class B or C, identify the citation identifiers that support the sentence.
+• For Class A, list the citation identifiers that appear in/around the sentence.
+• For Class D and Class E, citation_identifiers must be empty.
+• Return identifiers exactly as they appear in the report’s reference list. For numbered citations like [1], return
+“1”. For author-year like (Kim, 2024), return “Kim, 2024”. For other formats, return the identifier that maps to
+the source in the reference list.
+Figure 10: Citation classification system prompt, adapted from the DEER citation classification scheme of Han et al.
+(2026). The original tabular formatting (a markdown table) is rewritten here as a list for column compatibility, but
+the content is unchanged. The report and target sentence are provided in a separate user message.
+20
+
+
+===== page 21 =====
+Need-Citation Prompt
+You are an expert in evaluating text quality. You will receive a user’s question regarding their uploaded document (due to
+the length of the document, it is not shown to you) and an AI assistant’s response based on the document. The sentence
+being evaluated is marked with <target>...</target> tags within the response.
+Your task is to determine whether this sentence requires a citation. A sentence DOES NOT require citation if it is:
+• An introductory sentence that previews information that is comprehensively discussed later in the response (not just
+briefly mentioned)
+• A transition sentence connecting ideas
+• A summary or conclusion based on previous information in the response
+• Reasoning or inference derived from previous information
+Ensure that you do not use any other external information during your evaluation. Please provide a json object with your
+decision ([[Yes]] or [[No]]).
+{question, response with <target> tags}
+Figure 11: Need-citation prompt, adapted from LongCite (Zhang et al., 2025).
+21
+
+
+===== page 22 =====
+Agent (verdict)
+Output text with citations
+Explanation
+Chain 1: faithful propagation of a search-tool fabrication (searcher →researcher →orchestrator).
+Searcher –
+Hallucination
+The United States Space Force has formalized its cislunar
+effort by creating a Cislunar Coordination Office [...]
+officials have said the office will serve as the central hub for
+coordinating cislunar programs across the service and will
+ensure that space-situational-awareness data [...] is
+shared with NASA, other Department of Defense
+components, allied partners, and civilian space
+stakeholders, and this commitment was underscored by [...]
+the Oracle-M hot-fire test [...] which confirmed that the
+resulting data will be integrated into joint databases and
+disseminated to national-security and civil-space users.
+The searcher’s answer summarizes the pages
+retrieved for the query, but the highlighted
+data-sharing and database-integration
+commitments appear in none of them.
+Researcher –
+Inherited
+The office will integrate SSA data into joint databases and
+disseminate the information to both national-security and
+civil-space users to enhance safety, security, and mission
+planning.
+[.../space-force-sets-up-office-to-coordinate-cislunar-
+programs/]
+[.../oracle-m-hot-fire-test-a-major-milestone-in-cislunar-
+space-situational-awarenes]
+The researcher’s note restates the fabricated
+commitment and attaches the URLs that the
+searcher provided for this claim.
+Orchestrator –
+Inherited
+Public reporting indicates the U.S. Space Force has stood up
+a cislunar coordination function and is advancing systems
+(e.g., Oracle-M) aimed at monitoring and tracking cislunar
+objects, with plans to integrate tracking data into shared
+SSA databases.
+[.../space-force-sets-up-office-to-coordinate-cislunar-
+programs/]
+[.../oracle-m-hot-fire-test-a-major-milestone-in-cislunar-
+space-situational-awarenes]
+[.../space-force-sets-up-cislunar-coordination-office-to-
+focus-beyond-earth-orbit/]
+The final-report sentence faithfully summarizes the
+researcher’s notes and propagates their citations, so
+the orchestrator’s local test passes as well. The
+fabricated claim reaches the reader carrying
+citations to real articles that do not state the
+information.
+Chain 2: abstraction masks a researcher fabrication (researcher →orchestrator).
+Researcher –
+Hallucination
+Then enable scheduled autoscaling for the cluster ( gcloud
+container clusters update CLUSTER_NAME
+--enable-scheduled-autoscaling). Create or modify a
+schedule using gcloud container node-pools update
+POOL_NAME --add-chedule=start_time=HH:MM,
+end_time=HH:MM,min-nodes=MIN,max-nodes=MAX (or
+via console). The schedule can be daily or weekly.
+[.../kubernetes-engine/docs/concepts/cluster-autoscaler]
+The researcher invents an entire GKE “scheduled
+autoscaling” workflow, including command-line
+flags that do not appear in the cited official
+documentation, and attaches the real
+cluster-autoscaler documentation as its citation.
+Orchestrator –
+Inherited
+GKE: scheduled bounds on node pools via managed
+capabilities; ensure CA is enabled and schedules reflect
+business windows.
+[.../kubernetes-engine/docs/concepts/cluster-autoscaler]
+[.../kubernetes-engine/docs/how-to/cluster-autoscaler]
+The orchestrator abstracts the fabricated procedure
+into a hedged, higher-level claim that is fully
+supported by the researcher’s notes. The
+abstraction propagates the fabrication, masks it
+behind vaguer language, and keeps its citations.
+Chain 3: unsupported statistics travel verbatim with their citation (researcher →orchestrator).
+Researcher –
+Insufficient
+citations
+According to the OECD 2023 Annual Survey, infrastructure
+represents roughly 6–7 % of assets for large
+public-pension-related investors, with public pension
+reserve funds allocating about 9 % of their portfolios to
+infrastructure.
+[.../long-term-investing-of-large-pension-funds-and-public-
+pension-reserve-funds-2023_042fb731/c690ccc3-en.pdf]
+The highlighted figures were available to the
+researcher from other input documents, but the
+note cites only the OECD report, which does not
+support them.
+Orchestrator –
+Inherited
+The OECD 2023 survey reports infrastructure at roughly
+6–7% of assets for large public-pension-related investors
+and about 9% for public pension reserve funds.
+[.../long-term-investing-of-large-pension-funds-and-public-
+pension-reserve-funds-2023_042fb731/c690ccc3-en.pdf]
+The figures and their citation travel together across
+the compression boundary into the report. Because
+the orchestrator’s sentence is faithful to the
+researcher note it cites, only recursing into the
+researcher reveals that the attached citation never
+supported the figures.
+Table 6: Representative error-propagation chains produced by our system-level tracing evaluation on AI-Q, illustrat-
+ing how error types interact across agents.
+22
+
+
+===== page 23 =====
+Annotation guidelines
+Your task is to determine whether the target sentence (extracted from a deep research report – see the Report tab) is faithful
+to and correctly cited against the information providers (see the Information providers tab).
+Information providers – three types.
+Three kinds of providers may appear in the Information providers tab. The deep research report’s writer may extract or
+paraphrase information from any of them.
+1. Planner – a JSON plan from the agent’s planner subagent.
+2. Researcher – a short 1-page research note from a researcher subagent.
+3. Verified-sources registry – a numbered list of all URLs the agent’s subagents verified.
+Planner provider (exactly one) will usually not have citations.
+Researcher providers (more than one) usually
+carry their own citations. Each researcher provider has its own References / Sources section with its own [N] numbering –
+don’t conflate citation indices between different providers. Verified-sources registry (exactly one) is also important because
+the target sentence might use information based on their titles. Check now the providers tab and make sure you can find the
+different providers and their citations.
+Citations may live elsewhere.
+When deciding which citations belong to a sentence, look at both inline [N]
+markers and the surrounding context – an earlier sentence/ paragraph, or a "References" / "Sources" block at the end.
+Clarification – no need to open external URLs.
+Throughout the annotation process there is no need to open
+external URLs. All questions are about the correctness of the report with respect to the text and citations in the information
+providers tab.
+Searching tip.
+When looking for sentences that support the target, use Ctrl+F and try paraphrases of the tar-
+get’s key terms – the writer may have paraphrased the underlying source, so an exact-word match isn’t guaranteed. Note: in
+Google Docs, Ctrl+F may jump across tabs – always check which tab you’re currently viewing.
+Label definitions
+Your task is to select the most appropriate label for each target sentence based on its faithfulness and citation accuracy.
+1. N/A (doesn’t need citations) – the target does not need citations.
+2. Hallucination or partial hallucination – providers do not fully support the target.
+3. Uncited input reliance – providers do support the target, but one or more of the provider sentences necessary to support
+the target do not have citations.
+4. Uncited output – provider sentences that are needed to support the target have citations, but the target sentence has no
+citations at all.
+5. Insufficient citations – provider sentences that are needed to support the target have citations, but the target’s citations
+don’t cover those provider citations.
+6. No issues (correct) – the target is supported and correctly cited.
+Note. It’s possible that there is more than one provider sentence that supports the target. If you chose any label
+other than "No issues (correct)", make sure you didn’t miss another possible supporting sentence in the providers.
+Figure 12: Verbatim copy of the human annotation guidelines shown to annotators (see Section 4.3). The per-task
+worked example is omitted for space. The task was presented in a google doc with three tabs: the guidelines
+presented above, the output that the agent created, and the inputs that the agent received.
+Uncited Input
+Reliance
+Uncited Output
+Insuff. Cites
+0
+20
+40
+60
+80
+77%
+13%
+10%
+Orchestrator (30)
+Hallucination
+Insuff. Cites
+0
+20
+40
+60
+80
+100
+78%
+22%
+Reporter (90)
+Hallucination
+Insuff. Cites
+0
+20
+40
+60
+80
+100
+92%
+8%
+Researcher (75)
+Hallucination
+0
+20
+40
+60
+80
+100
+100%
+Searcher
+(Snippets) (7)
+Hallucination
+0
+20
+40
+60
+80
+100
+100%
+Searcher
+(Synthesized) (1)
+Figure 13: Agent-level error distribution for MS-Agent. The counterpart for Nvidia AI-Q is Figure 4.
+23
+
+
+===== page 24 =====
+Hallucination
+Uncited Output
+Insuff. Cites
+0
+20
+40
+60
+80
+100
+93%
+1%
+6%
+Orchestrator (161)
+Hallucination
+0
+20
+40
+60
+80
+100
+100%
+Researcher (98)
+Hallucination
+0
+20
+40
+60
+80
+100
+100%
+Searcher
+(Synthesized) (23)
+Figure 14: Agent-level error distribution for TrajectoryKit. Unlike the other two systems, hallucinations dominate at
+every agent rather than giving way to citation errors deeper in the information flow. The counterpart for Nvidia
+AI-Q is Figure 4.
+Hallucination
+Uncited Input
+Reliance
+Uncited Output
+Insuff. Cites
+0
+20
+40
+60
+80
+1%
+64%
+10%
+25%
+Orchestrator (103)
+Hallucination
+Insuff. Cites
+0
+20
+40
+60
+80
+100
+23%
+77%
+Reporter (93)
+Figure 15: System-level error distribution for MS-Agent. The counterpart for Nvidia AI-Q is Figure 5.
+24
+
+
+===== page 25 =====
+Hallucination
+Uncited Output
+Insuff. Cites
+Externally Crawled
+0
+20
+40
+60
+80
+100
+95%
+1%
+3%
+1%
+Orchestrator (189)
+Figure 16: System-level error distribution for Trajecto-
+ryKit. Every confirmed final-report error is attributed
+to the orchestrator, and 95% of them are hallucinations.
+The counterpart for Nvidia AI-Q is Figure 5.
+System
+Agent
+LLM
+Nvidia AI-Q
+Orchestrator
+GPT-5.2
+Planner
+GPT-5.2
+Researcher
+Nemotron Nano 30B
+Tavily Snippets
+(Tavily API)
+Tavily Answer
+(Tavily API)
+MS-Agent
+Orchestrator
+GPT-5
+Reporter
+GPT-5 mini
+Researcher
+GPT-5 mini
+Searcher
+GPT-5 nano
+TrajectoryKit
+Orchestrator
+gpt-oss-20b
+Worker
+gpt-oss-20b
+Summarize Webpage
+gpt-oss-20b
+Table 7: LLM used by each agent in the three open-
+source DR systems we evaluate. Nemotron Nano 30B
+refers to NVIDIA (2025). Tavily Snippets and Tavily
+Answer are calls to a search API rather than direct
+prompts to an LLM.
+25
+
+
+===== page 26 =====
+Hallucination
+Uncited Input
+Reliance
+Uncited Output
+Insuff. Cites
+0
+10
+20
+30
+40
+50
+40%
+17%
+13%
+30%
+Orchestrator (94)
+Hallucination
+Insuff. Cites
+0
+20
+40
+60
+80
+68%
+32%
+Researcher (28)
+Figure 17: System-level error distribution for Nvidia AI-Q after applying the “do NOT use information which is not
+backed by citations.” prompt change. Compare against Figure 5: the orchestrator’s uncited output bucket is reduced
+from 48% to 13%.
+System
+Agent
+Inputs (for span extraction)
+Outputs (evaluation tar-
+gets)
+Cit. mode
+AI-Q
+Orchestrator
+Researcher notes,
+planner plans,
+source registry
+Final report
+Semantic
+Researcher
+<Document> snippets + <Answer>
+blocks
+Synthesized note with [N]
+cit.
+Semantic
+Planner
+Same as Researcher
+JSON plan →Markdown
+-
+Searcher (snippets)
+Raw crawled documents
+<Document> blocks
+Extracted
+Searcher (answers)
+Raw crawled documents
+<Answer> blocks
+Structural
+MS-Agent
+Orchestrator
+Reporter snapshots, analyses, con-
+flicts
+Final report (post-edit)
+Semantic
+Reporter
+Syntheses, notes, analyses
+Report draft
+Semantic
+Researcher (notes)
+Summaries + key excerpts per URL
+Evidence notes
+Structural
+Searcher (synthesis)
+Raw crawled documents
+Synthesis JSON
+Structural
+Searcher (snippets)
+Raw crawled documents
+Synthesis JSON
+Extracted
+TrajectoryKit
+Orchestrator
+Researcher
+final
+responses,
+summarize_webpage digests
+Final report
+Semantic
+Researcher
+Search snippets + fetched page bod-
+ies
+Final response to orchestra-
+tor
+Structural
+Searcher (answers)
+One fetched page
+summarize_webpage
+di-
+gest
+Structural
+Table 8: Per-agent extraction summary. Inputs are the agent invocation inputs provided to the span-extraction step
+of our algorithm (Section 4.2); outputs are the evaluation targets; citation mode indicates how citations are identified
+(semantic = per-sentence DEER classification; structural = inherited from context; extracted = source URL identity).
+26

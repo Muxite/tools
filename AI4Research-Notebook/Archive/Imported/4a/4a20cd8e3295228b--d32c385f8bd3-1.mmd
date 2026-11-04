@@ -1,0 +1,10 @@
+flowchart TB
+    Slice["Intent Compilation and Verification Slice<br/>(formerly TRIAL-1)"] -.-> P1[Delivery Phase 1: Implementation Stages 0 through 7]
+    P1 --> P2[Delivery Phase 2: Implementation Stage 8 local-isolated RSI]
+    P1 -.->|Relevant baseline allows isolated preparation| P3[Delivery Phase 3: six dynamic integration efforts]
+    P2 -->|Continue applicable implementation| P3
+    P1 --> Core[Core demonstration: mandatory baseline and RSI exits]
+    P2 --> Core
+    P3 --> Account[Every applicable effort: PASS or BLOCKED or INCOMPLETE]
+    Core --> Report[M1 implementation accounting]
+    Account --> Report

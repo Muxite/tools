@@ -1,0 +1,24 @@
+flowchart LR
+    U[User browser or CLI on the LAN or VPN] -->|private address, session token on every request| W
+    subgraph Host[Server host: GB10, Docker Compose, one private network]
+        subgraph App[App container]
+            W[Web UI and control API] --> RT[Runtime: binder, scheduler, CC runner, check runner, gate host]
+            RT --> BR[Model bridge: Codex CLI over local IPC]
+            RT --> EX[Confined executor: own OS identity, POC workspace only]
+            RT --> ST[(Run state, artifacts, records)]
+            IN[(Admission inbox)] --> RT
+        end
+        subgraph Side[Sidecar container]
+            BM[Platform benchmark runner]
+            TR[Test runner]
+        end
+        subgraph WB[RSI workbench container, started by a human]
+            RSI[Proposer and child runner]
+            FX[(Hidden fixtures, referee identity only)]
+        end
+    end
+    BR --> M[Model endpoint]
+    BM -.->|own token, control API| W
+    TR -.->|own token, control API| W
+    ST -.->|record export, read-only| WB
+    WB -.->|signed candidate packages| IN

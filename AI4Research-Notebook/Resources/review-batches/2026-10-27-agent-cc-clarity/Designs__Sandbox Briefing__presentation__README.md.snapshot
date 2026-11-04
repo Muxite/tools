@@ -1,0 +1,88 @@
+---
+id: sandbox-design-presentation
+status: design-proposal-rendered-runtime-unverified
+source: Sources/Prompts/2026-10-27-cc-sources-factory-native.txt; Designs/Sandbox Lab Design
+last_reviewed: 2026-10-27
+next_action: Review the overall diagram and factory/native integration boundaries before implementing the bounded slice
+---
+# Sandbox design presentation
+
+[PowerPoint: AI4Research Sandbox Design rev8](output/AI4Research%20Sandbox%20Design%20rev8.pptx). [Live editable deck](page://page_7a233186a3548191869c85106fc552b4).
+
+Nine main slides and six hidden appendix slides, reduced from seventeen total. The complete lab system is the primary diagram. The source/factory view now shows general, domain and lab-owned storage; user/AI and source-driven factory creation/upgrades; independent qualification; local use; and separately reviewed contributions. Native JiuwenSwarm Skill/tool/evolution mechanisms are the preferred integration surface.
+
+The purpose-first opening, attributed Karpathy quote, recurring research cycle, lab VM ownership, private/shared model policy and independent stop paths remain. The workload example remains removed. Parallel work and scoped retry are folded into the cycle; the dedicated navigation slide is removed. The upstream original figure and our native integration mapping remain adjacent for comparison.
+
+| Slide | Content |
+|---|---|
+| 1 | Purpose and AI4R value |
+| 2 | The complete lab system |
+| 3 | Inside the lab AI4R |
+| 4 | Continuing research cycle |
+| 5 | CC sources, factory bundle and local reuse |
+| 6 | Model routing for AI4R and CCs |
+| 7 | Private models |
+| 8 | Persistence, stop and recovery |
+| 9 | Technology stack |
+| 10 | Original OpenJiuwen system diagram |
+| 11 | Native JiuwenSwarm integration |
+| 12 | Evidence and reuse limits |
+| 13 | Acceptance scenarios |
+| 14 | Tradeoffs and resource limits |
+| 15 | JiuwenBox requirements fit |
+
+## Core diagram previews
+
+### The complete lab system
+
+![The complete lab system](review-rev6/slide-2.png)
+
+### Inside the lab AI4R
+
+![Inside the lab AI4R](review-rev6/slide-3.png)
+
+### Continuing research cycle
+
+![Continuing research cycle](review-rev6/slide-4.png)
+
+### CC sources, factory bundle and local reuse
+
+![CC sources, factory bundle and local reuse](review-rev6/slide-5.png)
+
+### Model routing for AI4R and CCs
+
+![Model routing for AI4R and CCs](review-rev6/slide-6.png)
+
+### Private models
+
+![Private models](review-rev6/slide-7.png)
+
+### Persistence, stop and recovery
+
+![Persistence, stop and recovery](review-rev6/slide-8.png)
+
+The Factory is explicitly a bundle of lab CCs, not a new execution layer. The factory view expands illustrative ingestion, build/test and packaging CCs and shows their shared lab execution/model routing. Research and factory workflows use the same CC machinery. A bundle can expose a composite CC interface while its parts remain reusable. Checkers can be CCs; independent criteria and admission authority still apply.
+
+## Native integration and evidence
+
+JiuwenSwarm source pin `02b37f47fbefe80a58e4ed88606120818ca44ac3` provides Skill discovery/install, a local library with role visibility, config/tool/MCP integration and native skill create/evolution rails. The factory should emit compatible guidance and tool bindings with packaged implementation. A Skill is not an OCI image; a CC adds pinned execution and AI4R obligations. Qualify these adapters rather than introducing a parallel skill manager. Detailed source scope and limits are on slides 11–15 and in notes.
+
+Mental-model Skills provide source-inspired perspectives and methods. Claims of faithful person emulation or superior decisions require evidence. Functional qualification covers specified task behavior, compatibility and regression criteria. It does not establish general research benefit. A specialist replaces a generalist only after a matched assessment supports it. Local usefulness does not automatically publish a CC. Mother AI4R release adoption and generic JiuwenSwarm upstream contribution are separate review paths.
+
+Both AI4R and CCs use injected model routing. Endpoint relocation can preserve code and model identity; model substitution follows explicit policy. Private models remain lab-scoped. JiuwenBox offers execution, stop and proxy mechanisms; Docker owns OCI and the provider owns VM power control. Integration, actual termination, privacy, GPU support and research improvements remain unverified.
+
+- JiuwenSwarm: https://github.com/openJiuwen-ai/jiuwenswarm . Exact source paths are retained in notes and the dated source receipt.
+- JiuwenBox: https://github.com/openJiuwen-ai/jiuwenswarm/blob/develop/jiuwenbox/README.md . Graceful shutdown and signal escalation are source-backed, not a deployment test.
+- Karpathy publisher transcript: https://www.dwarkesh.com/p/andrej-karpathy , October 17, 2025. Persistent external state addresses continuity, not weight-level continual learning.
+- OpenJiuwen Figure 2: https://arxiv.org/html/2608.27969v1 , August 28, 2026. The original diagram is reproduced with attribution; similarity does not validate our complete deployment.
+- Stable-interface precedent: https://www.anthropic.com/research/managed-agents , April 8, 2026.
+- Serving/routing precedents: https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/ and https://docs.litellm.ai/docs/proxy/model_management . No gateway product is newly selected.
+- Host controls: https://docs.docker.com/engine/security/ , https://docs.docker.com/engine/containers/resource_constraints/ and https://libvirt.org/manpages/virsh.html . Effective configuration requires qualification.
+
+## Reusable source
+
+`factory_bundle.mjs` updates the current fifteen-slide deck with the explicit Factory composition; `export_bundle.mjs` exports the reviewed state. `cc_factory_native.mjs` contains the current diagram/native integration callbacks and one-time compaction of the prior seventeen-slide deck. Do not rerun `compact` against an already compacted deck. It uses native helpers from `system_deck.mjs`. Earlier callbacks describe the previous ordering and should not be replayed over the current deck. The earlier `export_native.mjs` exports the reviewed saved state to PowerPoint and embeds the attributed original image. The external live session supports PNG previews but not direct PPTX export. Current renders are in `review-rev6/`; earlier renders and exports remain as revision history. Page ID: `page_7a233186a3548191869c85106fc552b4`.
+
+Slide 6 placement correction: private model and lab configuration sit explicitly inside the VM boundary; shared inference stays outside. `private_model_placement.mjs` holds this targeted edit and `export_placement.mjs` exports rev7.
+
+Reports and discoveries are explicit outputs on slides 1–4, with a deliverable box on the overall diagram and retained reports/evidence feeding the cycle. `research_outputs.mjs` applies this targeted update; `export_reports.mjs` exports rev8. No slides were added.

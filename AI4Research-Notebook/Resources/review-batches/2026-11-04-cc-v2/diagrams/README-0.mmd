@@ -1,0 +1,19 @@
+flowchart TB
+    author["Author"] --> declaration["CC declaration"]
+    declaration --> factory
+    request["Brief or CC request"] --> factory["Factory coding agent"]
+    factory --> product["Software product"]
+    factory --> release["Optional sealed CC releases"]
+    factory --> build["Build and source provenance"]
+    build -. identifies .-> release
+    release --> host["Host: admit and bind"]
+    release --> catalog["Optional catalog"]
+    catalog --> agent
+    agent["Native agent"] -->|plain arguments| host
+    host --> boundCall["Bound capability call"]
+    boundCall --> adapter["native / image / jiuwenswarm"]
+    adapter --> receipt["Outputs + host receipt"]
+    receipt -. identifies .-> boundCall
+    product --> lab["Lab: verify actual loaded product"]
+    receipt --> lab
+    lab --> evidence["Measurement and independent assessment"]

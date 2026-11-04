@@ -1,0 +1,3917 @@
+
+
+===== page 1 =====
+SkillZip Pro: Execution-Aware Dynamic Compression of
+Progressively Loaded Skills for Self-Evolving Agents
+Xiaofan Bai1, Chao Liu1, Hongqiang Lin2, Di Wu1, Mingli Song2, Xuan Jin1,†, Xipeng Cao1, Yuhong Li1
+1Alibaba Group
+2Zhejiang University
+baixiaofan.bxf@alibaba-inc.com
+†Project leader
+Abstract— Production agent skills are directory bundles, not
+isolated prompts. The root is loaded at activation; references,
+schemas, scripts, assets, and nested subskills are loaded only
+when an execution path needs them. Compressing only the root
+misses most deployment cost and may move branch-specific
+details into the always-loaded context. Flattening instead destroys
+progressive-loading boundaries.
+We introduce SkillZip Pro, an evaluation-free compressor
+for complete, progressively loaded skill bundles. It leaves the
+agent harness unchanged and emits an ordinary directory. The
+method combines two safeguards. First, it compresses across
+files, removing content from a reference or subskill when the root
+or a declared environment contract already provides it. Second, it
+preserves routing, so every required file and directly callable entry
+remains reachable after rewriting. Users can configure SkillZip
+Pro along two independent axes. One-Shot mode rebuilds the full
+bundle; Continual mode reuses state and applies Zip-on-Write
+after each evolution patch. Persistent compression rewrites the
+shipped bundle to reduce storage and runtime context. Transient
+compression keeps that bundle byte-identical and builds a task-
+specific view, reducing only per-run context after build cost.
+Entry contracts mark private, public, and conditional resources;
+a multi-entry audit preserves standalone public subskills.
+On a production content-moderation skill evaluated by our
+industrial multi-round harness, SkillZip Pro removes 38% of
+skill bundle tokens and 10.4% of end-to-end per-run tokens
+with no quality loss, while an unprotected 71% configuration
+loses up to 26 accuracy points to one-sided false positives. On a
+multi-entry bundle, SkillZip Pro effeciently reduces token cost
+while near-perfectly preserving every route and public entry.
+Available at: https://github.com/yutou520131/SkillZip-Pro
+I. Introduction
+Agent skills package reusable instructions, procedures, and
+tools for use across tasks. A prototype may represent a skill
+as one prompt, but a production skill is usually a directory.
+A short root declares when the skill applies; references and
+subskills hold branch-specific knowledge; scripts implement
+deterministic operations; and schemas constrain inputs and out-
+puts. Agents load this bundle progressively: catalog metadata
+is visible before selection, the root appears after activation,
+and auxiliary files are opened only when the current path
+requires them [1], [2].
+Fig. 1. The dynamic compression and progressive loading of agent skills.
+This execution mode changes the compression objective.
+A root-only method can report an attractive ratio while
+leaving most deployed text untouched; it can even move rare
+branch details into the root and increase every invocation’s
+context. Concatenation fixes the accounting gap but destroys
+progressive disclosure. Neither reflects the agent’s actual cost.
+Self-evolving agents make the problem larger. Systems
+such as Voyager, Reflexion, and later evolution frameworks
+accumulate successful routines, counterexamples, and repair
+rules over time [3]–[6]. Repetition grows both within files and
+across branches. Sharing that logic saves space, but placement
+matters: moving content used by two rare branches into the
+root charges every task. Compression must therefore optimize
+a progressively loaded resource graph, not a flat string.
+Existing methods are not suitable for this setting. Prompt
+compressors optimize token salience or reconstruction in a flat
+context [7]–[9]. SkillReducer shortens skills with evaluation
+feedback, which requires rollouts and ties compression to
+sampled tasks [10]. Our earlier SkillZip formulation instead
+found a shortest faithful representation without evaluations [11].
+It preserved typed behavioral contracts and supported Zip-on-
+Write, but treated one document at a time and could not model
+references, subskills, or progressive-loading costs.
+arXiv:2608.30785v1  [cs.AI]  31 Aug 2026
+
+
+===== page 2 =====
+We present SkillZip Pro, a bundle-aware extension of
+SkillZip that preserves a harness-agnostic constraint: the agent
+harness is unchanged. Its output is an ordinary skill directory
+that uses existing file readers, paths, and loading behavior; no
+resolver, interception hook, or runtime protocol is required.
+SkillZip Pro adds two capabilities that a single-document
+compressor lacks. Pillar 1, activation-aware cross-file com-
+pression, removes content already supplied by the root or
+a declared environment contract, factors repeated branch
+content within its loading scope, and moves long guarded
+branches into on-demand capsules. These transformations
+reduce cross-file redundancy without enlarging the always-
+loaded layer. Pillar 2, cross-file routing preservation, locks
+routing instructions and audits the materialized directory
+before publication. Every required file must remain reachable,
+and interface contracts such as schemas, label lists, and
+worked formats remain contiguous and verbatim. The compiler
+supports two compression modes. One-Shot Compression
+scans and optimizes the full directory for migration, release,
+or periodic repacking. Continual Compression applies each
+evolution patch verbatim, reuses unchanged contracts, and
+repairs only the affected graph closure, where a global repack
+is used to bound the accumulated drift.
+To accommodate whether referenced files and subskills must
+remain independently usable outside the root skill, SkillZip
+Pro introduces a separate output-lifecycle choice. Persistent
+Bundle Compression rewrites the canonical directory and
+is best suited to private resources used only through the
+root, reducing both storage and future runtime context. If
+it modifies a public entry, a multi-entry audit must verify that
+the entry remains independently usable. Transient Execution-
+View Compression instead leaves the canonical directory
+unchanged and constructs a task-specific view for each run,
+preserving the independent usability of all shipped entries by
+construction while reducing runtime context but not disk usage.
+Either lifecycle can use either compression mode. Section V-C
+defines the resulting four combinations and their costs.
+Both schedules resolve explicit local references into a
+conservative resource graph, extract typed contracts from
+text, and lock executable or binary artifacts. The objective
+separates catalog, activation, deployment, and path-weighted
+costs. After transformation, an independent audit rereads the
+emitted directory and checks graph closure, scope, contract
+coverage, and byte identity before atomic publication.
+Our contributions are:
+• Bundle-aware compression for progressively loaded skills.
+We extend skill compression from a single document to a
+resource graph and jointly optimize content placement across
+the root, reference files, and subskills. This design removes
+cross-file redundancy without moving rarely used content
+into the always-loaded root.
+• Safe routing and independent entry preservation. We treat
+routing instructions and entry contracts as explicit constraints
+and audit the materialized bundle before deployment. This
+ensures that required branches remain reachable and that
+public subskills and references remain independently usable.
+• Flexible compression for different update and deployment
+requirements. We separate when compression is performed
+from where its output is stored. One-Shot and Continual
+modes support static and self-evolving skills, while Persistent
+and Transient lifecycles accommodate different requirements
+for storage reduction and independent resource usability.
+• Comprehensive compression results with production
+evidence. Every removal is supported by a containment,
+coverage, or logged-entailment witness, while interface
+contracts remain intact. On a production skill, SkillZip
+Pro reduces deployed content by 38% and end-to-end per-
+run tokens by 10.4% while preserving decision quality.
+II. Related Work
+Self-evolving agents and skill memories. Agents increas-
+ingly retain reusable procedures instead of solving every
+task from scratch. Voyager stores executable skills, Reflexion
+records verbal feedback, and ACE organizes evolving context
+as structured playbooks [3]–[5]. Other systems revise, optimize,
+or formalize skill artifacts [12]–[15]. As these libraries grow,
+equivalent rules accumulate at different scopes and branch
+updates can conflict. SkillZip Pro compresses the resulting
+representation regardless of how it was created.
+Prompt and context compression. LLMLingua, LongLLM-
+Lingua, and LLMLingua-2 remove or rewrite low-utility
+tokens [7]–[9]; selective-context, gisting, and recompression
+methods also target flat inference contexts [16]–[18]. Skill
+bundles differ in two ways: rare content may still be manda-
+tory, and each execution loads only part of the directory.
+SkillZip Pro therefore compresses typed behavioral units
+while preserving loading boundaries.
+Skill compression and runtime representations. SkillRe-
+ducer uses evaluation feedback to compress skill text [10];
+parameterized skills and execution-time mechanisms instead
+change the representation or runtime [19], [20]. Our transient
+lifecycle also builds content per run, but it remains evaluation-
+free and harness-neutral: the agent receives an ordinary
+directory and no resolver observes execution. The closest
+precursor is SkillZip, which introduced typed coverage and
+shortest-cover compression for one document. SkillZip Pro
+extends its optimization object, cost model, rewrites, and audit
+to progressively loaded bundles.
+Grammar-based compression and MDL. Minimum de-
+scription length (MDL) selects the shortest faithful represen-
+tation [21], [22]. Grammar compressors such as Sequitur and
+Re-Pair factor sequences when references amortize definition
+cost [23], [24]. We add semantic types, activation scope, path
+weights, locked artifacts, and deployment constraints. Sharing
+is allowed only when it lowers loaded-path cost.
+III. Problem Formulation
+A. A Skill Is a Progressively Loaded Bundle
+We model a skill as a rooted directory 𝐵= (𝑉, 𝐸, 𝑟). Each
+resource 𝑣∈𝑉has a canonical path 𝑝𝑣, bytes 𝑏𝑣, media type
+𝑚𝑣, and loading class ℓ𝑣. The root 𝑟is normally SKILL.md.
+An edge 𝑒= (𝑢, 𝑣, 𝑔, 𝑠) records a reference from 𝑢to 𝑣, its
+2
+
+
+===== page 3 =====
+guard 𝑔, and source span 𝑠; a guard may be unconditional or
+author-written, such as “for CSV export.”
+We distinguish four loading layers:
+1) Catalog: the name, description, and entry metadata visible
+before activation;
+2) Activation: the root instructions loaded whenever the skill
+is selected;
+3) Path: the transitive resources loaded for a particular
+execution branch;
+4) Deployment: all bytes distributed with the skill, including
+resources rarely or never read.
+An edit can improve one layer while harming another. Moving
+a rare 500-token branch into the root may reduce deployment
+length after deduplication yet add 500 tokens to every
+activation. We therefore measure each layer separately.
+Definition III.1 (Safe resource graph). A graph is safe if every
+resolved target is a regular file inside the canonical bundle root,
+every recorded internal reference has an existing target, and
+every edge retains its source span and guard. External URLs
+are recorded as external edges but are never fetched. Symbolic-
+link escape, path traversal, missing targets, and ambiguous
+dynamic paths are rejected in strict mode.
+The resolver is intentionally conservative. Markdown links,
+explicit path literals, and declared subskill entries are recog-
+nized; an unrecognized file remains in the deployment bundle
+but contributes no inferred dependency. This prevents the
+compressor from inventing loading semantics.
+B. Entry Contracts: Which Resources Must Stand Alone
+Agents usually reach resources from the root, but they
+may also select a nested subskill or reference directly. The
+compressor must know this before deleting content: text
+covered by the root may still be essential to a direct call.
+An entry contract 𝜂𝑣therefore assigns each node one of
+three roles:
+• Private (internal): reached only through the root, with no
+standalone-use requirement.
+• Public (standalone): directly selectable and therefore fully
+usable without the root.
+• Conditional: directly usable only with a declared host
+context or dependency closure.
+The author or catalog declares the contract; the compressor
+never infers it. For a public or conditional entry 𝑒, define
+independence as
+Ind(𝑒, 𝐵′) = Cov(𝑒, 𝐵′
+↓𝑒) I[𝑒discoverable],
+(1)
+where Cov is the fraction of source contract units covered by
+the closure 𝐵′
+↓𝑒reachable from 𝑒, including any declared host
+context. Discoverability requires an executable entry at the
+advertised path. Thus Ind = 1 means that the entry remains
+independently usable; missing content lowers coverage, while
+a renamed or hidden entry has independence zero.
+C. Typed Resource Contracts
+For each textual node 𝑣, SkillZip Pro extracts a contract
+C𝑣= ⟨𝐼𝑣, 𝑊𝑣,𝑇𝑣, 𝑅𝑣, 𝑂𝑣, 𝐸𝑣, 𝑃𝑣, 𝐿𝑣⟩,
+(2)
+where 𝐼contains applicability and interface conditions; 𝑊
+workflow states and ordering edges; 𝑇tool or resource
+requirements; 𝑅rules and prohibitions; 𝑂output fields and
+formats; 𝐸evidence or verification obligations; 𝑃provenance
+to source spans; and 𝐿locked residuals that must remain
+verbatim. Each unit 𝑎∈C𝑣has a semantic type, normalized
+payload, scope, guard, and provenance.
+Executable code, structured data, images, and other non-
+instructional artifacts are locked nodes. Phase A may rename
+neither their path nor their bytes. Their inbound references can
+be rewritten only when the referring Markdown is rewritten
+and the canonical target remains identical.
+For a candidate bundle 𝐵′, let cover(𝑎, 𝐵′) mean that a
+compatible statement, reference, or locked artifact in 𝐵′ entails
+unit 𝑎on every path where it originally applied. Coverage
+is type constrained: an example cannot cover a prohibition,
+generic advice cannot cover a required output field, and an
+unrelated branch cannot cover a guarded rule.
+Definition III.2 (Bundle faithfulness). 𝐵′ is faithful to 𝐵under
+environment contract 𝐻if (i) every source unit is covered at
+a compatible scope, (ii) every locked node is byte-identical,
+(iii) all internal references in 𝐵′ resolve safely, and (iv) any
+unit removed by host entailment has an exact typed witness
+in 𝐻bound to the audited environment digest.
+This structural guarantee does not assert behavioral equiv-
+alence for every language model. It protects the bundle’s
+explicit contract, not every latent reading.
+D. Four Costs, One Constrained Objective
+Let 𝜏(𝑥) be the deployment tokenizer or another declared
+length function. For a bundle 𝐵′, define
+𝐶cat(𝐵′) = 𝜏(name, description, entry),
+(3)
+𝐶act(𝐵′) = 𝜏(𝑏′
+𝑟),
+(4)
+𝐶dep(𝐵′) =
+∑︁
+𝑣∈𝑉′
+𝜏(𝑏′
+𝑣),
+(5)
+𝐶path(𝐵′; 𝜋) =
+∑︁
+𝑣∈load(𝐵′, 𝜋)
+𝜏(𝑏′
+𝑣).
+(6)
+Here 𝜋denotes an execution path or task class and load follows
+the unchanged agent’s progressive-loading behavior. Given an
+empirical path distribution 𝑞(𝜋), our primary optimization
+target is
+𝐽(𝐵′) = 𝐶cat(𝐵′) + 𝐶act(𝐵′) + E𝜋∼𝑞𝐶path(𝐵′; 𝜋) + 𝜆𝐶dep(𝐵′),
+(7)
+subject to bundle faithfulness. We use 𝜆= 0.05 as a transparent
+default so that storage matters without dominating runtime
+exposure. If no trace distribution is available, explicit branch
+guards induce a uniform distribution over reachable leaf paths;
+every reported result must identify which estimator was used.
+We report all four costs even when optimizing Eq. (7). A
+single “compression ratio” is insufficient: it can conceal a
+3
+
+
+===== page 4 =====
+regression in the always-loaded root or in the tail of path cost.
+For metric 𝑥, the reduction is 1 −𝐶𝑥(𝐵′)/𝐶𝑥(𝐵); negative
+values are preserved rather than clipped.
+E. Two Deployment Lifecycles and Their Costs
+The four costs above describe one artifact, but deployment
+has two distinct lifecycles. Persistent compression rewrites
+the canonical bundle; its one-time work reduces storage and
+future runs. Transient compression leaves the canonical bundle
+unchanged and builds a task-specific execution view b𝐵𝑒, 𝜋
+before a run through entry 𝑒. Its benefit applies only to that
+run and must be reported after build and cache cost.
+Because the two change different things, we separate seven
+quantities and never average across them:
+1) Canonical storage 𝐶disk(𝐵′): bytes of the on-disk bundle.
+Persistent shrinks it; transient keeps it equal to the source.
+2) Shipped/deployment 𝐶dep(𝐵′) (Eq. (7)): distributed bytes.
+3) Per-entrypoint activation 𝐶act(𝐵′; 𝑒): entry tokens loaded
+when entry 𝑒is selected.
+4) Per-run execution-view tokens 𝐶view( b𝐵𝑒, 𝜋): context
+loaded for one run through 𝑒on task 𝜋.
+5) Transient build latency Λbuild(𝑒, 𝜋): wall-clock time and
+any model calls to construct b𝐵𝑒, 𝜋.
+6) Cache and invalidation 𝐶cache: storing views keyed by
+(bundle digest, entry, environment version) and rebuilding
+them when any key changes.
+7) Public-entrypoint independence Ind(𝑒, 𝐵′) = 1 for every
+public 𝑒: a mandatory deployment constraint.
+Persistent results report quantities 1–3 and per-run load. Tran-
+sient results report quantities 4–6, including build overhead, but
+never a disk ratio because disk is unchanged. Both lifecycles
+must satisfy constraint 7 for every public entry. They use the
+same kernel but differ in deletion scope, publication, auditing,
+and fallback (Section V-C).
+IV. Execution-Aware Compression Theory
+A. From Repetition to Scoped Reuse
+Within one document, SkillZip selects a shortest cover
+of typed contract units using primitive statements, shared
+rules, parameterized procedures, and explicit exceptions. For
+candidate representation 𝑧, let 𝑑(𝑧) be its token cost and Γ(𝑧)
+the units it covers. The file-level problem is a weighted set
+cover with hard coverage:
+min
+𝑍⊆Z
+∑︁
+𝑧∈𝑍
+𝑑(𝑧)
+s.t.
+Ø
+𝑧∈𝑍
+Γ(𝑧) ⊇C𝑣.
+(8)
+SkillZip Pro retains this optimizer but changes candidate cost
+according to where the representation is placed in the bundle.
+Suppose exact fragment 𝑥of length 𝑑𝑥occurs in files 𝑆𝑥⊆
+𝑉. Keeping all copies incurs Í
+𝑣∈𝑆𝑥𝑤𝑣𝑑𝑥, where 𝑤𝑣is the
+effective load weight induced by Eq. (7). Factoring 𝑥into
+shared module ℎwith reference cost 𝑑ref costs
+𝑤ℎ𝑑𝑥+
+∑︁
+𝑣∈𝑆𝑥
+𝑤𝑣𝑑ref + 𝑑audit,
+(9)
+where 𝑤ℎis the probability-weighted scope of ℎ, and 𝑑audit
+covers import instructions and provenance. Factoring is allowed
+only if Eq. (9) is smaller.
+Proposition IV.1 (No sparse-root promotion). Let 𝑥occur
+only in branches with total access probability 𝑝< 1. Placing
+𝑥in the always-loaded root adds (1 −𝑝)𝑑𝑥expected tokens
+relative to keeping one copy within the affected activation
+scope, before reference overhead. Therefore root promotion is
+suboptimal whenever the deployment saving is smaller than
+(1 −𝑝)𝑑𝑥/𝜆plus reference cost.
+Proof. In Eq. (7), root placement gives load weight one,
+whereas branch-scoped placement gives weight 𝑝. Their
+path-cost difference is (1 −𝑝)𝑑𝑥; deployment can offset it
+only through the 𝜆𝐶dep term. Adding nonnegative reference
+overhead yields the stated condition.
+□
+The proposition captures a common failure: global dedu-
+plication can reduce storage while making common requests
+more expensive. SkillZip Pro instead places a shared module
+within the activation scope of the branches that need it. The
+root imports it only when every reachable path requires it.
+B. Conditional Capsules
+A guarded section with an explicit trigger can be moved from
+an always-loaded file into an on-demand capsule . Let the
+section body cost 𝑑𝑏, dispatcher cost 𝑑𝑔, and trigger probability
+𝑝𝑔. Keeping the body inline costs 𝑑𝑏per load; a capsule costs
+𝑑𝑔+ 𝑝𝑔𝑑𝑏in path expectation, plus 𝜆𝑑𝑔deployment overhead.
+Proposition IV.2 (Capsule threshold). Moving a guarded
+section to a capsule decreases Eq. (7) if
+(1 −𝑝𝑔)𝑑𝑏> (1 + 𝜆)𝑑𝑔.
+(10)
+The condition favors long, infrequent branches with short
+and unambiguous dispatchers. SkillZip Pro never infers a
+new guard: a capsule candidate must originate from an explicit
+heading or conditional clause, and the dispatcher must preserve
+the original trigger and relative path.
+Capsules and sharing address different costs. A capsule
+delays an infrequent branch; a shared module removes exact
+repetition across branches. When both apply, the shared module
+remains within the union of those branches rather than moving
+to the root.
+C. Host Entailment Under a Closed Contract
+Some skill text restates guarantees already enforced by
+the deployment environment: an available tool, an immutable
+output schema, or a mandatory safety policy. Removing such
+text can yield a high activation reduction, but only if the
+guarantee is explicit and stable. We represent the environment
+as a signed typed contract
+𝐻= {(𝑡, 𝑘, 𝑣, 𝜎, 𝛿)},
+(11)
+where 𝑡is unit type, 𝑘a canonical key, 𝑣the exact value,
+𝜎its scope, and 𝛿the environment digest. Removal requires
+an exact type/key/value/scope match; semantic similarity only
+flags manual review.
+4
+
+
+===== page 5 =====
+Assumption IV.3 (Environment stability). The audited en-
+vironment digest remains unchanged between compression
+and deployment. If it changes, the bundle is re-audited or the
+entailment transformation is disabled.
+Absent a supplied contract, host entailment is a no-op. This
+default avoids treating model knowledge, tool documentation,
+or informal conventions as guarantees.
+D. Interface Contracts and the Witness Hierarchy
+Typed coverage and host entailment do not fully protect
+two structures that matter in deployment: interface contracts
+and evidence for deletion.
+Definition IV.4 (Interface contract). An interface contract is
+a maximal source section that specifies the skill’s inputs or
+outputs as a machine-checked format: an output schema with
+worked examples, a whitelist of legal labels, or a field-level
+validation rule. Interface contracts are atomic: the specification
+is read as one unit by the consuming model, so its coverage
+obligation is discharged only when the whole section is emitted
+contiguously and verbatim. A rewriting that preserves every
+line but scatters the section across several synthetic headings
+does not cover the unit.
+The second gap concerns how a removal is justified.
+Coverage by itself is a claim; a witness is the evidence attached
+to it. Every removal SkillZip Pro commits carries exactly
+one, recorded in the audit state:
+𝑊1 ≻𝑊2 ≻𝑊3,
+(12)
+where 𝑊1 is literal containment: the removed text survives
+byte-for-byte at another reachable location, so the removal is
+reversible by construction; 𝑊2 is a cover witness: a merged
+or shared representation passes the deterministic content-
+word coverage gate while retaining every protected literal
+and every negation polarity; and 𝑊3 is an entailment witness:
+a frozen checker model (temperature 0, fixed prompt) certifies
+that the decision-relevant content of the removed span—
+conditions, verdicts, thresholds, whitelists, exemptions—is
+already fully expressed elsewhere. 𝑊3 verdicts are accepted
+only for evidence-class units that carry no prohibition, output,
+or exemption marker, and each accepted verdict is logged with
+the checker’s stated basis, so every 𝑊3 removal is individually
+auditable after publication. Any deletion that cannot attach
+a witness is refused, whatever the predicted saving. Two
+further rules keep 𝑊3 honest when it is applied inside a
+single document: the entailment base excludes the candidate
+segment itself, and two candidates may not justify each other’s
+removal—a deletion whose only witness is another deletion
+is vetoed, because each verdict may have relied on text that
+is itself about to disappear. Where placement costs differ by
+layer, 𝑊3 should additionally be spent where the executor
+charges most: a removal from the always-loaded root saves
+its weight once per reasoning round, while a removal from
+an on-demand reference saves it about once.
+The hierarchy makes the safety boundary testable: witness
+strength, not deletion count, sets the safe compression ceiling.
+Section VI-V compares the same bundle under 𝑊1, 𝑊2 alone
+and with restricted 𝑊3 witnesses.
+E. Bundle Faithfulness Invariant
+Let Φ be the ordered transformation sequence: resolve,
+extract, drop entailed units, factor exact structure, form
+capsules, apply file-level shortest cover, materialize, and audit.
+Proposition IV.5 (Phase-A preservation). Under a safe source
+graph, exact extraction provenance, Assumption 1, interface-
+contract atomicity, and a sound final auditor, a committed
+output 𝐵′ = Φ(𝐵) is faithful according to Definition 2 and
+can be executed by any harness that already supports the
+original bundle’s ordinary relative-file loading semantics.
+Proof sketch. Host deletion retains a digest-bound witness.
+Scoped sharing replaces covered units with a reachable refer-
+ence in the same activation scope. Capsule extraction preserves
+the explicit guard in a dispatcher, and file-level compression
+obeys Eq. (8). Interface contracts remain contiguous, while
+locked nodes are copied byte-for-byte. The disk audit rejects
+uncovered units, unsafe or dangling paths, scope expansion,
+scattered contracts, and changed locked bytes. Every committed
+candidate thus meets Definition 2 and runs through the source
+model’s ordinary files and relative paths, with no added
+runtime mechanism.
+□
+As with any static natural-language verifier, the guarantee
+depends on the extractor and auditor. We reduce this trusted
+surface by retaining source spans, preferring exact transforma-
+tions, auditing emitted files rather than an in-memory plan,
+and falling back to a byte-identical copy on uncertainty.
+F. Continual Compression
+For an incoming evolution patch Δ𝑡, Continual Bundle
+Compression identifies an affected closure 𝐴𝑡: changed nodes,
+reference ancestors, newly or formerly referenced descendants,
+shared modules whose support set intersects the patch, capsules
+whose guards changed, and host witnesses invalidated by a
+new environment digest. Only this closure is re-extracted and
+locally re-optimized; unchanged contracts are reused by source
+digest. The graph-update cost is
+𝑂(|𝐴𝑡| + |𝐸(𝐴𝑡)|) + LM(𝑇𝑡),
+(13)
+where 𝑇𝑡⊆𝐴𝑡are changed textual nodes requiring extraction.
+A global audit remains 𝑂(|𝑉𝑡| + |𝐸𝑡|) in the conservative
+implementation, but uses hashing and cached contracts rather
+than new language-model calls.
+Local decisions may drift from the one-shot optimum as
+support sets and path frequencies evolve. Define continual
+regret at checkpoint 𝑡as
+𝑅𝑡= 𝐽(𝐵cont
+𝑡
+) −𝐽(𝐵one
+𝑡
+)
+max(1, 𝐽(𝐵one
+𝑡
+)) ,
+(14)
+where 𝐵one
+𝑡
+is a full one-shot recompression of the same
+verbatim authored state. A triggered global repack resets
+placement debt. The trigger is conservative: recoverable saving
+above 𝜃repack, relative bundle growth above 𝜌, workload drift
+5
+
+
+===== page 6 =====
+above 𝛿𝑊, an environment-digest change, or a maximum
+of 𝐾patches. This gives a tunable continuum between full
+recompression after every write and cheap local updates.
+Faithfulness does not depend on the schedule: both modes
+materialize and audit a complete directory. If continual
+optimization fails, the system publishes the verbatim patched
+bundle, not the previous compressed version. Compression
+may lose savings, but it cannot discard the patch.
+V. SkillZip Pro
+Figure 2 summarizes SkillZip Pro. Like SkillZip, it is
+evaluation-free and seeks the shortest faithful representation.
+The difference is scope: SkillZip compiles one SKILL.md,
+whereas SkillZip Pro compiles a progressively loaded direc-
+tory as a typed resource graph. It supports both full One-Shot
+optimization and state-reusing Continual updates.
+The compiler removes linked-file content already supplied
+by the root or environment, then verifies every route. One-Shot
+or Continual determines when optimization runs; Persistent
+or Transient determines whether output replaces the canonical
+bundle or forms a per-run view.
+A. From SkillZip to SkillZip Pro
+Compared to SkillZip, SkillZip Pro adds graph-wide
+placement, accounting, and audits.
+B. The Two Pillars
+The extension has two goals. Pillar 1 (compress across
+files) chooses what to remove and where to place what remains.
+Pillar 2 (preserve routing) ensures that these rewrites do not
+sever the links used for progressive loading. The first creates
+savings; the second makes them safe to deploy.
+Pillar 1 — activation-aware cross-file compression.
+Three graph-level transformations, none available to a single-
+document compressor, act on top of the per-file optimizer.
+(i) Host-entailment pruning: a unit whose obligation is exactly
+implied by the root or by a declared environment contract is
+removed, with a digest witness recorded, because the agent
+already receives it. (ii) Activation-scoped sharing: text repeated
+across branches is factored into one
+shared module , but
+placed only within the activation scope that loads it—never
+promoted into the always-loaded root, which would raise per-
+run cost. (iii) Conditional capsules: a long guarded branch
+moves into an on-demand file, leaving a one-line dispatcher.
+Together, these transformations remove redundancy between
+the root and dynamically loaded files.
+Pillar 2 — cross-file routing preservation. The same
+rewriting is dangerous precisely because a routing line—“when
+the task matches 𝑋, read [X](refs/x.md)”—looks like
+ordinary prose but is the skill’s navigation table. SkillZip
+Pro protects it with three layers of defense. (i) The routing
+table is locked as a first-class unit, so the optimizer may
+neither reword nor merge it. (ii) Every reference-bearing
+source line is preserved through rendering, so a link cannot
+be dropped as a side effect of compressing the text around
+it. (iii) Before publishing, an independent pass re-reads the
+materialized directory and verifies that every file—including
+shared modules and capsules the compressor itself created—is
+still reachable from the root by following resolved links; if
+any branch became unreachable, the candidate is rejected and
+the verbatim bundle is shipped instead. Section VI-H measures
+the result: SkillZip Pro keeps 1.000 routing fidelity while
+root-only and flat compressors drop to 0.000.
+C. Two Deployment Lifecycles for the Kernel Output
+Together, the pillars form a compression kernel that rewrites
+files while preserving their routes. A separate lifecycle choice
+determines where the result lives. This choice is independent
+of the One-Shot/Continual schedule in Sections V-F–V-G: the
+schedule controls when the kernel runs, while the lifecycle
+controls whether its output replaces the shipped bundle.
+Persistent Bundle Compression runs the kernel on the
+canonical bundle and ships the smaller bundle in its place. It
+suits private references and subskills that are only ever reached
+from the root: their repeated text is covered elsewhere, so it
+can be removed once and for all, cutting both the shipped size
+and every future run that would have loaded it. Because the
+shipped files change, the kernel may touch a public entry only
+after a multi-entry audit re-reads the published directory from
+every declared public entry and confirms that each still routes
+correctly and keeps Ind = 1 on its own; if any check fails,
+the verbatim bundle is shipped. This is the lifecycle of every
+earlier section, and we label it as such from here on.
+Transient Execution-View Compression leaves the canon-
+ical bundle byte-for-byte unchanged and builds a throw-
+away execution view b𝐵𝑒, 𝜋before a run. For selected en-
+try 𝑒, the view combines the closures of the root, 𝑒,
+and their shared dependencies, compresses them with the
+same kernel, and re-roots the result at 𝑒. The original
+root remains linked as _host_context.md, so host
+obligations survive. The view is discarded or cached by
+(bundle digest, 𝑒, environment digest) until a key changes. It
+lowers run context, not disk use. Algorithm 1 summarizes
+the transient compression. If compression does not improve
+the view or its single-entry audit fails, the system loads the
+uncompressed closure.
+Because when to compress and whether to keep the result
+are independent, they combine into the four production modes
+of Table I. One-shot persistent is the initial migration of
+an evolved library into a shipped bundle; continual persistent
+keeps that bundle small as it is edited and re-shipped; one-shot
+transient serves a stable bundle whose entries are called directly
+and rarely; and continual transient serves high-frequency direct
+calls against a bundle that keeps changing, where digest-keyed
+caching amortizes the build over many runs.
+D. Shared Inputs and Persistent Compiler State
+The required input is a bundle root and its entry file.
+Optional inputs are a deployment tokenizer or cost callback,
+a workload ledger of task-class frequencies and observed
+resource loads, and a typed, digest-bound environment contract.
+Without traces, explicit branch structure estimates path weights.
+6
+
+
+===== page 7 =====
+Fig. 2. Overview of SkillZip Pro. (a) Compression modes. The bundle-aware kernel compresses a typed resource graph of skills, tools, prompts, policies,
+metadata, and inter-skill relationships while preserving routing, dependency, entry, and execution contracts. It supports global One-Shot compression, which
+builds a compact bundle in one pass, and state-reusing Continual compression, which incrementally updates an existing state as resources, tasks, or feedback
+change. (b) Bundle forms. Each mode produces either a Persistent Bundle for storage and repeated reuse, or a Transient Execution View for lightweight,
+task-specific execution. This separation balances compression, efficiency, adaptability, and contract fidelity.
+TABLE I
+The two axes are orthogonal. Update frequency (One-Shot vs. Continual) decides when the kernel runs; lifecycle (Persistent vs. Transient)
+decides whether its output replaces the shipped bundle. The four combinations target different deployments.
+Lifecycle
+Compression mode
+Best for
+What it saves
+System requirement
+Persistent
+One-Shot
+initial migration of an evolved library to a
+shipped bundle
+smallest canonical bundle and lowest steady-
+state run cost
+one multi-entry audit before publishing
+Continual
+a library that keeps evolving and is re-shipped
+over time
+each edit is repacked once and amortised over
+many runs
+re-audit on every write plus a periodic
+global repack
+Transient
+One-Shot
+a stable bundle whose entries are called directly
+and rarely
+per-run context saving with the canonical
+bundle untouched
+a view build (or cache read) before each
+run
+Continual
+high-frequency direct calls against a frequently
+edited bundle
+views are cached by bundle digest and reused
+across runs
+digest-keyed cache with invalidation on
+any edit
+Without an environment contract, no host-entailment deletion
+is attempted. Both modes share a persistent compressor state
+𝑀𝑡= ⟨𝐺𝑡, C𝑡, 𝑊𝑡, 𝐻𝑡, I𝑡, P𝑡, A𝑡⟩,
+(15)
+where 𝐺𝑡is the safe resource graph; C𝑡the per-node contract
+store; 𝑊𝑡the path-weight ledger; 𝐻𝑡the environment digest
+and witnesses; I𝑡candidate, support, and reverse-reference
+indices; P𝑡provenance; and A𝑡prior audit results. The
+sidecar accelerates future compression but is never required
+at execution. If it is absent or its digest is stale, the tool safely
+falls back to one-shot reconstruction.
+E. Shared Bundle Compiler
+Safe graph resolution. The scanner walks the directory
+without following escaping symbolic links and classifies each
+node as instructional Markdown, subskill entry, code, struc-
+tured data, or opaque asset. It recognizes local Markdown links,
+explicit path literals with known extensions, and declarative
+subskill references. Every internal edge records its exact source
+span and nearest explicit guard. External URLs are preserved
+but never fetched; missing, ambiguous, or escaping local targets
+fail strict mode. Unreferenced files remain in deployment cost
+and are never silently discarded.
+7
+
+
+===== page 8 =====
+Algorithm 1 Transient Execution-View Construction
+Require: canonical bundle 𝐵with root 𝑟, chosen entry 𝑒,
+optional environment 𝐻, cache flag
+Ensure: execution view rooted at 𝑒; canonical 𝐵unchanged
+1: 𝑘←ViewKey(digest(𝐵), 𝑒, digest(𝐻))
+2: if cache and Hit(𝑘) then
+3:
+return LoadCached(𝑘)
+⊲no kernel call
+4: Ω ←Reach(𝐵, 𝑒) ∪Reach(𝐵, 𝑟)
+⊲entry and root
+closures
+5: 𝑅←MaterializeClosure(𝐵, Ω, 𝑒)
+⊲promote 𝑒to
+root; link 𝑟as host context
+6: b𝐵←Kernel(𝑅)
+⊲Pillars 1–2, cross-file promotion on
+7: if b𝐵unusable or 𝜏( b𝐵) ≥𝜏(𝑅) or single-entry audit fails
+then
+8:
+b𝐵←𝑅
+⊲safe fallback: uncompressed closure
+9: return Cache(𝑘, b𝐵)
+⊲verify digest(𝐵) unchanged
+Typed contract extraction. Each instructional node is
+segmented by headings and source spans. One structured
+extraction recovers Eq. (2), while every unit retains provenance.
+Relations such as same_rule, same_workflow, and
+exception_of are accepted only after deterministic type,
+polarity, guard, and payload checks. Low-confidence units
+are locked and preserved verbatim. The original SkillZip
+file-level scanner, type-compatible reuse, minimum-cost cover,
+fixed-template render, and span-restoration audit operate here
+unchanged for each eligible file.
+Bundle-level candidate generation. Three transforma-
+tions expose savings unavailable inside a single file. (1)
+Exact contract units entailed by 𝐻𝑡may be removed only
+with a scope-compatible, digest-bound witness. (2) Re-
+peated exact rules or workflow fragments may move to
+.skillzip_shared/<digest>.md at their lowest safe
+activation scope; affected branches receive a mandatory relative
+loading instruction. (3) A long section with an explicit guard
+may move to capsules/<slug>.md; a dispatcher retaining
+the trigger remains at the original site. Each transformation is
+evaluated together with per-file covers under Eq. (7).
+Global selection and materialization. Because a capsule
+changes path weights and a shared module may serve several
+capsules, marginal selection is followed by local add/drop/swap
+improvement. Every move preserves modeled coverage. Mate-
+rialization writes an ordinary relative-path directory; code,
+data, schemas, and assets remain byte-identical. Interface
+contracts (Definition 3) are restored as one contiguous verbatim
+span: surrounding prose may shrink, but the optimizer cannot
+split, reorder, or paraphrase the contract. A post-pass removes
+scattered render fragments and restores the source span. Every
+removal records its witness class from Eq. (12); 𝑊3 removals
+also store the verdict and rationale.
+F. Mode I: One-Shot Bundle Compression
+One-shot mode is intended for initial migration, release
+packaging, a missing or invalid state sidecar, or a periodic
+global re-optimization after workload drift. It reconstructs
+𝑀𝑡from the complete source bundle and searches globally.
+Algorithm 2 SkillZip Pro: One-Shot Bundle Compression
+Require: source bundle 𝐵, entry 𝑟, optional 𝐻, 𝑄
+Ensure: audited bundle 𝐵★and state 𝑀, or verbatim 𝐵
+1: 𝐺←ResolveSafeGraph(𝐵, 𝑟)
+2: C ←ExtractTypedContracts(𝐺)
+3: 𝑊←EstimateLoadWeights(𝐺, 𝑄)
+4: 𝑍←FileCoverCandidates(C)
+5: 𝑍←𝑍∪HostEntailments(C, 𝐻)
+6: 𝑍←𝑍∪ScopedSharing(𝐺, C, 𝑊)
+7: 𝑍←𝑍∪GuardedCapsules(𝐺, C, 𝑊)
+8: 𝑃←ConstrainedSelect(𝑍, 𝐽, cover)
+9: 𝐷←MaterializeTemporary(𝐵, 𝑃)
+10: if 𝐽(𝐷) ≤𝐽(𝐵) and AuditFromDisk(𝐵, 𝐷, 𝐻) then
+11:
+return AtomicCommit(𝐷), SaveState(𝐷)
+12: else
+13:
+return VerbatimCopy(𝐵), FailureState(𝐵)
+Algorithm 2 never publishes a candidate whose materialized
+objective is worse than the source.
+G. Mode II: Continual Bundle Compression
+Continual mode targets self-evolving skills that receive
+frequent small patches. Let Δ𝑡contain added, modified,
+moved, and deleted paths. The tool first applies Δ𝑡without
+paraphrase to the current authored source, producing the
+semantic fallback 𝐵raw
+𝑡
+. It then updates reference edges and
+constructs an invalidation closure 𝐴𝑡containing changed
+nodes, their reference ancestors, newly or formerly referenced
+descendants, shared modules whose support changed, capsules
+whose guard changed, and any host witness invalidated by
+an environment digest change.
+Only changed textual nodes are re-extracted; digest-identical
+contracts are reused. Patch units retain the four operations of
+SkillZip: Absorb removes an exact duplicate already covered;
+Refine updates an existing rule, guard, argument, or exception;
+Extend adds genuinely new behavior or a new resource; and
+Refactor changes a representation when several edits make
+another cover shorter. Pro extends Refactor to placement:
+affected shared modules, capsules, and host witnesses are
+re-priced whenever their support set or path weight changes.
+Local repair cannot accumulate unbounded debt. A one-
+shot global repack is triggered when recoverable objective
+saving exceeds 𝜃repack, bundle growth exceeds 𝜌, the workload
+distribution drifts beyond 𝛿𝑊, the environment digest changes,
+or 𝐾patches have elapsed. Repacking reads the current bundle
+and compact state, never the full patch history.
+The fallback distinction is essential. A failed one-shot run
+may return its input. A failed continual run cannot reactivate
+𝐵𝑡−1 after a valid patch, which would discard learned behavior;
+it publishes 𝐵raw
+𝑡
+and records the failure for retry.
+H. Cross-File Audit and Mode Selection
+The auditor ignores in-memory coverage claims and rereads
+the emitted directory. It checks (i) graph closure and path
+confinement; (ii) typed coverage at a compatible scope or
+by an exact host witness; (iii) mandatory reachability and
+guard preservation for every capsule and shared module;
+8
+
+
+===== page 9 =====
+Algorithm 3 SkillZip Pro: Continual Bundle Compression
+Require: authored source 𝑆𝑡−1, audited state 𝑀𝑡−1, patch Δ𝑡
+Ensure: current faithful bundle 𝐵𝑡and state 𝑀𝑡
+1: 𝑆𝑡, 𝐵raw
+𝑡
+←ApplyPatchVerbatim(𝑆𝑡−1, Δ𝑡)
+2: 𝐺𝑡, 𝐴𝑡←UpdateGraphAndClosure(𝑀𝑡−1.𝐺, 𝑆𝑡, Δ𝑡)
+3: C𝑡←ReuseAndReextract(𝑀𝑡−1.C, 𝐴𝑡)
+4: 𝑈𝑡←Classify(Absorb, Refine, Extend, Refactor)
+5: 𝑍𝑡←RefreshAffectedCandidates(𝐴𝑡,𝑈𝑡, 𝑀𝑡−1)
+6: if RepackTriggered(𝑀𝑡−1, 𝑆𝑡, 𝑍𝑡) then
+7:
+return OneShot(𝑆𝑡)
+8: 𝑃𝑡←RepairLocalCoverAndPlacement(𝑍𝑡, 𝐽)
+9: 𝐷𝑡←MaterializeTemporary(𝐵raw
+𝑡
+, 𝑃𝑡)
+10: if 𝐽(𝐷𝑡) ≤𝐽(𝐵raw
+𝑡
+) and AuditFromDisk(𝑆𝑡, 𝐷𝑡, 𝐻𝑡)
+then
+11:
+return AtomicCommit(𝐷𝑡), SaveState(𝐷𝑡)
+12: else
+13:
+return AtomicCommit(𝐵raw
+𝑡
+), RebuildState(𝑆𝑡)
+(iv) path and SHA-256 identity for locked artifacts; (v) that
+every interface contract appears as one contiguous span whose
+normalized lines equal the source section, with no scattered
+fragments elsewhere; and (vi) all four materialized costs.
+Atomic publication occurs only after audit succeeds.
+I. Harness-Agnostic Deployability
+Both modes remain agent harness-agnostic. The compressor
+may persist state, observe offline traces, and run on every
+write, but the published bundle does not depend on it. The
+agent selects the same skill, loads the same root entry, follows
+ordinary relative links, and executes byte-identical artifacts.
+VI. Experiments
+We design our experiments around three goals: determining
+whether SkillZip Pro reduces both deployment and pro-
+gressively loaded runtime costs, verifying that these savings
+preserve task quality, routing, and the independent usability
+of public entries, and assessing whether its four operating
+modes remain practical as skills evolve. We evaluate these
+questions on three agent benchmarks, real self-evolving skill
+libraries, a controlled multi-entry bundle, and a production
+content-moderation skill. Comparisons with root-only, flat-
+tened, evaluation-guided, and expert-designed baselines are
+complemented by ablations and workload sweeps that isolate
+the contribution and cost of each design component.
+A. What We Ask
+• Q1: Is one ratio enough? When does a root-only ratio
+misrepresent the four cost layers?
+• Q2: Does it help? Does SkillZip Pro cut all four costs
+while keeping task success?
+• Q3: Does it still load correctly? Does the bundle open
+required files and skip irrelevant ones?
+• Q4: Is the saving real? How much source knowledge
+remains reachable rather than deleted?
+• Q5: Does it port across models? Does one compressed
+bundle stay useful when a different model family runs it?
+• Q6: What resources does compression consume?
+• Q7: Which part does the work? How much comes from
+the resource graph, host entailment, scoped sharing, capsules,
+and the audit?
+• Q8: One-shot or continual? How much update work does
+continual mode save, how far does it drift from a full rebuild,
+and when should it repack?
+• Q9: Does it hold in production? On a deployed skill, does
+witnessed compression preserve quality, and do modeled
+savings match runtime measurements?
+B. Benchmarks and Skill Bundles Construction
+We evaluate SkillZip Pro on three task families: BFCL-v4
+for tool use [25], [26], LiveMathematicianBench for mathe-
+matical problem solving [27], [28], and SpreadsheetBench for
+spreadsheet editing [29]. These benchmarks require different
+kinds of instructions: BFCL-v4 depends on correct tool names
+and call order, LiveMathematicianBench requires detailed
+reasoning and verification, and SpreadsheetBench requires
+precise cell values and formatting.
+The skill bundles are generated through self-evolution
+in our experiments. For each benchmark, we run the skill
+evolution optimizer SkillOpt [14] separately on every task
+class. The optimizer proposes one edit at a time and retains
+it only when it improves performance on that class. Each
+task therefore develops a specialised skill containing its own
+procedures, checks, and failure experience. These skills are
+not interchangeable, making routing important: the agent must
+identify and load the file associated with the current task class.
+From the resulting skills, we replay evolution patches into
+separate named branches. A deterministic builder records the
+source of every moved section and preserves its text verbatim.
+This process reproduces the structure that develops during
+continued self-evolution: common output rules, verification
+checklists, and records of previous errors are copied into
+multiple branches, while one branch accumulates a longer
+set of guarded edge cases.
+We divide tasks into non-overlapping evolution, validation,
+and held-out test sets. Skill construction and compression use
+only the data assigned to evolution; the held-out test set is used
+exclusively for final evaluation. Every compression method
+receives the same input bundle and the same environment.
+C. Models and Setup
+We use the same three model families as the earlier
+manuscript: Qwen3.7-Max, Qwen3.6-Plus, and Kimi K2.6 [30]–
+[32]. Qwen3.6-Plus runs the main tables, and all three
+serve as executors in the portability study. Sampling settings,
+tools, system prompt, and timeouts are fixed per benchmark.
+Deterministic compression needs one run per bundle; repeats
+are byte-identical.
+The executor is the unmodified benchmark agent. It sees
+catalog metadata first, then the root once the skill is selected.
+Other files appear only after an ordinary file read, and a file
+can be opened only if something already loaded links to it.
+A wrapper records which paths were opened and how many
+tokens were read; it never injects, hides, or reorders content.
+9
+
+
+===== page 10 =====
+D. Compared Conditions and Baselines
+We compare SkillZip Pro against two reference conditions
+and four compression baselines. Unless stated otherwise, all
+compression methods receive the same evolved bundle, and all
+reported savings are computed relative to the uncompressed.
+a) Reference conditions.: No Skill runs the agent without
+reusable instructions and provides a lower reference for task
+performance. Human Skill uses the original hand-written
+skill before self-evolution. Evolved Bundle is the complete,
+uncompressed output of the evolution process and serves as
+the primary reference for both fidelity and cost.
+b) Compression baselines.: Root-only SkillZip applies
+SkillZip only to the root SKILL.md and leaves all referenced
+resources unchanged, representing single-document compres-
+sion in a multi-file setting. Flat-concat SkillZip concatenates
+all textual resources with path delimiters, compresses the
+resulting document, and then maps the output back to files;
+it tests the effect of ignoring progressive-loading boundaries.
+SkillReducer is the evaluation-guided skill compressor. To
+match our no-rollout compression budget, we disable its
+evaluation-based candidate selection and retain only its com-
+pression stage. Expert Progressive is a deterministic, structure-
+aware baseline that factors paragraphs repeated across two or
+more files into a shared resource referenced from the root.
+E. Reading the Baselines: One Warning First
+One baseline needs a warning before any number is read,
+because it otherwise looks like the strongest method in the
+paper. Flat-concat SkillZip posts the largest savings of
+any method and also throws away almost the entire skill.
+On the real evolved libraries of Section VI-M it keeps 0.2%
+of the skill’s instruction lines: pasting every file together and
+compressing the result deletes the text and destroys the links
+that made the files reachable. Its savings are therefore not
+comparable with the other rows, and we mark it with †
+wherever it appears. We keep it in the tables on purpose: it
+is the clearest demonstration that a compression ratio means
+nothing until fidelity is measured next to it.
+Root-only SkillZip needs a smaller warning. It only rewrites
+SKILL.md, so it looks harmless, but that one file holds the
+routing list. Rewriting it keeps every file on disk while making
+the branches unreachable in practice, which is why its routing
+score is 0.000 everywhere.
+F. Metrics
+Task success. Each benchmark’s own automatic checker:
+boxed answer plus symbolic equality for math, normalized
+match against accepted answers for BFCL with its offline
+search tool available, and cell-by-cell workbook comparison
+for SpreadsheetBench, where a task passes only if every one
+of its test cases matches. For each method we also test whether
+it stays as good as the uncompressed bundle: we pool the held-
+out tasks of all three benchmarks, pair every method against the
+uncompressed bundle task by task, and bootstrap the difference
+in success rate (10,000 resamples). A method keeps quality
+when the lower end of the 95% interval stays above a five-point
+margin fixed before we looked at the numbers.
+TABLE II
+Task success on held-out tasks, using the unmodified agent
+(Qwen3.6-Plus, grown version). Higher is better.
+Method
+BFCL ↑
+Math ↑
+Sheet ↑
+Avg. ↑
+No Skill
+0.809
+0.364
+0.312
+0.495
+Human Skill
+0.905
+0.455
+0.333
+0.564
+Evolved Bundle
+0.905
+0.364
+0.354
+0.541
+Root-only SkillZip
+0.905
+0.333
+0.271
+0.503
+Flat-concat SkillZip
+0.857
+0.394
+0.167
+0.473
+SkillReducer
+0.857
+0.394
+0.271
+0.507
+Expert Progressive
+0.905
+0.333
+0.312
+0.517
+SkillZip Pro (One-Shot)
+0.952
+0.394
+0.333
+0.560
+TABLE III
+Four cost layers on three benchmarks. Cells report tokens and
+reduction from the Evolved Bundle; the agent is unchanged.
+Method
+Shipped ↑
+Always loaded ↑
+One run, avg ↑
+One run, worst ↑
+Human Skill
+328/+87.7%
+328/-51.4%
+328/+43.3%
+328/+54.3%
+Evolved Bundle
+2649/0%
+212/0%
+588/0%
+755/0%
+Root-only SkillZip ✗
+2589/+2.2%
+153/+27.8%
+529/+10.3%
+696/+8.2%
+Flat-concat SkillZip ✗
+954/+63.8%
+120/+42.9%
+183/+68.9%
+249/+67.3%
+SkillReducer
+2518/+5.0%
+213/-0.4%
+564/+4.1%
+722/+4.4%
+Expert Progressive
+2285/+13.7%
+226/-6.5%
+482/+17.9%
+754/+0.2%
+SkillZip Pro (One-Shot)
+2112/+19.7%
+196/+7.3%
+500/+14.3%
+669/+10.8%
+Cost. We measure the four layers of Section III—catalog,
+activation, deployment, and loaded path—plus objective 𝐽
+from Eq. (7). Negative savings remain visible.
+Loading. Whether the agent opened the file that specialises
+in the task (required recall), what share of opened files were
+not that file (irrelevant load), how many links are broken
+or point outside the bundle, and how many files became
+unreachable from the root.
+Knowledge kept. We count the source instruction lines
+still present, possibly lightly reworded, in reachable files.
+Environment-guaranteed removals are recorded separately
+rather than counted as loss; each has a signed audit witness.
+Run cost. Compression time, model calls, tokens, peak
+memory, and rollouts, measured end to end.
+G. Main Result: Task Success and the Four Costs
+Tables II and III must be read together, so that no method
+looks good on quality alone or on compression alone.
+Three things stand out. First, a single ratio really can
+mislead: Root-only SkillZip takes almost nothing off the
+shipped size yet shortens the always-loaded root a lot, while
+Human Skill looks like the best "compressor" by shipped size
+and at the same time makes the always-loaded root longer.
+Second, Flat-concat SkillZip posts by far the biggest numbers
+in both shipped size and per-run cost – and Sections VI-I
+show those numbers are paid for by throwing away the skill.
+Third, SkillZip Pro is the only method that cuts all four
+layers at once while matching the uncompressed bundle on
+task success. Figure 3 shows the per-layer picture.
+On BFCL every method scores high because the offline
+search tool does much of the work; the skill still helps (no skill
+0.809, uncompressed 0.905), and SkillZip Pro reaches the
+top score of any method here (0.952), but the gaps are a few
+questions wide on twenty-one held-out questions, so we lean
+on the pooled test below rather than this single column. On
+SpreadsheetBench, where a task passes only if every one of
+10
+
+
+===== page 11 =====
+TABLE IV
+Does the compressed bundle stay as good as the uncompressed one?
+Pooled over all 102 held-out tasks (33 math, 21 BFCL, 48 spreadsheet),
+paired task by task against the Evolved Bundle, 10,000 bootstrap
+resamples. A method keeps quality (✓) when the 95% interval stays
+above the −0.05 margin fixed before the numbers were seen.
+Method
+Success ↑
+vs Evolved ↑
+95% interval
+Keeps quality
+No Skill
+0.431
+-0.039
+[-0.108, +0.029]
+✗
+Human Skill
+0.490
++0.020
+[-0.039, +0.078]
+✓
+Root-only SkillZip
+0.422
+-0.049
+[-0.128, +0.020]
+✗
+Flat-concat SkillZip
+0.382
+-0.088
+[-0.167, -0.010]
+✗
+SkillReducer
+0.431
+-0.039
+[-0.108, +0.029]
+✗
+Expert Progressive
+0.441
+-0.029
+[-0.088, +0.029]
+✗
+SkillZip Pro (One-Shot)
+0.480
++0.010
+[-0.029, +0.059]
+✓
+Root-only
+SkillZip
+Flat-concat
+SkillZip
+Skill
+Reducer
+Expert
+Progressive
+SkillZip Pro
+(One-Shot)
+0
+20
+40
+60
+Reduction vs Evolved (\%)
+Execution-aware cost reduction per loading layer (structured-growth track, macro-average)
+Deployment
+Activation
+Mean path
+P95 path
+Fig. 3. Saving in each cost layer (grown version, averaged over benchmarks).
+Bars below zero mean that layer got worse: a method can shrink the shipped
+package while making every single run longer, which one ratio would hide.
+its test cases reproduces the gold range, SkillZip Pro scores
+0.333 against 0.312 for the hand-built expert baseline and
+sits one task in forty-eight below the uncompressed bundle –
+we sample that benchmark at twice the density of the others
+precisely because its strict verdict makes single-task flips
+dominate at small 𝑛. Table IV runs the pooled test.
+The test is decisive and answers Q2 directly. Across
+102 pooled held-out tasks, SkillZip Pro has the highest
+pooled success of any compression method, and it is the
+only compressor that keeps quality: its interval against the
+uncompressed bundle stays above the margin, while root-
+only, flat-concat, SkillReducer, and even the hand-built expert
+baseline all fall below it. In other words, every other way of
+making the bundle smaller also made the agent measurably
+worse, and SkillZip Pro did not.
+Takeaway
+A single ratio is insufficient. Only SkillZip Pro reduces all
+four costs while matching the uncompressed skill; every other
+compressor regresses elsewhere.
+H. Does Compression Preserve Progressive Loading?
+A smaller bundle is useful only if the agent can still
+identify and load the resources required by each task. We
+therefore execute the grown bundles with the unmodified agent
+and measure both routing correctness and loading behavior.
+Required recall is the fraction of task-relevant resources that
+are loaded, irrelevant load is the fraction of loaded resources
+that the task does not need, and dispatch measures whether the
+agent selects the intended branch. We also record link errors,
+fallback activations, and the average number of reachable files.
+Among the compression methods, SkillZip Pro most
+closely matches the loading behavior of the uncompressed
+TABLE V
+Loading behavior on grown bundles. Required recall is maximized;
+broken links, unreachable files, and irrelevant loads are minimized.
+Method
+Req. recall ↑
+Irrel. load ↓
+Dispatch ↑
+Link errors ↓
+Fallback ↓
+Files reached
+Evolved Bundle
+0.795
+0.171
+0.795
+0
+–
+6.3
+Root-only SkillZip ✗
+0.685
+0.290
+0.685
+0
+0.000
+6.3
+Flat-concat SkillZip ✗
+0.708
+0.259
+0.708
+0
+0.000
+6.0
+SkillReducer
+0.688
+0.288
+0.688
+0
+0.000
+6.3
+SkillZip Pro (One-Shot)
+0.755
+0.193
+0.755
+0
+0.000
+10.3
+TABLE VI
+Knowledge retained versus text saved on grown bundles. “Kept”
+counts original instruction lines that remain reachable; “Lost”
+counts unwitnessed deletions. † denotes an incomplete bundle.
+Method
+Kept ↑
+Lost lines ↓
+Repeated text removed ↑
+Shipped saving ↑
+Routing kept ↑
+Evolved Bundle
+1.000
+0.0
+0.000
++0.0%
+1.000
+Root-only SkillZip ✗
+0.939
+5.3
+0.002
++2.2%
+0.000
+Flat-concat SkillZip ✗
+0.241
+59.0
+1.000
++63.8%
+0.000
+SkillReducer
+1.000
+0.0
+0.073
++5.0%
+1.000
+Expert Progressive
+1.000
+0.0
+0.482
++13.7%
+1.000
+SkillZip Pro (One-Shot)
+0.986
+1.0
+0.736
++19.7%
+1.000
+bundle. It achieves a required-resource recall of 0.755, com-
+pared with 0.795 for the Evolved Bundle, while reducing
+irrelevant loading to 0.193. The corresponding rates for the
+other compressors range from 0.259 to 0.290. The larger
+number of reachable files under SkillZip Pro reflects the
+shared modules and conditional capsules introduced during
+compression; these additional nodes remain connected to
+the appropriate execution paths rather than being loaded
+indiscriminately.
+The absence of link errors alone does not establish routing
+fidelity. Root-only and Flat-concat SkillZip remove routing
+instructions instead of leaving dangling links, so their branches
+remain on disk but can no longer be selected. The routing
+audit confirms this distinction: both baselines preserve 0.000
+of the original routing pairs, whereas SkillZip Pro preserves
+1.000. Its savings therefore come from shortening and sharing
+the resources that the agent loads, rather than making required
+branches unreachable.
+Takeaway
+SkillZip Pro preserves every declared route and retains loading
+behavior closest to the uncompressed bundle. Its runtime savings
+come from reducing the content loaded along valid execution
+paths, not from suppressing required branches.
+INSIGHT 1 ★For the compression of progressively loaded skills,
+the danger is not lost text but lost reachability: rewriting only
+the root leaves every branch on disk yet unreachable in practice,
+so it looks safe and scores like deletion. Routing fidelity has
+to be measured separately from how many files still exist.
+I. Is the Saving Real, or Just Deleted Text?
+A compressor can post a very large ratio simply by removing
+text, and a cost table cannot tell that apart from genuine
+compression. Table VI therefore reports, for every method,
+how much of the original skill still reaches the agent, next to
+how much of the repeated text it managed to remove. Repeated
+text is the part a bundle-level method is entitled to reclaim;
+it is the same sentence appearing in several files.
+The result reframes the whole comparison. Flat-concat
+SkillZip appeared to be the strongest compressor by a wide
+margin, but it keeps under a quarter of the skill’s instruction
+11
+
+
+===== page 12 =====
+0
+20
+40
+60
+80
+100
+Knowledge kept (\%)
+0
+20
+40
+60
+Shipped saving (\%)
+Evolved
+Root-only
+Flat-concat
+SkillReducer
+Expert
+SkillZip Pro
+lost part of the skill
+(a) A big ratio can just mean deleted text
+Root-only
+Flat-concat
+SkillReducer
+Expert
+SkillZip Pro
+0
+20
+40
+60
+80
+100
+Repeated text removed (\%)
+lossy
+lossy
+(b) How much repetition each method reclaims
+Fig. 4. (a) Saving versus knowledge retained; shaded points lost content. (b)
+Repetition reclaimed. SkillZip Pro achieves the largest faithful saving.
+lines: its ratio is mostly deletion, not compression. Root-only
+SkillZip also drops lines, because rewriting the root alone
+rewrites text that carried real conditions. SkillZip Pro removes
+the largest share of repeated text of any method while keeping
+essentially the whole skill, and its only removals that are
+not recoverable from the output are the ones the environment
+contract guarantees, each stored with a signed witness. Figure 4
+plots the two quantities together.
+Takeaway
+A large ratio may reflect deletion. SkillZip Pro removes the
+most repeated text while preserving the complete skill.
+J. Case Study: What Does Compression Remove?
+Aggregate compression ratios do not reveal whether a
+method removes redundancy or discards task-relevant content.
+We therefore examine one strategy file, round_02, from
+the evolved qwen3.6-plus library and compare its treat-
+ment under Flat-concat SkillZip and SkillZip Pro. This
+library contains substantial cross-file repetition: the same
+mathematical-output rules occur at 16 locations across the
+bundle, including all 15 strategy branches, while each branch
+retains its own workflow, verification steps, and conditional
+instructions. This example shows whether a compressor can
+eliminate the repeated content without changing the availability
+or behavior of the individual branch.
+Figure 5 illustrates the source of the measured savings.
+Flat-concat SkillZip retains only two of the fifteen strategy
+branches, making round_02 unavailable to the agent. In
+contrast, SkillZip Pro reduces this file from 527 to 160
+tokens while keeping all fifteen branches reachable. Repeated
+rules are stored once and referenced from each relevant loca-
+tion, whereas the branch-specific workflow, verification steps,
+and guarded instructions remain unchanged. The reduction
+therefore comes from cross-file reuse rather than the removal
+of an execution path.
+K. How Do Savings Accumulate Across Repeated Use?
+Because a skill is deployed once but may be invoked many
+times, deployment size alone does not determine its total cost.
+We therefore measure cumulative token cost as the sum of the
+one-time deployment cost and the runtime cost of executing 𝑁
+tasks. Table VII reports the percentage reduction relative to the
+Evolved Bundle. We separately identify methods that retain at
+least 95% of the original lines, since reductions obtained by
+removing substantial skill content are not directly comparable.
+TABLE VII
+Reduction in cumulative token cost relative to the Evolved Bundle,
+averaged across benchmarks. The cost includes one deployment and 𝑁
+task executions. The retention criterion requires a method to
+preserve at least 95% of the original lines; † denotes methods that do
+not satisfy this criterion.
+Method
+Keeps skill
+𝑁=1 ↑
+𝑁=10 ↑
+𝑁=50 ↑
+𝑁=200 ↑
+𝑁=1000 ↑
+Root-only SkillZip
+no†
++5.1%
++11.5%
++13.8%
++14.3%
++14.5%
+Flat-concat SkillZip
+no†
++63.6%
++63.1%
++62.9%
++62.9%
++62.9%
+SkillReducer
+yes
++5.1%
++5.4%
++5.4%
++5.5%
++5.5%
+Expert Progressive
+yes
++13.1%
++11.7%
++11.3%
++11.1%
++11.1%
+SkillZip Pro (One-Shot)
+yes
++17.9%
++13.9%
++12.5%
++12.2%
++12.1%
+TABLE VIII
+Behavior at the smallest and largest tested libraries, averaged over
+benchmarks. Retention and routing use the largest size.
+Shipped saving
+Per-run saving
+At largest size
+Method
+small ↑
+large ↑
+small ↑
+large ↑
+Kept ↑
+Routing ↑
+Root-only SkillZip
++2.0%
++5.2%
++8.7%
++3.5%
+0.896
+0.000
+SkillReducer
++5.4%
++4.3%
++4.7%
++2.1%
+1.000
+1.000
+Expert Progressive
++12.4%
++22.6%
++18.4%
++10.4%
+1.000
+1.000
+SkillZip Pro (One-Shot)
++21.8%
++25.5%
++17.6%
++5.3%
+0.984
+1.000
+Among the methods that satisfy the retention criterion,
+SkillZip Pro achieves the largest cumulative saving at every
+workload size. Its reduction is 17.9% for a single task and
+remains 12.1% after 1,000 tasks, compared with 11.1% for
+Expert Progressive and 5.5% for SkillReducer. As 𝑁increases,
+the effect of the one-time deployment cost diminishes and the
+results approach each method’s per-run saving. The ordering
+of the three eligible methods nevertheless remains unchanged.
+Root-only and Flat-concat SkillZip sometimes report larger
+reductions, but both fall below the retention threshold and are
+therefore excluded from this comparison. Figure 6(a) presents
+the same results as cumulative-cost curves.
+Takeaway
+Runtime cost matters more than a one-time shipping ratio.
+Among methods that preserve the skill, SkillZip Pro is the
+cheapest at every workload size.
+L. What Happens as the Library Keeps Growing
+Self-evolving libraries do not stay small. We grow one step
+by step, adding branches that repeat the same shared text, and
+record both sides of the ledger at each size.
+SkillZip Pro is the only approach that preserves the
+complete skill and routing table at every size, and its per-
+run cost remains flat as the library grows. At the largest size,
+however, Expert Progressive removes more shipped bytes by
+moving all repeated text into one root-linked file. Every run
+then reads that growing file, so its runtime saving declines.
+SkillZip Pro keeps each shared block within the branches
+that use it, trading some storage saving for lower execution
+cost. Routing also has an unavoidable price: the root retains
+one condition per branch. An attempted on-demand grouping
+added a hop to every run and failed the never-inflate check.
+Figure 6(b,c) shows this trade-off.
+M. Real Evolved Skill Libraries
+The bundles used so far repeat about a third of their text.
+Libraries that a self-evolving agent actually leaves behind
+12
+
+
+===== page 13 =====
+Original Branch
+## Purpose
+Solve competition-style math
+## Approach
+3. Notation for all unknowns...
+4. Solve step by step...
+## Rules
+×16 bundle locations
+- Never round intermediate...
+- Reduce fractions...
+## Output
+×16 bundle locations
+- \boxed{...} final answer
+- multi-answer: comma list
+×15
+- single: output only that
+×7
+## Verification
+- Substitute back
+- Sanity-check units
+Flat-concat SKILLZIP ✗(branch re-
+moved)
+13 of 15 strategy branches removed.
+Only round_00 and round_10 remain.
+Root reduced to a flat routing list:
+- ---name: ...
+- read [round_05](...)
+- read [specialist](sub/...)
+✗Rules removed
+✗Output instructions removed
+✗Verification steps removed
+✗Routing link removed
+✗Branch-specific approach removed
+Branch content retained: 0.2%; routing path:
+unavailable.
+SKILLZIP PRO ✓(70% fewer tokens)
+## Workflow
+1. Read
+[rounding rule]
+×16 locations
+[multi-answer]
+×15
+[single]
+×7
+2. Notation for unknowns...
+3. Ordered vs. unordered...
+4.
+If ambiguous, state assumptions
+5. \boxed{...}
+## Verification
+- Substitute back (branch-specific)
+✓Rules moved to a linked shared module
+✓Output instructions moved to a linked shared module
+✓Verification steps preserved verbatim
+✓Routing link remains intact
+✓Branch-specific approach preserved
+Legend.
+Yellow
+indicates content repeated across the bundle.
+Green
+indicates content stored once in a linked shared module.
+Blue
+indicates a guarded instruction
+preserved verbatim. Grey indicates content removed by Flat-concat SkillZip.
+Shared module
+## Notes
+- Never round intermediate results unless the
+problem explicitly asks for a decimal.
+- Reduce fractions to lowest terms and
+rationalize denominators where standard.
+- For counting: ordered vs. unordered,
+with vs. without replacement.
+- Give the answer in simplest exact form.
+This 315-token module is stored once and referenced from 16 locations across the bundle.
+Replacing the other 15 copies avoids 15 × 315 = 4,725 repeated tokens.
+0
+2
+4
+6
+8
+10
+12
+14
+16
+18
+Times this one shared module is reused across the library's 15 strategy files
+strictly verify each candidate against all pro
+maximum, minimum, unique solution) or implies 
+maximum, minimum, unique solution), output onl
+explicitly verify each intermediate product an
+permutations, or large integer products, expli
+list all distinct values separated by commas i
+Never round intermediate results unless the pr
+×2
+×5
+×7
+×10
+×11
+×15
+×16
+Write the shared rule once, reuse it across many branches
+Case summary
+Original branch
+527 tok
+SkillZip Pro branch
+160 tok
+Token reduction
+70%
+Shared modules
+7
+Branches retained
+15/15
+Flat-concat retained
+2/15
+Fig. 5. One real strategy file (round_02, qwen3.6-plus library) under three methods, plus the reuse it enables. Yellow marks text duplicated
+across branches (with its repeat count); green marks the shared module SkillZip Pro factors it into; blue marks a guarded rule kept word for word.
+Bottom left: how many of the 15 strategy files reuse each shared module SkillZip Pro created. Bottom right: the token and reachability outcome for this file.
+Flat-concat’s big ratio comes from deleting the file; SkillZip Pro’s saving comes from writing each shared rule once.
+10
+0
+10
+1
+10
+2
+10
+3
+Tasks run with the skill
+20
+40
+60
+Total tokens saved (\%)
+(a) Cost over a workload
+Root-only (lossy)
+Flat-concat (lossy)
+SkillReducer
+Expert
+SkillZip Pro
+5
+10
+15
+20
+Files in the library
+0
+10
+20
+30
+Saving (\%)
+(b) Shipped saving vs size
+5
+10
+15
+20
+Files in the library
+0
+10
+20
+30
+Saving (\%)
+(c) Per-run saving vs size
+Fig. 6. (a) Cumulative token saving as tasks grow; faded methods lost skill
+content. (b) Shipped and (c) per-run saving as library size grows. SkillZip
+Pro keeps per-run saving stable.
+TABLE IX
+Real evolved libraries, averaged over three runs. † marks incomplete
+bundles. For SkillZip Pro, brackets count published compressions;
+otherwise the never-inflate check republishes the source.
+Method
+Kept ↑
+Shipped ↑
+Always loaded ↑
+One run ↑
+Routing ↑
+Evolved library (uncompressed)
+1.000
++0.0%
++0.0%
++0.0%
+1.000
+Root-only SkillZip
+0.951
++1.6%
++69.2%
++12.5%
+0.000
+Flat-concat SkillZip ✗
+0.002
++64.4%
++82.4%
++90.2%
+0.000
+SkillReducer
+0.954
++6.3%
++63.0%
++30.9%
+0.125
+Expert Progressive
+1.000
++25.0%
+-2.9%
++26.0%
+1.000
+SkillZip Pro (One-Shot)
+1.000
++23.1% (2/3)
++1.7%
++17.7%
+1.000
+repeat far more, because every round appends its output rules,
+its checklist and its growing list of past mistakes into whichever
+skill it edits. We therefore take the evolution runs stored with
+this project, keep every round as its own file, and assemble
+each run into one progressively loaded library: 17 files, 15
+rounds, about 20,000 tokens, and 79–84% repeated text.
+This is the regime the method is built for, so it carries the
+headline numbers.
+0
+50
+100
+Knowledge kept (\%)
+0
+20
+40
+60
+Shipped saving (\%)
+Root-only
+Flat-concat
+SkillReducer
+Expert
+SkillZip Pro
+(a) Real evolved libraries
+5
+10
+Evolution round
+1000
+1250
+1500
+1750
+2000
+Objective J
+(b) Cost as the library grows
+no compression
+rebuild every round
+root-only ZoW
+continual, no repack
+continual + repack
+5
+10
+Model calls per round
+0
+10
+20
+Distance from full rebuild (\%)
+rebuild every round
+root-only ZoW
+continual, no repack
+continual + repack
+(c) Work vs staying optimal
+Fig. 7. (a) Saving versus retained knowledge on evolved libraries. (b) Published
+cost over rounds; triangles mark repacks. (c) Update work versus final drift
+from One-Shot rebuilding.
+Three readings matter. First, where it publishes a result,
+SkillZip Pro removes 34.7% of shipped tokens versus 25.0%
+for the strongest faithful baseline, while preserving the skill
+and routing list. Second, that baseline moves all repeated
+text into one root-linked file, making the always-loaded layer
+longer (−2.9%); only SkillZip Pro improves every layer at
+full fidelity. Third, root-only and SkillReducer gain +69%
+and +63% in the root by rewriting away routing, reflected in
+routing scores of 0.000 and 0.125.
+On the third library, SkillZip Pro declined to compress and
+republished the source byte for byte. The candidate passed
+the audit but did not improve the objective, so Algorithm 2
+rejected it. This fallback is intentional: the method never ships
+an unproven regression. Continual mode later compresses the
+same library to +49.9% by repacking at a more favorable
+point in the stream (Section VI-N).
+13
+
+
+===== page 14 =====
+Takeaway
+On real self-evolved libraries, SkillZip Pro removes about one
+third of shipped tokens where it publishes—roughly ten points
+more than the strongest content-preserving baseline. It is also the
+only method that improves shipped, always-loaded, and per-run
+cost together; otherwise it keeps the original bundle.
+N. Continual Compression Over a Long Evolution Stream
+Continual compression is intended to incorporate new skill
+updates without rebuilding the entire library after every change.
+We evaluate whether it can reduce this update cost while still
+recovering redundancy that accumulates across multiple rounds.
+Specifically, we replay 13 real evolution rounds for each of
+three libraries and compare five compression schedules. All
+schedules begin from the same initial state and receive the
+same sequence of updates.
+SkillZip Pro Continual with repacking removes 48.1%
+of shipped tokens and 28.2% of per-run tokens while
+requiring only 3.31 compressor calls per round. Rebuilding
+the complete library after every update requires 10 calls per
+round, so Continual mode uses approximately one third as
+many calls. It also reduces the average processing time from
+0.234 to 0.068 seconds per round. The result is slightly smaller
+than the corresponding rebuild, as indicated by the drift of
+−0.083. This difference occurs because the final rebuild rejects
+a non-improving candidate, whereas Continual mode retains
+the valid compressed state produced by an earlier repack.
+Periodic repacking is necessary to recover redundancy in-
+troduced across different evolution rounds. Without repacking,
+the shipped-token saving falls to 2.7%, the per-run saving falls
+to 0.8%, and drift increases to +0.262. This result shows that
+processing each update locally is insufficient when related
+content is added in separate rounds. Root-only Zip-on-Write
+requires only one call and 389 processed bytes per round,
+but it reduces the shipped library by just 2.4% because it
+cannot consolidate repeated content across files. Although
+it reduces the root-level per-run cost, it leaves most bundle-
+wide redundancy unchanged. Figure 7(b,c) shows how these
+differences accumulate over the evolution stream.
+Takeaway
+With periodic repacking, Continual mode recovers cross-round
+redundancy while using approximately one third as many
+compressor calls as rebuilding after every update. Without
+repacking, shipped-token savings remain at only 2.7%.
+O. When Should Compression Be Switched On?
+A self-evolving library is republished and reloaded after
+every round. Waiting therefore costs more than final size: the
+agent carries the uncompressed library through every earlier
+round. We switch compression on at 𝑘∈{1, 4, 7, 10, 13}, plus
+a never-compress baseline.
+The metric that answers the question is the total tokens
+the agent carries across the whole stream: for each round
+we add up the full size of the library published at that round.
+We also report the total compressor calls, so a schedule cannot
+look cheap merely by doing less work.
+5
+10
+Round compression is switched on
+0
+10
+20
+30
+40
+Total tokens saved (\%)
+never switch on
+(a) Waiting throws saving away
+5
+10
+15
+Evolution round
+0
+2500
+5000
+7500
+10000
+Library size (tokens)
+6165 tok
+saved
+(b) Pro controls growth
+never compress
+always compressed
+20
+30
+40
+Compressor calls over the stream
+20
+25
+30
+35
+40
+Total tokens saved (\%)
+round 1
+round 4
+round 7
+round 10
+round 13
+(c) Saving vs work
+Fig. 8. (a) Total tokens saved over the stream against the round compression
+is switched on; bars show the spread across the three libraries. (b) Actual
+library size at each round: uncompressed grows linearly while Pro keeps it
+roughly 50% smaller by removing repeated text as it appears. (c) The same
+total saving plotted against the number of compressor calls.
+The ordering is monotone and the effect is large.
+Switching on at the first round saves 40.8% of everything the
+agent carries over the stream; waiting until round 13 recovers
+only 18.5%, less than half as much, and starting at round 1
+beats starting at round 7 by a clear 9.7%. Every extra round
+of waiting leaves saving on the table.
+The reason is worth stating precisely, because it is not
+simply “smaller is better”. Repetition in an evolved library
+is cumulative: round 𝑡re-appends the same output rules and
+checklist that rounds 1..𝑡−1 already contain, so the number of
+duplicate copies grows with 𝑡. Compression removes copies,
+not rounds. Starting at round 𝑘therefore leaves the agent
+paying full price on rounds 1..𝑘−1, and those tokens can never
+be recovered afterwards – the final library can be compressed
+just as well later, but the intervening runs are already spent.
+Figure 8(b) plots the running total the agent has paid: the
+three curves never cross, so an earlier start is cheaper at every
+round and the gap only widens. Early compression is strictly
+cheaper because delayed rounds cannot be recovered. Starting
+at round 1 requires 43 compressor calls over 15 rounds, versus
+16 for a late start, and uses no task rollouts.
+INSIGHT 2 ★For a self-evolving agent, compression should start
+early. Repetition accumulates each round, and later compression
+cannot recover context already paid for. The lowest cumulative
+cost therefore comes from enabling compression in the first
+evolution round.
+P. Why the Savings Compound: A Look Inside Self-Evolution
+The results so far show that SkillZip Pro helps; this
+subsection shows why, and the reason is the surprising finding
+in the paper. We measured, at every evolution round, how much
+of the growing library is genuinely new and how much simply
+repeats text the agent has already written, by compressing
+each round-𝑘prefix and comparing its size against the raw
+prefix. Three facts fall out, all from the same real evolved
+libraries and all consistent across runs.
+Finding 1 — repetition accumulates during self-evolution.
+Across rounds, 55% ± 3% of the content added in each round
+overlaps with existing text (Figure 9b). This proportion remains
+relatively stable across rounds and models, as append-only
+updates often repeat output formats, verification checklists,
+and previously accumulated rules when extending a skill.
+Finding 2 — so the savings compound with age. Because
+redundancy accumulates, the share SkillZip Pro can remove
+grows with the library: from 29% at round 2 to 53% at
+round 15, still climbing (Figure 9a). The method does not
+14
+
+
+===== page 15 =====
+TABLE X
+Continual compression over 13 real evolution rounds, averaged across three libraries. Savings are measured relative to publishing every update
+without compression. Drift measures the difference from rebuilding the complete library at the same round; a negative value indicates a smaller
+result than the rebuild. Compressor calls, processed bytes, and wall-clock time are reported per round.
+Schedule
+Shipped saving ↑
+Per-run saving ↑
+Drift ↓
+Calls/round ↓
+Bytes/round ↓
+Seconds/round ↓
+Publish without compressing
++0.0%
++0.0%
++0.000
+0.00
+3201
+0.000
+Rebuild from scratch every round
++35.1%
++18.7%
++0.000
+10.00
+13388
+0.234
+SkillZip Zip-on-Write (root only)
++2.4%
++19.6%
+-0.027
+1.00
+389
+0.094
+SkillZip Pro Continual, no repack
++2.7%
++0.8%
++0.262
+1.00
+3201
+0.008
+SkillZip Pro Continual + repack
++48.1%
++28.2%
+-0.083
+3.31
+5697
+0.068
+5
+10
+15
+Evolution round
+0
+10
+20
+30
+40
+50
+60
+Shipped tokens removed (%)
+29%
+53%
+(a) Savings compound with age
+5
+10
+15
+Evolution round
+0
+20
+40
+60
+80
+Repeated share of round (%)
+mean 55%
+(b) Half of each round is repetition
+2
+4
+6
+Shared module (ranked by reuse)
+0
+5
+10
+15
+Times reused
+(c) A few rules absorb most reuse
+0
+20
+40
+60
+80
+100
+Cumulative share (%)
+Fig. 9. Why the savings compound. (a) The share of shipped tokens SkillZip Pro removes climbs from 29% at round 2 to 53% at round 15 and is still
+rising – the method gets more valuable the longer the agent evolves. (b) The reason: the fraction of each new round that merely repeats earlier text is stable at
+55%±3% – more than half of everything a self-evolving agent writes, it has written before. (c) That repetition is concentrated: a few “universal” rules absorb
+most of the reuse (top two of seven modules = 47%), so a small shared library covers the bulk of the redundancy.
+TABLE XI
+When to switch compression on, averaged over the three libraries and
+the whole 15-round stream. Carried tokens is the sum, over rounds, of
+the size of the library the agent holds that round.
+Compression is on
+Tokens carried ↓
+Tokens saved ↑
+Calls ↓
+from round 1
+48055
++40.8%
+43
+from round 4
+49627
++38.9%
+36
+from round 7
+53234
++34.4%
+42
+from round 10
+56179
++30.8%
+30
+from round 13
+66139
++18.5%
+16
+never switch it on
+81176
++0.0%
+0
+have diminishing returns; it has increasing ones. The longer
+an agent runs, the more of its library is repetition, and the
+more SkillZip Pro saves – the opposite of how one-shot
+compressors of static prompts behave.
+Finding 3 — the repetition is concentrated. The reuse
+is heavy-tailed: of the seven shared modules SkillZip Pro
+factors out on the worked library, the top two account for 47%
+and the top three for 64% of all reuse (Figure 9c). A handful
+of “universal” rules – how to format the answer, when to keep
+exact values – are re-derived over and over, so a very small
+shared library covers most of the redundancy.
+Remark. For references or subskills that are used only
+through the root skill, these universal rules are redundant
+and can be removed through Persistent Compression. If a
+reference or subskill must also remain independently usable,
+however, a rule repeated from the root may still be required
+by its standalone entry contract and cannot be removed solely
+because of that overlap. In this case, Transient Compression
+TABLE XII
+Mean cost of compressing one skill bundle. Structural extraction,
+cross-file transformation, and post-compression auditing are
+deterministic and require no model calls, model tokens, or agent
+rollouts.
+Method
+Time (s) ↓
+Calls ↓
+Tokens ↓
+Rollouts ↓
+Peak GB ↓
+Root-only SkillZip
+0.11
+0
+0
+0
+0.02
+Flat-concat SkillZip
+0.14
+0
+0
+0
+0.02
+SkillReducer
+0.12
+0
+0
+0
+0.02
+SkillZip Pro (One-Shot)
+0.21
+0
+0
+0
+0.02
+can eliminate the duplication within a task-specific execution
+view while leaving the original resource unchanged. We will
+discuss this distinction in detail in Section VI-U.
+INSIGHT 3 ★Self-evolution manufactures redundancy, and
+SkillZip Pro turns that into a compounding advantage.
+More than half of every new round (55%) is text the agent
+has already written, so the share SkillZip Pro removes rises
+with age – 29%→53% over fifteen rounds and still climbing.
+A compressor for evolving skills is therefore worth more the
+longer it runs, not less; and because the repetition concentrates
+in a few universal rules, a tiny shared library captures most of
+it. This is the reason to put compression inside the evolution
+loop rather than treating it as occasional cleanup.
+Q. Runtime Overhead of Compression
+Table XII measures the computational cost of producing a
+compressed bundle. We report wall-clock time, model calls,
+model tokens, agent rollouts, and peak memory. These mea-
+surements isolate compression overhead from the subsequent
+cost of executing tasks with the compressed skill.
+15
+
+
+===== page 16 =====
+TABLE XIII
+Transfer of one compressed bundle across three executor models.
+Each executor runs the same SkillZip Pro bundle and the
+corresponding uncompressed Evolved Bundle on identical tasks.
+Required-resource recall and irrelevant loading measure whether
+compression changes the resources selected during execution.
+Task success
+Req. recall
+Irrel. load
+Executor
+Evolved ↑
+SkillZip Pro ↑
+Evolved ↑
+SkillZip Pro ↑
+Evolved ↓
+SkillZip Pro ↓
+qwen3.7-max
+0.541
+0.619
+0.679
+0.690
+0.321
+0.300
+qwen3.6-plus
+0.608
+0.656
+0.738
+0.727
+0.224
+0.223
+kimi-k2.6
+0.611
+0.574
+0.435
+0.490
+0.077
+0.287
+SkillZip Pro compresses a bundle in 0.21 seconds on
+average, compared with 0.11 seconds for Root-only SkillZip.
+The additional 0.10 seconds are used to resolve the resource
+graph, identify content that can be shared across files, construct
+conditional capsules, and audit the resulting bundle from disk.
+Despite these additional checks, SkillZip Pro requires no
+task feedback and no agent rollouts. Its peak memory usage
+remains 0.02 GB, identical to the other methods.
+R. Does a Compressed Bundle Transfer Across Models?
+A compressed bundle should not depend on the model that
+later executes it. We therefore evaluate the same SkillZip
+Pro output with three executor models(qwen3.7-max as the
+evolving model), without recompiling or modifying any files.
+For each executor, we compare task success and progressive-
+loading behavior against the same uncompressed Evolved
+Bundle. The reported results are run on the structured track of
+two of our three benchmarks—LiveMathematicianBench (27
+held-out tasks) and BFCL-v4 (17 held-out tasks), 44 tasks in
+total—with each cell macro-averaged over the two benchmarks.
+The compressed bundle remains executable without mod-
+ification under all three models, confirming that its files,
+relative links, and routing structure do not require an executor-
+specific integration. With qwen3.7-max and qwen3.6-plus,
+SkillZip Pro improves task success from 0.541 to 0.619 and
+from 0.608 to 0.656, respectively, while required-resource
+recall and irrelevant loading remain close to those of the
+uncompressed bundle. The result is less consistent for kimi-
+k2.6: required recall improves from 0.435 to 0.490, but task
+success decreases from 0.611 to 0.574 and irrelevant loading
+increases from 0.077 to 0.287. Thus, the bundle is structurally
+portable, although its loading efficiency still depends on how
+the executor interprets the shared routing instructions.
+INSIGHT 4 ★Compression changes not only bundle size, but
+also cross-model transferability. Moving repeated instructions
+from inline copies into shared files makes execution depend
+more strongly on routing. This restructuring improves task
+success for both Qwen executors, but causes more irrelevant
+loading and slightly lower success for kimi-k2.6.
+S. Which Part Does the Work?
+Table XIV switches off one piece at a time, grouped by
+the two pillars. The first four rows ablate Pillar 1 (what and
+where to compress); the last three probe Pillar 2 (keeping the
+routing intact). “No resource graph” approximates compressing
+each file on its own; “global sharing” deliberately ignores
+10
+2
+0
+10
+2
+10
+1
+10
+0
+7.5
+10.0
+12.5
+15.0
+17.5
+20.0
+22.5
+Reduction (\%)
+BFCL-v4
+Deployment
+Mean path
+P95 path
+10
+2
+0
+10
+2
+10
+1
+10
+0
+LiveMath
+10
+2
+0
+10
+2
+10
+1
+10
+0
+SpreadsheetBench
+Stability of the deployment weight  (dashed line = default = 0.05)
+Fig. 10. Sensitivity to storage weight 𝜆. Costs remain unchanged across two
+orders of magnitude; the dashed default is not result-tuned.
+which branches need a block and tests the failure predicted
+by Proposition IV.1.
+The ablations separate the pillars. Pillar 1 supplies the
+savings: removing scoped sharing loses most deployment
+reduction, while removing capsules trades lower storage for
+higher per-run cost, as Eq. (10) predicts. Pillar 2 makes
+those savings deployable. Global sharing pushes content into
+the root, drives 𝐽below the source (−0.166), and makes
+one file unreachable. Disabling only the routing lock leaves
+routing intact because reference-line preservation and the final
+reachability audit remain. Routing safety therefore comes from
+layered checks, not one switch.
+We sweep 𝜆∈{0, 0.01, 0.05, 0.1, 0.25, 1} and rerun the
+optimizer. Figure 10 shows identical transformations and costs
+across the range. Each bundle-level move is accepted only
+when package saving exceeds added loading cost, so the
+decision remains stable from 𝜆= 0 to 1. The default 𝜆= 0.05
+is not tuned to the results.
+Takeaway
+Cross-file sharing produces most of the shipped saving, while
+capsules trade a small storage cost for cheaper runs. Ignoring
+branch scope breaks the bundle, and varying 𝜆over two orders
+of magnitude does not change the result.
+T. One-Shot Versus Continual
+Patches are replayed in order into a fixed source, so
+every checkpoint has one identical uncompressed bundle
+that all schedules start from. We compare: publish without
+compressing; rebuild fully after every patch (the reference);
+root-only Zip-on-Write; continual with local repair and no
+repack; and continual with the preset repack rule. Continual
+runs may only reuse state from before the current patch.
+Continual mode with repacking reaches the full rebuild’s
+objective with zero drift, about one third of the model calls
+per patch, and far fewer rewritten bytes. Between repacks it
+reads only the changed file; without repacking, unfactored
+repetition accumulates. Root-only Zip-on-Write reports a
+smaller objective only by rewriting routing text that SkillZip
+Pro locks; Table V shows the runtime loss.
+Table XVI shows the schedule matters more than any single
+trigger here. Rebuilding after every patch removes all drift at
+nearly ten times the per-patch call cost, while never rebuilding
+still keeps worst drift near a tenth of a percent. The saving
+and growth triggers never fire on this stream because drift
+never crosses their thresholds, so the combined rule is driven
+16
+
+
+===== page 17 =====
+TABLE XIV
+Turning off one piece at a time (grown version). “Damage” counts files left unreachable plus broken links. Quality columns use held-out runs and
+are reported for the full method.
+Variant
+𝐽saving ↑
+Shipped ↑
+Always loaded ↑
+Per run ↑
+Task success ↑
+Req. recall ↑
+Damage ↓
+SkillZip Pro (One-Shot)
+0.142
++21.1%
++7.3%
++15.8%
+0.560
+0.755
+0
+−Resource graph
+0.118
++13.7%
++7.3%
++13.6%
+–
+–
+0
+−Host entailment
+0.077
++15.3%
++2.0%
++8.3%
+–
+–
+0
+−Scoped sharing
+0.132
++7.9%
++7.3%
++17.0%
+–
+–
+0
+−Conditional capsules
+0.126
++26.9%
++7.3%
++11.8%
+–
+–
+0
+−Cross-file audit
+0.142
++21.1%
++7.3%
++15.8%
+–
+–
+0
+−Routing-table lock
+0.156
++22.2%
++7.1%
++17.8%
+–
+–
+0
+Global sharing (unsafe control)
+-0.166
++17.0%
+-84.9%
+-0.9%
+–
+–
+1
+TABLE XV
+After the last patch, averaged over benchmarks. Savings are against publishing without compressing. Drift is measured against a full rebuild of
+the same state. Update seconds, bytes touched, and calls are per patch.
+Schedule
+Shipped saving ↑
+Per-run saving ↑
+Drift ↓
+Update s ↓
+Bytes touched ↓
+Calls/patch ↓
+ΔQuality
+Append Only
++0.0%
++0.0%
++4.6%
+0.001
+263
+0.0
+0
+SkillZip Pro One-Shot after every patch
++12.4%
++2.1%
++0.0%
+0.170
+6250
+8.8
+0
+SkillZip Zip-on-Write (root only)
++9.4%
++21.7%
+-27.7%
+0.115
+604
+1.0
+0
+SkillZip Pro Continual, no repack
++7.7%
++4.7%
+-0.8%
+0.013
+263
+1.0
+0
+SkillZip Pro Continual + triggered repack
++12.4%
++2.1%
++0.0%
+0.060
+1875
+3.3
+0
+2.5
+5.0
+7.5
+Patch index
+600
+700
+800
+J(Bt)
+(a) Objective
+LiveMath
+BFCL-v4
+SpreadsheetBench
+2.5
+5.0
+7.5
+Patch index
+1.0
+0.5
+0.0
+0.5
+Rt (\%)
+(b) Regret ( repack)
+2.5
+5.0
+7.5
+Patch index
+0
+25
+50
+75
+Cumulative calls
+(c) Compressor work
+2.5
+5.0
+7.5
+Calls per patch
+0.00
+0.05
+0.10
+max Rt (\%)
+never
+every
+Kcomb.
+(d) Repack policy
+Fig. 11. Continual mode over patches. (a) objective per patch, full rebuild
+(solid) versus continual with repack (dashed); (b) drift from the full rebuild,
+with repack events marked; (c) model calls added up over patches; (d) repack
+rules, calls against worst drift.
+TABLE XVI
+Repack rules on one patch stream. Repack rate is the fraction of
+patches rebuilt globally; worst drift spans all checkpoints.
+Rule
+Repack rate
+Worst drift ↓
+Calls/patch ↓
+Update s ↓
+Never repack
+0.00
+0.0014
+1.00
+0.000
+Every patch
+1.00
+0
+9.50
+0.413
+Savings only (𝜃)
+0.00
+0.0014
+1.00
+0.000
+Growth only (𝜌)
+0.00
+0.0014
+1.00
+0.000
+Patch count only (𝐾)
+0.25
+0.0014
+3.50
+0.119
+Combined policy
+0.25
+0.0014
+3.50
+0.106
+by the patch counter and lands at a quarter of the rebuild
+rate with the same bounded drift.
+Takeaway
+Continual mode matches a full rebuild with about one third of
+the model calls per patch. A patch-count trigger is sufficient at
+this scale; the other triggers protect faster-changing workloads.
+U. The Compression Lifecycle: Persistent vs. Transient
+Every result above shipped a rewritten bundle on disk. In
+the vocabulary of Section V-C that is Persistent compression:
+Tables III, V, and VI are all persistent results, and we relabel
+them as such rather than re-run them. What those tables did
+not test is the second lifecycle—building a throwaway view
+per run—or the case that makes the two lifecycles diverge: a
+bundle whose subskills and references are called directly, not
+only from the root. This subsection adds exactly that—and it
+is where SkillZip Pro’s advantage is easiest to see: among all
+methods we test, only SkillZip Pro compresses a multi-entry
+bundle while keeping all of its routing and every declared entry
+independently callable, whereas the lossy baselines reach their
+smaller numbers only by breaking exactly those two properties.
+Setup. We derive one controlled multi-entry bundle from
+the math skill: a root SKILL.md, a catalogued public subskill
+at sub/SKILL.md, and four conditional references carrying
+full task contracts. We compare Uncompressed, SkillZip, the
+lossy Root-only and Flat-concat baselines, audited persistent
+SkillZip Pro, persistent SkillZip Pro without the multi-entry
+audit, and transient execution-view SkillZip Pro. Compression
+and view construction are deterministic and use no model calls;
+only the direct-call rollout in Table XIX uses the unmodified
+agent. Following Section III-E, persistent rows report disk
+and per-run cost. The transient row keeps disk at 1.000 and
+reports runtime saving separately.
+1) Compressing without losing a single public entry:
+Table XVII separates methods that preserve a multi-entry
+bundle from those that do not. Standalone-preserving persistent
+SkillZip Pro reduces the bundle to 0.884 of its bytes and per-
+run load from 404 to 352 tokens while keeping routing, mean
+public independence, and worst-case independence at 1.000.
+The transient view keeps the same guarantees without changing
+disk. Root-only and flat-concat report smaller numbers only
+after breaking routing or removing public content. Disabling
+the multi-entry audit exposes the failure: persistent SkillZip
+Pro reaches 0.845 on disk but renames the public subskill,
+reducing its effective independence to 0.500. Proposition IV.1
+therefore applies at bundle scale: every declared entry, not the
+desired ratio, sets the safe persistent ceiling.
+2) Direct calls need the audit or a transient view:
+Table XVIII isolates the failure. Without the audit, persistent
+SkillZip Pro retains 0.929 of public-entry content but only
+0.500 discoverability because it renames the public subskill.
+17
+
+
+===== page 18 =====
+TABLE XVII
+Persistent cost and multi-entry fidelity. Lower cost is better;
+higher routing and independence are better. Blue rows are valid; grey
+rows break routing or independence.
+Method
+Disk ↓
+P95 ctx ↓
+Per-run ↓
+Route ↑
+Pub. Ind. ↑
+Worst ↑
+Uncompressed
+1.000
+607
+404
+1.000
+1.000
+1.000
+SkillZip
+0.959
+587
+393
+1.000
+1.000
+1.000
+Root-only ✗
+0.972
+537
+242
+0.000
+0.625
+0.250
+Flat-concat ✗
+0.379
+190
+74
+0.000
+0.062
+0.000
+Standalone-preserving Persistent SkillZip Pro
+0.884
+607
+352
+1.000
+1.000
+1.000
+Persistent SkillZip Pro, no audit ✗
+0.845
+565
+331
+1.000
+0.500
+0.000
+Transient Execution-View SkillZip Pro
+1.000
+607
+404
+1.000
+1.000
+1.000
+TABLE XVIII
+Why a public entry loses independence (math bundle). “Discoverable”
+is whether a direct call still finds the entry (↑); “Content” is how
+much of the found entry’s knowledge survives (↑); “Effective” is their
+per-entry product, averaged—the number Table XVII reports. “Cond.”
+is conditional-entry content. Persistent SkillZip Pro with the audit
+off loses capability by renaming a public entry, not by deleting its text.
+Method
+Pub. disc. ↑
+Pub. content ↑
+Pub. eff. ↑
+Cond. content ↑
+Uncompressed
+1.000
+1.000
+1.000
+1.000
+SkillZip
+1.000
+1.000
+1.000
+1.000
+Root-only ✗
+1.000
+0.625
+0.625
+1.000
+Flat-concat ✗
+1.000
+0.062
+0.062
+0.150
+Persistent SkillZip Pro, no audit ✗
+0.500
+0.929
+0.500
+0.887
+Standalone-preserving Persistent SkillZip Pro
+1.000
+1.000
+1.000
+1.000
+Transient Execution-View SkillZip Pro
+1.000
+1.000
+1.000
+1.000
+Audited persistent and transient modes remain at 1.000 on all
+four measures: one rejects hidden entries, and the other never
+edits them. Direct calls need one of these protections.
+The live rollout confirms this result. Table XIX calls
+each entry through the unmodified agent. Without the audit,
+persistent SkillZip Pro cannot start the renamed public
+subskill (discoverability and standalone success are both
+0.000), although unrenamed conditional references still run.
+Audited persistent and transient modes keep every entry
+discoverable; their standalone and root-mediated success
+matches uncompressed within this small rollout’s noise (𝑛=3
+for the public entry, 𝑛=8 per reference). Discoverability is
+deterministic: only the audit or a transient view prevents cross-
+file deduplication from hiding a public entry.
+3) Matching the four modes to update rate and call pattern:
+Table XX reports each workload boundary. Persistent load
+stays below transient load at every direct-call count because
+compression is paid once; stable, heavily used bundles favor
+one-shot persistent. A global repack costs 273 ms versus
+183 ms for a local transient rebuild, so changing direct-call
+bundles favor cached continual transient above roughly one
+edit per ten runs. Figure 12 shows the crossover.
+4) What a transient view costs to build and cache: Transient
+compression has overhead (Table XXI). The root-heavy entry
+saves 24.8%; leaf references save under 2% because their
+closures share little content. Cold builds take 150–245 ms and
+warm reads under 2 ms, amortizing to 15–25 ms per call at a
+0.9 hit rate. The non-improving geometry.md entry uses its
+raw closure, and the canonical bundle remains byte-identical. A
+view helps only when its token saving exceeds build overhead.
+5) Which safeguards are load-bearing: Table XXII removes
+one safeguard at a time. Without entry labels, public indepen-
+dence falls to 0.500; without the multi-entry audit, a public
+entry becomes undiscoverable. Ignoring dependency closure
+drops 10 of 11 references, and missing host context reduces
+conditional independence to 0.887. Removing the view cache
+raises per-call build from 18.7 to 173.4 ms; removing global
+TABLE XIX
+Direct-call rollout. Pub. disc. tests public-subskill startup; Pub.,
+Cond., and Root report success by entry type. Discoverability is
+deterministic; 𝑛=3 public and 𝑛=8 per reference.
+Method
+Pub. disc. ↑
+Pub. ↑
+Cond. ↑
+Root ↑
+Uncompressed
+1.000
+0.333
+0.375
+0.364
+Persistent SkillZip Pro, no audit ✗
+0.000
+0.000
+0.417
+0.394
+Standalone-preserving Persistent SkillZip Pro
+1.000
+0.333
+0.375
+–
+Transient Execution-View SkillZip Pro
+1.000
+0.667
+0.417
+–
+repacking moves the disk ratio from 0.845 to 0.959. Under
+workload drift, persistent saving decays from 12.9% to 2.6%,
+while the transient view remains at 4.7%. Each safeguard
+therefore protects either a saving or a public call.
+Takeaway
+SkillZip Pro is the only tested approach that compresses a
+multi-entry bundle without breaking routing or hiding a public
+entry. Audited persistent compression gives the smallest bundle
+and lowest steady-state run cost; transient compression preserves
+the canonical bundle and better tolerates drift, but pays per-run
+build cost. The lifecycles are complementary, and each safeguard
+protects either fidelity or efficiency.
+V. An Example in Industrial Compression Deployment
+The preceding benchmarks use an instrumented wrapper
+to record which files the agent loads. We further evaluate
+SkillZip Pro inside the production execution environment of
+a content-moderation service. Its skill bundle contains a root
+document of approximately 20,000 tokens, three on-demand
+reference documents covering prior cases and moderation
+standards, and a locked risk map. The root is injected when
+the skill is activated, while reference files are loaded only
+when needed. Each audit involves approximately 13 agent
+reasoning rounds on average.
+The official evaluation set contains 100 real moderation
+tasks, evenly divided between violating and normal cases.
+Task content is retrieved at execution time and is not available
+locally, so both decision quality and runtime cost must be
+measured through the production harness. We report the binary
+moderation verdict using accuracy and false positives. The
+bundle is written in Chinese, which also exposes a practical
+limitation of language-specific protection rules: an English-
+only deterministic extractor identifies only 7 of 264 instruction
+units as required, leaving most Chinese obligations unprotected
+during compression.
+Aggressive compression removes essential exemption
+knowledge. Without protection classes, deterministic and
+model-assisted compression reduce the deployed bundle by
+71.4% and 75.8%, respectively. However, accuracy falls from
+88.00% for the paired uncompressed bundle to 70.00% and
+62.00%. The errors are strongly asymmetric: false positives
+increase from 10 to 29–35, while false negatives remain
+between 1 and 3. An audit of the removed content shows
+that most losses occur in exemption rules specifying when
+content should not be flagged, including authorized-seller cases,
+whitelisted exceptions, and evidence thresholds. As fewer of
+these rules are retained, the false-positive rate increases.
+Unprotected compression also damages the presentation of
+the output interface. Two worked JSON examples and the label
+18
+
+
+===== page 19 =====
+TABLE XX
+Lifecycle sensitivity. Each row reports the measured boundary at which one lifecycle becomes cheaper or safer.
+Sweep
+Range
+Measured effect
+Verdict
+Public-node fraction
+0.10→1.00
+standalone keeps 0.10→1.00 of nodes
+more public ⇒less persistent deletion room
+Direct-call frequency 𝑁
+1→50 calls
+persistent load < transient load at all 𝑁
+winner: persistent-standalone
+Cross-file redundancy
+0.35→0.41 dup.
+persistent deploy saving up to 28.1%
+more redundancy ⇒larger permanent saving
+Bundle size (tokens)
+548→879
+cold view build 170→228 ms
+build cost is per-run for transient, one-time for
+persistent
+Update frequency 𝑈
+0→1 edits/run
+repack 273 ms vs rebuild 183 ms at 𝑈=1
+transient wins once 𝑈> 0.1
+Workload drift 𝑑
+0→0.8
+persistent saving 12.9%→2.6% vs transient 4.7% (flat)
+transient wins for 𝑑≥0.8
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+Update frequency U (edits / run)
+0
+50
+100
+150
+200
+250
+Rework cost (ms / run)
+transient cheaper
+for U > 0.1
+(a) Frequent edits favour transient
+Persistent (global repack)
+Transient (local rebuild)
+10
+0
+10
+1
+Direct calls N to one stable entry
+10
+3
+10
+4
+Cumulative load (tokens)
+(b) Stable direct calls favour persistent
+Persistent (standalone)
+Transient (per-run view)
+Fig. 12. Which lifecycle is cheaper depends on the workload; both panels are drawn from the deterministic sweeps of Table XX. (a) As the edit rate 𝑈
+rises, a persistent global repack (which re-audits the whole bundle) costs more rework per run than a transient local rebuild (which touches only the affected
+view); they tie for a stable bundle (𝑈=0), and transient is cheaper for 𝑈> 0.1. (b) For repeated direct calls to one stable public entry, a standalone-preserving
+persistent bundle pays its compression once and stays below a per-run transient view at every call count 𝑁(log–log axes). Read together: a stable, heavily
+called bundle wants persistent; a frequently edited one wants transient.
+TABLE XXI
+Transient-view cost. Closure and View are tokens before and after compression. Cold, Warm, and Amort. report build latency; Built marks a
+smaller view, and Canon. confirms that the canonical bundle is unchanged.
+Entry
+Kind
+Closure
+View
+Run saving ↑
+Cold ms ↓
+Warm ms ↓
+Amort. ms ↓
+Built
+Canon.
+SKILL.md
+publ
+493
+371
+24.8%
+218
+0.34
+22.1
+✓
+✓
+sub/SKILL.md
+publ
+548
+545
+0.5%
+173
+1.53
+18.7
+✓
+✓
+references/algebra.md
+cond
+532
+529
+0.6%
+155
+0.23
+15.7
+✓
+✓
+references/edge_cases.md
+cond
+513
+505
+1.6%
+153
+0.29
+15.5
+✓
+✓
+references/geometry.md
+cond
+489
+489
+0.0%
+244
+0.54
+24.9
+✗
+✓
+references/number_theory.md
+cond
+483
+478
+1.0%
+157
+0.56
+16.2
+✓
+✓
+whitelist are separated into synthetic sections approximately
+sixty lines apart, while renderer scaffolding remains in the
+root. Although the individual fragments still exist, neither
+the downstream parser nor the executing model receives the
+interface as one coherent contract.
+Witnessed compression protects semantic and interface-
+critical content. We recompress the identical bundle while
+introducing the safeguards of Section IV-D incrementally.
+Exemption-bearing units are locked as class C1; obligation-
+bearing units are restored to the required class C2, so they can
+be modified only through witnessed transformations; and the
+output interface is re-emitted as one contiguous, verbatim C0
+span. A removal is accepted only when supported by a logged
+witness: 𝑊1 for literal containment, 𝑊2 for coverage-preserving
+transformations, or 𝑊3 for entailment within evidence segments
+that contain no boundary marker.
+Because the production harness may vary between sessions,
+each compressed configuration is evaluated against an uncom-
+pressed bundle in the same session. The first uncompressed
+row in Table XXIII therefore reports 88.00%, while the two
+sessions used by the final configuration have uncompressed
+baselines of 92.00% and 91.00%. For reference, the standalone
+official evaluation of the same uncompressed bundle reports
+90.91%. Table XXIII shows how compression changes as the
+protection mechanisms are introduced.
+The incremental comparison supports four findings.
+First, stronger witnesses expand the amount of content
+that can be removed safely. With C1/C2 protection and only
+𝑊1 and 𝑊2, SkillZip Pro reduces the deployed bundle by
+19
+
+
+===== page 20 =====
+TABLE XXII
+Lifecycle ablations. Each row removes one safeguard and reports the protected metric and resulting failure.
+Removed safeguard
+Metric
+Intact
+Ablated
+What breaks
+−Entry-type labels
+mean public independence (math/structured)
+1.000
+0.500
+public entries lose content the root happens to
+cover
+−Multi-entry audit
+all public entries discoverable (0/1)
+1.000
+0.000
+a public sub-entry is renamed and no longer
+callable
+−Dependency closure
+dependency files reachable from the entry in its
+view
+11
+1
+the view omits every reference the entry routes
+to
+−Host-context supplement
+mean conditional-entry independence (math-
+/structured)
+1.000
+0.887
+content assumed covered by the host is deleted,
+then truly lost
+−View cache
+mean build ms/call over 20 calls
+18.7
+173.4
+every call rebuilds the same view from scratch
+−Global repack
+deploy token ratio, lower is better (math/struc-
+tured)
+0.845
+0.959
+cross-file duplication is never removed; only per-
+file gains remain
+TABLE XXIII
+Production evaluation under the service’s native execution harness.
+Deployment saving is measured over the shipped bundle. Per-run saving
+is task-paired within the same session over 100 tasks; the final row
+pools two sessions (𝑛=200). Accuracy and false positives are measured
+on the corresponding full evaluation set. The relevant uncompressed
+session baselines are 88.00%, 92.00%, and 91.00%.
+Configuration
+Deployment ↑
+Measured per run ↑
+Accuracy ↑
+FP ↓
+Interface contract ↑
+Uncompressed
++0.0%
++0.0%
+88.00%
+10
+contiguous
+Pro, no protection classes ✗
++71.4%
+–
+70.00% / 62.00%
+29 / 35
+contiguous
+Pro + C1/C2 (𝑊1, 𝑊2 only)
++13.8%
++7.1%
+89.00%
+9
+fragmented
+Pro + 𝑊3 entailment witness
++32.7%
++6.8%
+88.00%
+10
+fragmented
+Pro + 𝑊3 + C0 contract restore
++32.2%
++6.1%
+89.00%
+9
+contiguous
+Pro + 𝑊3 inside the root (v3)
++38.1%
++10.4% (𝑛=200)
+89.00%
+9
+contiguous
+13.8% and achieves 89.00% accuracy, one task above the
+paired uncompressed result, with one fewer false positive.
+Further candidates cannot pass these deterministic checks
+because their redundancy is semantic rather than literal. Adding
+the restricted 𝑊3 entailment witness increases deployment
+saving to 32.7%. The resulting accuracy and confusion matrix
+are identical to those of the paired uncompressed bundle. Each
+of the 106 removed reference segments has a logged entailment
+verdict, and none changes a decision on the 100-task evaluation.
+The increase in saving therefore comes from stronger evidence
+for removal, not from relaxing the acceptance criteria.
+Second, interface integrity must be evaluated separately
+from task accuracy. The configuration using 𝑊3 alone leaves
+the output contract fragmented because the fixed-template
+renderer distributes its components across separate sections.
+The C0 restoration pass reconstructs a single contiguous span
+containing both worked examples and the label whitelist, while
+removing residual scaffolding. This repair reduces deployment
+saving only slightly, from 32.7% to 32.2%. Accuracy changes
+from 88.00% to 89.00%, which is insufficient to attribute
+an accuracy benefit to contiguity alone. The relevant result
+is instead that the published bundle once again exposes the
+complete contract in the form expected by its consumer, and
+that this property is now checked explicitly.
+Third, compressing the repeatedly loaded root produces
+the largest runtime benefit. Because the root is processed
+throughout approximately 13 reasoning rounds, removing one
+root token saves roughly five to six times as many measured
+runtime tokens as removing one token from an on-demand
+reference. We therefore allow restricted 𝑊3 witnesses inside
+the root, while continuing to protect frontmatter, interface
+contracts, and boundary-bearing segments. Two candidate
+deletions are also prohibited from serving as witnesses for
+each other. This configuration removes 38.1% of the deployed
+bundle and reduces pooled, task-paired runtime tokens by
+10.4% over 𝑛=200 audits. Both compressed runs achieve
+89.00% accuracy, compared with same-session uncompressed
+baselines of 92.00% and 91.00%.
+Fourth, static cost estimates do not fully capture changes
+in agent execution. The loading-weight model of Section III
+predicts approximately 3% per-run saving, whereas paired
+production measurements range from 6% to 11%. A shorter
+root changes not only the number of loaded tokens but also
+the agent’s reading and repeated-reasoning behavior, neither
+of which is represented by the static model. A 30-task pilot
+varies from 6% to 14% across days, while two 100-task paired
+runs produce 9.5% and 11.3%, yielding the pooled result of
+10.4%. The static model is conservative in this deployment,
+but runtime claims should be based on paired measurements
+collected within the same execution session.
+Takeaway
+On the production moderation skill, witnessed compression
+removes 38.1% of the deployed bundle and 10.4% of pooled,
+task-paired runtime tokens while keeping accuracy within the
+observed variation of the uncompressed system. In contrast, the
+unprotected 71.4–75.8% configurations lose 18–26 accuracy
+points, primarily through additional false positives.
+INSIGHT 5 ★The safe compression limit is determined by
+the evidence available for each removal. Literal and cover-
+age witnesses provide only 13.8% deployment saving, while
+restricted entailment witnesses raise it to 32.7%; extending
+the same witnessed reasoning to the repeatedly loaded root
+raises the final saving to 38.1%. The benefit is also amplified
+at execution time: although the static loading model predicts
+only 3% per-run saving, the production engine measures 6–
+11% because shorter root context reduces work across repeated
+reasoning rounds. Industrial compression should therefore be
+both proof-bound and execution-aware: remove content only
+when its redundancy is witnessed, and prioritize the context
+that the agent repeatedly processes.
+VII. Conclusion
+SkillZip Pro compresses the progressively loaded skill
+bundles used by production agents, including instructions,
+references, subskills, code, data, and assets. Host entailment,
+20
+
+
+===== page 21 =====
+activation-scoped sharing, and conditional capsules remove
+cross-file redundancy without increasing activation or path cost.
+Before publication, a transactional disk audit verifies routing,
+typed contracts, scope, interface integrity, and locked content.
+The compiler supports two independent choices. One-Shot
+compression rebuilds the complete resource graph, whereas
+Continual compression processes only the closure affected by
+each evolution patch. Persistent compression rewrites the
+canonical bundle, while Transient compression preserves
+it and constructs a per-run execution view. These modes
+support different update frequencies and requirements for
+the independent usability of references and subskills, while
+remaining compatible with Phase-A deployment.
+Across three benchmarks and a real industrial deployment,
+SkillZip Pro reduces all four cost layers while preserving ev-
+ery routing pair and introducing no reference errors. Triggered
+Continual repacking achieves a result comparable to One-
+Shot rebuilding with approximately one third as many model
+calls per patch. In production, verification-gated compression
+removes 38.1% of the deployed bundle and 10.4% of measured
+per-run tokens without a measurable loss in decision quality.
+These results show that effective skill compression must
+preserve not only content, but also the loading structure
+through which agents access it.
+References
+[1] Anthropic, “Claude Code: An agentic coding tool for the termi-
+nal,” https://docs.anthropic.com/en/docs/claude-code/overview, 2025,
+accessed: 2026-07-25.
+[2] OpenAI, “Codex: An agentic coding tool for the terminal,” https://github.
+com/openai/codex, 2025, accessed: 2026-07-25.
+[3] G. Wang, Y. Xie, Y. Jiang, A. Mandlekar, C. Xiao, Y. Zhu, L. Fan, and
+A. Anandkumar, “Voyager: An open-ended embodied agent with large
+language models,” Transactions on Machine Learning Research, 2023.
+[4] N. Shinn, F. Cassano, A. Gopinath, K. Narasimhan, and S. Yao,
+“Reflexion: Language agents with verbal reinforcement learning,” in
+Advances in Neural Information Processing Systems, vol. 36, 2023.
+[5] Q. Zhang, C. Hu, S. Upasani, B. Ma, F. Hong, V. Kamanuru, J. Rainton,
+C. Wu, M. Ji, H. Li, U. Thakker, J. Zou, and K. Olukotun, “Agentic
+context engineering: Evolving contexts for self-improving language
+models,” arXiv preprint arXiv:2510.04618, 2025.
+[6] H.-a. Gao, J. Geng, W. Hua, M. Hu, X. Juan et al., “A survey of self-
+evolving agents: On path to artificial super intelligence,” arXiv preprint
+arXiv:2507.21046, 2025.
+[7] H. Jiang, Q. Wu, C.-Y. Lin, Y. Yang, and L. Qiu, “Llmlingua:
+Compressing prompts for accelerated inference of large language models,”
+in Proceedings of the 2023 Conference on Empirical Methods in Natural
+Language Processing, 2023, pp. 13 358–13 376.
+[8] H. Jiang, Q. Wu, X. Luo, D. Li, C.-Y. Lin, Y. Yang, and L. Qiu,
+“Longllmlingua: Accelerating and enhancing llms in long context
+scenarios via prompt compression,” arXiv preprint arXiv:2310.06839,
+2023.
+[9] Z. Pan, Q. Wu, H. Jiang, M. Xia, X. Luo et al., “Llmlingua-2: Data
+distillation for efficient and faithful task-agnostic prompt compression,”
+in Findings of the Association for Computational Linguistics: ACL 2024,
+2024.
+[10] Y. Gao, Z. Li, Y. Yuan, Z. Ji, P. Ma, and S. Wang, “Skillreducer:
+Optimizing llm agent skills for token efficiency,” arXiv preprint
+arXiv:2603.29919, 2026.
+[11] X.
+Bai,
+H.
+Lin,
+C.
+Liu,
+Y.
+Zhang,
+X.
+Jin,
+X.
+Cao,
+and
+Y. Li, “Skillzip: Evaluation-free skill compression for self-evolving
+agents by discovering reusable structure,” 2026. [Online]. Available:
+https://arxiv.org/abs/2608.11079
+[12] Y. Liu, Z. Su, L. Xie, Y. Zhang, Q. Zong, J. Guo, Z. Xie, Y. Ji, Y. Yim,
+H. Luo, X. Ren, R. Chenyu, H. Li, and Y. Song, “Skillrevise: Improving
+llm-authored agent skills via trace-conditioned skill revision,” arXiv
+preprint arXiv:2606.01139, 2026.
+[13] H. Wang, Y. Lan, B. Cao, L. Lin, and J. Chen, “Skillgrad: Optimizing
+agent skills like gradient descent,” arXiv preprint arXiv:2605.27760,
+2026.
+[14] Y. Yang, Z. Gong, W. Huang, Q. Yang, Z. Zhou, Z. Huang, Y. Li,
+X. Gao, Q. Dai, B. Liu, K. Qiu, Y. Yang, D. Chen, X. Yang, and
+C. Luo, “Skillopt: Executive strategy for self-evolving agent skills,”
+arXiv preprint arXiv:2605.23904, 2026.
+[15] X. Zhang, M. Gao, Y. Zhao, X. Tan, Y. Yao, F. Wang, Y. Wang, Dingsiyi,
+and T. Yang, “Formal skill: Programmable runtime skills for efficient
+and accurate llm agents,” arXiv preprint arXiv:2605.19604, 2026.
+[16] Y. Li, B. Dong, F. Guerin, and C. Lin, “Compressing context to enhance
+inference efficiency of large language models,” in Proceedings of the
+2023 Conference on Empirical Methods in Natural Language Processing,
+2023, pp. 6342–6353.
+[17] J. Mu, X. L. Li, and N. Goodman, “Learning to compress prompts with
+gist tokens,” in Advances in Neural Information Processing Systems,
+vol. 36, 2023, pp. 19 327–19 352.
+[18] F. Xu, W. Shi, and E. Choi, “Recomp: Improving retrieval-augmented
+lms with compression and selective augmentation,” in International
+Conference on Learning Representations, 2024.
+[19] T. Zhang and Z. Qi, “Skill-to-lora: From using skills to learning behav-
+iors for token-efficient llm agents,” arXiv preprint arXiv:2606.16769,
+2026.
+[20] L. Chen, E. Feng, Y. Xia, and H. Chen, “Skillrt: Compiling skills for
+efficient execution everywhere,” arXiv preprint arXiv:2604.03088, 2026.
+[21] P. D. Gr"unwald, The Minimum Description Length Principle.
+MIT
+Press, 2007.
+[22] E. Galbrun, “The minimum description length principle for pattern
+mining: A survey,” Data Mining and Knowledge Discovery, vol. 36,
+no. 5, pp. 1679–1727, 2022.
+[23] C. G. Nevill-Manning and I. H. Witten, “Identifying hierarchical
+structure in sequences: A linear-time algorithm,” Journal of Artificial
+Intelligence Research, vol. 7, pp. 67–82, 1997.
+[24] N. J. Larsson and A. Moffat, “Off-line dictionary-based compression,”
+Proceedings of the IEEE, vol. 88, no. 11, pp. 1722–1732, 2000.
+[25] S. G. Patil, H. Mao, F. Yan, C. C.-J. Ji, V. Suresh, I. Stoica, and
+J. E. Gonzalez, “The berkeley function calling leaderboard (BFCL):
+From tool use to agentic evaluation of large language models,” in
+Proceedings of the 42nd International Conference on Machine Learning,
+ser. Proceedings of Machine Learning Research, vol. 267.
+PMLR,
+2025, pp. 48 371–48 392.
+[26] Gorilla Team, “Berkeley function calling leaderboard v4,” https://gorilla.
+cs.berkeley.edu/leaderboard.html, 2026, accessed 2026-07-20.
+[27] L. He, Q. Yu, H. Dong, B. Liao, X. Xu, M. Goldblum, J. Bian,
+and N. Mesgarani, “Livemathematicianbench: A live benchmark for
+mathematician-level reasoning with proof sketches,” arXiv preprint
+arXiv:2604.01754, 2026.
+[28] ——, “LiveMathematicianBench: A live benchmark for mathematician-
+level reasoning with proof sketches,” arXiv preprint arXiv:2604.01754,
+2026.
+[29] Z. Ma, B. Zhang, J. Zhang, J. Yu, X. Zhang, X. Zhang, S. Luo,
+X. Wang, and J. Tang, “Spreadsheetbench: Towards challenging real
+world spreadsheet manipulation,” in Advances in Neural Information
+Processing Systems, vol. 37, 2024.
+[30] Qwen Team, “Qwen3.7: The agent frontier,” Qwen Research Blog, May
+2026, introduces the Qwen3.7 series, including Qwen3.7-Max. Accessed:
+2026-07-23. [Online]. Available: https://qwen.ai/blog?id=qwen3.7
+[31] ——, “Qwen3.6-Plus: Towards real world agents,” Qwen Research
+Blog, Apr. 2026, accessed: 2026-07-23. [Online]. Available: https:
+//qwen.ai/blog?id=qwen3.6
+[32] Moonshot AI, “Kimi K2.6: Advancing open-source coding,” Kimi
+Technical Blog, 2026, accessed: 2026-07-23. [Online]. Available:
+https://www.kimi.com/blog/kimi-k2-6
+21
+
+
+===== page 22 =====
+Appendix A
+Implementation Details
+Appendix roadmap
+This appendix fixes the implementation contract needed to reproduce Phase A. It specifies bundle discovery, reference resolution,
+candidate layout, the cost ledger, auditing, atomic publication, and Zip-on-Write invalidation. Appendix B gives machine-readable
+schemas and prompt contracts; Appendix C gives the run matrix; Appendix D expands theory, limitations, and failure analysis.
+A. Reference Directory Layout
+The implementation treats the authoritative source directory as immutable during a transaction and creates all intermediate
+and persistent compiler state outside the published runtime bundle. A successful publication uses the following split layout:
+<published-bundle>/
+SKILL.md # unchanged entry path
+references/...
+subskills/.../SUBSKILL.md
+capsules/<guard-slug>.md # generated on-demand text
+.skillzip_shared/<hash>.md # generated scoped modules
+scripts/... # byte-identical
+data/... # byte-identical
+assets/... # byte-identical
+<compiler-cache>/<bundle-id>/
+state.json # graph, indices, workload ledger
+manifest.json # provenance and audit results
+contracts/<digest>.json # reusable typed contracts
+authored.snapshot # optional transactional source snapshot
+Generated runtime directories are namespaced to avoid collisions. If either namespace already exists in the source, the tool
+selects a digest-suffixed namespace and records it in the external manifest. Nested source SKILL.md files are treated as subskill
+entries internally; the published filename is changed only when the original harness accepts SUBSKILL.md. The default is
+path preservation. Compiler state is not distributed to the agent and is therefore not charged to runtime deployment cost; a
+reproducibility package that includes it reports payload bytes and total archive bytes separately.
+B. Discovery and Media Classification
+Directory traversal is deterministic: paths are normalized to UTF-8 NFC, sorted bytewise, and visited without following
+directory symlinks. Content signatures and extensions classify regular files. Declared text types support contract extraction;
+code, notebooks, structured data, images, archives, and unknown binaries remain locked.
+Every node stores:
+• canonical path relative to the bundle root;
+• SHA-256 of source bytes and media classification;
+• token and byte counts;
+• loading class and inbound/outbound edges;
+• whether rewrite, relocation, or only verbatim copy is permitted.
+The default text-size guard is 1 MiB per file. Larger text remains locked unless the user explicitly raises the limit. Archive
+members are never expanded implicitly.
+C. Reference Resolution
+The Phase-A resolver recognizes only syntax that the host agent can already follow:
+1) Markdown links and images with relative local targets;
+2) explicit code-formatted paths ending in a known extension;
+3) front-matter fields declared by the selected skill format;
+4) imperative loading clauses such as “read references/csv.md.”
+Fragments and query strings are separated before filesystem resolution and restored in the emitted link. Percent decoding
+is performed once; double decoding is forbidden. The canonical target must have the canonical root as a path-component
+prefix, not merely a string prefix.
+The nearest enclosing heading and conditional clause define the initial guard. If guard extraction is ambiguous, the edge is
+marked unknown; it may be preserved but cannot justify capsule creation or path-specific sharing. External http, https,
+and mailto links are preserved as opaque strings and excluded from local closure checks.
+22
+
+
+===== page 23 =====
+D. Contract Extraction and Normalization
+Files are chunked only at heading boundaries, with a 256-token overlap carrying the parent heading and active guard. Each
+chunk is extracted once. Units are merged by source span and normalized key; disagreements retain the stricter wording as
+a locked residual. The implementation never resolves a disagreement by majority vote.
+Normalization is type specific. Tool calls normalize tool name, required arguments, and order. Output obligations normalize field
+name, type, and cardinality. Prohibitions preserve polarity. Workflow units form a directed graph whose edges encode before,
+after, retry, or fallback. Examples are tagged as non-normative unless the source explicitly declares them required.
+E. Protection Classes, Witnesses, and Non-Latin Bundles
+The production configuration in Section VI-V adds three implementation requirements.
+Script-aware lexical signals. Modality and requirement detection are lexical: obligation, prohibition, and recommendation
+markers drive which units are required. The reference implementation ships with English marker sets, which on a Chinese
+bundle demotes almost every obligation to optional (7 of 264 units required on the production skill). The fix is script-aware
+signal sets—obligation and prohibition markers per writing system—applied in the same deterministic extractor, so required-unit
+detection works before any witness is consulted. The English path is unchanged byte for byte.
+Boundary classes and the exemption lock. Units whose payload carries an exemption or negative-verdict marker (authorized
+cases, whitelisted exceptions, “judge normal” clauses) are classified as boundary units. Boundary units are required and
+additionally locked against wording compression and against 𝑊3 entailment removal: they may only be moved verbatim. Markers
+are a configurable lexicon per language; the audit counts them so a release reports boundary retention explicitly.
+Interface-contract restoration. After materialization, a post-pass locates each source section matching the interface-contract
+pattern (output-format headings with fenced schema examples and whitelist constraints), strips any of its normalized lines that the
+fixed-template render scattered elsewhere in the emitted root, removes render-scaffolding sentences, and re-inserts the whole source
+span verbatim at one site. The audit then verifies contiguity: the section must appear once, whole, with no fragments outside it.
+Entailment witness protocol (𝑊3). The checker prompt presents the emitted root document 𝑆and one candidate reference
+segment 𝑃, and asks whether the decision-relevant content of 𝑃—conditions, verdicts, thresholds, whitelists, exemptions—is
+fully expressed in 𝑆, explicitly instructing that concrete case facts need not reappear but the rule they demonstrate must. The
+checker runs at temperature 0 with a fixed prompt; the first response line must be the verdict and the second a one-sentence
+basis. A verdict is accepted only for evidence-class segments containing no boundary marker, and the verdict, basis, segment
+coordinates, and prompt digest are written to the witness log, making every 𝑊3 removal individually auditable after publication.
+Intra-root witnesses and their safeguards. 𝑊3 may also be applied inside the root document, where each candidate is
+checked against the root minus itself. Three safeguards apply. (i) The YAML frontmatter and every interface-contract span
+are exempt from 𝑊3 regardless of verdict: they carry no decision knowledge a checker can weigh, yet they are the loading
+and output contract. (ii) Boundary segments remain exempt. (iii) A mutual-witness veto: after verdicts are collected, any two
+approved segments whose normalized bigram sets overlap above 0.6 are both retained, since each may have received its verdict
+only because the other was still present in the base. Because the root is injected into every reasoning round, intra-root removals
+carry the largest per-run multiplier, and the veto plus the exemptions are what keep that lever safe.
+F. Candidate Enumeration
+File-level candidates are primitive statements, shared rules, named procedures, guarded exceptions, and locked residual spans.
+Bundle-level candidates are exact host witnesses, shared modules, and capsules.
+Cross-file sharing uses a two-stage test. A hash over canonical typed units finds exact candidates; a deterministic structural
+comparator then verifies identical type, payload, guard parameters, and normative strength. Parameterized sharing is allowed
+only when differing values correspond to explicit source variables and the resulting call sites preserve them. Pure embedding
+similarity never creates an automatic shared module.
+For each support set, the algorithm considers the lowest common activation scopes in the resource graph rather than only
+the directory ancestor. A scope candidate is discarded if it would be loaded by a path that previously loaded none of the
+occurrences, unless the added path cost is compensated under Eq. (7) and the rule is proven universally applicable. The
+production default disables this exception and requires no scope expansion.
+Capsule candidates require all of the following: an explicit guard, a body above the minimum length, no unguarded inbound
+dependency from adjacent prose, and a dispatcher whose mandatory loading instruction fits within the configured budget.
+Headings such as “Background” or “Notes” do not constitute guards.
+G. Selection and Cost Ledger
+Candidate deltas use tokenized emitted text, including links, dispatcher verbs, generated headings, and manifest-excluded
+runtime content. Selection starts with the best coverage-preserving improvement, then tests removals and one-for-one or
+one-for-two swaps until 𝐽cannot improve by one token.
+The ledger stores both estimated and materialized values:
+23
+
+
+===== page 24 =====
+{
+"tokenizer": {"name": "...", "revision": "..."},
+"lambda_deployment": 0.05,
+"path_weights": {"source": "trace|guards", "digest": "..."},
+"source": {"catalog": 0, "activation": 0,
+"deployment": 0, "mean_path": 0, "p95_path": 0},
+"candidate": {"catalog": 0, "activation": 0,
+"deployment": 0, "mean_path": 0, "p95_path": 0},
+"objective_delta": 0
+}
+Estimated and materialized costs must agree exactly for bytes and within tokenizer determinism for tokens. A discrepancy
+rejects the candidate.
+H. Disk-Level Audit
+The audit runs in a new process with only the source path, candidate path, and manifest as inputs. This prevents it from
+trusting optimizer objects accidentally. It rebuilds both graphs, rehashes every node, and verifies:
+1) source and candidate roots are distinct and canonical;
+2) all internal candidate targets exist, remain inside the root, and preserve fragments;
+3) every source contract unit maps to a compatible candidate unit or exact host witness;
+4) every generated shared module or capsule is reachable through a mandatory dispatcher under a compatible guard;
+5) locked-file path and SHA-256 pairs match, except for explicitly user-approved path migrations;
+6) no source file has been omitted merely because it was unreferenced;
+7) every interface contract appears as one contiguous span equal to its source section, with no scattered fragments;
+8) materialized costs do not exceed the source objective.
+Strict mode treats any warning as failure. Diagnostic mode emits the candidate for inspection but never publishes it
+as a successful compression.
+I. Atomic Publication and Recovery
+The tool creates a temporary sibling directory so that final rename remains on one filesystem. It fsyncs files, the manifest,
+and containing directories before publication. If the destination exists, the default command fails; explicit -replace first
+renames the old output to a timestamped backup. The source is never overwritten.
+On one-shot extraction, selection, materialization, or audit failure, the official output is a verbatim copy of the source
+with an external failure manifest. On a continual optimization failure after a patch has been applied successfully, the official
+output is the verbatim patched bundle. Only a failure to apply or validate the patch transaction itself leaves the previous
+publication active. A temporary directory may be retained for debugging only under an explicit flag. This behavior makes
+failure visible while preserving the current authored semantics.
+J. Dual-Mode Driver and Bundle-Aware Zip-on-Write
+The command exposes -mode one-shot and -mode continual. One-shot requires only the source and entry path; it
+rebuilds all compiler state. Continual additionally requires the previous bundle identifier, state digest, and an incoming patch.
+A missing, corrupt, or source-mismatched state never causes an unsafe partial update: the driver applies the patch verbatim
+and switches to one-shot compression of that current authored state.
+An incoming patch identifies added, modified, moved, and deleted paths. Before optimization, the tool creates a raw patched
+snapshot and validates patch preconditions and expected hashes. The invalidation closure contains changed nodes, their reference
+ancestors, newly or formerly referenced descendants, shared modules whose support sets changed, capsules whose guard spans
+changed, and environment witnesses whose digest changed. Extraction and candidate generation rerun only on this closure. Global
+reference, coverage, and hash checks still scan the full candidate, while unchanged file contracts are reused by source digest.
+Each patch unit is classified as Absorb, Refine, Extend, or Refactor. The first three update semantic content. Refactor may
+also change placement when a support set, guard, or path weight crosses the sharing or capsule threshold. The driver estimates
+recoverable saving from stale candidates and invokes one-shot repacking when any configured trigger is reached: 𝜃repack saving, 𝜌
+growth, 𝛿𝑊workload drift, environment-digest change, or 𝐾patches. Trigger values and causes are logged in the state transition.
+Deletion is especially conservative. A shared module is deleted only after all inbound dispatchers are removed and the
+recomputed coverage graph shows no remaining source unit depends on it. If compression of a valid raw patch fails, the raw
+patched snapshot is atomically published and a clean state is rebuilt from it. Thus a patch can reduce compression temporarily
+but cannot disappear because the optimizer rejected its rewrite.
+24
+
+
+===== page 25 =====
+Appendix B
+Schemas and Model Contracts
+This appendix records the structured interfaces used by the extractor and rewriter. Prompts are templates; implementations
+should pin the system message, model snapshot, JSON validator, and retry policy.
+A. Resource-Graph Record
+{
+"bundle_digest": "sha256:...",
+"entry": "SKILL.md",
+"nodes": [{
+"id": "n17",
+"path": "references/csv.md",
+"sha256": "...",
+"media_type": "text/markdown",
+"kind": "reference",
+"locked": false,
+"token_count": 412
+}],
+"edges": [{
+"source": "n1", "target": "n17",
+"source_span": [88, 126],
+"syntax": "markdown_link",
+"guard": {"text": "when exporting CSV", "status": "explicit"}
+}],
+"external_edges": [],
+"unresolved": []
+}
+Line/byte offsets are measured against immutable source bytes. A graph containing an unresolved local reference cannot
+enter strict compression.
+B. Typed Contract Record
+{
+"resource_id": "n17",
+"units": [{
+"unit_id": "n17:u4",
+"type": "output_obligation",
+"key": "csv.encoding",
+"payload": {"value": "UTF-8", "strength": "must"},
+"scope": {"resource": "n17", "guard": "export CSV"},
+"source_spans": [[241, 274]],
+"confidence": "high",
+"locked": false
+}],
+"relations": [{
+"kind": "before",
+"source_unit": "n17:u2",
+"target_unit": "n17:u4",
+"source_spans": [[178, 274]]
+}]
+}
+Allowed unit types are interface, workflow, tool, rule, prohibition, output_obligation, evidence,
+and locked_residual. The validator rejects unknown types and units without source spans.
+C. Environment Contract and Witness
+{
+"environment_digest": "sha256:...",
+"guarantees": [{
+"type": "output_obligation",
+"key": "csv.encoding",
+"value": "UTF-8",
+"scope": "all_spreadsheet_exports",
+"enforced_by": "serializer/v3",
+"evidence_digest": "sha256:..."
+}]
+}
+A removal witness stores the source unit, guarantee index, exact comparison result, and environment digest. Natural-language
+descriptions of the host are not accepted as contracts.
+25
+
+
+===== page 26 =====
+D. Extraction Prompt Contract
+Contract extraction
+You are extracting an auditable behavioral contract from ONE resource in an agent-skill bundle.
+Inputs: canonical resource path; ancestor headings; explicit loading guard; immutable source text with
+byte offsets; resource-graph neighbors.
+Return JSON matching the supplied schema. Extract every applicability condition, ordered workflow
+step, tool/resource requirement, normative rule, prohibition, output obligation, verification/evidence
+requirement, and ambiguous residual. Attach exact source spans. Preserve polarity, strength, and guard.
+Mark uncertain or non-decomposable text as locked_residual.
+Do not rewrite the resource. Do not infer requirements from world knowledge. Do not treat an example as
+normative unless the source explicitly does. Do not invent references or guards. Output JSON only.
+E. Candidate Rewrite Prompt Contract
+File rewrite
+Rewrite the supplied Markdown resource using ONLY the selected representation plan and mapped source
+units.
+Hard requirements: (1) preserve every selected typed unit at the specified scope and normative
+strength; (2) preserve every locked residual verbatim; (3) emit each provided relative path exactly;
+(4) for a capsule/shared module, keep the supplied explicit guard and mandatory read instruction; (5)
+do not add tools, claims, examples, branches, or host assumptions; (6) return one Markdown file with no
+commentary.
+If the plan is inconsistent or omits a mapped unit, return PLAN_REJECTED with the unit IDs.
+The implementation does not rely on the rewriter to calculate coverage. It re-extracts and audits the emitted text.
+F. Audit Prompt Contract
+Most audit checks are deterministic. A model is used only for semantic coverage pairs not discharged by exact normalization.
+Semantic coverage adjudication
+Given one source unit and one candidate unit, decide whether the candidate entails the full source
+requirement under the same or narrower compatible scope.
+Return: COVERED, NOT_COVERED, or UNCERTAIN; a type match; a polarity/strength match; a scope match; and
+the minimal text spans supporting the decision.
+Rules: examples do not cover obligations; recommendations do not cover MUST; broader applicability
+cannot be assumed from a narrower branch; external knowledge and model plausibility are forbidden.
+UNCERTAIN is treated as NOT_COVERED by strict mode. Output JSON only.
+G. Transformation Manifest
+{
+"format_version": "skillzip-pro/1",
+"phase": "A",
+"source_digest": "sha256:...",
+"output_digest": "sha256:...",
+"models": {"extractor": "...", "rewriter": "...", "auditor": "..."},
+"graph": {"nodes": 0, "edges": 0, "unresolved": 0},
+"transformations": [
+{"kind": "host_entailment", "units": [], "witness": "..."},
+{"kind": "scoped_share", "units": [], "scope": [], "path": "..."},
+{"kind": "capsule", "units": [], "guard": "...", "path": "..."},
+{"kind": "file_cover", "resource": "...", "units": []}
+],
+"cost_ledger": {},
+"audit": {"passed": true, "checks": [], "fallback": false}
+}
+The manifest is not required at agent runtime. It exists for provenance, regression testing, and exact reconstruction of
+experimental measurements.
+Appendix C
+Detailed Experimental Protocols
+A. Pre-registration Sequence
+The evaluation follows a fixed order to prevent test leakage:
+1) freeze benchmark versions, evolution/validation/test IDs, and task-template groups;
+26
+
+
+===== page 27 =====
+2) construct native and structured-growth source bundles using only evolution tasks;
+3) freeze the bundle builder, path annotations, environment contracts, and source digests;
+4) tune only declared thresholds on validation tasks;
+5) freeze compressor code, prompts, model snapshots, tokenizers, and non-inferiority margin;
+6) run every compressor on the same source digests;
+7) audit outputs before any held-out execution;
+8) execute all valid or fallback outputs on paired held-out tasks;
+9) generate tables directly from immutable raw records.
+Any post-freeze repair creates a new experiment revision and reruns all affected baselines.
+B. Bundle Construction Checks
+The structured-growth builder moves contiguous source spans into references or subskills and replaces them with explicit
+guarded links. Before compression, three checks establish that this transformation is not itself responsible for performance
+changes: (i) concatenating files in provenance order recovers all normative source spans; (ii) every moved span has exactly one
+reachable dispatcher; and (iii) the evolved flat skill and the structured bundle are compared on validation tasks under the same
+executor. A task-score difference above one percentage point triggers manual review and rebuilding.
+Each benchmark includes at least four branch types: a common path, a rare format/tool path, a verification path, and a
+recovery path. Path-frequency scenarios include observed validation traces, uniform leaf paths, and a skewed stress distribution
+with 80% mass on the common path. This separates gains from bundle structure from gains tied to one traffic assumption.
+C. Gold Resource Sets
+For each held-out task, annotators identify the minimal set of source resources required to satisfy the explicit task and
+benchmark rubric. They may inspect the task, source bundle, tool schema, and official expected behavior, but not any compressed
+output. A second annotator independently labels a stratified 20% sample covering all branches. Disagreements are adjudicated
+before execution; Cohen’s 𝜅and raw agreement are reported.
+A resource is required if omitting it removes a unique normative unit needed by the task. Redundant references are marked
+acceptable alternatives rather than jointly required. Scripts invoked by a required workflow count as required even if their
+source code is not injected into the model context.
+D. Run Matrix
+The full factorial matrix is summarized in Table XXIV. Budget-matched and native-cost comparisons are separate run
+groups. The no-skill condition is executed but not compressed.
+TABLE XXIV
+Minimum run matrix before stochastic seeds.
+Dimension
+Levels
+Benchmarks
+3
+Bundle tracks
+2
+Compression methods
+7
+Compressor models
+3
+Executor models
+3
+Traffic scenarios (cost only)
+3
+Primary seeds
+3 if stochastic
+For the main table, compressor model and traffic estimator are fixed in advance, reducing the execution grid to all methods,
+benchmarks, tracks, executors, tasks, and seeds. The full compressor–executor cross product is used only for RQ4.
+E. Harness Instrumentation
+Instrumentation records timestamp, task ID, selected skill, read path, read result, byte count, model-token count, caller action,
+and current branch label. It does not expose gold paths to the agent. Catalog and root injection are recorded as synthetic events
+emitted by the existing harness; auxiliary loads are recorded at the ordinary file-reading boundary.
+Two validation tests are mandatory. The visibility test verifies that the agent cannot read the trace buffer. The equivalence
+test replays a fixed set of actions with instrumentation on and off and compares all task-visible observations byte-for-byte.
+Hashes of the harness executable and configuration accompany each trace.
+27
+
+
+===== page 28 =====
+F. Task Execution and Failure Policy
+A compression-time exception, audit rejection, or timeout produces the original bundle as the executable fallback. Its task
+score and uncompressed costs remain in the method’s aggregate; excluding failed cases would reward unsafe aggressiveness.
+An execution-time missing file, invalid path, or unavailable generated module counts as both task failure (when it prevents
+completion) and a loading error.
+Task timeouts and transient provider failures are distinguished. A provider failure is retried under the same seed up to the
+predeclared limit; a reproducible model or agent failure is not retried. Every exclusion is listed by task ID and reason.
+G. Metric Computation
+Catalog and activation cost are deterministic functions of published files. Deployment cost includes all files distributed to the
+agent except the audit manifest when the production package explicitly excludes it; both inclusive and runtime-package counts are
+recorded. Path cost is calculated from actual load events, including duplicate loads. Mean and P95 are paired over identical tasks.
+For a task 𝑡, required-file recall is defined as one when 𝑅𝑡is empty. Irrelevant-load rate is zero when 𝐿𝑡is empty. Generated
+shared modules inherit the union of source-unit annotations they cover, allowing them to count as a valid substitute for original
+resources. A capsule is relevant only when its guard is active for the task.
+Quality macro-averages first within benchmark categories, then across the three benchmarks, preventing a large benchmark
+from dominating. Compression ratios are computed from summed token costs before averaging; we additionally report median
+per-bundle reduction to reveal size effects.
+H. Confidence Intervals and Tests
+The task is the resampling unit. Paired bootstrap samples preserve all method outcomes, path costs, and seeds for a task.
+The primary comparison is SkillZip Pro versus Evolved Bundle for quality and versus Root-only SkillZip for mean-path
+reduction. Secondary comparisons cover other baselines and cost layers.
+We declare quality non-inferiority when the lower bound of the paired 95% interval exceeds −0.01. Only after non-inferiority
+is established do we test compression superiority. McNemar’s test operates on paired binary outcomes; multi-level official
+scores use paired bootstrap or permutation tests. Holm correction is performed separately within RQ2–RQ7.
+I. Table Population Contract
+Every cell in Section VI is emitted by the table script from a row-oriented result file; nothing is transcribed by hand.
+The pipeline writes one JSONL record per (benchmark, track, method) with the following shape, and the script renders
+each table body from those records:
+{
+"benchmark": "...", "track": "native|structured",
+"method": "pro|root_only|flat_concat|skillreducer|expert|...",
+"cost": {"catalog_tokens": 0, "activation_tokens": 0,
+"deployment_text_tokens": 0, "path_mean_tokens": 0.0,
+"path_max_tokens": 0, "path_count": 0},
+"J": 0.0,
+"reductions": {"catalog": 0.0, "activation": 0.0,
+"deployment": 0.0, "mean_path": 0.0,
+"max_path": 0.0, "J": 0.0},
+"loading": {"orphaned_modules": 0, "ref_errors": 0,
+"dangling": 0, "unsafe": 0, "reachable_files": 0},
+"routing": {"pairs_before": 0, "pairs_exact_kept": 0,
+"routing_fidelity": 0.0},
+"efficiency": {"time_s": 0.0, "compress_calls": 0,
+"rollouts": 0, "peak_gb": 0.0},
+"report": {"selected_verbatim": false, "audit_ok": true,
+"promotions_count": 0, "capsules_count": 0,
+"env_drops_count": 0}
+}
+Quality and behavioral-loading records are stored separately, keyed by the same (benchmark, track, method) triple plus an
+executor field, and carry accuracy, required_recall, irrelevant_load, dispatch, and the per-task read traces.
+Continual records add the per-patch trajectory with 𝐽(𝐵one
+𝑡
+), 𝐽(𝐵cont
+𝑡
+), the regret of Eq. (14), and an explicit repack flag.
+The generated artifacts are: costs.jsonl (method costs and loading structure), ablations.jsonl, quality.jsonl,
+transfer.jsonl, continual.jsonl, lambda_sweep.jsonl, and repack_sensitivity.jsonl. A failed
+compression remains in the denominator and is represented by the cost of its verbatim fallback, which the record marks
+with selected_verbatim.
+28
+
+
+===== page 29 =====
+J. Zip-on-Write Replay
+Each evolution patch is a transaction with timestamp, added/modified/moved/deleted paths, inserted source spans, and expected
+source digest. All schedules see patches in identical order and operate on the same verbatim authored checkpoint: append-only,
+Pro One-Shot after every patch, root-only SkillZip Zip-on-Write, Pro Continual without repacking, and Pro Continual with
+the combined repack policy. We checkpoint after every patch and measure changed contract units, invalidation-closure size,
+reused-contract fraction, rewritten bytes, model calls, update latency, four costs, objective regret, audit outcome, fallback type,
+and validation quality. Held-out test quality is measured only at predeclared checkpoints to avoid adaptive tuning to the test set.
+The growth plot uses patch index on the horizontal axis and reports absolute tokens, not only normalized reduction. Additional
+panels report objective regret, cumulative compression cost, and closure fraction so that frequent small updates are not favored by
+hiding total overhead. Repack events and their trigger causes are overlaid. Every rejected compression is checked automatically
+to ensure that the published fallback digest equals the verbatim patched snapshot, not the previous version.
+K. Exact Setup of the Reported Runs
+This subsection records, in full, the configuration behind every number in Section VI, so that a reader can reproduce
+it without reading the code.
+Bundle tracks. Three tracks are used. (i) Plain: the evolved class skills assembled into a root with a routing list, one
+reference per class, one class as a nested subskill, and one locked helper script. (ii) Grown: the same skills with evolution
+patches replayed into named branches, which re-append the output rules, the verification checklist and the accumulated pitfall
+list into every branch, plus one file of long guarded edge cases. A deterministic builder records the source span and patch
+identifier of every moved section and never rewords text. (iii) Real evolved libraries: three self-evolution runs stored with
+the project, each keeping all of its rounds as separate files, giving 17 files, 15 rounds, roughly 20,000 tokens, and 79–84%
+repeated text. Main cost tables use the grown track; Sections VI-M–VI-O use the real libraries.
+Held-out task counts. Math 33, BFCL 21, SpreadsheetBench 48, giving 102 tasks pooled. The same tasks are used for
+every method within a benchmark, which is what makes the paired test valid. SpreadsheetBench is sampled at twice the density
+of the other two because its verdict is the strictest (a task passes only if every one of its test cases reproduces the gold range),
+so single-task flips dominate at small 𝑛; at 𝑛= 24 the ordering between the compressed and uncompressed bundles turned
+on one task, and doubling the sample removed that artefact without changing any method’s configuration. BFCL runs with
+its offline search tool enabled; without the tool the skill provides no measurable benefit on that benchmark (no skill and the
+uncompressed library score identically), so that configuration cannot separate compression methods and is not used.
+Compressor configuration. Structural extraction and structural audit (no model calls), capsule minimum 40 tokens, shortest
+repeated statement worth factoring 8 tokens, storage weight 𝜆= 0.05, navigation locked, literal blocks locked, and pre-
+existing source reference defects tolerated but never introduced. Every method receives the identical source bundle and the
+identical environment contract.
+Environment contract. Guarantees are only those the benchmark harness itself puts in front of the agent on every task,
+quoted from the harness: for math, “Solve the PROBLEM and end with the final result on its own line as \boxed{...}”;
+for BFCL, “Decompose it into ordered hops and resolve each one” and “end with a line EXACTLY in the form ‘ANSWER:
+<short answer>’ ”; for SpreadsheetBench, “Read the workbook at path IN and write the modified workbook to path OUT”,
+“Respond with ONE run_python block ... the variables IN and OUT are predefined”, and “write general logic (do not
+hard-code values you can compute)”. A statement the harness does not supply is never listed as a guarantee, because removing
+it would take away a rule the agent still needs.
+Knowledge kept. A content unit is one behaviour-bearing line of the source (a bullet or sentence of at least a few words,
+excluding headings and fenced code). A unit counts as kept if its wording still appears, verbatim or lightly reworded, in a file
+the agent can reach by following links from the root; matching accepts either high local edit similarity or high local coverage
+of the unit’s content words inside one window, so moving a qualifier is not scored as a loss while scattering words across
+unrelated files is. Units removed under the environment contract are reported separately as witnessed removals.
+Continual replay. Rounds are appended one at a time in evolution order. All five schedules start from the identical state and
+see the identical rounds. Repacking runs every fourth round after compression is switched on. Drift is the relative difference
+in objective against rebuilding the whole library at that same round. Model calls are counted as one per changed textual
+node for a local update and one per textual node for a rebuild.
+Start-time ablation. Compression is switched on at round 𝑘∈{1, 4, 7, 10, 13}, and for comparison never. Everything else
+is held fixed. The reported total is the sum, over rounds, of the per-run cost of the library published at that round, which
+is what an agent actually pays while the library evolves.
+L. Compounding Analysis (Section VI-P)
+The three findings behind the compounding effect are computed from the same full-resolution real evolved libraries used for
+the continual study, with no new model calls. For each round 𝑘we build the prefix holding the first 𝑘rounds, measure its raw
+29
+
+
+===== page 30 =====
+shipped size 𝑈(𝑘), compress it one-shot with SkillZip Pro to size 𝐶(𝑘), and record both. The compression ratio at round 𝑘is
+1 −𝐶(𝑘)/𝑈(𝑘) (Figure 9a). The repeated share of round 𝑘is 1 − 𝐶(𝑘) −𝐶(𝑘−1)/ 𝑈(𝑘) −𝑈(𝑘−1): the numerator is the
+genuinely new text the compressor kept, the denominator is all text the round added, so their complement is the fraction of the
+round that was already present (Figure 9b). Reuse concentration counts, for each shared module SkillZip Pro created, how
+many strategy files link to it, sorted descending (Figure 9c). We report the two libraries whose one-shot compression cleared the
+never-inflate check at every prefix; the third is excluded because at some prefixes its candidate did not beat the source and was
+republished verbatim, which would report a 0% ratio that reflects the safety guard rather than the redundancy structure under
+study. All numbers are averaged across the included libraries and are monotone in the same direction for each one individually.
+Appendix D
+Additional Analysis
+A. Why a Deployment-Only Objective Is Insufficient
+Consider a bundle with a 200-token root, two rare references of 800 tokens each, and an exact 300-token fragment shared by
+those references. Each rare branch is used by 5% of tasks. Global factoring into the root reduces deployment by nearly 300
+tokens (minus references), yet increases expected runtime exposure by approximately 0.9 × 300 = 270 tokens per task. Factoring
+into a shared on-demand module retains the deployment saving while charging the module only to the 10% affected paths.
+This example illustrates why deduplication scope is part of the representation, not an implementation detail.
+The same reasoning applies to capsules. Moving a 600-token export guide behind a 20-token dispatcher at 10% frequency saves
+roughly 600−(20+60) = 520 expected path tokens before deployment weighting. At 95% frequency, the saving falls to 10 tokens
+and may disappear after reference overhead. The path distribution changes the best layout even when the underlying prose does not.
+B. Sensitivity to Unknown Traffic
+When traces are unavailable, uniform leaf-path weights can overvalue rare branches in a deep tree or undervalue a broad
+common branch. SkillZip Pro therefore exposes three policies: uniform-leaf, guard-prior, and minimax. The
+minimax policy accepts a transformation only when it improves 𝐽for every distribution in a declared uncertainty set. It is
+more conservative but avoids large regressions under traffic shift.
+We recommend reporting both the optimization distribution and counterfactual distributions. A transformation that wins
+only under a narrow prior should be labeled workload-specific. Host-entailment witnesses are independent of traffic, while
+capsule and sharing placement are not.
+C. Faithfulness Is Structural, Not Universal Semantics
+Typed coverage protects explicit instructions and their scope, but natural language can carry implicature, tone, and redundancy
+that help a particular model. Removing redundant emphasis may affect behavior even if normative content is retained. This
+is why the empirical protocol measures non-inferiority across executor families and why a strict structural audit does not
+replace held-out evaluation in scientific validation. “Evaluation-free” describes the compression algorithm, not the evidence
+standard for publishing its effectiveness.
+The audit can also share errors with extraction. Independent prompts, source-span provenance, deterministic type checks,
+and verbatim locking reduce correlated failure but cannot eliminate it. High-stakes skills should use human review or stronger
+formal specifications for critical obligations.
+30

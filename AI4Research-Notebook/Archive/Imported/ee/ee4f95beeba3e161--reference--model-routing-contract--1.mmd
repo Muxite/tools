@@ -1,0 +1,9 @@
+flowchart TD
+    Binder[Protected binder: one admitted pinned Capsule] --> Export[SelectedCapsuleInput and protected model profile]
+    Export --> Select[RouterPort: CodexRouter, or the API router when enabled]
+    Select --> Freeze[Preflight and persist RouteDecision and route record]
+    Freeze --> Runner[Runner: recheck eligibility and prerequisites]
+    Runner --> Bridge[Governed bridge: same Capsule and selected model]
+    Bridge --> Capture[Immutable output and call evidence]
+    Capture --> Checks[Existing deterministic checks and independent verifier]
+    Checks --> Gate[Protected durable acceptance or halt]
