@@ -82,7 +82,7 @@ class Applications:
     @staticmethod
     def docker(*arguments):
         try:
-            return subprocess.run(['docker', *arguments], capture_output=True, text=True, timeout=30)
+            return subprocess.run(['docker', *arguments], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
         except (OSError, subprocess.TimeoutExpired) as error:
             return subprocess.CompletedProcess(['docker', *arguments], 1, '', str(error))
 

@@ -278,7 +278,7 @@ def snapshot(root):
     rows = tree_files(root)
     git = {}
     for key, arguments in [('head', ['rev-parse', 'HEAD']), ('index_path', ['rev-parse', '--git-path', 'index'])]:
-        proc = subprocess.run(['git', '-C', str(root), *arguments], capture_output=True, text=True)
+        proc = subprocess.run(['git', '-C', str(root), *arguments], stdin=subprocess.DEVNULL, capture_output=True, text=True)
         if proc.returncode == 0:
             git[key] = proc.stdout.strip()
     if 'index_path' in git:
@@ -710,7 +710,7 @@ class Host:
                     for pname, value in staged.items():
                         if port(cap['takes'][pname], decl['defs'])['kind'] == 'artifact':
                             value['path'] = '/cc/in/' + pname
-                    command = ['docker', 'run', '--rm', '--name', 'cc-' + receipt['call'], '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
+                    command = ['docker', 'run', '--rm', '--pull=never', '--name', 'cc-' + receipt['call'], '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
                                '--tmpfs', '/tmp', '--mount', f'type=bind,src={bundle},dst=/cc/bundle,readonly',
                                '--mount', f'type=bind,src={indir},dst=/cc/in,readonly', '--mount', f'type=bind,src={outdir},dst=/cc/out',
                                '-e', 'CC_OUTPUT_DIR=/cc/out', '-e', 'PYTHONDONTWRITEBYTECODE=1']
@@ -731,7 +731,7 @@ class Host:
                 except subprocess.TimeoutExpired as e:
                     (attempt / 'stderr.log').write_bytes(e.stderr or b'')
                     if binding['kind'] == 'image':
-                        stopped = subprocess.run(['docker', 'rm', '-f', 'cc-' + receipt['call']], capture_output=True, timeout=20)
+                        stopped = subprocess.run(['docker', 'rm', '-f', 'cc-' + receipt['call']], stdin=subprocess.DEVNULL, capture_output=True, timeout=20)
                         require(stopped.returncode == 0, 'EXECUTION_UNKNOWN', 'Container stop could not be confirmed')
                     # Native grandchildren may survive direct-process termination.
                     raise CCError('EXECUTION_UNKNOWN' if binding['kind'] == 'native' else 'DEADLINE', 'Deadline reached; no automatic replay') from e
