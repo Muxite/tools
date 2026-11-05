@@ -296,3 +296,7 @@ request, the simpler Docker/image workflow and remaining executor constraints.
 ## November 5 - domain ontology in requests
 
 [[Sources/Prompts/2026-11-05-cc-ontology.txt|Ontology construction purpose]] clarifies that request CCs can carry domain abstractions for implementers. [[Designs/CC Protocols/FORMAT#Domain ontology as a construction requirement|Construction semantics]] separates fixed requirements, open implementation choices and optional verification. Inference engines are an example of the general protocol.
+
+## November 5 - technical ontology clarification
+
+[[Sources/Prompts/2026-11-05-cc-technical-ontology.txt|Technical ontology correction]] supersedes the earlier interface-focused interpretation. [[Designs/CC Protocols/FORMAT#Domain ontology as a construction requirement|Request construction material]] describes the technique applied to model layers and weights, memory representation/execution, assumptions and tradeoffs. Intended reductions, implemented design and observed measurements remain separate.
