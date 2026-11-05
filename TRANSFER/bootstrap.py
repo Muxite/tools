@@ -9,7 +9,7 @@ import venv
 
 ROOT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
-REFERENCE = ROOT / 'AI4Research-Notebook/Designs/CC and Strata delivery/CC Protocols/reference'
+REFERENCE = ROOT / 'AI4Research-Notebook/Designs/CC Protocols/reference'
 
 
 def python_path(directory):

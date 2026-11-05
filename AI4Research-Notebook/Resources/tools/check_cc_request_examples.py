@@ -1,6 +1,6 @@
 from pathlib import Path
 import json,sys
-ROOT=Path(__file__).resolve().parents[2]/'Designs/CC and Strata delivery/CC Protocols'
+ROOT=Path(__file__).resolve().parents[2]/'Designs/CC Protocols'
 sys.path.insert(0,str(ROOT/'reference'))
 from ccv2 import resolve_request
 from schema_tools import validate

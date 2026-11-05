@@ -257,17 +257,17 @@ request, the simpler Docker/image workflow and remaining executor constraints.
 
 [[Sources/Prompts/2026-11-03-one-cc-implementation.txt|Approved one-CC plan]]. [[Designs/CC and Strata delivery/CC and Software Factory/README|CC and Software Factory]] and [[Designs/CC and Strata delivery/Strata Research Lab/README|Strata Research Lab]] now own the single-CC proposal. Factory briefs, products and evaluations are companion records. The November 2 image template and November 3 interchange forms remain historical design inputs.
 
-[[Sources/Prompts/2026-11-03-cc-protocols.txt|CC protocols and provenance request]] directs the proposed unified declaration and invocation standard in [[Designs/CC and Strata delivery/CC Protocols/README]].
+[[Sources/Prompts/2026-11-03-cc-protocols.txt|CC protocols and provenance request]] directs the proposed unified declaration and invocation standard in [[Designs/CC Protocols/README]].
 
-[[Sources/Prompts/2026-11-04-cc-protocol-structure.txt|November 4 protocol structure request]] specifies Mermaid diagrams and concise, structured semantics for [[Designs/CC and Strata delivery/CC Protocols/README]].
+[[Sources/Prompts/2026-11-04-cc-protocol-structure.txt|November 4 protocol structure request]] specifies Mermaid diagrams and concise, structured semantics for [[Designs/CC Protocols/README]].
 
-[[Sources/Prompts/2026-11-04-cc-quality-bindings.txt|November 4 CC interoperability and quality request]] is reflected in [[Designs/CC and Strata delivery/CC Protocols/README]].
+[[Sources/Prompts/2026-11-04-cc-quality-bindings.txt|November 4 CC interoperability and quality request]] is reflected in [[Designs/CC Protocols/README]].
 
-[[Sources/Prompts/2026-11-04-cc-upstream-integration.txt|November 4 official upstream integration and request forms]] is interpreted in [[Designs/CC and Strata delivery/CC Protocols/IMPLEMENTATION]], [[Designs/CC and Strata delivery/CC Protocols/FORMAT]] and [[Designs/CC and Strata delivery/CC Protocols/EXAMPLES]]. These remain proposals, not deployed upstream capabilities.
+[[Sources/Prompts/2026-11-04-cc-upstream-integration.txt|November 4 official upstream integration and request forms]] is interpreted in [[Designs/CC Protocols/IMPLEMENTATION]], [[Designs/CC Protocols/FORMAT]] and [[Designs/CC Protocols/EXAMPLES]]. These remain proposals, not deployed upstream capabilities.
 
 ## November 4 - CC v2 implementation
 
-[[Sources/Prompts/2026-11-04-cc-v2-1.txt|Approved implementation plan]] and [[Sources/Prompts/2026-11-04-cc-v2-2.txt|Upstream clone and iteration authorization]] direct [[Designs/CC and Strata delivery/CC Protocols/README|CC Protocol v2]]. [[Sources/Prompts/2026-11-04-cc-v2-3.txt|Native execution and simplicity direction]] and [[Sources/Prompts/2026-11-04-cc-v2-4.txt|Coding subagent direction]] explain the intended use. The v2 result is a tested feasibility host and bounded upstream integration; production isolation, distributed lifecycle and GPU measurement remain unqualified.
+[[Sources/Prompts/2026-11-04-cc-v2-1.txt|Approved implementation plan]] and [[Sources/Prompts/2026-11-04-cc-v2-2.txt|Upstream clone and iteration authorization]] direct [[Designs/CC Protocols/README|CC Protocol v2]]. [[Sources/Prompts/2026-11-04-cc-v2-3.txt|Native execution and simplicity direction]] and [[Sources/Prompts/2026-11-04-cc-v2-4.txt|Coding subagent direction]] explain the intended use. The v2 result is a tested feasibility host and bounded upstream integration; production isolation, distributed lifecycle and GPU measurement remain unqualified.
 
 ## November 4 - repository transfer
 
@@ -275,16 +275,24 @@ request, the simpler Docker/image workflow and remaining executor constraints.
 
 ## November 4 - CC v2 ease-of-use revision
 
-[[Sources/Prompts/2026-11-04-cc-ease-of-use-plan.txt|Approved ease-of-use plan]] makes semantic verification opt-in, advisory failures nonblocking, session authority reusable and folder-based calls automatic. [[Designs/CC and Strata delivery/CC Protocols/README|Current CC v2]] implements it. M1 scheduler adoption remains a separate task. Original transfer checkpoint 41c709f and historical evidence remain preserved in the published Muxite/tools handoff.
+[[Sources/Prompts/2026-11-04-cc-ease-of-use-plan.txt|Approved ease-of-use plan]] makes semantic verification opt-in, advisory failures nonblocking, session authority reusable and folder-based calls automatic. [[Designs/CC Protocols/README|Current CC v2]] implements it. M1 scheduler adoption remains a separate task. Original transfer checkpoint 41c709f and historical evidence remain preserved in the published Muxite/tools handoff.
 
 ## November 4 - product capsules and runner
 
-[[Sources/Prompts/2026-11-04-cc-products-and-runner.txt|Product/source/image and complexity request]] and [[Sources/Prompts/2026-11-04-cc-products-answer.json|Explicit package-model answer]] amend v2 to allow optional capabilities and applications in one package. [[Designs/CC and Strata delivery/CC Protocols/USAGE|Runner and mistakes]] owns the new support boundary. Raw products may still contain zero embedded CCs; the optional CC wrapper adds common delivery/lifecycle. Native product demonstration is synthetic; GPU and image execution remain separate qualification.
+[[Sources/Prompts/2026-11-04-cc-products-and-runner.txt|Product/source/image and complexity request]] and [[Sources/Prompts/2026-11-04-cc-products-answer.json|Explicit package-model answer]] amend v2 to allow optional capabilities and applications in one package. [[Designs/CC Protocols/USAGE|Runner and mistakes]] owns the new support boundary. Raw products may still contain zero embedded CCs; the optional CC wrapper adds common delivery/lifecycle. Native product demonstration is synthetic; GPU and image execution remain separate qualification.
 
 ## November 4 - unified capabilities and Incus Lab
 
-[[Sources/Prompts/2026-11-04-cc-incus-and-flexible-capabilities.txt|Incus composition, optional telemetry and passive skills]] supersedes the preceding separate-applications vocabulary. The canonical model has capabilities, optional `serves` lifecycle and passive `materials`; native/image packaging is independent. [[Designs/CC and Strata delivery/CC Protocols/IMPLEMENTATION|Lab and optional telemetry]] records standards inspiration, Incus qualification plan and ownership-scoped optional cleanup. Incus and real inference/benchmark execution remain unexecuted; current code demonstrates native serving and passive materials.
+[[Sources/Prompts/2026-11-04-cc-incus-and-flexible-capabilities.txt|Incus composition, optional telemetry and passive skills]] supersedes the preceding separate-applications vocabulary. The canonical model has capabilities, optional `serves` lifecycle and passive `materials`; native/image packaging is independent. [[Designs/CC Protocols/IMPLEMENTATION|Lab and optional telemetry]] records standards inspiration, Incus qualification plan and ownership-scoped optional cleanup. Incus and real inference/benchmark execution remain unexecuted; current code demonstrates native serving and passive materials.
 
 ## November 4 - focused protocol publication
 
-[[Sources/Prompts/2026-11-04-cc-focused-document-request.txt|Document-set direction]], [[Sources/Prompts/2026-11-04-cc-no-migration.txt|No migration requirement]] and [[Sources/Prompts/2026-11-04-cc-focused-approved-plan.txt|Approved plan]] direct [[Designs/CC and Strata delivery/CC Protocols/README|CC v2 draft]]. FORMAT and USAGE own requirements; IMPLEMENTATION owns strategy and experimental status. Schemas and complete examples are published beside them. Previous numbered drafts are preserved as exact history snapshots.
+[[Sources/Prompts/2026-11-04-cc-focused-document-request.txt|Document-set direction]], [[Sources/Prompts/2026-11-04-cc-no-migration.txt|No migration requirement]] and [[Sources/Prompts/2026-11-04-cc-focused-approved-plan.txt|Approved plan]] direct [[Designs/CC Protocols/README|CC v2 draft]]. FORMAT and USAGE own requirements; IMPLEMENTATION owns strategy and experimental status. Schemas and complete examples are published beside them. Previous numbered drafts are preserved as exact history snapshots.
+
+## November 5 - CC-only location
+
+[[Sources/Prompts/2026-11-05-cc-location.txt|CC naming direction]] moves the current package to [[Designs/CC Protocols/README|Designs/CC Protocols]]. CC is a general protocol; Strata and inference engines are examples, not its scope. Historical evidence retains its original paths and bytes.
+
+## November 5 - domain ontology in requests
+
+[[Sources/Prompts/2026-11-05-cc-ontology.txt|Ontology construction purpose]] clarifies that request CCs can carry domain abstractions for implementers. [[Designs/CC Protocols/FORMAT#Domain ontology as a construction requirement|Construction semantics]] separates fixed requirements, open implementation choices and optional verification. Inference engines are an example of the general protocol.

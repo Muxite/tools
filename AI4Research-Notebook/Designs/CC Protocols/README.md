@@ -66,6 +66,8 @@ The [complete package](examples/trim/cc.yaml) includes the implementation. Suppl
 
 A running instance is execution state, not another package form. A template is a reusable request. [FORMAT](FORMAT.md#request-cc) defines construction; [EXAMPLES](EXAMPLES.md) walks each situation.
 
+**Describe what should be built.** A request CC can carry a domain ontology: the concepts, relationships, interfaces and constraints an implementation must respect. For example, an inference-engine request can describe models, workloads, execution and observation interfaces, then leave implementation choices open. This is one use of CC's general construction contract, alongside tools, agents, services and methodology libraries; it adds no inference-specific core fields.
+
 ## Independent and lightweight
 
 CC requires no Factory, Lab, agent framework, registry, network service or telemetry collector. Local use works offline when its declared software and assets are available. A passive library needs no executable. Native and image bindings are execution choices; finite actions and persistent services are lifetime choices.

@@ -9,7 +9,7 @@ import sys
 import time
 
 REFERENCE = Path(__file__).resolve().parent
-WORKSPACE = Path(__file__).resolve().parents[5]
+WORKSPACE = Path(__file__).resolve().parents[4]
 
 
 def main():

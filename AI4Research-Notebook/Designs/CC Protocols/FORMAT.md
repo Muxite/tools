@@ -146,4 +146,10 @@ Normalization MUST be idempotent and follows these exact steps:
 
 Pointers use JSON Pointer escaping, MUST NOT overlap and MUST name absent fields with existing parents. The implementer supplies exactly the named choices and real files; resolution MUST preserve fixed requirements and validate the completed declaration. Null is not an implementation hole. Changed fixed requirements mean a revised request. A template is a reusable request. Runtime-built and prebuilt packages share this same completed format and usage contract.
 
+### Domain ontology as a construction requirement
+
+A requester MAY include an ontology or abstraction model as a material in `desired.materials`: a bundled document or structured file defining domain concepts, relationships, interfaces and constraints. For an inference engine this can describe models, workloads, execution interfaces and observation points. Its declared capability contracts specify the externally visible behavior to build; `open` identifies implementation decisions still to resolve. The ontology is construction material, not an extra executable declaration form or an inference-specific root field. Runtime model/configuration values remain ordinary capability inputs.
+
+The requester SHOULD identify which ontology statements are fixed requirements and which are explanatory context. The implementer MUST retain fixed requirements during resolution or issue a revised request. Supplying an ontology does not prove the implementation conforms: verification remains separately requested, and a consumer MUST NOT treat material instructions as authority to execute or access resources. A domain-specific mandatory interpretation requires an explicitly supported profile; unknown mandatory semantics MUST fail explicitly rather than be silently ignored.
+
 An index consumer MUST check normalization, agreement with the packaged `cc.yaml`, sorted unique portable paths, exact file membership, sizes and digests. Unindexed implementation bytes MUST NOT execute.
