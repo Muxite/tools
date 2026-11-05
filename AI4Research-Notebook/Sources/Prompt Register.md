@@ -300,3 +300,7 @@ request, the simpler Docker/image workflow and remaining executor constraints.
 ## November 5 - technical ontology clarification
 
 [[Sources/Prompts/2026-11-05-cc-technical-ontology.txt|Technical ontology correction]] supersedes the earlier interface-focused interpretation. [[Designs/CC Protocols/FORMAT#Domain ontology as a construction requirement|Request construction material]] describes the technique applied to model layers and weights, memory representation/execution, assumptions and tradeoffs. Intended reductions, implemented design and observed measurements remain separate.
+
+## November 5 - ontology ownership boundary
+
+[[Sources/Prompts/2026-11-05-cc-ontology-ownership.txt|Ontology ownership correction]] supersedes the preceding ontology definitions and technical guidance. CC states support for the inference engine ontology; its responsible person owns the definition. Current protocol documents remove the attempted definition and examples. Earlier prompts remain historical.

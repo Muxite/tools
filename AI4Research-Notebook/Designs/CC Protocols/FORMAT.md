@@ -146,24 +146,8 @@ Normalization MUST be idempotent and follows these exact steps:
 
 Pointers use JSON Pointer escaping, MUST NOT overlap and MUST name absent fields with existing parents. The implementer supplies exactly the named choices and real files; resolution MUST preserve fixed requirements and validate the completed declaration. Null is not an implementation hole. Changed fixed requirements mean a revised request. A template is a reusable request. Runtime-built and prebuilt packages share this same completed format and usage contract.
 
-### Domain ontology as a construction requirement
+### Externally defined construction material
 
-A requester MAY include an ontology or abstraction model as a material in `desired.materials`: a bundled document or structured file describing the technical method and the system it changes. For an inference engine, this means the technique applied to particular model layers, operations and weights, including how representations, transformations, storage, loading and execution reduce memory. Interfaces and constraints are part of that description, not its whole meaning. Its declared capability contracts specify the externally visible behavior to build; `open` identifies implementation decisions still to resolve. The ontology is construction material, not an extra executable declaration form or an inference-specific root field. Runtime model/configuration values remain ordinary capability inputs.
-
-An inference-technique material SHOULD describe the following where relevant; these are domain guidance, not mandatory fields for every CC:
-
-| Aspect | Description |
-|---|---|
-| Technique | Algorithm or methodology, its mechanism and source/version. |
-| Targets | Model/revision, affected layers, operations and weight groups; excluded parts. |
-| Representation | Weight precision, quantization/compression scheme, scales or other metadata, and intermediate-state layout. |
-| Execution | Transformations, kernels, weight loading/offloading and memory lifecycle. |
-| Requirements | Compatible runtimes/hardware, calibration data, dependencies and assumptions. |
-| Goals and tradeoffs | Intended memory reduction, accuracy/performance constraints and measurement conditions; distinguish targets from observations. |
-| Open choices | Decisions left to the implementer, explicitly identified in the request. |
-
-The producer SHOULD link the completed package to the requested technique material and record the actual implementation, model/weight identities, configuration and deviations in bundled provenance or referenced evidence. Request-time intent, implemented design and measured results remain distinct. Optional assessment can examine their agreement without becoming a prerequisite for ordinary execution.
-
-The requester SHOULD identify which ontology statements are fixed requirements and which are explanatory context. The implementer MUST retain fixed requirements during resolution or issue a revised request. Supplying an ontology does not prove the implementation conforms: verification remains separately requested, and a consumer MUST NOT treat material instructions as authority to execute or access resources. A domain-specific mandatory interpretation requires an explicitly supported profile; unknown mandatory semantics MUST fail explicitly rather than be silently ignored.
+A requester MAY supply domain construction material through `desired.materials`, using the existing material contract. CC supports the inference engine ontology; readers should obtain its definition from the person responsible for that ontology. This specification does not define it or prescribe its fields.
 
 An index consumer MUST check normalization, agreement with the packaged `cc.yaml`, sorted unique portable paths, exact file membership, sizes and digests. Unindexed implementation bytes MUST NOT execute.
