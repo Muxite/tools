@@ -1,0 +1,20 @@
+[Unit]
+Description=Satay shared build and inference job queue
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/siminfeng
+ExecStart=/usr/bin/python3 %h/projects/siminfeng/bin/jobq worker
+Restart=always
+RestartSec=5
+# Runners survive worker restart and are reconciled before new dispatch.
+# Use jobq cancel to cancel a job; stopping this service stops admission only.
+KillMode=process
+TimeoutStopSec=10
+UMask=0077
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
