@@ -41,8 +41,21 @@ def main():
     subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True)
     subprocess.run(['systemctl', '--user', 'enable', '--now', 'satay-jobq.service'], check=True)
     subprocess.run(['systemctl', '--user', 'is-active', 'satay-jobq.service'], check=True)
-    subprocess.run(['loginctl', 'show-user', os.environ.get('USER', 'muk'), '-p', 'Linger'], check=True)
-    print('If Linger=no, boot without login still requires administrator enable-linger.')
+    user = os.environ.get('USER', 'muk')
+    def linger_status():
+        return subprocess.check_output(['loginctl', 'show-user', user, '-p', 'Linger'], text=True).strip()
+    if linger_status() != 'Linger=yes':
+        # Own-user policy can permit this without sudo. Never prompt unattended.
+        result = subprocess.run(['loginctl', '--no-ask-password', 'enable-linger', user],
+                                capture_output=True, text=True)
+        if result.returncode:
+            print('Automatic linger enable failed: ' + result.stderr.strip())
+    status = linger_status()
+    print(status)
+    if status != 'Linger=yes':
+        print('Boot without login still requires administrator enable-linger.')
+    else:
+        print('Boot startup prerequisite configured; an actual reboot is not tested here.')
 
 
 if __name__ == '__main__':

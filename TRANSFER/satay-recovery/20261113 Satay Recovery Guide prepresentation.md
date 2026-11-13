@@ -19,7 +19,7 @@ journalctl --user -u satay-jobq.service -n 40 --no-pager
 
 Stopping the service stops admission, not running commands. Use `jobq cancel JOB_ID` and wait for the recorded terminal state to cancel work. Preview stale containers before removing any. Unknown effects are not permission to rerun.
 
-**Boot prerequisite:** `loginctl show-user muk -p Linger` must say `Linger=yes` for unattended startup without a login. If it says no, an administrator must run `sudo loginctl enable-linger muk`. The user service alone does not establish boot-without-login recovery. Do not reboot the shared machine just to test this during demo preparation.
+**Boot prerequisite:** `loginctl show-user muk -p Linger` must say `Linger=yes` for unattended startup without a login. The installer first attempts `loginctl --no-ask-password enable-linger muk` directly, without sudo or a password prompt. If policy denies that attempt and the status remains no, an administrator must run `sudo loginctl enable-linger muk`. Satay now reports `Linger=yes`. This configures the prerequisite; an actual reboot has not been tested. Do not reboot the shared machine just to test this during demo preparation.
 
 If the service exhausts its restart limit, inspect the journal and resolve the error, then `systemctl --user reset-failed satay-jobq` and `systemctl --user start satay-jobq`. Do not create an unbounded restart loop.
 
@@ -49,5 +49,5 @@ Queue tests use isolated temporary queues, lightweight subprocesses and a fake o
 - Checkpoint fixture suite: 2 passed; hashes and restored fixture contents match; auth-file exclusion and failed-snapshot cleanup checked.
 - One private live snapshot created under `~/backup/factory-checkpoints/`, with both SQLite integrity checks passing. It is not included in Git or the public demo package.
 - While the production queue was idle, the service's main worker was killed once. systemd restarted it automatically (restart count 0 to 1), with no jobs dispatched and no tmux sessions stopped.
-- Current boot limitation: `Linger=no`; no sudo credentials were available, so boot-without-login startup remains unqualified and needs the one administrator command above.
+- The first check reported `Linger=no`. The subsequent own-user command `loginctl --no-ask-password enable-linger muk` succeeded without sudo, and verification reports `Linger=yes`. Boot-without-login startup is configured; an actual reboot remains untested.
 - No model runs, hardware builds, reboot, Danta writes or tag changes were performed for these checks.
