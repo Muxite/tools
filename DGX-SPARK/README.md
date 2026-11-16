@@ -1,5 +1,7 @@
 # DGX Spark software factory: agent context package
 
+**Latest source integration (2026-11-16):** read [Native workflow integration](NATIVE-WORKFLOW-INTEGRATION.md) before resuming implementation. It supersedes the snapshot below for workflow ownership and the active integration branch; historical measurements retain their original scope.
+
 Snapshot date: **2026-11-15, America/Toronto**. Some source documents use November 16 UTC; those original names and timestamps are preserved. This is an engineering handoff, not a new presentation, experiment authorization, or claim that every included source is production-ready.
 
 ## Goals, components, presentations and plans
