@@ -1,0 +1,310 @@
+{
+  "generated_utc": "2026-11-13T23:34:26.340245+00:00",
+  "status": "strata_recovered_and_llamacpp_fallback_verified",
+  "source_branch": "cc-dgx-spark",
+  "diagnosis": "Aggressive automatic GPU expert placement, CPU cache budgeting and oversized prefill buffers on unified RAM; container accounting did not capture most GPU memory. Explicit conservative placement/buffers resolved the observed failure.",
+  "strata": {
+    "attempt_id": "5f4aeac8fba04610ab19913d3831e9a3",
+    "status": "success",
+    "output": "Watering in the morning gives plants time to absorb moisture before the heat of the day causes it to evaporate. It also reduces the risk of fungal diseases,",
+    "generated_tokens": 32,
+    "exit_code": 0,
+    "duration_s": 67.59505414916202,
+    "minimum_sampled_host_available_bytes": 87493566464,
+    "maximum_sampled_cgroup_current_bytes": 76697468928,
+    "config": "/home/user2/software-factory-spark-20261113/sources/cc-dgx-spark/deploy/spark/configs/strata-conservative.json",
+    "image": {
+      "image_id": "sha256:1b6c3196f68f1c26d2aa873bf8cd9917362ffe7554fbb7e5aff2eee1f4864bbc",
+      "architecture": "arm64",
+      "labels": {
+        "campaign.target.profile": "spark-gb10",
+        "factory.owner": "cc-dgx-spark",
+        "factory.source": "ffa80d73133ea5c548aefe57889a16e8085a938f",
+        "factory.target.architecture": "arm64",
+        "factory.target.cuda": "13",
+        "factory.target.sm": "121",
+        "maintainer": "NVIDIA CORPORATION <cudatools@nvidia.com>",
+        "org.opencontainers.image.created": "2026-10-07T04:46:08Z",
+        "org.opencontainers.image.description": "LLM inference in C/C++",
+        "org.opencontainers.image.revision": "f498f864fbc0472004ee1c3616c1188c68eb157f",
+        "org.opencontainers.image.source": "https://github.com/ggml-org/llama.cpp",
+        "org.opencontainers.image.title": "llama.cpp",
+        "org.opencontainers.image.url": "https://github.com/ggml-org/llama.cpp",
+        "org.opencontainers.image.version": "b11459"
+      },
+      "layers": [
+        "sha256:01c818468a75d080ea22eed90a9fa08caeb68931c680c3023b01a0b0427a8641",
+        "sha256:a6259aa424d23c4e5db1e39e9a15735eaa603600920c1474f2954fce5680893f",
+        "sha256:2dc195971afd59315226511925439187e1aad7cac1e0c65ad104282690d0d1c4",
+        "sha256:e9b7a1e2c805195aaa935ded43d4030243f0bb7630a418d1a9717797c371614b",
+        "sha256:ce0ae13b3b07d2692ce3fb76dc24020d775bfa327d7cc19de94aec0497489bbd",
+        "sha256:ddd5ad9424c520444433410191ca0ca1288a3da8a325662e3fc4fe66b1854e91",
+        "sha256:37916f2ec7845711758cd6254e20712f3145a3aad2d9d8af3901382c4cbf1b9b",
+        "sha256:c90abf63ff225c95a9a1057c3d6f931d86dac238f950b65662e50e34f072158a",
+        "sha256:ae9817adee8baad71f2c3419c64001c93564acc35727849461c2c17e82010a55",
+        "sha256:0bd918847131f9f640649a9b0ee5cfdd2b938c261a22a6f4c728a7930d6ae39e",
+        "sha256:54dd08339bcc27d79517960354183b735a6936a012bb632d5351f7c4d156c60f",
+        "sha256:dc5f95e33abedb0341f78afee91b87d95877ce481ca49bac42176ba1ff98de20",
+        "sha256:b3f5ce6f7ca042d921eddc11eeb65e43bf224d7652f41c15ff02391909862373",
+        "sha256:6f86abe5ad6bfa2e8f90b64a842391e788b8cbf9e37c953cece54d3574b80b3c",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:34a47f1b1701ba069dfc2b6d94c6b4d484d76613b1630cb277b356d57d98d8a7",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+      ]
+    },
+    "model_provenance_limit": "Matching model sizes and timestamps do not establish full hash verification."
+  },
+  "fallback": {
+    "backend": "llama.cpp",
+    "model": "GPT-OSS 20B MXFP4",
+    "model_identity": {
+      "bytes": 12109566624,
+      "path": "/home/user2/ai4r-data/inference-v3/models/gptoss20/gpt-oss-20b-MXFP4.gguf",
+      "sha256": "27cd6c432c7672cb812a92f611cf3ba7bbc35928262bb1e1253ff4ee6ae35901"
+    },
+    "qualification_attempt": "015dae68de67465994b61ea9d895f807",
+    "status": "success",
+    "outputs": [
+      "42 [end of text]\n\n\n",
+      "CPU, memory (RAM), and storage (hard drive/SSD). [end of text]\n\n\n",
+      "42 [end of text]\n\n\n"
+    ],
+    "repeated_output_equal": true,
+    "gpu_activity_confirmed": true,
+    "additional_prompts": [
+      {
+        "attempt_id": "11a0aec008444aa3b79707c420a15d76",
+        "prompt": "What is 9 multiplied by 7? Reply with only the number.",
+        "output": "63 [end of text]\n\n\n",
+        "status": "success"
+      },
+      {
+        "attempt_id": "f4e301bee1d248de8af0601dc649bd66",
+        "prompt": "What is 6 multiplied by 8? Reply with only the number.",
+        "output": "48 [end of text]\n\n\n",
+        "status": "success"
+      }
+    ],
+    "image": {
+      "image_id": "sha256:997d4219d7982f493facdfc8f4f1b17a4aecc453bf60215e31d022cda3a791b1",
+      "architecture": "arm64",
+      "labels": {
+        "campaign.target.profile": "spark-gb10",
+        "factory.owner": "cc-dgx-spark",
+        "factory.source": "cf34d311332e362198f0a410c466d1e940287d02",
+        "factory.target.architecture": "arm64",
+        "factory.target.cuda": "13",
+        "factory.target.sm": "121",
+        "maintainer": "NVIDIA CORPORATION <cudatools@nvidia.com>",
+        "org.opencontainers.image.created": "2026-10-07T04:46:08Z",
+        "org.opencontainers.image.description": "LLM inference in C/C++",
+        "org.opencontainers.image.revision": "f498f864fbc0472004ee1c3616c1188c68eb157f",
+        "org.opencontainers.image.source": "https://github.com/ggml-org/llama.cpp",
+        "org.opencontainers.image.title": "llama.cpp",
+        "org.opencontainers.image.url": "https://github.com/ggml-org/llama.cpp",
+        "org.opencontainers.image.version": "b11459"
+      },
+      "layers": [
+        "sha256:01c818468a75d080ea22eed90a9fa08caeb68931c680c3023b01a0b0427a8641",
+        "sha256:a6259aa424d23c4e5db1e39e9a15735eaa603600920c1474f2954fce5680893f",
+        "sha256:2dc195971afd59315226511925439187e1aad7cac1e0c65ad104282690d0d1c4",
+        "sha256:e9b7a1e2c805195aaa935ded43d4030243f0bb7630a418d1a9717797c371614b",
+        "sha256:ce0ae13b3b07d2692ce3fb76dc24020d775bfa327d7cc19de94aec0497489bbd",
+        "sha256:ddd5ad9424c520444433410191ca0ca1288a3da8a325662e3fc4fe66b1854e91",
+        "sha256:37916f2ec7845711758cd6254e20712f3145a3aad2d9d8af3901382c4cbf1b9b",
+        "sha256:c90abf63ff225c95a9a1057c3d6f931d86dac238f950b65662e50e34f072158a",
+        "sha256:ae9817adee8baad71f2c3419c64001c93564acc35727849461c2c17e82010a55",
+        "sha256:0bd918847131f9f640649a9b0ee5cfdd2b938c261a22a6f4c728a7930d6ae39e",
+        "sha256:54dd08339bcc27d79517960354183b735a6936a012bb632d5351f7c4d156c60f",
+        "sha256:dc5f95e33abedb0341f78afee91b87d95877ce481ca49bac42176ba1ff98de20",
+        "sha256:b3f5ce6f7ca042d921eddc11eeb65e43bf224d7652f41c15ff02391909862373",
+        "sha256:6f86abe5ad6bfa2e8f90b64a842391e788b8cbf9e37c953cece54d3574b80b3c",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:4775241725a0ca9ea8318f09c75f729e2b5b10aa4c00da1b734323b486e0da88",
+        "sha256:c58c3eb9e68edafeb013d7690c6bb5f77a8aedbabb55add90b17fe341ed0e5fb",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+      ]
+    },
+    "launcher": "/home/user2/software-factory-spark-20261113/sources/cc-dgx-spark/deploy/spark/run-stable.sh",
+    "limits": {
+      "cpus": 8,
+      "memory_bytes": 25769803776,
+      "swap_extra_bytes": 0,
+      "timeout_per_case_s": 300,
+      "max_tokens_per_case": 32
+    }
+  },
+  "tests": {
+    "passed": 66,
+    "log": "/home/user2/software-factory-spark-20261113/results/recovery-tests-final.log",
+    "earlier_signal_cleanup_failure_corrected": true,
+    "original_port_tests_passed": 104
+  },
+  "dependencies": {
+    "new_packages": [],
+    "global_installs": false,
+    "model_downloads": false,
+    "driver_changes": false
+  },
+  "cleanup": {
+    "all_attempts_terminal": true,
+    "attempts": [
+      {
+        "task_id": "spark-deepseek-port",
+        "attempt_id": "f0bbabf3d74d46c3a2978dd5399016ac",
+        "kind": "build",
+        "state": "succeeded",
+        "cleanup_state": "process_groups_reaped;containers_unverified"
+      },
+      {
+        "task_id": "spark-deepseek-port",
+        "attempt_id": "2ad83c655c134f25814a06729ebb2077",
+        "kind": "smoke",
+        "state": "failed",
+        "cleanup_state": "process_groups_reaped;containers_unverified"
+      },
+      {
+        "task_id": "spark-deepseek-port",
+        "attempt_id": "ba12e051ab9f47a68163e70deef40057",
+        "kind": "smoke",
+        "state": "failed",
+        "cleanup_state": "process_groups_reaped;containers_unverified"
+      },
+      {
+        "task_id": "spark-deepseek-port",
+        "attempt_id": "5f4aeac8fba04610ab19913d3831e9a3",
+        "kind": "smoke",
+        "state": "succeeded",
+        "cleanup_state": "process_groups_reaped;containers_unverified"
+      },
+      {
+        "task_id": "spark-deepseek-port",
+        "attempt_id": "85c48c059ece4d24a78234725954ce54",
+        "kind": "probe",
+        "state": "cancelled",
+        "cleanup_state": "process_groups_reaped;containers_unverified"
+      },
+      {
+        "task_id": "spark-deepseek-port",
+        "attempt_id": "0d8252a7f7034c079821fcbe5f36029d",
+        "kind": "probe",
+        "state": "failed",
+        "cleanup_state": "process_groups_reaped;containers_unverified"
+      },
+      {
+        "task_id": "spark-llamacpp-stable",
+        "attempt_id": "31a29d1af0ed4282bffdde5e63f5a7be",
+        "kind": "build",
+        "state": "succeeded",
+        "cleanup_state": "process_groups_reaped;containers_unverified"
+      },
+      {
+        "task_id": "spark-llamacpp-stable",
+        "attempt_id": "015dae68de67465994b61ea9d895f807",
+        "kind": "qualification",
+        "state": "succeeded",
+        "cleanup_state": "process_groups_reaped;containers_unverified"
+      },
+      {
+        "task_id": "spark-llamacpp-stable",
+        "attempt_id": "221c4666e9a84dab8177159f1488fa18",
+        "kind": "qualification",
+        "state": "failed",
+        "cleanup_state": "process_groups_reaped;containers_unverified"
+      },
+      {
+        "task_id": "spark-llamacpp-stable",
+        "attempt_id": "f4e301bee1d248de8af0601dc649bd66",
+        "kind": "qualification",
+        "state": "succeeded",
+        "cleanup_state": "process_groups_reaped;containers_unverified"
+      },
+      {
+        "task_id": "spark-llamacpp-stable",
+        "attempt_id": "11a0aec008444aa3b79707c420a15d76",
+        "kind": "qualification",
+        "state": "succeeded",
+        "cleanup_state": "process_groups_reaped;containers_unverified"
+      }
+    ],
+    "owned_processes_remaining": [],
+    "bridge_stopped": true,
+    "bridge_lock_released": true,
+    "owned_collectors_removed": [
+      {
+        "container_id": "9fe27686e4c4ec814deade1b848d75a5ec0e619879e2c7d22a79ca06e5c21aa4",
+        "removed": true
+      },
+      {
+        "container_id": "417e56b3fc9c59428b30ba5b38b62c9195399962ee2660248db231b226d59865",
+        "removed": true
+      },
+      {
+        "container_id": "95ac79876015f1038a0823ed6d499a044c26a551007e504ba7410b8015ac714d",
+        "removed": true
+      },
+      {
+        "container_id": "1de7fe6ce85f6278384899cb2a3818b122cac3c0e3e01ee17440b91256d30426",
+        "removed": true
+      },
+      {
+        "container_id": "c2da464eec20e65398439c7fb926676e97c13aefe9f30147e65f75806bb50c7c",
+        "removed": true
+      },
+      {
+        "container_id": "d5db93a53c471d74d11d1215ff3ebfada2ba8c392383f814459c184e794545d2",
+        "removed": true
+      },
+      {
+        "container_id": "585fd09fe7847b68f7c10518b8f345f79cbea44485f5cedd19d867b5083091ba",
+        "removed": true
+      },
+      {
+        "container_id": "f06f228a7b4bed2dd453ea02d2687d0fcf51553a090f8fd6900f61d96a5c1b65",
+        "removed": true
+      },
+      {
+        "container_id": "e3eaf121559b760e2cccf10568c3cc4e35f001d61c8a249177d3e6d7cef08898",
+        "removed": true
+      },
+      {
+        "container_id": "a2e6720ca7845b937fec2a7fd11990e085e3b1dd17b7baba8dc3978ddd95f75a",
+        "removed": true
+      },
+      {
+        "container_id": "7b80c81e969f82d0a598a4344512dcd484a011bd26f4035023c2b92779bcd851",
+        "removed": true
+      },
+      {
+        "container_id": "3cae7ba27381a5f3c559caf580491d70ee4654daa8d96b0a2f6f77c237c4ef99",
+        "removed": true
+      },
+      {
+        "container_id": "ce695b867f017d354f958217808b6b6930c8644628e0115ac6669cb28d4ca071",
+        "removed": true
+      },
+      {
+        "container_id": "b528c18785aa4a80ee63627c5d219ab2c04cd0258a9c7ddaceec09f7d72a4898",
+        "removed": true
+      }
+    ],
+    "unrelated_services_preserved": true,
+    "shared_caches_not_flushed": true,
+    "shared_docker_not_pruned": true
+  },
+  "limitations": [
+    "Bounded functional checks; no long-running load/concurrency certification or general accuracy/performance claim.",
+    "The llama.cpp fallback uses a different model from DeepSeek.",
+    "The 104 GiB Strata container ceiling does not fully bound unified GPU physical memory; the host guard remains necessary.",
+    "DeepSeek model metadata matches, but full weight hashes were not recomputed."
+  ],
+  "artifacts": {
+    "source_manifest": "/home/user2/software-factory-spark-20261113/results/recovery-source-manifest.json",
+    "source_archive": "/home/user2/software-factory-spark-20261113/results/recovery-source-changes.tar.gz"
+  },
+  "incremental_disk": {
+    "known_filesystem_delta_bytes": 11993088,
+    "measurement": "Known owned paths versus port-summary.json plus newly named recovery artifacts, before final evidence ingestion.",
+    "docker_note": "Fallback packaging has exactly the existing llama image layers, adding labels only. Factory rebuilds reuse layers. No global Docker-cache baseline or shared pruning."
+  }
+}

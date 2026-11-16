@@ -1,0 +1,3329 @@
+{
+  "task_id": "spark-broad-throughput-006",
+  "real_jiuwenswarm": true,
+  "model": "gpt-6.1-sol",
+  "initial_experiment_budget": 10,
+  "experiments_reserved": 6,
+  "experiments_dispatched": 6,
+  "cycles": [
+    {
+      "task_id": "spark-broad-throughput-006-loop-1",
+      "attempt_id": "28ab941a34a64cb8abf36db6a57eeecc",
+      "state": "succeeded",
+      "template_id": "engram4-screen",
+      "contract_sha256": "191f8ac46f07d7d673ef9562a6289381de9be2286eadd496874606b489fa168d",
+      "source_identity": {
+        "benchmark.py": "d75caa55fe58f0e7e84263172d7f33f42cf2263411677d88d6bd665c36fdaeb5",
+        "benchmark_analysis.py": "507cbfbc2c0dd265f0e43dab21eca178c869a3b482805f8ffee0756ee50c5fb7",
+        "benchmark_data.py": "0466b42cbfe38b58accb3e1d3ea5bf527b1261f0c75c3321c3b78c8202618eb4",
+        "benchmark_worker.py": "c89108b6ec4764d748bb62b20c32fe0fa9f469aeed521d22ccaf1c8b7b1f194a",
+        "broad_benchmark.py": "e61d2c70aa83a3823605fa8fd2cb655491a0552c380bc9be9b1042104165310b",
+        "lab_lifecycle.py": "6fbbbe76bb48f47800669641e4c1bfedd524204d7d6451e19c9bc9c6330970c9",
+        "lab_recorder.py": "34cafbfe5f20160b8761195f293ab5c33e494d79d7d7b1d735946d6723cc3403"
+      },
+      "quiet": {
+        "attempt_id": "28ab941a34a64cb8abf36db6a57eeecc",
+        "boot_id": "f4b7dbde-596c-4863-a21e-79d1ec3cfa04",
+        "control_container_id": "2c9962da74634197e71b2d8d353fc9241b568ad39ede2bf0009303914287268e",
+        "control_image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+        "control_stopped": true,
+        "recorded_at": 1794699064.0540493
+      },
+      "elapsed_s": 372.0114973783493,
+      "error": null,
+      "report": {
+        "campaign_stage": "screen",
+        "configuration_change": "engram4",
+        "gates": {
+          "baseline_accuracy_valid": true,
+          "candidate_mechanism_engaged": true,
+          "sampled_no_per_question_regression": true
+        },
+        "limitations": [
+          "Eight-question screens are exploratory, not full quality validation.",
+          "First after initialization is not cold storage. Startup/tokenization excluded.",
+          "Single pair screens have no independent confidence interval; all failed/null episodes retained."
+        ],
+        "performance_acceptance_evaluated": false,
+        "promotion_authorized": false,
+        "quality": {
+          "accuracy": {
+            "A": 1.0,
+            "B": 1.0
+          },
+          "all_answers_valid": true,
+          "case_count": 8,
+          "regression_question_ids": []
+        },
+        "raw_token_equal": true,
+        "schema_version": 3,
+        "scope": "sampled_public_quality_plus_fixed_native_throughput",
+        "speed": {
+          "cells": [
+            {
+              "arm": "A",
+              "decode_tokens_per_second": 14.45881121461545,
+              "index": 1,
+              "prefill_plus_decode_ms": 39667.7,
+              "tokens_per_second": 9.680420089896819
+            },
+            {
+              "arm": "B",
+              "decode_tokens_per_second": 14.43587314476474,
+              "index": 2,
+              "prefill_plus_decode_ms": 40528.3,
+              "tokens_per_second": 9.474860776297056
+            }
+          ],
+          "geometric_mean_ratio_B_over_A": 0.9787654552497883,
+          "pairs": [
+            0.9787654552497883
+          ],
+          "primary_metric": "prefill_plus_decode_output_tokens_per_second",
+          "warmup_requests_discarded_per_cell": 1
+        },
+        "verdict": "screen_no_improvement",
+        "verification": {
+          "complete_cells": 2,
+          "independent_native_parse": true,
+          "raw_files_verified": true
+        }
+      },
+      "cleanup": [
+        {
+          "cell": "cell-001-A",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-001-A",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        }
+      ]
+    },
+    {
+      "task_id": "spark-broad-throughput-006-loop-2",
+      "attempt_id": "2ac319da7a1c496084a9d68cc221b20a",
+      "state": "succeeded",
+      "template_id": "cache256-screen",
+      "contract_sha256": "972e64d936cf40da2adceaa57e362fb30c7b816b039148047a800a5b3f99e3f4",
+      "source_identity": {
+        "benchmark.py": "d75caa55fe58f0e7e84263172d7f33f42cf2263411677d88d6bd665c36fdaeb5",
+        "benchmark_analysis.py": "507cbfbc2c0dd265f0e43dab21eca178c869a3b482805f8ffee0756ee50c5fb7",
+        "benchmark_data.py": "0466b42cbfe38b58accb3e1d3ea5bf527b1261f0c75c3321c3b78c8202618eb4",
+        "benchmark_worker.py": "c89108b6ec4764d748bb62b20c32fe0fa9f469aeed521d22ccaf1c8b7b1f194a",
+        "broad_benchmark.py": "e61d2c70aa83a3823605fa8fd2cb655491a0552c380bc9be9b1042104165310b",
+        "lab_lifecycle.py": "6fbbbe76bb48f47800669641e4c1bfedd524204d7d6451e19c9bc9c6330970c9",
+        "lab_recorder.py": "34cafbfe5f20160b8761195f293ab5c33e494d79d7d7b1d735946d6723cc3403"
+      },
+      "quiet": {
+        "attempt_id": "2ac319da7a1c496084a9d68cc221b20a",
+        "boot_id": "f4b7dbde-596c-4863-a21e-79d1ec3cfa04",
+        "control_container_id": "e3b45cea3ee6c0749bb6f50a844aacc53dbc6161708da464eaa59a54a550b086",
+        "control_image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+        "control_stopped": true,
+        "recorded_at": 1794699547.8124313
+      },
+      "elapsed_s": 372.8978950800374,
+      "error": null,
+      "report": {
+        "campaign_stage": "screen",
+        "configuration_change": "cache256",
+        "gates": {
+          "baseline_accuracy_valid": true,
+          "candidate_mechanism_engaged": true,
+          "sampled_no_per_question_regression": true
+        },
+        "limitations": [
+          "Eight-question screens are exploratory, not full quality validation.",
+          "First after initialization is not cold storage. Startup/tokenization excluded.",
+          "Single pair screens have no independent confidence interval; all failed/null episodes retained."
+        ],
+        "performance_acceptance_evaluated": false,
+        "promotion_authorized": false,
+        "quality": {
+          "accuracy": {
+            "A": 1.0,
+            "B": 1.0
+          },
+          "all_answers_valid": true,
+          "case_count": 8,
+          "regression_question_ids": []
+        },
+        "raw_token_equal": false,
+        "schema_version": 3,
+        "scope": "sampled_public_quality_plus_fixed_native_throughput",
+        "speed": {
+          "cells": [
+            {
+              "arm": "A",
+              "decode_tokens_per_second": 14.417066202116757,
+              "index": 1,
+              "prefill_plus_decode_ms": 39936.399999999994,
+              "tokens_per_second": 9.615288308410374
+            },
+            {
+              "arm": "B",
+              "decode_tokens_per_second": 13.86812281956272,
+              "index": 2,
+              "prefill_plus_decode_ms": 41869.1,
+              "tokens_per_second": 9.171441468768137
+            }
+          ],
+          "geometric_mean_ratio_B_over_A": 0.9538394663367493,
+          "pairs": [
+            0.9538394663367493
+          ],
+          "primary_metric": "prefill_plus_decode_output_tokens_per_second",
+          "warmup_requests_discarded_per_cell": 1
+        },
+        "verdict": "screen_no_improvement",
+        "verification": {
+          "complete_cells": 2,
+          "independent_native_parse": true,
+          "raw_files_verified": true
+        }
+      },
+      "cleanup": [
+        {
+          "cell": "cell-001-A",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-001-A",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        }
+      ]
+    },
+    {
+      "task_id": "spark-broad-throughput-006-loop-3",
+      "attempt_id": "d07163cd828f4b5db3fbe387c93acdd7",
+      "state": "succeeded",
+      "template_id": "cpu4-screen",
+      "contract_sha256": "7b2b406ad7a674b3ff2817256a7640f009f717072e9049fc97b45549fd25dab9",
+      "source_identity": {
+        "benchmark.py": "d75caa55fe58f0e7e84263172d7f33f42cf2263411677d88d6bd665c36fdaeb5",
+        "benchmark_analysis.py": "507cbfbc2c0dd265f0e43dab21eca178c869a3b482805f8ffee0756ee50c5fb7",
+        "benchmark_data.py": "0466b42cbfe38b58accb3e1d3ea5bf527b1261f0c75c3321c3b78c8202618eb4",
+        "benchmark_worker.py": "c89108b6ec4764d748bb62b20c32fe0fa9f469aeed521d22ccaf1c8b7b1f194a",
+        "broad_benchmark.py": "e61d2c70aa83a3823605fa8fd2cb655491a0552c380bc9be9b1042104165310b",
+        "lab_lifecycle.py": "6fbbbe76bb48f47800669641e4c1bfedd524204d7d6451e19c9bc9c6330970c9",
+        "lab_recorder.py": "34cafbfe5f20160b8761195f293ab5c33e494d79d7d7b1d735946d6723cc3403"
+      },
+      "quiet": {
+        "attempt_id": "d07163cd828f4b5db3fbe387c93acdd7",
+        "boot_id": "f4b7dbde-596c-4863-a21e-79d1ec3cfa04",
+        "control_container_id": "b9e2c5a182c29542601192857b3ddf0b02e2e11b6ae9e533095f94683c2078d9",
+        "control_image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+        "control_stopped": true,
+        "recorded_at": 1794700031.772414
+      },
+      "elapsed_s": 403.17787870997563,
+      "error": null,
+      "report": {
+        "campaign_stage": "screen",
+        "configuration_change": "cpu4",
+        "gates": {
+          "baseline_accuracy_valid": true,
+          "candidate_mechanism_engaged": true,
+          "sampled_no_per_question_regression": true
+        },
+        "limitations": [
+          "Eight-question screens are exploratory, not full quality validation.",
+          "First after initialization is not cold storage. Startup/tokenization excluded.",
+          "Single pair screens have no independent confidence interval; all failed/null episodes retained."
+        ],
+        "performance_acceptance_evaluated": false,
+        "promotion_authorized": false,
+        "quality": {
+          "accuracy": {
+            "A": 1.0,
+            "B": 1.0
+          },
+          "all_answers_valid": true,
+          "case_count": 8,
+          "regression_question_ids": []
+        },
+        "raw_token_equal": true,
+        "schema_version": 3,
+        "scope": "sampled_public_quality_plus_fixed_native_throughput",
+        "speed": {
+          "cells": [
+            {
+              "arm": "A",
+              "decode_tokens_per_second": 14.393612834304777,
+              "index": 1,
+              "prefill_plus_decode_ms": 44445.1,
+              "tokens_per_second": 8.639872561879713
+            },
+            {
+              "arm": "B",
+              "decode_tokens_per_second": 11.309485241710794,
+              "index": 2,
+              "prefill_plus_decode_ms": 50378.899999999994,
+              "tokens_per_second": 7.622238675318438
+            }
+          ],
+          "geometric_mean_ratio_B_over_A": 0.8822165628864466,
+          "pairs": [
+            0.8822165628864466
+          ],
+          "primary_metric": "prefill_plus_decode_output_tokens_per_second",
+          "warmup_requests_discarded_per_cell": 1
+        },
+        "verdict": "screen_no_improvement",
+        "verification": {
+          "complete_cells": 2,
+          "independent_native_parse": true,
+          "raw_files_verified": true
+        }
+      },
+      "cleanup": [
+        {
+          "cell": "cell-001-A",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-001-A",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        }
+      ]
+    },
+    {
+      "task_id": "spark-broad-throughput-006-loop-4",
+      "attempt_id": "dc242599f18a4447a77311c77e212299",
+      "state": "succeeded",
+      "template_id": "draft-screen",
+      "contract_sha256": "94d935cf39986726b87a7f35a0f486b24dee5ff7b7b6d12ae8616bbb0cf016ea",
+      "source_identity": {
+        "benchmark.py": "d75caa55fe58f0e7e84263172d7f33f42cf2263411677d88d6bd665c36fdaeb5",
+        "benchmark_analysis.py": "507cbfbc2c0dd265f0e43dab21eca178c869a3b482805f8ffee0756ee50c5fb7",
+        "benchmark_data.py": "0466b42cbfe38b58accb3e1d3ea5bf527b1261f0c75c3321c3b78c8202618eb4",
+        "benchmark_worker.py": "c89108b6ec4764d748bb62b20c32fe0fa9f469aeed521d22ccaf1c8b7b1f194a",
+        "broad_benchmark.py": "e61d2c70aa83a3823605fa8fd2cb655491a0552c380bc9be9b1042104165310b",
+        "lab_lifecycle.py": "6fbbbe76bb48f47800669641e4c1bfedd524204d7d6451e19c9bc9c6330970c9",
+        "lab_recorder.py": "34cafbfe5f20160b8761195f293ab5c33e494d79d7d7b1d735946d6723cc3403"
+      },
+      "quiet": {
+        "attempt_id": "dc242599f18a4447a77311c77e212299",
+        "boot_id": "f4b7dbde-596c-4863-a21e-79d1ec3cfa04",
+        "control_container_id": "9175c1ea6e8b649a59f7366881e08b49e3d0b4554de1eb05849aa9c6a7036105",
+        "control_image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+        "control_stopped": true,
+        "recorded_at": 1794700551.3879056
+      },
+      "elapsed_s": 399.662887875922,
+      "error": null,
+      "report": {
+        "campaign_stage": "screen",
+        "configuration_change": "draft",
+        "gates": {
+          "baseline_accuracy_valid": true,
+          "candidate_mechanism_engaged": true,
+          "sampled_no_per_question_regression": true
+        },
+        "limitations": [
+          "Eight-question screens are exploratory, not full quality validation.",
+          "First after initialization is not cold storage. Startup/tokenization excluded.",
+          "Single pair screens have no independent confidence interval; all failed/null episodes retained."
+        ],
+        "performance_acceptance_evaluated": false,
+        "promotion_authorized": false,
+        "quality": {
+          "accuracy": {
+            "A": 1.0,
+            "B": 1.0
+          },
+          "all_answers_valid": true,
+          "case_count": 8,
+          "regression_question_ids": []
+        },
+        "raw_token_equal": false,
+        "schema_version": 3,
+        "scope": "sampled_public_quality_plus_fixed_native_throughput",
+        "speed": {
+          "cells": [
+            {
+              "arm": "A",
+              "decode_tokens_per_second": 14.43055670382034,
+              "index": 1,
+              "prefill_plus_decode_ms": 42947.8,
+              "tokens_per_second": 8.94108662143346
+            },
+            {
+              "arm": "B",
+              "decode_tokens_per_second": 16.70378619153675,
+              "index": 2,
+              "prefill_plus_decode_ms": 44694.399999999994,
+              "tokens_per_second": 8.591680389489513
+            }
+          ],
+          "geometric_mean_ratio_B_over_A": 0.9609212787284317,
+          "pairs": [
+            0.9609212787284317
+          ],
+          "primary_metric": "prefill_plus_decode_output_tokens_per_second",
+          "warmup_requests_discarded_per_cell": 1
+        },
+        "verdict": "screen_no_improvement",
+        "verification": {
+          "complete_cells": 2,
+          "independent_native_parse": true,
+          "raw_files_verified": true
+        }
+      },
+      "cleanup": [
+        {
+          "cell": "cell-001-A",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-001-A",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        }
+      ]
+    },
+    {
+      "task_id": "spark-broad-throughput-006-loop-5",
+      "attempt_id": "38e07041d0cf4250be5831aaf7e9fbed",
+      "state": "succeeded",
+      "template_id": "ahead1-screen",
+      "contract_sha256": "e621bcfc8b789883071e03f7a0aba59322a4f61f6cf301ca263d8eb4b4762ae1",
+      "source_identity": {
+        "benchmark.py": "d75caa55fe58f0e7e84263172d7f33f42cf2263411677d88d6bd665c36fdaeb5",
+        "benchmark_analysis.py": "507cbfbc2c0dd265f0e43dab21eca178c869a3b482805f8ffee0756ee50c5fb7",
+        "benchmark_data.py": "0466b42cbfe38b58accb3e1d3ea5bf527b1261f0c75c3321c3b78c8202618eb4",
+        "benchmark_worker.py": "c89108b6ec4764d748bb62b20c32fe0fa9f469aeed521d22ccaf1c8b7b1f194a",
+        "broad_benchmark.py": "e61d2c70aa83a3823605fa8fd2cb655491a0552c380bc9be9b1042104165310b",
+        "lab_lifecycle.py": "6fbbbe76bb48f47800669641e4c1bfedd524204d7d6451e19c9bc9c6330970c9",
+        "lab_recorder.py": "34cafbfe5f20160b8761195f293ab5c33e494d79d7d7b1d735946d6723cc3403"
+      },
+      "quiet": {
+        "attempt_id": "38e07041d0cf4250be5831aaf7e9fbed",
+        "boot_id": "f4b7dbde-596c-4863-a21e-79d1ec3cfa04",
+        "control_container_id": "e03faf7805f999a233cbfedbd651cca54700d8569bbffd7ac0c977949fb8a25b",
+        "control_image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+        "control_stopped": true,
+        "recorded_at": 1794701054.5693378
+      },
+      "elapsed_s": 379.43033632822335,
+      "error": null,
+      "report": {
+        "campaign_stage": "screen",
+        "configuration_change": "ahead1",
+        "gates": {
+          "baseline_accuracy_valid": true,
+          "candidate_mechanism_engaged": true,
+          "sampled_no_per_question_regression": true
+        },
+        "limitations": [
+          "Eight-question screens are exploratory, not full quality validation.",
+          "First after initialization is not cold storage. Startup/tokenization excluded.",
+          "Single pair screens have no independent confidence interval; all failed/null episodes retained."
+        ],
+        "performance_acceptance_evaluated": false,
+        "promotion_authorized": false,
+        "quality": {
+          "accuracy": {
+            "A": 1.0,
+            "B": 1.0
+          },
+          "all_answers_valid": true,
+          "case_count": 8,
+          "regression_question_ids": []
+        },
+        "raw_token_equal": true,
+        "schema_version": 3,
+        "scope": "sampled_public_quality_plus_fixed_native_throughput",
+        "speed": {
+          "cells": [
+            {
+              "arm": "A",
+              "decode_tokens_per_second": 14.401710203086617,
+              "index": 1,
+              "prefill_plus_decode_ms": 44850.3,
+              "tokens_per_second": 8.561815640029163
+            },
+            {
+              "arm": "B",
+              "decode_tokens_per_second": 13.994526099426736,
+              "index": 2,
+              "prefill_plus_decode_ms": 39966.7,
+              "tokens_per_second": 9.60799865888352
+            }
+          ],
+          "geometric_mean_ratio_B_over_A": 1.1221917246107385,
+          "pairs": [
+            1.1221917246107385
+          ],
+          "primary_metric": "prefill_plus_decode_output_tokens_per_second",
+          "warmup_requests_discarded_per_cell": 1
+        },
+        "verdict": "screen_candidate",
+        "verification": {
+          "complete_cells": 2,
+          "independent_native_parse": true,
+          "raw_files_verified": true
+        }
+      },
+      "cleanup": [
+        {
+          "cell": "cell-001-A",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-001-A",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        }
+      ]
+    },
+    {
+      "task_id": "spark-broad-throughput-006-loop-6",
+      "attempt_id": "44133015d8bf4b64be22836f5dd7ed27",
+      "state": "succeeded",
+      "template_id": "cpu6-screen",
+      "contract_sha256": "d54e8f57667bc0e839a73021440990ebe7af38d4c060c5066ab67e3143218760",
+      "source_identity": {
+        "benchmark.py": "d75caa55fe58f0e7e84263172d7f33f42cf2263411677d88d6bd665c36fdaeb5",
+        "benchmark_analysis.py": "507cbfbc2c0dd265f0e43dab21eca178c869a3b482805f8ffee0756ee50c5fb7",
+        "benchmark_data.py": "0466b42cbfe38b58accb3e1d3ea5bf527b1261f0c75c3321c3b78c8202618eb4",
+        "benchmark_worker.py": "c89108b6ec4764d748bb62b20c32fe0fa9f469aeed521d22ccaf1c8b7b1f194a",
+        "broad_benchmark.py": "e61d2c70aa83a3823605fa8fd2cb655491a0552c380bc9be9b1042104165310b",
+        "lab_lifecycle.py": "6fbbbe76bb48f47800669641e4c1bfedd524204d7d6451e19c9bc9c6330970c9",
+        "lab_recorder.py": "34cafbfe5f20160b8761195f293ab5c33e494d79d7d7b1d735946d6723cc3403"
+      },
+      "quiet": {
+        "attempt_id": "44133015d8bf4b64be22836f5dd7ed27",
+        "boot_id": "f4b7dbde-596c-4863-a21e-79d1ec3cfa04",
+        "control_container_id": "7b8af1746cfefb6ebb26e5e449c01ada515e7a9dcb167169b3b1ebb2076c38f0",
+        "control_image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+        "control_stopped": true,
+        "recorded_at": 1794701543.194345
+      },
+      "elapsed_s": 369.26070907432586,
+      "error": null,
+      "report": {
+        "campaign_stage": "screen",
+        "configuration_change": "cpu6",
+        "gates": {
+          "baseline_accuracy_valid": true,
+          "candidate_mechanism_engaged": true,
+          "sampled_no_per_question_regression": true
+        },
+        "limitations": [
+          "Eight-question screens are exploratory, not full quality validation.",
+          "First after initialization is not cold storage. Startup/tokenization excluded.",
+          "Single pair screens have no independent confidence interval; all failed/null episodes retained."
+        ],
+        "performance_acceptance_evaluated": false,
+        "promotion_authorized": false,
+        "quality": {
+          "accuracy": {
+            "A": 1.0,
+            "B": 1.0
+          },
+          "all_answers_valid": true,
+          "case_count": 8,
+          "regression_question_ids": []
+        },
+        "raw_token_equal": true,
+        "schema_version": 3,
+        "scope": "sampled_public_quality_plus_fixed_native_throughput",
+        "speed": {
+          "cells": [
+            {
+              "arm": "A",
+              "decode_tokens_per_second": 14.428984222056055,
+              "index": 1,
+              "prefill_plus_decode_ms": 41302.1,
+              "tokens_per_second": 9.297348076732176
+            },
+            {
+              "arm": "B",
+              "decode_tokens_per_second": 14.4650747550543,
+              "index": 2,
+              "prefill_plus_decode_ms": 40337.8,
+              "tokens_per_second": 9.519606919564279
+            }
+          ],
+          "geometric_mean_ratio_B_over_A": 1.0239056170638954,
+          "pairs": [
+            1.0239056170638954
+          ],
+          "primary_metric": "prefill_plus_decode_output_tokens_per_second",
+          "warmup_requests_discarded_per_cell": 1
+        },
+        "verdict": "screen_no_improvement",
+        "verification": {
+          "complete_cells": 2,
+          "independent_native_parse": true,
+          "raw_files_verified": true
+        }
+      },
+      "cleanup": [
+        {
+          "cell": "cell-001-A",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-001-A",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        }
+      ]
+    }
+  ],
+  "native_calls": [
+    {
+      "time": 1794698965.5706868,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-c64dfbb6-7b24-4493-a370-421c37d95d60"
+    },
+    {
+      "time": 1794698965.901802,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-f69d22e5-ed9c-418e-89ef-57ae760030ae"
+    },
+    {
+      "time": 1794698966.1844378,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-253e859c-5293-498b-aa18-a4ac7e966613"
+    },
+    {
+      "time": 1794698966.4879017,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-f45df96b-6cd3-45fe-899b-4ea633fb6765"
+    },
+    {
+      "time": 1794698971.8289008,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-34009ba6-7537-47c3-aad2-d24fe67af6f0"
+    },
+    {
+      "time": 1794698972.1295297,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-9c4ae81c-7e43-4653-84ea-e1700a2f37eb"
+    },
+    {
+      "time": 1794698972.3953953,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-b653a0fd-dabc-4857-be27-e4efdb0817d6"
+    },
+    {
+      "time": 1794698977.0896246,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "inspect",
+      "tool_call_id": "exec-696234cc-00d6-4792-bfec-8a881ee4d251"
+    },
+    {
+      "time": 1794698977.3653796,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-69800a8f-0d56-4fab-9791-5af2b534c13f"
+    },
+    {
+      "time": 1794698977.6471171,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "design",
+      "tool_call_id": "exec-ee417f7f-5a9c-4fb0-a8ea-fcc22d48ef7d"
+    },
+    {
+      "time": 1794698977.950058,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-4092bb41-11c8-4ba5-9f62-8111958a83e7"
+    },
+    {
+      "time": 1794698986.3169262,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "apply",
+      "tool_call_id": "exec-3a8a8560-3710-4b60-bfde-a445ab993356"
+    },
+    {
+      "time": 1794698993.508967,
+      "cc": "factory.cc_qualification",
+      "capability": "inspect_package",
+      "tool_call_id": "exec-a33e19b8-886c-4291-9724-ca4ec7750bcb"
+    },
+    {
+      "time": 1794698993.9560666,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "verify_profile",
+      "tool_call_id": "exec-e62e5a54-e73c-4b5f-82ec-ca64c2b11e5a"
+    },
+    {
+      "time": 1794698997.82786,
+      "cc": "factory.cc_qualification",
+      "capability": "inspect_package",
+      "tool_call_id": "exec-9ffba8fd-6366-4b9d-a417-2b5d0ac8ecc9"
+    },
+    {
+      "time": 1794699014.5593114,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "propose",
+      "tool_call_id": "exec-2d00bd45-8ca7-48e8-bfd8-b3768ccbf0ef"
+    },
+    {
+      "time": 1794699029.1459422,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "propose",
+      "tool_call_id": "exec-1697edfc-fcfc-4b07-bd91-b727e16d58c6"
+    },
+    {
+      "time": 1794699039.3913472,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-f27f5910-58ec-49a2-9e15-570a3f934539"
+    },
+    {
+      "time": 1794699048.2260559,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-b7ecb846-2e01-44e2-9e4b-a0bb78bc59ca"
+    },
+    {
+      "time": 1794699053.504756,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "select",
+      "tool_call_id": "exec-7606940f-d235-4853-b8be-e58a22117066"
+    },
+    {
+      "time": 1794699057.7615867,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "execute",
+      "tool_call_id": "exec-c71763a7-76ed-43ec-84b1-200519b1e741"
+    },
+    {
+      "time": 1794699451.3464205,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-c63e797e-5938-4493-965f-9140e992e0de"
+    },
+    {
+      "time": 1794699451.7335255,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-daa04310-640b-46c2-95ab-4105b3295a47"
+    },
+    {
+      "time": 1794699452.0347698,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-a2da304d-ddc9-416f-bdae-34c749cf527c"
+    },
+    {
+      "time": 1794699457.452913,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-f8e45185-b988-4c57-858e-f68c8a64ed5f"
+    },
+    {
+      "time": 1794699457.7229972,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-00154cb5-d27c-4780-8d39-271fb4a6b183"
+    },
+    {
+      "time": 1794699458.006595,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-2b39b887-be90-474e-a674-53cccc07df91"
+    },
+    {
+      "time": 1794699458.302591,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-e5fe7c9b-cb78-4612-8110-3274c597a471"
+    },
+    {
+      "time": 1794699458.590712,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "collect",
+      "tool_call_id": "exec-abfe3b64-a621-44f9-8983-e45ac32462ea"
+    },
+    {
+      "time": 1794699464.8834395,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-492f22e1-0aa2-49ae-89a8-596f6005e2bb"
+    },
+    {
+      "time": 1794699465.1695957,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-42bf758b-4da2-45c2-84a7-b3956d7622c5"
+    },
+    {
+      "time": 1794699465.4443498,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "inspect",
+      "tool_call_id": "exec-2fb11595-7c72-4d6f-8bd6-82a0ca04c6f2"
+    },
+    {
+      "time": 1794699465.7778318,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "design",
+      "tool_call_id": "exec-4bcc19a4-573e-443a-b387-82b58698dbf6"
+    },
+    {
+      "time": 1794699471.4209435,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-c1a7afdf-ad2d-4116-a33d-e10ac3cbaec5"
+    },
+    {
+      "time": 1794699471.7059138,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-7ac35c0f-b3b9-4448-a971-b462610f5cec"
+    },
+    {
+      "time": 1794699472.0026305,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-909f09b8-9774-4883-8bf7-aedbe685c18c"
+    },
+    {
+      "time": 1794699488.8219342,
+      "cc": "factory.standard_benchmark",
+      "capability": "result",
+      "tool_call_id": "exec-55d37fbd-d535-4abf-935f-802eb05c3034"
+    },
+    {
+      "time": 1794699494.4195547,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "apply",
+      "tool_call_id": "exec-7f59c5f2-0a82-47ce-88c3-4425e05b8e6f"
+    },
+    {
+      "time": 1794699494.6937215,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-e4198d2a-43d3-40a0-81aa-f6fa8c73b790"
+    },
+    {
+      "time": 1794699505.1339755,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "verify_profile",
+      "tool_call_id": "exec-81a7cf11-c781-4706-ae8b-1b380fb96fce"
+    },
+    {
+      "time": 1794699523.0502422,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "propose",
+      "tool_call_id": "exec-eab26d22-0df8-44b3-9299-420fbe97b982"
+    },
+    {
+      "time": 1794699523.3331144,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-dc5acef5-b1c1-4a5b-9e36-e68bad1f4a80"
+    },
+    {
+      "time": 1794699533.6159382,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-f2c0202b-fb0c-4745-a6ff-575934753d4b"
+    },
+    {
+      "time": 1794699538.4497538,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "select",
+      "tool_call_id": "exec-807e8a2d-d5ed-4d23-af95-d63aac298b07"
+    },
+    {
+      "time": 1794699541.7085972,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "execute",
+      "tool_call_id": "exec-68a0c00b-f150-40a8-9dc7-08a3e49ceea5"
+    },
+    {
+      "time": 1794699937.2675283,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-fe3dc30b-d81c-453d-84db-bb510949b495"
+    },
+    {
+      "time": 1794699937.6575058,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-4154936f-478e-421b-801e-3c3438ce9a5e"
+    },
+    {
+      "time": 1794699937.95363,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-52c07d01-7525-4346-ac9f-bc9f24fa6525"
+    },
+    {
+      "time": 1794699938.2666488,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "inspect",
+      "tool_call_id": "exec-a694acc1-fafb-4452-8e79-ef9fd4dcb697"
+    },
+    {
+      "time": 1794699943.0001628,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-751e8bb2-7993-44b4-a0b3-0d4c1e86f1be"
+    },
+    {
+      "time": 1794699943.2881536,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-48df0824-9824-410e-b2d3-25adab285867"
+    },
+    {
+      "time": 1794699947.1710339,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-ba0ea1f6-5b17-4a1d-81fb-b77a9de33344"
+    },
+    {
+      "time": 1794699952.9692137,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-78f6957d-5ff6-49ad-afc8-d1a3d89f190a"
+    },
+    {
+      "time": 1794699953.2796648,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-49a697b6-e8dc-4f38-aaa6-8c5683e044de"
+    },
+    {
+      "time": 1794699953.5625572,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-64d2c31c-ba66-437d-8388-726c72d4c61b"
+    },
+    {
+      "time": 1794699953.8401904,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-469f15ba-f357-4537-b8da-59a79dd4ecb1"
+    },
+    {
+      "time": 1794699959.8475099,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "collect",
+      "tool_call_id": "exec-d3562bff-b6e4-4e2e-ad71-ddccbb45d284"
+    },
+    {
+      "time": 1794699969.3056748,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "design",
+      "tool_call_id": "exec-4cefef39-4bb0-40a7-8d36-dc888d714707"
+    },
+    {
+      "time": 1794699975.088878,
+      "cc": "factory.cc_qualification",
+      "capability": "inspect_package",
+      "tool_call_id": "exec-aefaa650-31b2-4a9b-abdc-ea3ad8843cb1"
+    },
+    {
+      "time": 1794699975.5170002,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "apply",
+      "tool_call_id": "exec-d2ff092b-30e7-4f4f-b14e-7e761fe45d04"
+    },
+    {
+      "time": 1794699975.824612,
+      "cc": "factory.evidence",
+      "capability": "plan_get",
+      "tool_call_id": "exec-534ce02d-d9ab-4ea1-9c5a-b37e101de0f6"
+    },
+    {
+      "time": 1794699982.8251102,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "verify_profile",
+      "tool_call_id": "exec-126a5950-4d50-4574-9788-38785365343e"
+    },
+    {
+      "time": 1794699983.0969195,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-ecc2abe0-5ef3-4d47-abf9-50b2c8becb5e"
+    },
+    {
+      "time": 1794699999.4307783,
+      "cc": "factory.cc_qualification",
+      "capability": "inspect_package",
+      "tool_call_id": "exec-5207a0bb-4404-47fc-86c5-52a497cd93bb"
+    },
+    {
+      "time": 1794699999.840782,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "propose",
+      "tool_call_id": "exec-e1c6957a-f7ba-4936-8ec5-5ba6caf6b85d"
+    },
+    {
+      "time": 1794700016.8397017,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-88c77d16-6502-46d3-bded-00ce5286bd96"
+    },
+    {
+      "time": 1794700023.5070744,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "select",
+      "tool_call_id": "exec-0e618e69-be78-4f30-b497-19b9bc29a7f0"
+    },
+    {
+      "time": 1794700026.692798,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "execute",
+      "tool_call_id": "exec-5531630b-66ec-4833-8e77-65195bbf110e"
+    },
+    {
+      "time": 1794700453.5564256,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-7166cddd-0674-4a43-b20d-6033a88d23c5"
+    },
+    {
+      "time": 1794700453.9205828,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-40b188a7-ccc8-41fa-8ade-d73c0a7f4175"
+    },
+    {
+      "time": 1794700454.19906,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-6797323d-f710-461f-a6d4-b089c1633a03"
+    },
+    {
+      "time": 1794700454.5077062,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "inspect",
+      "tool_call_id": "exec-35a1d01e-b998-4975-96be-4d6938ccebff"
+    },
+    {
+      "time": 1794700458.8612487,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-e2d719cc-a2f6-4d4e-8bd3-7adf87cd3b3c"
+    },
+    {
+      "time": 1794700459.1528888,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-aa49dd8b-2055-4a34-b598-03c4fbf8f743"
+    },
+    {
+      "time": 1794700464.4729683,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-6a8ec75e-6101-4643-9653-ade880dbb4bc"
+    },
+    {
+      "time": 1794700464.7702417,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-410c3c48-ec97-481b-a33d-d24b719c14ba"
+    },
+    {
+      "time": 1794700465.0424328,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-52e3dbf7-a000-470a-b701-66a540de20d2"
+    },
+    {
+      "time": 1794700465.3329744,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-f4503cf4-1311-408b-8ec6-946b71518f11"
+    },
+    {
+      "time": 1794700465.6376991,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "collect",
+      "tool_call_id": "exec-7dfed25d-d8ac-45d6-ad86-e88dc067f3ae"
+    },
+    {
+      "time": 1794700467.4253407,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-85e092ee-1b8a-48a1-954e-45ef4d6a62ca"
+    },
+    {
+      "time": 1794700473.3682375,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-07b30774-165e-49be-97a7-ae100ab6509c"
+    },
+    {
+      "time": 1794700473.665966,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-ff367226-3443-4e8a-a331-e3a7b18674aa"
+    },
+    {
+      "time": 1794700473.942896,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-5a064709-a9d9-4ee4-a2e1-8bf40c9e2142"
+    },
+    {
+      "time": 1794700474.242245,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "design",
+      "tool_call_id": "exec-97747b86-8352-48f9-b321-279b57781270"
+    },
+    {
+      "time": 1794700485.8635435,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-027856a5-c035-4080-8b4a-ed62e87217e5"
+    },
+    {
+      "time": 1794700486.1496975,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "design",
+      "tool_call_id": "exec-a230d947-573a-4809-b0a2-2a340911d468"
+    },
+    {
+      "time": 1794700486.4426537,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-78c83fc9-a960-44b0-8acf-83e14caf51c5"
+    },
+    {
+      "time": 1794700495.174199,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "design",
+      "tool_call_id": "exec-1eb70c20-287d-43ae-9306-3ad432a8af8b"
+    },
+    {
+      "time": 1794700495.4638882,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "apply",
+      "tool_call_id": "exec-7bf88a36-580e-48b6-8e08-2ffcfc9cd395"
+    },
+    {
+      "time": 1794700511.5346506,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "verify_profile",
+      "tool_call_id": "exec-7ef2a9a0-60bb-478e-8602-d88fcc574084"
+    },
+    {
+      "time": 1794700511.8704083,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "propose",
+      "tool_call_id": "exec-74a93e59-89c7-4bb4-a8cc-f657081c93d5"
+    },
+    {
+      "time": 1794700532.1263685,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-074f66a5-d235-4be4-bfb3-209f56ce6743"
+    },
+    {
+      "time": 1794700540.1372812,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "select",
+      "tool_call_id": "exec-cbb486bc-a352-4255-a841-4f19eca5982d"
+    },
+    {
+      "time": 1794700544.3057244,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "execute",
+      "tool_call_id": "exec-b2e249a3-8da1-4854-97cf-ecd7048a9909"
+    },
+    {
+      "time": 1794700968.6903877,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-b89ae52a-e3b2-4cc0-ab72-ab98d885f95f"
+    },
+    {
+      "time": 1794700969.0729315,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-a07b32da-59ff-49d5-93f2-0163e0d1c563"
+    },
+    {
+      "time": 1794700969.3462877,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-caa7842a-3f2f-457c-8b43-27485e03d81b"
+    },
+    {
+      "time": 1794700969.6407063,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "inspect",
+      "tool_call_id": "exec-4f0788b7-f7d5-42a8-b974-174bc51b1da8"
+    },
+    {
+      "time": 1794700973.9261732,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-bda4a3de-55b2-48a4-95c0-1625a0c228ee"
+    },
+    {
+      "time": 1794700974.2246706,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-999a4670-5e8c-4378-b8ae-70d3cbe3e561"
+    },
+    {
+      "time": 1794700979.1421044,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-5c127a94-45e2-4600-8ef8-c8cb47fc5e1b"
+    },
+    {
+      "time": 1794700979.4300194,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-62664ada-5d45-4c1c-82a4-85ebd6ce7e47"
+    },
+    {
+      "time": 1794700979.7287633,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-32054dbf-7d2d-4e09-a307-331049232728"
+    },
+    {
+      "time": 1794700980.0133088,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-9082bcc8-cdab-46a9-a972-4513167fbedb"
+    },
+    {
+      "time": 1794700980.3070915,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "collect",
+      "tool_call_id": "exec-7c8e3554-8157-4d64-ad48-fcf51bfc1a45"
+    },
+    {
+      "time": 1794700985.5018613,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-d0ede377-3110-447c-b245-8e94a1df5ca4"
+    },
+    {
+      "time": 1794700993.13517,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-fc8c2ae9-2b65-4d8c-8fa2-e56db4de4e9f"
+    },
+    {
+      "time": 1794700993.4345062,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-a87d9a91-a5ff-4f67-bab0-318fb9f293ae"
+    },
+    {
+      "time": 1794700993.7346346,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-49e78eb0-9654-43a2-b01e-f46f4c6d2999"
+    },
+    {
+      "time": 1794700994.0266652,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "design",
+      "tool_call_id": "exec-1c06d193-80bf-434d-b6a7-2fd8e59498f8"
+    },
+    {
+      "time": 1794701001.8337746,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-bad08063-11cb-45fb-8b02-6e9a8ca6429f"
+    },
+    {
+      "time": 1794701002.1516025,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-77d7cf79-927c-442d-a8d2-539d117be591"
+    },
+    {
+      "time": 1794701002.468925,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "apply",
+      "tool_call_id": "exec-3fcf8598-ccf2-4b31-9009-07cc0167b865"
+    },
+    {
+      "time": 1794701019.6078255,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "verify_profile",
+      "tool_call_id": "exec-35e77a7e-025d-468b-92af-6deb27487963"
+    },
+    {
+      "time": 1794701019.8993568,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "propose",
+      "tool_call_id": "exec-0aaf43d6-2ce6-414c-bc8d-fa8a42490bc1"
+    },
+    {
+      "time": 1794701020.2442484,
+      "cc": "factory.evidence",
+      "capability": "plan_get",
+      "tool_call_id": "exec-4eddbe7c-7f2b-4a40-8385-e1d0d73f7d0a"
+    },
+    {
+      "time": 1794701038.094179,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-8862fbfe-8932-4e79-ba51-76832e71606b"
+    },
+    {
+      "time": 1794701044.4134085,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "select",
+      "tool_call_id": "exec-f25aaadf-da9d-4e50-8a88-12e08462f2d8"
+    },
+    {
+      "time": 1794701048.2143254,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "execute",
+      "tool_call_id": "exec-97131656-722e-4437-8f70-23532d8aaa3c"
+    },
+    {
+      "time": 1794701450.7352662,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-4258b9f2-7f98-4192-9369-635ee6ed0b12"
+    },
+    {
+      "time": 1794701458.6380281,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-04fc3b67-35ae-4a51-b944-15262dc6acf1"
+    },
+    {
+      "time": 1794701458.9121776,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-17d2dd17-d57d-421f-ab62-9623cc11f499"
+    },
+    {
+      "time": 1794701459.204337,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-adc129fa-a367-4ec9-abf2-06c6786140f6"
+    },
+    {
+      "time": 1794701459.5109758,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-c3537d2e-97b6-4d79-82cd-e82e17ee8571"
+    },
+    {
+      "time": 1794701459.804343,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-d0fb4ab7-bf27-4d8c-9174-119a859362e3"
+    },
+    {
+      "time": 1794701460.0646532,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "inspect",
+      "tool_call_id": "exec-1dea7af9-ce2d-4ab3-9d79-ed539423daa5"
+    },
+    {
+      "time": 1794701465.9831088,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-3190f691-2993-449b-8d6f-2c67d1224014"
+    },
+    {
+      "time": 1794701466.2939591,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "collect",
+      "tool_call_id": "exec-fc294b2f-d27d-4f11-bc49-ad0b07529d1e"
+    },
+    {
+      "time": 1794701467.980199,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-29c3c4b4-1613-41b9-96a9-0ab545fef103"
+    },
+    {
+      "time": 1794701475.939321,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-694412aa-d1bd-4b8d-ae95-9d7d0968b017"
+    },
+    {
+      "time": 1794701476.213083,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-db3f87f8-d3f9-4ced-86bc-686817b51328"
+    },
+    {
+      "time": 1794701476.5109627,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-cafb1b83-830c-4405-9448-4c55630c15d1"
+    },
+    {
+      "time": 1794701476.8004622,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "design",
+      "tool_call_id": "exec-c0193d99-47f9-4077-9952-df83737bb5ad"
+    },
+    {
+      "time": 1794701484.2618983,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "apply",
+      "tool_call_id": "exec-b8a9638d-168a-4450-9e6a-ef47b5bde023"
+    },
+    {
+      "time": 1794701484.5650992,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-ffc20420-2305-4623-b17f-55c7a1145185"
+    },
+    {
+      "time": 1794701490.3822012,
+      "cc": "factory.cc_qualification",
+      "capability": "inspect_package",
+      "tool_call_id": "exec-9fc4d2b3-07c2-4a8c-9108-23af23217139"
+    },
+    {
+      "time": 1794701490.8489728,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "verify_profile",
+      "tool_call_id": "exec-52e32281-8eeb-40fd-b97e-7df9bdbabbb9"
+    },
+    {
+      "time": 1794701497.8314989,
+      "cc": "factory.cc_qualification",
+      "capability": "inspect_package",
+      "tool_call_id": "exec-0522edaf-9a2c-44aa-b24c-002a6dfde921"
+    },
+    {
+      "time": 1794701510.3817592,
+      "cc": "factory.evidence",
+      "capability": "plan_get",
+      "tool_call_id": "exec-a9a2dd9c-46fe-49f2-b4e1-905b61bff776"
+    },
+    {
+      "time": 1794701510.6294572,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "propose",
+      "tool_call_id": "exec-7831f05e-f4cf-4631-a345-43db0ebd9088"
+    },
+    {
+      "time": 1794701525.119047,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-d2fceeff-7f52-4749-95e1-8b13870d1943"
+    },
+    {
+      "time": 1794701533.3886085,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "select",
+      "tool_call_id": "exec-fe96759e-b180-414c-95e5-f8fc0ef409cc"
+    },
+    {
+      "time": 1794701536.975979,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "execute",
+      "tool_call_id": "exec-c591e4ea-b3a4-4605-9f21-7daaae16676b"
+    },
+    {
+      "time": 1794701929.8631582,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-4c55c5b8-8678-4e0f-840e-5123d01261b2"
+    },
+    {
+      "time": 1794701930.271318,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-8ef5c0eb-13b9-491d-89ca-1e47b3e570ad"
+    },
+    {
+      "time": 1794701930.566405,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-5ba392f5-faa7-4b32-87e6-bd678ef7f3b8"
+    },
+    {
+      "time": 1794701930.899008,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "inspect",
+      "tool_call_id": "exec-3225222e-ca89-4d18-b75d-fc9840f26ecb"
+    },
+    {
+      "time": 1794701934.9040895,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-a18a77ee-a3b0-43b9-8640-958458a29e4c"
+    },
+    {
+      "time": 1794701935.1976793,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-0a13df8e-bb55-41e7-b15f-eeede3c75e94"
+    },
+    {
+      "time": 1794701941.8130066,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-0db62a9a-becc-46e8-bb9e-cbc91b47f5f5"
+    },
+    {
+      "time": 1794701942.1346774,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-35f8ca3a-f97d-490d-b9d8-f9d67efd0e5f"
+    },
+    {
+      "time": 1794701942.4358706,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-0e224c52-2e63-40d6-9f7a-90602799c4a0"
+    },
+    {
+      "time": 1794701942.7282758,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-8f6db035-bc2f-4e07-ae71-068abcbddf07"
+    },
+    {
+      "time": 1794701943.046053,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "collect",
+      "tool_call_id": "exec-9a9dfdd9-3155-40fa-8ef7-7a3c94feb328"
+    },
+    {
+      "time": 1794701948.9946637,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-ec0e65cd-8b12-45cb-9bb2-8168536b63ee"
+    },
+    {
+      "time": 1794701959.2690773,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-8366fb23-bdbd-4b7b-bd74-fa7a3f772ef4"
+    },
+    {
+      "time": 1794701959.525734,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-f98c41ad-7ad9-4e88-8d5d-ed56906ab8ff"
+    },
+    {
+      "time": 1794701959.8277261,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-cc66cc74-6a0d-4c2c-b7c1-24822463334b"
+    },
+    {
+      "time": 1794701960.1426055,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "design",
+      "tool_call_id": "exec-f8f1bf83-2774-446d-8023-1189d43753a2"
+    },
+    {
+      "time": 1794701965.4763558,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-6bee6edc-b7bb-4d83-a2af-aa0d7bf88c52"
+    },
+    {
+      "time": 1794701975.93581,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-33c537e7-bc02-4c83-97e1-c1fc04a21200"
+    },
+    {
+      "time": 1794701976.249277,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-78b87bb4-1ef2-4baf-bc68-c4d9b8229d4d"
+    },
+    {
+      "time": 1794701976.563496,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-8aa9a6da-f299-4bd1-bf73-6cf63668b0a3"
+    },
+    {
+      "time": 1794701976.8871465,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-68f3bfdb-d699-4da5-acfe-255e4b190068"
+    },
+    {
+      "time": 1794701977.1850276,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-6e359c07-1348-463d-9b1d-e4b284bc986a"
+    },
+    {
+      "time": 1794701988.851839,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "followup",
+      "tool_call_id": "exec-2b75b0b7-b527-438a-a9a7-109de04eba33"
+    },
+    {
+      "time": 1794701989.17651,
+      "cc": "factory.evidence",
+      "capability": "plan_get",
+      "tool_call_id": "exec-43d11bae-f90f-4b78-9057-6c13d64dbd3a"
+    },
+    {
+      "time": 1794702011.50707,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-79997448-5b1b-4284-8c73-b49f0dfd1a13"
+    },
+    {
+      "time": 1794702015.9004672,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "stop",
+      "tool_call_id": "exec-e935d51e-2910-42e4-82b7-7bb2af3eed49"
+    },
+    {
+      "time": 1794702028.2513092,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-26c73180-f777-4e4e-8a9a-7eab5fcf11c8"
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "spark-broad-throughput-006:decision:1",
+      "task_id": "spark-broad-throughput-006",
+      "rev": 1,
+      "parent_rev": 0,
+      "evidence_ids": [
+        "original-aa-failure",
+        "placement-confounder",
+        "campaign-leads",
+        "hypothesis-proposal-broad-engram4",
+        "005cdbd1c3204937b209bdcbe1175d0d"
+      ],
+      "observations": [
+        {
+          "admission_requirements": [
+            "operator-frozen contract",
+            "independent A/A validity",
+            "complete mechanism engagement",
+            "observer overhead within contract",
+            "host admission and quiet lease"
+          ],
+          "authority": "Design only. Existing frozen-template selection remains the sole execution admission.",
+          "candidate": {
+            "applicability": {
+              "hardware": "spark-gb10, unchanged 8 CPU quota and UMA guards",
+              "limits": "Original failed A/A unchanged. Per-process automatic UMA placement confounds timing and tokens; no deterministic equivalence, confirmation, acceptance or promotion.",
+              "model": "Pinned complete DeepSeek v4.1 Flash IST DAS 2.00bpw; all six authoritative experts",
+              "source_revision": "ffa80d73133ea5c548aefe57889a16e8085a938f"
+            },
+            "correctness_obligations": [
+              "All six authoritative target experts; no skipped experts or routing change",
+              "Exact hashed engram4-screen template, image/model/data pins, eight ARC cases, four fixed speed cases and frozen warmup/request/order protocol",
+              "Keep chunk256, no draft/spec0, static cache policy, reserve/headroom, CPU quota and other profile fields fixed",
+              "Mandatory sampled no-per-question answer regression; small sample cannot establish equivalence or full quality",
+              "Retain original A/A attempt 2e84dd3da6564e0e9ef7defbafe2b689 as failed; raw token mismatch alone is not a treatment correctness regression",
+              "Descriptive only, no added gains, no promotion; terminal report_inconclusive"
+            ],
+            "evidence_ids": [
+              "original-aa-failure",
+              "placement-confounder",
+              "campaign-leads"
+            ],
+            "evidence_sources": [
+              {
+                "evidence_id": "original-aa-failure",
+                "record_kind": "artifact",
+                "record_sha256": "00420513ebca762112857f4be37087b60df52685a772ac0a71bcb756d5f21037",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "placement-confounder",
+                "record_kind": "artifact",
+                "record_sha256": "8f6f4e5793b0c7d1d3fb61c5b1475865ecc0c7e8615bd9ef0d656218cba1625c",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "campaign-leads",
+                "record_kind": "artifact",
+                "record_sha256": "91546c08993d9dbdb0b9d0d02ee9af25a66b7a40f45d3fb1e2ec3fb995a02196",
+                "task_id": "spark-broad-throughput-006"
+              }
+            ],
+            "expected_benefit": "unknown",
+            "falsification": "No combined increase falsifies the directional prediction in this screen. Missing actual-reader or demand evidence stops this branch as unengaged. Sampled answer regression or protocol failure stops the branch. Placement differences prevent sole nominal-setting attribution.",
+            "hypothesis": "Parallel Engram row reads with four reader threads may hide more I/O than two; contention may negate the benefit (campaign-leads source3400-3420,3486,7955-7960).",
+            "id": "broad-engram4",
+            "prediction": "Actual four readers with nonzero row demand may increase descriptive combined native output tokens/s; report decode separately and preserve null/loss.",
+            "primary_source_urls": [],
+            "reason": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: No combined increase falsifies the directional prediction in this screen. Missing actual-reader or demand evidence stops this branch as unengaged. Sampled answer regression or protocol failure stops the branch. Placement differences prevent sole nominal-setting attribution.",
+            "required_counters": [
+              "Actual startup reader count and nonzero Engram rows/reads",
+              "Request-delta Engram cache hits/reads and capacity",
+              "Each quality/speed process INFO expert_slots and cpu_experts plus placement/budget stderr",
+              "Native prefill/decode/combined times and per-request output counts",
+              "ARC per-question answers and sampled no-regression result",
+              "Raw token/finish observations; observer resource samples and cleanup receipts"
+            ],
+            "single_change": {
+              "baseline": "2",
+              "candidate": "4",
+              "name": "DS4_ENGRAM_THREADS"
+            },
+            "status": "proposal_only"
+          },
+          "citations_fetched": false,
+          "citations_unverified": true,
+          "correctness_obligations": [
+            "All six authoritative target experts; no skipped experts or routing change",
+            "Exact hashed engram4-screen template, image/model/data pins, eight ARC cases, four fixed speed cases and frozen warmup/request/order protocol",
+            "Keep chunk256, no draft/spec0, static cache policy, reserve/headroom, CPU quota and other profile fields fixed",
+            "Mandatory sampled no-per-question answer regression; small sample cannot establish equivalence or full quality",
+            "Retain original A/A attempt 2e84dd3da6564e0e9ef7defbafe2b689 as failed; raw token mismatch alone is not a treatment correctness regression",
+            "Descriptive only, no added gains, no promotion; terminal report_inconclusive"
+          ],
+          "evidence_sources": [
+            {
+              "evidence_id": "original-aa-failure",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "placement-confounder",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "campaign-leads",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "hypothesis-proposal-broad-engram4",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "005cdbd1c3204937b209bdcbe1175d0d",
+              "task_id": "spark-broad-throughput-006"
+            }
+          ],
+          "execution_authorized": false,
+          "execution_order": [
+            "A",
+            "B",
+            "B",
+            "A"
+          ],
+          "falsification": "No combined increase falsifies the directional prediction in this screen. Missing actual-reader or demand evidence stops this branch as unengaged. Sampled answer regression or protocol failure stops the branch. Placement differences prevent sole nominal-setting attribution.",
+          "final_combined_validation": "Compare the final stack directly against the frozen original; do not multiply individual gains.",
+          "freeze": [
+            "image/source identities except the declared change",
+            "workload/tokenizer/model",
+            "full-expert and correctness policy",
+            "cache/warmup protocol",
+            "resource limits"
+          ],
+          "hypothesis_id": "broad-engram4",
+          "hypothesis_sha256": "f634bb8d26748c1c568f11d68ecf6caffcaafe56881a6bdf190d25123f1fd1fe",
+          "maximum_changed_variables": 1,
+          "maximum_trials": 3,
+          "mode": "single_variable_abba_after_admission",
+          "promotion_authorized": false,
+          "proposal_evidence_source": {
+            "evidence_id": "hypothesis-proposal-broad-engram4",
+            "task_id": "spark-broad-throughput-006"
+          },
+          "required_counters": [
+            "Actual startup reader count and nonzero Engram rows/reads",
+            "Request-delta Engram cache hits/reads and capacity",
+            "Each quality/speed process INFO expert_slots and cpu_experts plus placement/budget stderr",
+            "Native prefill/decode/combined times and per-request output counts",
+            "ARC per-question answers and sampled no-regression result",
+            "Raw token/finish observations; observer resource samples and cleanup receipts"
+          ],
+          "schema_version": 1,
+          "scoring_ready": false,
+          "status": "proposal_only",
+          "stop_conditions": [
+            "correctness failure",
+            "memory guard/OOM",
+            "missing engagement",
+            "incomplete evidence",
+            "budget exhausted"
+          ]
+        }
+      ],
+      "hypothesis": "Parallel Engram row reads with four reader threads may hide more I/O than two; contention may negate the benefit (campaign-leads source3400-3420,3486,7955-7960).",
+      "uncertainty": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: No combined increase falsifies the directional prediction in this screen. Missing actual-reader or demand evidence stops this branch as unengaged. Sampled answer regression or protocol failure stops the branch. Placement differences prevent sole nominal-setting attribution.",
+      "action": {
+        "capability": "factory_loop.execute",
+        "cycle_id": "diagnostic-01-engram4",
+        "template_id": "engram4-screen",
+        "type": "measure"
+      },
+      "expected_evidence": "Pinned benchmark result plus bounded follow-up proposal",
+      "budget": {
+        "max_experiments": 1
+      },
+      "stop_condition": "Correctness failure, incomplete evidence, cancellation or exhausted policy",
+      "reason_for_change": "Agent selected a report-backed hypothesis under the admitted template envelope",
+      "created": 1794699053.8229063,
+      "plan_patch": null,
+      "expected_graph_rev": null
+    },
+    {
+      "decision_id": "spark-broad-throughput-006:decision:2",
+      "task_id": "spark-broad-throughput-006",
+      "rev": 2,
+      "parent_rev": 1,
+      "evidence_ids": [
+        "original-aa-failure",
+        "placement-confounder",
+        "campaign-leads",
+        "loop-result:1",
+        "hypothesis-proposal-broad-cache256",
+        "f83419b7d78f41cb9125e24d94f389db"
+      ],
+      "observations": [
+        {
+          "admission_requirements": [
+            "operator-frozen contract",
+            "independent A/A validity",
+            "complete mechanism engagement",
+            "observer overhead within contract",
+            "host admission and quiet lease"
+          ],
+          "authority": "Design only. Existing frozen-template selection remains the sole execution admission.",
+          "candidate": {
+            "applicability": {
+              "hardware": "spark-gb10, unchanged 8 CPU quota and UMA guards",
+              "limits": "Original failed A/A unchanged. Per-process automatic UMA placement confounds timing and tokens; no deterministic equivalence, confirmation, acceptance or promotion.",
+              "model": "Pinned complete DeepSeek v4.1 Flash IST DAS 2.00bpw; all six authoritative experts",
+              "source_revision": "ffa80d73133ea5c548aefe57889a16e8085a938f"
+            },
+            "correctness_obligations": [
+              "All six authoritative target experts; no skipped experts or routing change",
+              "Exact hashed cache256-screen template, image/model/data pins, eight ARC cases, four fixed speed cases and frozen warmup/request/order protocol",
+              "Keep chunk256, no draft/spec0, static cache policy, reserve/headroom, CPU quota and other profile fields fixed",
+              "Mandatory sampled no-per-question answer regression; small sample cannot establish equivalence or full quality",
+              "Retain original A/A attempt 2e84dd3da6564e0e9ef7defbafe2b689 as failed; raw token mismatch alone is not a treatment correctness regression",
+              "Descriptive only, no added gains, no promotion; terminal report_inconclusive"
+            ],
+            "evidence_ids": [
+              "original-aa-failure",
+              "placement-confounder",
+              "campaign-leads",
+              "loop-result:1"
+            ],
+            "evidence_sources": [
+              {
+                "evidence_id": "original-aa-failure",
+                "record_kind": "artifact",
+                "record_sha256": "00420513ebca762112857f4be37087b60df52685a772ac0a71bcb756d5f21037",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "placement-confounder",
+                "record_kind": "artifact",
+                "record_sha256": "8f6f4e5793b0c7d1d3fb61c5b1475865ecc0c7e8615bd9ef0d656218cba1625c",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "campaign-leads",
+                "record_kind": "artifact",
+                "record_sha256": "91546c08993d9dbdb0b9d0d02ee9af25a66b7a40f45d3fb1e2ec3fb995a02196",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:1",
+                "record_kind": "observation",
+                "record_sha256": "2577685b2b216a7192026cde24d6fbd67e9c46701bd3e31ad3b6c6844982ce66",
+                "task_id": "spark-broad-throughput-006"
+              }
+            ],
+            "expected_benefit": "unknown",
+            "falsification": "Missing effective capacity or request-delta hit/read evidence stops the cache256 branch as mechanism-unresolved. Sampled answer regression or protocol failure stops the branch. No combined increase falsifies the directional screen prediction; placement can confound attribution.",
+            "hypothesis": "Larger native Engram row cache may avoid repeated reads (campaign-leads source3486,7955-7960). Engram4 showed no descriptive combined gain, so explore cache capacity separately.",
+            "id": "broad-cache256",
+            "prediction": "At nonzero Engram demand, 256 MiB capacity may increase request-delta hits or reduce reads and increase descriptive combined throughput; report decode separately.",
+            "primary_source_urls": [],
+            "reason": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: Missing effective capacity or request-delta hit/read evidence stops the cache256 branch as mechanism-unresolved. Sampled answer regression or protocol failure stops the branch. No combined increase falsifies the directional screen prediction; placement can confound attribution.",
+            "required_counters": [
+              "Native startup Engram cache capacity plus nonzero row demand",
+              "Request-delta Engram cache hits/reads and capacity",
+              "Each quality/speed process INFO expert_slots and cpu_experts plus placement/budget stderr",
+              "Native prefill/decode/combined times and per-request output counts",
+              "ARC per-question answers and sampled no-regression result",
+              "Raw token/finish observations; observer resource samples and cleanup receipts"
+            ],
+            "single_change": {
+              "baseline": "64",
+              "candidate": "256",
+              "name": "DS4_ENGRAM_CACHE_MB"
+            },
+            "status": "proposal_only"
+          },
+          "citations_fetched": false,
+          "citations_unverified": true,
+          "correctness_obligations": [
+            "All six authoritative target experts; no skipped experts or routing change",
+            "Exact hashed cache256-screen template, image/model/data pins, eight ARC cases, four fixed speed cases and frozen warmup/request/order protocol",
+            "Keep chunk256, no draft/spec0, static cache policy, reserve/headroom, CPU quota and other profile fields fixed",
+            "Mandatory sampled no-per-question answer regression; small sample cannot establish equivalence or full quality",
+            "Retain original A/A attempt 2e84dd3da6564e0e9ef7defbafe2b689 as failed; raw token mismatch alone is not a treatment correctness regression",
+            "Descriptive only, no added gains, no promotion; terminal report_inconclusive"
+          ],
+          "evidence_sources": [
+            {
+              "evidence_id": "original-aa-failure",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "placement-confounder",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "campaign-leads",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:1",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "hypothesis-proposal-broad-cache256",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "f83419b7d78f41cb9125e24d94f389db",
+              "task_id": "spark-broad-throughput-006"
+            }
+          ],
+          "execution_authorized": false,
+          "execution_order": [
+            "A",
+            "B",
+            "B",
+            "A"
+          ],
+          "falsification": "Missing effective capacity or request-delta hit/read evidence stops the cache256 branch as mechanism-unresolved. Sampled answer regression or protocol failure stops the branch. No combined increase falsifies the directional screen prediction; placement can confound attribution.",
+          "final_combined_validation": "Compare the final stack directly against the frozen original; do not multiply individual gains.",
+          "freeze": [
+            "image/source identities except the declared change",
+            "workload/tokenizer/model",
+            "full-expert and correctness policy",
+            "cache/warmup protocol",
+            "resource limits"
+          ],
+          "hypothesis_id": "broad-cache256",
+          "hypothesis_sha256": "734e55f9ab1618e5abae260492b8cb81c36d2308006389a386a31bb15aba2f09",
+          "maximum_changed_variables": 1,
+          "maximum_trials": 3,
+          "mode": "single_variable_abba_after_admission",
+          "promotion_authorized": false,
+          "proposal_evidence_source": {
+            "evidence_id": "hypothesis-proposal-broad-cache256",
+            "task_id": "spark-broad-throughput-006"
+          },
+          "required_counters": [
+            "Native startup Engram cache capacity plus nonzero row demand",
+            "Request-delta Engram cache hits/reads and capacity",
+            "Each quality/speed process INFO expert_slots and cpu_experts plus placement/budget stderr",
+            "Native prefill/decode/combined times and per-request output counts",
+            "ARC per-question answers and sampled no-regression result",
+            "Raw token/finish observations; observer resource samples and cleanup receipts"
+          ],
+          "schema_version": 1,
+          "scoring_ready": false,
+          "status": "proposal_only",
+          "stop_conditions": [
+            "correctness failure",
+            "memory guard/OOM",
+            "missing engagement",
+            "incomplete evidence",
+            "budget exhausted"
+          ]
+        }
+      ],
+      "hypothesis": "Larger native Engram row cache may avoid repeated reads (campaign-leads source3486,7955-7960). Engram4 showed no descriptive combined gain, so explore cache capacity separately.",
+      "uncertainty": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: Missing effective capacity or request-delta hit/read evidence stops the cache256 branch as mechanism-unresolved. Sampled answer regression or protocol failure stops the branch. No combined increase falsifies the directional screen prediction; placement can confound attribution.",
+      "action": {
+        "capability": "factory_loop.execute",
+        "cycle_id": "diagnostic-02-cache256",
+        "template_id": "cache256-screen",
+        "type": "measure"
+      },
+      "expected_evidence": "Pinned benchmark result plus bounded follow-up proposal",
+      "budget": {
+        "max_experiments": 1
+      },
+      "stop_condition": "Correctness failure, incomplete evidence, cancellation or exhausted policy",
+      "reason_for_change": "Agent selected a report-backed hypothesis under the admitted template envelope",
+      "created": 1794699538.7588904,
+      "plan_patch": null,
+      "expected_graph_rev": null
+    },
+    {
+      "decision_id": "spark-broad-throughput-006:decision:3",
+      "task_id": "spark-broad-throughput-006",
+      "rev": 3,
+      "parent_rev": 2,
+      "evidence_ids": [
+        "original-aa-failure",
+        "placement-confounder",
+        "campaign-leads",
+        "loop-result:1",
+        "loop-result:2",
+        "hypothesis-proposal-broad-cpu4",
+        "a19e1a6bb704434cb1bbf29d9d92f369"
+      ],
+      "observations": [
+        {
+          "admission_requirements": [
+            "operator-frozen contract",
+            "independent A/A validity",
+            "complete mechanism engagement",
+            "observer overhead within contract",
+            "host admission and quiet lease"
+          ],
+          "authority": "Design only. Existing frozen-template selection remains the sole execution admission.",
+          "candidate": {
+            "applicability": {
+              "hardware": "spark-gb10 with frozen 8 CPU quota and UMA guards",
+              "limits": "Original failed A/A unchanged; automatic UMA placement is a confounder; descriptive diagnostics only",
+              "model": "Pinned full DeepSeek v4.1 Flash IST DAS 2.00bpw, six authoritative target experts",
+              "source_revision": "ffa80d73133ea5c548aefe57889a16e8085a938f"
+            },
+            "correctness_obligations": [
+              "All six authoritative target experts with no skipping or target routing change",
+              "Exact cpu4-screen hashed contract, frozen model/image/source/data, eight ARC cases and four speed cases, request positions and warmup/order",
+              "Only CPU worker count changes from 8 to 4; preserve chunk256, no draft/spec0, cache policy, reserve/headroom and resource limits",
+              "Sampled no-per-question answer regression mandatory; no claim of full quality or correctness-equivalence",
+              "Retain original failed A/A 2e84dd3da6564e0e9ef7defbafe2b689; raw token mismatch alone is not treatment correctness regression",
+              "No confirmation, acceptance, promotion or summed gains; terminal report_inconclusive"
+            ],
+            "evidence_ids": [
+              "original-aa-failure",
+              "placement-confounder",
+              "campaign-leads",
+              "loop-result:1",
+              "loop-result:2"
+            ],
+            "evidence_sources": [
+              {
+                "evidence_id": "original-aa-failure",
+                "record_kind": "artifact",
+                "record_sha256": "00420513ebca762112857f4be37087b60df52685a772ac0a71bcb756d5f21037",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "placement-confounder",
+                "record_kind": "artifact",
+                "record_sha256": "8f6f4e5793b0c7d1d3fb61c5b1475865ecc0c7e8615bd9ef0d656218cba1625c",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "campaign-leads",
+                "record_kind": "artifact",
+                "record_sha256": "91546c08993d9dbdb0b9d0d02ee9af25a66b7a40f45d3fb1e2ec3fb995a02196",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:1",
+                "record_kind": "observation",
+                "record_sha256": "2577685b2b216a7192026cde24d6fbd67e9c46701bd3e31ad3b6c6844982ce66",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:2",
+                "record_kind": "observation",
+                "record_sha256": "4708d75ac088929bcaf0125056341654413e4fff662745dcf384720df15b4dd8",
+                "task_id": "spark-broad-throughput-006"
+              }
+            ],
+            "expected_benefit": "unknown",
+            "falsification": "No descriptive combined throughput increase falsifies the directional screen prediction. Missing actual worker count or CPU expert demand closes the CPU4 branch unresolved. Sampled per-question answer regression, protocol failure or resource failure stops the branch.",
+            "hypothesis": "Fewer CPU expert workers can reduce spinning, scheduling and shared DRAM contention, leaving CPU time for launch/Engram work (campaign-leads source6843,6876,6957). Engram4 and cache256 yielded descriptive losses, motivating an independent CPU scheduling screen against the exact frozen baseline.",
+            "id": "broad-cpu4",
+            "prediction": "With nonzero CPU expert demand, four actual workers may improve combined native throughput relative to eight; decode is reported separately. Any difference remains confounded by process placement.",
+            "primary_source_urls": [],
+            "reason": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: No descriptive combined throughput increase falsifies the directional screen prediction. Missing actual worker count or CPU expert demand closes the CPU4 branch unresolved. Sampled per-question answer regression, protocol failure or resource failure stops the branch.",
+            "required_counters": [
+              "Actual native CPU expert lane worker count and nonzero CPU expert demand",
+              "Each quality/speed process INFO expert_slots and cpu_experts plus placement/budget stderr",
+              "Native prefill, decode and combined times and per-request counts",
+              "ARC per-question answers and no-per-question regression",
+              "Raw token/finish observations; observer samples and cleanup receipts"
+            ],
+            "single_change": {
+              "baseline": "8",
+              "candidate": "4",
+              "name": "--cpu-threads"
+            },
+            "status": "proposal_only"
+          },
+          "citations_fetched": false,
+          "citations_unverified": true,
+          "correctness_obligations": [
+            "All six authoritative target experts with no skipping or target routing change",
+            "Exact cpu4-screen hashed contract, frozen model/image/source/data, eight ARC cases and four speed cases, request positions and warmup/order",
+            "Only CPU worker count changes from 8 to 4; preserve chunk256, no draft/spec0, cache policy, reserve/headroom and resource limits",
+            "Sampled no-per-question answer regression mandatory; no claim of full quality or correctness-equivalence",
+            "Retain original failed A/A 2e84dd3da6564e0e9ef7defbafe2b689; raw token mismatch alone is not treatment correctness regression",
+            "No confirmation, acceptance, promotion or summed gains; terminal report_inconclusive"
+          ],
+          "evidence_sources": [
+            {
+              "evidence_id": "original-aa-failure",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "placement-confounder",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "campaign-leads",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:1",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:2",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "hypothesis-proposal-broad-cpu4",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "a19e1a6bb704434cb1bbf29d9d92f369",
+              "task_id": "spark-broad-throughput-006"
+            }
+          ],
+          "execution_authorized": false,
+          "execution_order": [
+            "A",
+            "B",
+            "B",
+            "A"
+          ],
+          "falsification": "No descriptive combined throughput increase falsifies the directional screen prediction. Missing actual worker count or CPU expert demand closes the CPU4 branch unresolved. Sampled per-question answer regression, protocol failure or resource failure stops the branch.",
+          "final_combined_validation": "Compare the final stack directly against the frozen original; do not multiply individual gains.",
+          "freeze": [
+            "image/source identities except the declared change",
+            "workload/tokenizer/model",
+            "full-expert and correctness policy",
+            "cache/warmup protocol",
+            "resource limits"
+          ],
+          "hypothesis_id": "broad-cpu4",
+          "hypothesis_sha256": "98ab790f06421438764f927c508028d8af4c3f88dda82fa079732be4af2e3380",
+          "maximum_changed_variables": 1,
+          "maximum_trials": 3,
+          "mode": "single_variable_abba_after_admission",
+          "promotion_authorized": false,
+          "proposal_evidence_source": {
+            "evidence_id": "hypothesis-proposal-broad-cpu4",
+            "task_id": "spark-broad-throughput-006"
+          },
+          "required_counters": [
+            "Actual native CPU expert lane worker count and nonzero CPU expert demand",
+            "Each quality/speed process INFO expert_slots and cpu_experts plus placement/budget stderr",
+            "Native prefill, decode and combined times and per-request counts",
+            "ARC per-question answers and no-per-question regression",
+            "Raw token/finish observations; observer samples and cleanup receipts"
+          ],
+          "schema_version": 1,
+          "scoring_ready": false,
+          "status": "proposal_only",
+          "stop_conditions": [
+            "correctness failure",
+            "memory guard/OOM",
+            "missing engagement",
+            "incomplete evidence",
+            "budget exhausted"
+          ]
+        }
+      ],
+      "hypothesis": "Fewer CPU expert workers can reduce spinning, scheduling and shared DRAM contention, leaving CPU time for launch/Engram work (campaign-leads source6843,6876,6957). Engram4 and cache256 yielded descriptive losses, motivating an independent CPU scheduling screen against the exact frozen baseline.",
+      "uncertainty": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: No descriptive combined throughput increase falsifies the directional screen prediction. Missing actual worker count or CPU expert demand closes the CPU4 branch unresolved. Sampled per-question answer regression, protocol failure or resource failure stops the branch.",
+      "action": {
+        "capability": "factory_loop.execute",
+        "cycle_id": "diagnostic-03-cpu4",
+        "template_id": "cpu4-screen",
+        "type": "measure"
+      },
+      "expected_evidence": "Pinned benchmark result plus bounded follow-up proposal",
+      "budget": {
+        "max_experiments": 1
+      },
+      "stop_condition": "Correctness failure, incomplete evidence, cancellation or exhausted policy",
+      "reason_for_change": "Agent selected a report-backed hypothesis under the admitted template envelope",
+      "created": 1794700023.8123512,
+      "plan_patch": null,
+      "expected_graph_rev": null
+    },
+    {
+      "decision_id": "spark-broad-throughput-006:decision:4",
+      "task_id": "spark-broad-throughput-006",
+      "rev": 4,
+      "parent_rev": 3,
+      "evidence_ids": [
+        "original-aa-failure",
+        "placement-confounder",
+        "campaign-leads",
+        "loop-result:1",
+        "loop-result:2",
+        "loop-result:3",
+        "operator-cpu-throttling-lead",
+        "hypothesis-proposal-broad-draft",
+        "0b06a24c271440ba8a06188325a7f74d"
+      ],
+      "observations": [
+        {
+          "admission_requirements": [
+            "operator-frozen contract",
+            "independent A/A validity",
+            "complete mechanism engagement",
+            "observer overhead within contract",
+            "host admission and quiet lease"
+          ],
+          "authority": "Design only. Existing frozen-template selection remains the sole execution admission.",
+          "candidate": {
+            "applicability": {
+              "hardware": "spark-gb10 with frozen 8 CPU quota and UMA guards",
+              "limits": "Nonpromoting diagnostic only; original failed A/A remains final; automatic UMA placement confounds attribution",
+              "model": "Pinned full DeepSeek v4.1 Flash IST DAS 2.00bpw; six authoritative target experts",
+              "source_revision": "ffa80d73133ea5c548aefe57889a16e8085a938f"
+            },
+            "correctness_obligations": [
+              "Six authoritative target experts; no skipping or target-routing change",
+              "Exact draft-screen hash and frozen image/source/model/data, eight quality and four speed cases, request positions, warmup and order",
+              "Only dspark none to on; all other profile fields, reserve/headroom, resources and cache policy unchanged; request spec must match frozen template",
+              "Sampled no-per-question answer regression required; no correctness-equivalence or full quality claim",
+              "Original failed A/A 2e84dd3da6564e0e9ef7defbafe2b689 unchanged; raw-token difference alone is not a treatment correctness regression",
+              "No confirmation, acceptance, promotion or summed gains; terminal report_inconclusive"
+            ],
+            "evidence_ids": [
+              "original-aa-failure",
+              "placement-confounder",
+              "campaign-leads",
+              "loop-result:1",
+              "loop-result:2",
+              "loop-result:3",
+              "operator-cpu-throttling-lead"
+            ],
+            "evidence_sources": [
+              {
+                "evidence_id": "original-aa-failure",
+                "record_kind": "artifact",
+                "record_sha256": "00420513ebca762112857f4be37087b60df52685a772ac0a71bcb756d5f21037",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "placement-confounder",
+                "record_kind": "artifact",
+                "record_sha256": "8f6f4e5793b0c7d1d3fb61c5b1475865ecc0c7e8615bd9ef0d656218cba1625c",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "campaign-leads",
+                "record_kind": "artifact",
+                "record_sha256": "91546c08993d9dbdb0b9d0d02ee9af25a66b7a40f45d3fb1e2ec3fb995a02196",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:1",
+                "record_kind": "observation",
+                "record_sha256": "2577685b2b216a7192026cde24d6fbd67e9c46701bd3e31ad3b6c6844982ce66",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:2",
+                "record_kind": "observation",
+                "record_sha256": "4708d75ac088929bcaf0125056341654413e4fff662745dcf384720df15b4dd8",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:3",
+                "record_kind": "observation",
+                "record_sha256": "2076a8fac7e8ca624bcf7b230494b7e19b329216549ffa49b2437493d74868f0",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "operator-cpu-throttling-lead",
+                "record_kind": "artifact",
+                "record_sha256": "c512ffbb0c48f91724bc843ce5a1b25d3e0dd1038203a4627144c2219c6ef89e",
+                "task_id": "spark-broad-throughput-006"
+              }
+            ],
+            "expected_benefit": "unknown",
+            "falsification": "No decode increase falsifies the directional prediction; combined loss rejects an overall directional benefit for this screen. Missing accepted/offered counters or request-spec evidence closes draft branch unresolved; sampled per-question regression, protocol or resource failure stops it.",
+            "hypothesis": "Native verified drafting may amortize target decode work. campaign-leads and workbench inspect retain prior warm decode benefit with complete512/128 regression; CPU4, Engram4 and cache256 screens were descriptive losses. Test drafting independently against frozen chunk256 baseline, without combining settings.",
+            "id": "broad-draft",
+            "prediction": "With native offered and accepted drafts, decode throughput may rise but prefill overhead may erase combined benefit. Predict a descriptive decode increase and report combined rate separately; no improvement acceptance.",
+            "primary_source_urls": [],
+            "reason": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: No decode increase falsifies the directional prediction; combined loss rejects an overall directional benefit for this screen. Missing accepted/offered counters or request-spec evidence closes draft branch unresolved; sampled per-question regression, protocol or resource failure stops it.",
+            "required_counters": [
+              "Native accepted/offered drafts, request spec and startup drafting activation",
+              "Each quality/speed process INFO expert_slots and cpu_experts, plus placement and UMA budget stderr",
+              "Per-request native prefill/decode/combined times and counts",
+              "Eight ARC per-question answers and no-per-question regression",
+              "Raw tokens/finish, observer/resource/cleanup receipts"
+            ],
+            "single_change": {
+              "baseline": "none",
+              "candidate": "on",
+              "name": "--dspark"
+            },
+            "status": "proposal_only"
+          },
+          "citations_fetched": false,
+          "citations_unverified": true,
+          "correctness_obligations": [
+            "Six authoritative target experts; no skipping or target-routing change",
+            "Exact draft-screen hash and frozen image/source/model/data, eight quality and four speed cases, request positions, warmup and order",
+            "Only dspark none to on; all other profile fields, reserve/headroom, resources and cache policy unchanged; request spec must match frozen template",
+            "Sampled no-per-question answer regression required; no correctness-equivalence or full quality claim",
+            "Original failed A/A 2e84dd3da6564e0e9ef7defbafe2b689 unchanged; raw-token difference alone is not a treatment correctness regression",
+            "No confirmation, acceptance, promotion or summed gains; terminal report_inconclusive"
+          ],
+          "evidence_sources": [
+            {
+              "evidence_id": "original-aa-failure",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "placement-confounder",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "campaign-leads",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:1",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:2",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:3",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "operator-cpu-throttling-lead",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "hypothesis-proposal-broad-draft",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "0b06a24c271440ba8a06188325a7f74d",
+              "task_id": "spark-broad-throughput-006"
+            }
+          ],
+          "execution_authorized": false,
+          "execution_order": [
+            "A",
+            "B",
+            "B",
+            "A"
+          ],
+          "falsification": "No decode increase falsifies the directional prediction; combined loss rejects an overall directional benefit for this screen. Missing accepted/offered counters or request-spec evidence closes draft branch unresolved; sampled per-question regression, protocol or resource failure stops it.",
+          "final_combined_validation": "Compare the final stack directly against the frozen original; do not multiply individual gains.",
+          "freeze": [
+            "image/source identities except the declared change",
+            "workload/tokenizer/model",
+            "full-expert and correctness policy",
+            "cache/warmup protocol",
+            "resource limits"
+          ],
+          "hypothesis_id": "broad-draft",
+          "hypothesis_sha256": "0df6ad80b97efc83da8eef0abe7c44d1db847a8f3272b5d904d9c510582df07b",
+          "maximum_changed_variables": 1,
+          "maximum_trials": 3,
+          "mode": "single_variable_abba_after_admission",
+          "promotion_authorized": false,
+          "proposal_evidence_source": {
+            "evidence_id": "hypothesis-proposal-broad-draft",
+            "task_id": "spark-broad-throughput-006"
+          },
+          "required_counters": [
+            "Native accepted/offered drafts, request spec and startup drafting activation",
+            "Each quality/speed process INFO expert_slots and cpu_experts, plus placement and UMA budget stderr",
+            "Per-request native prefill/decode/combined times and counts",
+            "Eight ARC per-question answers and no-per-question regression",
+            "Raw tokens/finish, observer/resource/cleanup receipts"
+          ],
+          "schema_version": 1,
+          "scoring_ready": false,
+          "status": "proposal_only",
+          "stop_conditions": [
+            "correctness failure",
+            "memory guard/OOM",
+            "missing engagement",
+            "incomplete evidence",
+            "budget exhausted"
+          ]
+        }
+      ],
+      "hypothesis": "Native verified drafting may amortize target decode work. campaign-leads and workbench inspect retain prior warm decode benefit with complete512/128 regression; CPU4, Engram4 and cache256 screens were descriptive losses. Test drafting independently against frozen chunk256 baseline, without combining settings.",
+      "uncertainty": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: No decode increase falsifies the directional prediction; combined loss rejects an overall directional benefit for this screen. Missing accepted/offered counters or request-spec evidence closes draft branch unresolved; sampled per-question regression, protocol or resource failure stops it.",
+      "action": {
+        "capability": "factory_loop.execute",
+        "cycle_id": "diagnostic-04-draft",
+        "template_id": "draft-screen",
+        "type": "measure"
+      },
+      "expected_evidence": "Pinned benchmark result plus bounded follow-up proposal",
+      "budget": {
+        "max_experiments": 1
+      },
+      "stop_condition": "Correctness failure, incomplete evidence, cancellation or exhausted policy",
+      "reason_for_change": "Agent selected a report-backed hypothesis under the admitted template envelope",
+      "created": 1794700540.4446864,
+      "plan_patch": null,
+      "expected_graph_rev": null
+    },
+    {
+      "decision_id": "spark-broad-throughput-006:decision:5",
+      "task_id": "spark-broad-throughput-006",
+      "rev": 5,
+      "parent_rev": 4,
+      "evidence_ids": [
+        "original-aa-failure",
+        "placement-confounder",
+        "campaign-leads",
+        "loop-result:1",
+        "loop-result:2",
+        "loop-result:3",
+        "loop-result:4",
+        "hypothesis-proposal-broad-ahead1",
+        "767855ae69e1428198ca311229d1cbd0"
+      ],
+      "observations": [
+        {
+          "admission_requirements": [
+            "operator-frozen contract",
+            "independent A/A validity",
+            "complete mechanism engagement",
+            "observer overhead within contract",
+            "host admission and quiet lease"
+          ],
+          "authority": "Design only. Existing frozen-template selection remains the sole execution admission.",
+          "candidate": {
+            "applicability": {
+              "hardware": "spark-gb10, frozen 8 CPU quota and UMA guards",
+              "limits": "Descriptive nonpromoting diagnostic only; original failed A/A unchanged; automatic placement confounds attribution",
+              "model": "Pinned DeepSeek v4.1 Flash IST DAS 2.00bpw, six authoritative target experts",
+              "source_revision": "ffa80d73133ea5c548aefe57889a16e8085a938f"
+            },
+            "correctness_obligations": [
+              "All six authoritative target experts; no skipping or routing changes",
+              "Exact admitted ahead1 template and fixed model/image/source/dataset/workload, eight ARC and four speed cases, order and warmup unchanged",
+              "Only DS4_AHEAD 0 to1, all other settings/resource/reserve/cache obligations frozen",
+              "Sampled no-per-question answer regression required; no equivalence or stable-output claim",
+              "Original failed A/A 2e84dd3da6564e0e9ef7defbafe2b689 unchanged; token mismatch alone is not treatment correctness regression",
+              "No confirm, acceptance, promotion or addition of gains; terminal report_inconclusive"
+            ],
+            "evidence_ids": [
+              "original-aa-failure",
+              "placement-confounder",
+              "campaign-leads",
+              "loop-result:1",
+              "loop-result:2",
+              "loop-result:3",
+              "loop-result:4"
+            ],
+            "evidence_sources": [
+              {
+                "evidence_id": "original-aa-failure",
+                "record_kind": "artifact",
+                "record_sha256": "00420513ebca762112857f4be37087b60df52685a772ac0a71bcb756d5f21037",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "placement-confounder",
+                "record_kind": "artifact",
+                "record_sha256": "8f6f4e5793b0c7d1d3fb61c5b1475865ecc0c7e8615bd9ef0d656218cba1625c",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "campaign-leads",
+                "record_kind": "artifact",
+                "record_sha256": "91546c08993d9dbdb0b9d0d02ee9af25a66b7a40f45d3fb1e2ec3fb995a02196",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:1",
+                "record_kind": "observation",
+                "record_sha256": "2577685b2b216a7192026cde24d6fbd67e9c46701bd3e31ad3b6c6844982ce66",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:2",
+                "record_kind": "observation",
+                "record_sha256": "4708d75ac088929bcaf0125056341654413e4fff662745dcf384720df15b4dd8",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:3",
+                "record_kind": "observation",
+                "record_sha256": "2076a8fac7e8ca624bcf7b230494b7e19b329216549ffa49b2437493d74868f0",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:4",
+                "record_kind": "observation",
+                "record_sha256": "20246ba33581b85b356720f2e4a091f9a0e3a6ef09cf7b6a323310234a663587",
+                "task_id": "spark-broad-throughput-006"
+              }
+            ],
+            "expected_benefit": "unknown",
+            "falsification": "No decode increase falsifies the directional prediction. Missing predicted/requested/hit evidence leaves useful prefetch unestablished and closes branch unresolved. Stop affected branch on sampled question regression, protocol/resource failure or missing engagement.",
+            "hypothesis": "campaign-leads source9530/14131 describes next-layer router prediction overlapping file reads. Four prior distinct screens yielded combined losses; explore the independent lookahead mechanism without combining settings.",
+            "id": "broad-ahead1",
+            "prediction": "Useful predictions may increase descriptive decode throughput; extra router and file traffic may negate combined benefit. Report combined and decode separately without acceptance.",
+            "primary_source_urls": [],
+            "reason": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: No decode increase falsifies the directional prediction. Missing predicted/requested/hit evidence leaves useful prefetch unestablished and closes branch unresolved. Stop affected branch on sampled question regression, protocol/resource failure or missing engagement.",
+            "required_counters": [
+              "Each quality/speed process stdout INFO expert_slots and cpu_experts plus placement/UMA budget stderr",
+              "Native ahead predicted/requested/hit counters across multiple decoded tokens; requested state alone insufficient",
+              "Per-request native prefill/decode/combined times and output counts",
+              "ARC per-question answers and no-per-question regression",
+              "Raw tokens/finish and observer/resource/cleanup receipts"
+            ],
+            "single_change": {
+              "baseline": "0",
+              "candidate": "1",
+              "name": "DS4_AHEAD"
+            },
+            "status": "proposal_only"
+          },
+          "citations_fetched": false,
+          "citations_unverified": true,
+          "correctness_obligations": [
+            "All six authoritative target experts; no skipping or routing changes",
+            "Exact admitted ahead1 template and fixed model/image/source/dataset/workload, eight ARC and four speed cases, order and warmup unchanged",
+            "Only DS4_AHEAD 0 to1, all other settings/resource/reserve/cache obligations frozen",
+            "Sampled no-per-question answer regression required; no equivalence or stable-output claim",
+            "Original failed A/A 2e84dd3da6564e0e9ef7defbafe2b689 unchanged; token mismatch alone is not treatment correctness regression",
+            "No confirm, acceptance, promotion or addition of gains; terminal report_inconclusive"
+          ],
+          "evidence_sources": [
+            {
+              "evidence_id": "original-aa-failure",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "placement-confounder",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "campaign-leads",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:1",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:2",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:3",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:4",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "hypothesis-proposal-broad-ahead1",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "767855ae69e1428198ca311229d1cbd0",
+              "task_id": "spark-broad-throughput-006"
+            }
+          ],
+          "execution_authorized": false,
+          "execution_order": [
+            "A",
+            "B",
+            "B",
+            "A"
+          ],
+          "falsification": "No decode increase falsifies the directional prediction. Missing predicted/requested/hit evidence leaves useful prefetch unestablished and closes branch unresolved. Stop affected branch on sampled question regression, protocol/resource failure or missing engagement.",
+          "final_combined_validation": "Compare the final stack directly against the frozen original; do not multiply individual gains.",
+          "freeze": [
+            "image/source identities except the declared change",
+            "workload/tokenizer/model",
+            "full-expert and correctness policy",
+            "cache/warmup protocol",
+            "resource limits"
+          ],
+          "hypothesis_id": "broad-ahead1",
+          "hypothesis_sha256": "ba9e6ea07856415fb566417423b0ce9e9e7d0a960a0d54b3ab62fec7d43135cd",
+          "maximum_changed_variables": 1,
+          "maximum_trials": 3,
+          "mode": "single_variable_abba_after_admission",
+          "promotion_authorized": false,
+          "proposal_evidence_source": {
+            "evidence_id": "hypothesis-proposal-broad-ahead1",
+            "task_id": "spark-broad-throughput-006"
+          },
+          "required_counters": [
+            "Each quality/speed process stdout INFO expert_slots and cpu_experts plus placement/UMA budget stderr",
+            "Native ahead predicted/requested/hit counters across multiple decoded tokens; requested state alone insufficient",
+            "Per-request native prefill/decode/combined times and output counts",
+            "ARC per-question answers and no-per-question regression",
+            "Raw tokens/finish and observer/resource/cleanup receipts"
+          ],
+          "schema_version": 1,
+          "scoring_ready": false,
+          "status": "proposal_only",
+          "stop_conditions": [
+            "correctness failure",
+            "memory guard/OOM",
+            "missing engagement",
+            "incomplete evidence",
+            "budget exhausted"
+          ]
+        }
+      ],
+      "hypothesis": "campaign-leads source9530/14131 describes next-layer router prediction overlapping file reads. Four prior distinct screens yielded combined losses; explore the independent lookahead mechanism without combining settings.",
+      "uncertainty": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: No decode increase falsifies the directional prediction. Missing predicted/requested/hit evidence leaves useful prefetch unestablished and closes branch unresolved. Stop affected branch on sampled question regression, protocol/resource failure or missing engagement.",
+      "action": {
+        "capability": "factory_loop.execute",
+        "cycle_id": "diagnostic-05-ahead1",
+        "template_id": "ahead1-screen",
+        "type": "measure"
+      },
+      "expected_evidence": "Pinned benchmark result plus bounded follow-up proposal",
+      "budget": {
+        "max_experiments": 1
+      },
+      "stop_condition": "Correctness failure, incomplete evidence, cancellation or exhausted policy",
+      "reason_for_change": "Agent selected a report-backed hypothesis under the admitted template envelope",
+      "created": 1794701044.7069807,
+      "plan_patch": null,
+      "expected_graph_rev": null
+    },
+    {
+      "decision_id": "spark-broad-throughput-006:decision:6",
+      "task_id": "spark-broad-throughput-006",
+      "rev": 6,
+      "parent_rev": 5,
+      "evidence_ids": [
+        "original-aa-failure",
+        "placement-confounder",
+        "campaign-leads",
+        "loop-result:3",
+        "loop-result:5",
+        "hypothesis-proposal-broad-cpu6",
+        "d3daeedeed314728a8066e39251b3e99"
+      ],
+      "observations": [
+        {
+          "admission_requirements": [
+            "operator-frozen contract",
+            "independent A/A validity",
+            "complete mechanism engagement",
+            "observer overhead within contract",
+            "host admission and quiet lease"
+          ],
+          "authority": "Design only. Existing frozen-template selection remains the sole execution admission.",
+          "candidate": {
+            "applicability": {
+              "hardware": "spark-gb10 with frozen 8 CPU quota and UMA guards",
+              "limits": "Original failed A/A unchanged; automatic UMA placement is a confounder; descriptive diagnostics only",
+              "model": "Pinned full DeepSeek v4.1 Flash IST DAS 2.00bpw, six authoritative target experts",
+              "source_revision": "ffa80d73133ea5c548aefe57889a16e8085a938f"
+            },
+            "correctness_obligations": [
+              "All six authoritative target experts with no skipping or target routing change",
+              "Exact cpu6-screen hashed contract, frozen model/image/source/data, eight ARC cases and four speed cases, request positions and warmup/order",
+              "Only CPU worker count changes from 8 to 6; preserve chunk256, no draft/spec0, cache policy, reserve/headroom and resource limits",
+              "Sampled no-per-question answer regression mandatory; no claim of full quality or correctness-equivalence",
+              "Retain original failed A/A 2e84dd3da6564e0e9ef7defbafe2b689; raw token mismatch alone is not treatment correctness regression",
+              "No confirmation, acceptance, promotion or summed gains; terminal report_inconclusive"
+            ],
+            "evidence_ids": [
+              "original-aa-failure",
+              "placement-confounder",
+              "campaign-leads",
+              "loop-result:3",
+              "loop-result:5"
+            ],
+            "evidence_sources": [
+              {
+                "evidence_id": "original-aa-failure",
+                "record_kind": "artifact",
+                "record_sha256": "00420513ebca762112857f4be37087b60df52685a772ac0a71bcb756d5f21037",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "placement-confounder",
+                "record_kind": "artifact",
+                "record_sha256": "8f6f4e5793b0c7d1d3fb61c5b1475865ecc0c7e8615bd9ef0d656218cba1625c",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "campaign-leads",
+                "record_kind": "artifact",
+                "record_sha256": "91546c08993d9dbdb0b9d0d02ee9af25a66b7a40f45d3fb1e2ec3fb995a02196",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:3",
+                "record_kind": "observation",
+                "record_sha256": "2076a8fac7e8ca624bcf7b230494b7e19b329216549ffa49b2437493d74868f0",
+                "task_id": "spark-broad-throughput-006"
+              },
+              {
+                "evidence_id": "loop-result:5",
+                "record_kind": "observation",
+                "record_sha256": "b7544a29fd40911c34803fe523018784857a1749830e9233eed93faf6202295d",
+                "task_id": "spark-broad-throughput-006"
+              }
+            ],
+            "expected_benefit": "unknown",
+            "falsification": "No combined rate increase falsifies the directional screen prediction. Missing actual worker count or CPU demand leaves CPU6 unresolved and closes this branch. Stop on sampled per-question answer regression, protocol failure or missing engagement.",
+            "hypothesis": "campaign-leads source6843/6876/6957 motivates CPU worker contention. CPU4 reduced combined throughput to 0.8822 and decode to 0.7857 of baseline; six workers may preserve more expert parallelism while reducing eight-worker scheduling contention. This is a distinct unmeasured point, not a retry or combination.",
+            "id": "broad-cpu6",
+            "prediction": "Six actual workers may improve descriptive combined throughput versus eight with nonzero CPU expert demand; report decode separately and placement confounding.",
+            "primary_source_urls": [],
+            "reason": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: No combined rate increase falsifies the directional screen prediction. Missing actual worker count or CPU demand leaves CPU6 unresolved and closes this branch. Stop on sampled per-question answer regression, protocol failure or missing engagement.",
+            "required_counters": [
+              "Actual native CPU expert lane worker count and nonzero CPU expert demand",
+              "Each quality/speed process INFO expert_slots and cpu_experts plus placement/budget stderr",
+              "Native prefill, decode and combined times and per-request counts",
+              "ARC per-question answers and no-per-question regression",
+              "Raw token/finish observations; observer samples and cleanup receipts"
+            ],
+            "single_change": {
+              "baseline": "8",
+              "candidate": "6",
+              "name": "--cpu-threads"
+            },
+            "status": "proposal_only"
+          },
+          "citations_fetched": false,
+          "citations_unverified": true,
+          "correctness_obligations": [
+            "All six authoritative target experts with no skipping or target routing change",
+            "Exact cpu6-screen hashed contract, frozen model/image/source/data, eight ARC cases and four speed cases, request positions and warmup/order",
+            "Only CPU worker count changes from 8 to 6; preserve chunk256, no draft/spec0, cache policy, reserve/headroom and resource limits",
+            "Sampled no-per-question answer regression mandatory; no claim of full quality or correctness-equivalence",
+            "Retain original failed A/A 2e84dd3da6564e0e9ef7defbafe2b689; raw token mismatch alone is not treatment correctness regression",
+            "No confirmation, acceptance, promotion or summed gains; terminal report_inconclusive"
+          ],
+          "evidence_sources": [
+            {
+              "evidence_id": "original-aa-failure",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "placement-confounder",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "campaign-leads",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:3",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "loop-result:5",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "hypothesis-proposal-broad-cpu6",
+              "task_id": "spark-broad-throughput-006"
+            },
+            {
+              "evidence_id": "d3daeedeed314728a8066e39251b3e99",
+              "task_id": "spark-broad-throughput-006"
+            }
+          ],
+          "execution_authorized": false,
+          "execution_order": [
+            "A",
+            "B",
+            "B",
+            "A"
+          ],
+          "falsification": "No combined rate increase falsifies the directional screen prediction. Missing actual worker count or CPU demand leaves CPU6 unresolved and closes this branch. Stop on sampled per-question answer regression, protocol failure or missing engagement.",
+          "final_combined_validation": "Compare the final stack directly against the frozen original; do not multiply individual gains.",
+          "freeze": [
+            "image/source identities except the declared change",
+            "workload/tokenizer/model",
+            "full-expert and correctness policy",
+            "cache/warmup protocol",
+            "resource limits"
+          ],
+          "hypothesis_id": "broad-cpu6",
+          "hypothesis_sha256": "a60b672304ce07d8409c8227806827f204084835cef6df6504f8d8067e1c4032",
+          "maximum_changed_variables": 1,
+          "maximum_trials": 3,
+          "mode": "single_variable_abba_after_admission",
+          "promotion_authorized": false,
+          "proposal_evidence_source": {
+            "evidence_id": "hypothesis-proposal-broad-cpu6",
+            "task_id": "spark-broad-throughput-006"
+          },
+          "required_counters": [
+            "Actual native CPU expert lane worker count and nonzero CPU expert demand",
+            "Each quality/speed process INFO expert_slots and cpu_experts plus placement/budget stderr",
+            "Native prefill, decode and combined times and per-request counts",
+            "ARC per-question answers and no-per-question regression",
+            "Raw token/finish observations; observer samples and cleanup receipts"
+          ],
+          "schema_version": 1,
+          "scoring_ready": false,
+          "status": "proposal_only",
+          "stop_conditions": [
+            "correctness failure",
+            "memory guard/OOM",
+            "missing engagement",
+            "incomplete evidence",
+            "budget exhausted"
+          ]
+        }
+      ],
+      "hypothesis": "campaign-leads source6843/6876/6957 motivates CPU worker contention. CPU4 reduced combined throughput to 0.8822 and decode to 0.7857 of baseline; six workers may preserve more expert parallelism while reducing eight-worker scheduling contention. This is a distinct unmeasured point, not a retry or combination.",
+      "uncertainty": "Unmeasured agent hypothesis; transfer and causality remain uncertain. Falsification: No combined rate increase falsifies the directional screen prediction. Missing actual worker count or CPU demand leaves CPU6 unresolved and closes this branch. Stop on sampled per-question answer regression, protocol failure or missing engagement.",
+      "action": {
+        "capability": "factory_loop.execute",
+        "cycle_id": "diagnostic-06-cpu6",
+        "template_id": "cpu6-screen",
+        "type": "measure"
+      },
+      "expected_evidence": "Pinned benchmark result plus bounded follow-up proposal",
+      "budget": {
+        "max_experiments": 1
+      },
+      "stop_condition": "Correctness failure, incomplete evidence, cancellation or exhausted policy",
+      "reason_for_change": "Agent selected a report-backed hypothesis under the admitted template envelope",
+      "created": 1794701533.7123065,
+      "plan_patch": null,
+      "expected_graph_rev": null
+    },
+    {
+      "decision_id": "spark-broad-throughput-006:decision:7",
+      "task_id": "spark-broad-throughput-006",
+      "rev": 7,
+      "parent_rev": 6,
+      "evidence_ids": [
+        "original-aa-failure",
+        "placement-confounder",
+        "campaign-leads",
+        "loop-result:1",
+        "loop-result:2",
+        "loop-result:3",
+        "loop-result:4",
+        "loop-result:5",
+        "loop-result:6",
+        "cd7e531275f74552a4ec531ef321c8b0"
+      ],
+      "observations": [
+        {
+          "limitations": "Missing raw placement/budget and native mechanism counters; collected raw-verification and engagement gates do not supply those details. Original exact-output failure remains final.",
+          "summary": "Six screens collected, all 8/8 sampled ARC in each arm without per-question regression; detailed rates, attempt IDs and missing per-process placement preserved in diagnostic_final_report.",
+          "values": {
+            "report_id": "cd7e531275f74552a4ec531ef321c8b0",
+            "screens": [
+              {
+                "attempt_id": "28ab941a34a64cb8abf36db6a57eeecc",
+                "attempt_state": "succeeded",
+                "collected_mechanism_gate": true,
+                "combined_tps": {
+                  "A": 9.680420089896819,
+                  "B": 9.474860776297056,
+                  "ratio": 0.9787654552497883
+                },
+                "decode_tps": {
+                  "A": 14.45881121461545,
+                  "B": 14.43587314476474,
+                  "ratio": 0.9984135576908616
+                },
+                "evidence_id": "loop-result:1",
+                "placement_budget_stderr": null,
+                "placement_per_process": {
+                  "A_quality": null,
+                  "A_speed": null,
+                  "B_quality": null,
+                  "B_speed": null
+                },
+                "raw_token_equal": true,
+                "raw_verification": {
+                  "complete_cells": 2,
+                  "independent_native_parse": true,
+                  "raw_files_verified": true
+                },
+                "sampled_arc": {
+                  "A": "8/8",
+                  "B": "8/8",
+                  "no_per_question_regression": true
+                },
+                "screen": "engram4"
+              },
+              {
+                "attempt_id": "2ac319da7a1c496084a9d68cc221b20a",
+                "attempt_state": "succeeded",
+                "collected_mechanism_gate": true,
+                "combined_tps": {
+                  "A": 9.615288308410374,
+                  "B": 9.171441468768137,
+                  "ratio": 0.9538394663367493
+                },
+                "decode_tps": {
+                  "A": 14.417066202116757,
+                  "B": 13.86812281956272,
+                  "ratio": 0.9619240575816015
+                },
+                "evidence_id": "loop-result:2",
+                "placement_budget_stderr": null,
+                "placement_per_process": {
+                  "A_quality": null,
+                  "A_speed": null,
+                  "B_quality": null,
+                  "B_speed": null
+                },
+                "raw_token_equal": false,
+                "raw_verification": {
+                  "complete_cells": 2,
+                  "independent_native_parse": true,
+                  "raw_files_verified": true
+                },
+                "sampled_arc": {
+                  "A": "8/8",
+                  "B": "8/8",
+                  "no_per_question_regression": true
+                },
+                "screen": "cache256"
+              },
+              {
+                "attempt_id": "d07163cd828f4b5db3fbe387c93acdd7",
+                "attempt_state": "succeeded",
+                "collected_mechanism_gate": true,
+                "combined_tps": {
+                  "A": 8.639872561879713,
+                  "B": 7.622238675318438,
+                  "ratio": 0.8822165628864466
+                },
+                "decode_tps": {
+                  "A": 14.393612834304777,
+                  "B": 11.309485241710794,
+                  "ratio": 0.7857294323463058
+                },
+                "evidence_id": "loop-result:3",
+                "placement_budget_stderr": null,
+                "placement_per_process": {
+                  "A_quality": null,
+                  "A_speed": null,
+                  "B_quality": null,
+                  "B_speed": null
+                },
+                "raw_token_equal": true,
+                "raw_verification": {
+                  "complete_cells": 2,
+                  "independent_native_parse": true,
+                  "raw_files_verified": true
+                },
+                "sampled_arc": {
+                  "A": "8/8",
+                  "B": "8/8",
+                  "no_per_question_regression": true
+                },
+                "screen": "cpu4"
+              },
+              {
+                "attempt_id": "dc242599f18a4447a77311c77e212299",
+                "attempt_state": "succeeded",
+                "collected_mechanism_gate": true,
+                "combined_tps": {
+                  "A": 8.94108662143346,
+                  "B": 8.591680389489513,
+                  "ratio": 0.9609212787284317
+                },
+                "decode_tps": {
+                  "A": 14.43055670382034,
+                  "B": 16.70378619153675,
+                  "ratio": 1.1575288836302897
+                },
+                "evidence_id": "loop-result:4",
+                "placement_budget_stderr": null,
+                "placement_per_process": {
+                  "A_quality": null,
+                  "A_speed": null,
+                  "B_quality": null,
+                  "B_speed": null
+                },
+                "raw_token_equal": false,
+                "raw_verification": {
+                  "complete_cells": 2,
+                  "independent_native_parse": true,
+                  "raw_files_verified": true
+                },
+                "sampled_arc": {
+                  "A": "8/8",
+                  "B": "8/8",
+                  "no_per_question_regression": true
+                },
+                "screen": "draft"
+              },
+              {
+                "attempt_id": "38e07041d0cf4250be5831aaf7e9fbed",
+                "attempt_state": "succeeded",
+                "collected_mechanism_gate": true,
+                "combined_tps": {
+                  "A": 8.561815640029163,
+                  "B": 9.60799865888352,
+                  "ratio": 1.1221917246107385
+                },
+                "decode_tps": {
+                  "A": 14.401710203086617,
+                  "B": 13.994526099426736,
+                  "ratio": 0.9717266839897519
+                },
+                "evidence_id": "loop-result:5",
+                "placement_budget_stderr": null,
+                "placement_per_process": {
+                  "A_quality": null,
+                  "A_speed": null,
+                  "B_quality": null,
+                  "B_speed": null
+                },
+                "raw_token_equal": true,
+                "raw_verification": {
+                  "complete_cells": 2,
+                  "independent_native_parse": true,
+                  "raw_files_verified": true
+                },
+                "sampled_arc": {
+                  "A": "8/8",
+                  "B": "8/8",
+                  "no_per_question_regression": true
+                },
+                "screen": "ahead1"
+              },
+              {
+                "attempt_id": "44133015d8bf4b64be22836f5dd7ed27",
+                "attempt_state": "succeeded",
+                "collected_mechanism_gate": true,
+                "combined_tps": {
+                  "A": 9.297348076732176,
+                  "B": 9.519606919564279,
+                  "ratio": 1.0239056170638954
+                },
+                "decode_tps": {
+                  "A": 14.428984222056055,
+                  "B": 14.4650747550543,
+                  "ratio": 1.002501252509728
+                },
+                "evidence_id": "loop-result:6",
+                "placement_budget_stderr": null,
+                "placement_per_process": {
+                  "A_quality": null,
+                  "A_speed": null,
+                  "B_quality": null,
+                  "B_speed": null
+                },
+                "raw_token_equal": true,
+                "raw_verification": {
+                  "complete_cells": 2,
+                  "independent_native_parse": true,
+                  "raw_files_verified": true
+                },
+                "sampled_arc": {
+                  "A": "8/8",
+                  "B": "8/8",
+                  "no_per_question_regression": true
+                },
+                "screen": "cpu6"
+              }
+            ]
+          }
+        }
+      ],
+      "hypothesis": "The finite screens describe throughput variation under the frozen workload; none establishes an accepted improvement or deterministic correctness-equivalence.",
+      "uncertainty": "Automatic UMA placement confounds nominal-setting attribution. Missing worker/demand, cache, prefetch and draft accepted/offered counters prevent mechanism conclusions. Observer overhead, warm cache and single ordered pairs limit timing interpretation.",
+      "action": {
+        "next_operation": "No further execution; all affected branches closed. Engram1 and cache0 unrun.",
+        "report_id": "cd7e531275f74552a4ec531ef321c8b0",
+        "type": "report_inconclusive"
+      },
+      "expected_evidence": "No additional execution. A future separately admitted task should expose retained raw process logs and native counters through collection before choosing further mechanisms.",
+      "budget": {
+        "aggregate_used_with_original": 7,
+        "diagnostic_unused": 2,
+        "diagnostic_used": 6,
+        "reserved_external_slot_used": false
+      },
+      "stop_condition": "Terminal descriptive diagnostic report; no confirmation, acceptance, promotion, stable-output claim, relaxed gate or summed gains.",
+      "reason_for_change": "loop-result:6 completes CPU6; cd7e531275f74552a4ec531ef321c8b0 retains all six screens and access failures. placement-confounder and original-aa-failure prohibit deterministic equivalence, and missing detailed engagement closes affected branches rather than spending remaining slots.",
+      "created": 1794702028.527579,
+      "plan_patch": null,
+      "expected_graph_rev": null
+    }
+  ],
+  "stopped_control_containers": [
+    {
+      "id": "2c9962da74634197e71b2d8d353fc9241b568ad39ede2bf0009303914287268e",
+      "image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+      "running": false,
+      "pid": 0,
+      "exit_code": 0,
+      "started": "2026-11-14T23:29:05.242420058Z",
+      "finished": "2026-11-14T23:31:03.366456293Z"
+    },
+    {
+      "id": "b9e2c5a182c29542601192857b3ddf0b02e2e11b6ae9e533095f94683c2078d9",
+      "image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+      "running": false,
+      "pid": 0,
+      "exit_code": 0,
+      "started": "2026-11-14T23:45:16.203469075Z",
+      "finished": "2026-11-14T23:47:11.279539955Z"
+    },
+    {
+      "id": "e03faf7805f999a233cbfedbd651cca54700d8569bbffd7ac0c977949fb8a25b",
+      "image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+      "running": false,
+      "pid": 0,
+      "exit_code": 0,
+      "started": "2026-11-15T00:02:25.112653975Z",
+      "finished": "2026-11-15T00:04:14.137692963Z"
+    },
+    {
+      "id": "9175c1ea6e8b649a59f7366881e08b49e3d0b4554de1eb05849aa9c6a7036105",
+      "image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+      "running": false,
+      "pid": 0,
+      "exit_code": 0,
+      "started": "2026-11-14T23:53:51.610411582Z",
+      "finished": "2026-11-14T23:55:50.619243889Z"
+    },
+    {
+      "id": "e3b45cea3ee6c0749bb6f50a844aacc53dbc6161708da464eaa59a54a550b086",
+      "image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+      "running": false,
+      "pid": 0,
+      "exit_code": 0,
+      "started": "2026-11-14T23:37:11.251619198Z",
+      "finished": "2026-11-14T23:39:07.642032563Z"
+    },
+    {
+      "id": "7b8af1746cfefb6ebb26e5e449c01ada515e7a9dcb167169b3b1ebb2076c38f0",
+      "image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+      "running": false,
+      "pid": 0,
+      "exit_code": 0,
+      "started": "2026-11-15T00:10:29.500509782Z",
+      "finished": "2026-11-15T00:12:22.091283108Z"
+    },
+    {
+      "id": "5382d6129a4088dbdd71afbe0fe0c59dda3d52070d013f1ea08a94b3aba65393",
+      "image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+      "running": false,
+      "pid": 0,
+      "exit_code": 0,
+      "started": "2026-11-15T00:18:27.758469978Z",
+      "finished": "2026-11-15T00:20:45.598118109Z"
+    }
+  ],
+  "supervisor": {
+    "elapsed_s": 3101.5715028569102,
+    "generations": 7,
+    "outcome": "report_inconclusive",
+    "task_id": "spark-broad-throughput-006"
+  },
+  "limitations": [
+    "Configuration screens reuse the pinned engine image; no source-changing engine optimization is demonstrated.",
+    "Small sampled screens are exploratory; full quality confirmation remains a separate experiment.",
+    "CPU/unit tests, real agent calls, GPU measurements and accepted improvements are distinct evidence classes.",
+    "The running agent uses a read-only source bind; standalone refreshed image qualification is separate."
+  ]
+}

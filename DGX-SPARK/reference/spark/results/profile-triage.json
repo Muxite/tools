@@ -1,0 +1,54 @@
+{
+  "attempt_id": "1efa6fbbbe094d35b4e1ee75b6481277",
+  "known": {
+    "container_removed": true,
+    "done_count": 0,
+    "exit_code": 139,
+    "maximum_cgroup_bytes": 22461005824,
+    "minimum_available_bytes": 35098492928,
+    "oom_events": 0,
+    "oom_killed": false,
+    "quiescent": true,
+    "ready_seen": true,
+    "reason": "native_replay_incomplete",
+    "sample_count": 53,
+    "stage_rows": 0,
+    "stderr_tail": [
+      "ds4: CUDA0 layers [0, 39] + head: weights 5.86 GB, experts 77.00 GB (8959 of 15360 in VRAM), caches 0.01 GB, 18371 MiB free",
+      "ds4: 6401 routed experts on the CPU lane (55.1 GB, in place in the model's files), 8 threads",
+      "maya ds4 serve: GEN <max_new> [keys] <ids>; GENI <max_new> [keys] <pictures> <ids>; STOP, QUIT",
+      "ds4: prompt path warmed up in 2445 ms",
+      "ds4: the prompt path's room handed back: 7 experts (0.07 GB) read into VRAM again in 43 ms"
+    ],
+    "stdout_tail": [
+      "PP 460 512 12840.2 35.8 0",
+      "PP 460 512 12890.4 35.7 0",
+      "PP 473 512 12940.6 36.6 0",
+      "PP 473 512 12990.9 36.4 0",
+      "PP 486 512 13041.1 37.3 0",
+      "PP 486 512 13091.2 37.1 0",
+      "PP 499 512 13141.4 38.0 0",
+      "PP 499 512 13191.6 37.8 0"
+    ]
+  },
+  "next_step": "Inspect a host-approved symbolized crash/core or isolated event-lifecycle test for the same immutable engine revision before retrying profiling.",
+  "scoring_eligible": false,
+  "source_inspection": {
+    "files": {
+      "/home/user2/strata-baseline/Strata/src/dsv41/ds4_model.cu": "26c5b9ddb8d34dc93fa2694f2adf4f45da6900ae18ec78cae4bb9652c87f2ba6",
+      "/home/user2/strata-rsi-engine-capability-004-20261112/intake-base-source-unmodified/src/dsv41/ds4_model.cu": "26c5b9ddb8d34dc93fa2694f2adf4f45da6900ae18ec78cae4bb9652c87f2ba6"
+    },
+    "findings": [
+      "DS4_PROF event pool is explicitly resized at ds4_model.cu:2678, and main prof_mark checks device bounds and CUDA API status; no evidence establishes an uninitialized main pool.",
+      "The separate expert-kernel ek_ev helper at lines1693-1708 leaves cudaGetDevice/cudaEventCreate unchecked; run_set event recordings near5012 are unchecked. These are instrumentation audit targets, not a demonstrated crash cause.",
+      "No CUDA profiling-disabled message, exception detail, core dump or stack trace exists in retained stdout/stderr."
+    ]
+  },
+  "status": "failed_profile",
+  "unknown": [
+    "Exit139 is consistent with SIGSEGV but does not localize the failing instruction.",
+    "No cgroup OOM or OOM-killed evidence; memory pressure is not established as the cause. Sampling cannot exclude transient allocation/resource failures.",
+    "Matching inspected source hashes do not independently establish the admitted binary/source correspondence; use build provenance.",
+    "No native phase table was emitted, so no measured phase bottleneck or expert prediction metric is available."
+  ]
+}

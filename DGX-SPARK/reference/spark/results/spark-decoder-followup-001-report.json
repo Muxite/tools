@@ -1,0 +1,428 @@
+{
+  "obs_id": "spark-decoder-followup-001-report",
+  "task_id": "spark-decoder-followup-001",
+  "source_artifacts": [],
+  "kind": "decoder_followup_report",
+  "values": {
+    "ablation": {
+      "admission_requirements": [
+        "operator-frozen contract",
+        "independent A/A validity",
+        "complete mechanism engagement",
+        "observer overhead within contract",
+        "host admission and quiet lease"
+      ],
+      "candidate": {
+        "engine_slice": "quality",
+        "evidence_ids": [
+          "d129efa8ac314ffa958a630e8a735c18:observation",
+          "173dfd946f2f4e78a84162f860e22aa9:observation",
+          "9f11709dc3384766852b7df84a46b28f:observation"
+        ],
+        "expected_benefit": "unknown",
+        "hypothesis": "A fixed no-draft/static-cache baseline can establish comparable output and latency.",
+        "id": "establish_repeatability",
+        "prerequisites": [
+          "fixed model/tokenizer/workload",
+          "full-expert policy",
+          "explicit cache protocol"
+        ],
+        "reason": "Repeatability is different or not established; a treatment gain cannot yet be scored.",
+        "single_change": "diagnostic A/A campaign",
+        "status": "proposal_only"
+      },
+      "evidence_sources": [
+        {
+          "evidence_id": "d129efa8ac314ffa958a630e8a735c18:observation",
+          "task_id": "spark-strata-e2e-001"
+        },
+        {
+          "evidence_id": "173dfd946f2f4e78a84162f860e22aa9:observation",
+          "task_id": "spark-strata-e2e-001"
+        },
+        {
+          "evidence_id": "9f11709dc3384766852b7df84a46b28f:observation",
+          "task_id": "spark-strata-e2e-001"
+        }
+      ],
+      "execution_order": [
+        "A",
+        "A",
+        "A"
+      ],
+      "final_combined_validation": "Compare the final stack directly against the frozen original; do not multiply individual gains.",
+      "freeze": [
+        "image/source identities except the declared change",
+        "workload/tokenizer/model",
+        "full-expert and correctness policy",
+        "cache/warmup protocol",
+        "resource limits"
+      ],
+      "maximum_changed_variables": 1,
+      "maximum_trials": 3,
+      "mode": "diagnostic_non_scoring",
+      "schema_version": 1,
+      "scoring_ready": false,
+      "status": "proposal_only",
+      "stop_conditions": [
+        "correctness failure",
+        "memory guard/OOM",
+        "missing engagement",
+        "incomplete evidence",
+        "budget exhausted"
+      ]
+    },
+    "alternatives_considered": [
+      "physical IO/readiness",
+      "CPU scheduling",
+      "placement/headroom",
+      "prefill versus decode",
+      "cache carryover",
+      "drafting",
+      "telemetry completeness/overhead"
+    ],
+    "cache_protocol": {
+      "controls": [
+        "fixed model/pack/tokenizer/workload",
+        "disable prefix reuse",
+        "record effective placement/cache/draft state",
+        "record phase physical-read deltas",
+        "record host headroom and observer cost",
+        "no builds during measurement"
+      ],
+      "evidence_ids": [
+        "d129efa8ac314ffa958a630e8a735c18:observation",
+        "173dfd946f2f4e78a84162f860e22aa9:observation",
+        "9f11709dc3384766852b7df84a46b28f:observation"
+      ],
+      "evidence_sources": [
+        {
+          "evidence_id": "d129efa8ac314ffa958a630e8a735c18:observation",
+          "task_id": "spark-strata-e2e-001"
+        },
+        {
+          "evidence_id": "173dfd946f2f4e78a84162f860e22aa9:observation",
+          "task_id": "spark-strata-e2e-001"
+        },
+        {
+          "evidence_id": "9f11709dc3384766852b7df84a46b28f:observation",
+          "task_id": "spark-strata-e2e-001"
+        }
+      ],
+      "forbidden": [
+        "global cache eviction",
+        "calling hardlinks independent file cache",
+        "combining first/repeat as a causal A/B improvement"
+      ],
+      "maximum_completed_cells": 6,
+      "phases": [
+        {
+          "description": "First request after engine initialization; does not imply cold SSD.",
+          "fresh_container": true,
+          "name": "first_after_initialization"
+        },
+        {
+          "fresh_container": false,
+          "measured_requests": 1,
+          "name": "repeat_fixed_workload",
+          "warmup_requests": 1
+        }
+      ],
+      "schema_version": 1,
+      "status": "proposal_only"
+    },
+    "contract": {
+      "current_scope": "diagnostic_only; zero builds/lab runs",
+      "id": "spark-strata-e2e-001-repeatability-v1",
+      "sha256": "ceeac38db0783d729b7f50e6bb833b8478d0b5fbec73144a20fa7d56b1bc2d85"
+    },
+    "diagnosis": {
+      "candidates": [
+        {
+          "engine_slice": "quality",
+          "evidence_ids": [
+            "d129efa8ac314ffa958a630e8a735c18:observation",
+            "173dfd946f2f4e78a84162f860e22aa9:observation",
+            "9f11709dc3384766852b7df84a46b28f:observation"
+          ],
+          "expected_benefit": "unknown",
+          "hypothesis": "A fixed no-draft/static-cache baseline can establish comparable output and latency.",
+          "id": "establish_repeatability",
+          "prerequisites": [
+            "fixed model/tokenizer/workload",
+            "full-expert policy",
+            "explicit cache protocol"
+          ],
+          "reason": "Repeatability is different or not established; a treatment gain cannot yet be scored.",
+          "single_change": "diagnostic A/A campaign",
+          "status": "proposal_only"
+        },
+        {
+          "engine_slice": "io",
+          "evidence_ids": [
+            "d129efa8ac314ffa958a630e8a735c18:observation",
+            "173dfd946f2f4e78a84162f860e22aa9:observation",
+            "9f11709dc3384766852b7df84a46b28f:observation"
+          ],
+          "expected_benefit": "unknown",
+          "hypothesis": "Demand-readiness and critical-path waits can distinguish storage pressure from overlap.",
+          "id": "measure_io_readiness",
+          "prerequisites": [
+            "phase boundaries",
+            "observer overhead bound"
+          ],
+          "reason": "A tokens/s number alone does not identify the limiting mechanism.",
+          "single_change": "readiness/wait instrumentation only",
+          "status": "proposal_only"
+        },
+        {
+          "engine_slice": "cpu",
+          "evidence_ids": [
+            "d129efa8ac314ffa958a630e8a735c18:observation",
+            "173dfd946f2f4e78a84162f860e22aa9:observation",
+            "9f11709dc3384766852b7df84a46b28f:observation"
+          ],
+          "expected_benefit": "unknown",
+          "hypothesis": "CPU queue and phase counters can show whether worker contention delays decode.",
+          "id": "measure_cpu_scheduling",
+          "prerequisites": [
+            "CPU quota recorded",
+            "no concurrent builds"
+          ],
+          "reason": "CPU scheduling is an alternative explanation to expert streaming.",
+          "single_change": "CPU scheduling observation only",
+          "status": "proposal_only"
+        },
+        {
+          "engine_slice": "placement",
+          "evidence_ids": [
+            "d129efa8ac314ffa958a630e8a735c18:observation",
+            "173dfd946f2f4e78a84162f860e22aa9:observation",
+            "9f11709dc3384766852b7df84a46b28f:observation"
+          ],
+          "expected_benefit": "unknown",
+          "hypothesis": "Residency and demand-stall measurements can justify one placement-budget trial.",
+          "id": "measure_placement",
+          "prerequisites": [
+            "host memory headroom",
+            "effective placement counters",
+            "repeatability"
+          ],
+          "reason": "More resident memory is not assumed to be faster.",
+          "single_change": "one resident-budget setting",
+          "status": "proposal_only"
+        }
+      ],
+      "constraints": [
+        "one hypothesis per trial",
+        "missing signal is unknown, not zero",
+        "diagnostic traces never score",
+        "failed/null episodes remain retained",
+        "no contract/grant mutation",
+        "no automatic task submission or CC promotion"
+      ],
+      "decode_tps": {
+        "count": 6,
+        "maximum": 13.822744894763554,
+        "median": 10.789003263770244,
+        "minimum": 7.753581488324197,
+        "scope": "descriptive across recorded requests; not a treatment effect"
+      },
+      "draft_engagement": {
+        "acceptance_ratio": null,
+        "accepted": 0,
+        "offered": 0
+      },
+      "episodes": 3,
+      "evidence_ids": [
+        "d129efa8ac314ffa958a630e8a735c18:observation",
+        "173dfd946f2f4e78a84162f860e22aa9:observation",
+        "9f11709dc3384766852b7df84a46b28f:observation"
+      ],
+      "evidence_sources": [
+        {
+          "evidence_id": "d129efa8ac314ffa958a630e8a735c18:observation",
+          "task_id": "spark-strata-e2e-001"
+        },
+        {
+          "evidence_id": "173dfd946f2f4e78a84162f860e22aa9:observation",
+          "task_id": "spark-strata-e2e-001"
+        },
+        {
+          "evidence_id": "9f11709dc3384766852b7df84a46b28f:observation",
+          "task_id": "spark-strata-e2e-001"
+        }
+      ],
+      "failure_count": 0,
+      "failures": [],
+      "methodology_version": "1.0.0",
+      "objective": "Make the decoder faster.",
+      "ontology": {
+        "cache": {
+          "question": "How do initialization and fixed repeat workloads differ?",
+          "signals": [
+            "physical_read_bytes",
+            "canonical_ids_sha256",
+            "cache_policy"
+          ]
+        },
+        "cpu": {
+          "question": "Are CPU scheduling or oversubscription delaying the GPU?",
+          "signals": [
+            "cpu_time_ms",
+            "run_queue_wait_ms",
+            "cpu_quota"
+          ]
+        },
+        "decode": {
+          "question": "What is on the decode critical path?",
+          "signals": [
+            "decode_ms",
+            "generated_tokens",
+            "critical_path_wait_ms"
+          ]
+        },
+        "draft": {
+          "question": "Does verified drafting save target work at fixed correctness?",
+          "signals": [
+            "draft_accepted",
+            "draft_offered",
+            "decode_ms"
+          ]
+        },
+        "io": {
+          "question": "Are demand reads on the critical path?",
+          "signals": [
+            "physical_read_bytes",
+            "demand_wait_ms",
+            "ready_at_demand_bytes"
+          ]
+        },
+        "placement": {
+          "question": "Does residency reduce demand stalls within host headroom?",
+          "signals": [
+            "resident_expert_bytes",
+            "vram_hit",
+            "host_available_bytes"
+          ]
+        },
+        "prefill": {
+          "question": "Does prompt processing dominate request latency?",
+          "signals": [
+            "prompt_ms",
+            "prompt_tokens",
+            "ttft_ms"
+          ]
+        },
+        "quality": {
+          "question": "Are output and full-model obligations preserved?",
+          "signals": [
+            "canonical_ids_sha256",
+            "finish_reason",
+            "effective_experts",
+            "task_accuracy"
+          ]
+        },
+        "telemetry": {
+          "question": "Are results complete and observer costs bounded?",
+          "signals": [
+            "collector_exit",
+            "container_removed",
+            "observer_overhead",
+            "artifact_integrity"
+          ]
+        }
+      },
+      "recommended_inspection": "establish_repeatability",
+      "recorded_accuracy_labels": [
+        "not_tested",
+        "not_tested",
+        "not_tested"
+      ],
+      "repeatability": {
+        "comparable_cross_cell_groups": 1,
+        "different_groups": 1,
+        "limitation": "Matching prompt repeats; cross-cell comparison only with an explicit identical experiment identity. Not an accuracy or performance-gain test.",
+        "matched_prompt_groups": 4,
+        "status": "different"
+      },
+      "schema_version": 1,
+      "semantic_accuracy": "not_established"
+    },
+    "evidence_ids": [
+      "spark-decoder-followup-001",
+      "spark-strata-e2e-001",
+      "d129efa8ac314ffa958a630e8a735c18:observation",
+      "173dfd946f2f4e78a84162f860e22aa9:observation",
+      "9f11709dc3384766852b7df84a46b28f:observation",
+      "spark-strata-e2e-001-final-reference-report",
+      "spark-strata-e2e-001-final-followup-proposal",
+      "spark-strata-e2e-001:decision:21",
+      "69187bee179f42bc82e7d80e77d5d31e",
+      "operator-submit-reconciliation-001",
+      "operator-docker-argv-repair-001",
+      "operator-native-transport-repair-001",
+      "62c5d7198de6474fa9ba8faa65ef32a2:build-result",
+      "2e129aa0ecec481a9d66eadfc61b932a"
+    ],
+    "findings": {
+      "canonical_groups": 2,
+      "completed_cells": 3,
+      "first_decode_tps": [
+        7.863084048996842,
+        7.808591891265357,
+        7.753581488324197
+      ],
+      "first_difference": {
+        "cell1": 9271,
+        "cell2": 270,
+        "index_zero_based": 16
+      },
+      "repeat_decode_tps": [
+        13.822744894763554,
+        13.714922478543647,
+        13.794887269905592
+      ],
+      "semantic_accuracy": "not_tested",
+      "speedup": "not_established",
+      "within_process_matches": 3
+    },
+    "hypothesis": "Process-dependent initialization or numerical execution causes cross-process divergence while repeated requests in the same process stay stable; unproven.",
+    "initial_request": {
+      "objective": "Make the decoder faster.",
+      "source_task": "spark-strata-e2e-001",
+      "verified_report_ids": [
+        "d129efa8ac314ffa958a630e8a735c18:observation",
+        "173dfd946f2f4e78a84162f860e22aa9:observation",
+        "9f11709dc3384766852b7df84a46b28f:observation"
+      ]
+    },
+    "limitations_detail": "Throughput and first/repeat differences do not identify a bottleneck or treatment gain. Physical-read phase deltas, readiness, effective residency and observer overhead remain unknown. Matching cells 2/3 cannot erase cell 1. No mechanism selected for activation.",
+    "retained_failures": {
+      "build": "77c546c864994b0c98bef26326d0d8e5",
+      "disposition": "Historical failures remain failed. Successful successors resolve execution/transport prerequisite, not canonical repeatability. Process IO may be not_measured.",
+      "host_repairs": [
+        "69187bee179f42bc82e7d80e77d5d31e",
+        "operator-submit-reconciliation-001",
+        "operator-docker-argv-repair-001",
+        "operator-native-transport-repair-001"
+      ],
+      "lab": [
+        "e058117107e9403c8523bdbea40cbda2",
+        "8cc6e949ec3e49b2b1414ea20709eba5"
+      ],
+      "successor_build": "62c5d7198de6474fa9ba8faa65ef32a2",
+      "successor_cells": [
+        "d129efa8ac314ffa958a630e8a735c18:observation",
+        "173dfd946f2f4e78a84162f860e22aa9:observation",
+        "9f11709dc3384766852b7df84a46b28f:observation"
+      ]
+    },
+    "tooling_note": "Three attempts to republish host lab_result observations were denied with SCOPE_DENIED; no imported result was created. Readable prior observations were then analyzed directly, successfully, with explicit source-task provenance."
+  },
+  "error": {},
+  "host_run": {},
+  "confidence": null,
+  "limitations": "Diagnostic proposal only; no engine runs, edits or contract changes. No performance acceptance.",
+  "created": 1794621914.9709184
+}

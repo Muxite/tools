@@ -1,0 +1,16 @@
+{
+  "status": "invalid_attempt_not_used_for_performance_claims",
+  "reason": "Benchmark harness incorrectly asserted missing-grant denial state == failed; actual Host correctly returned state blocked, reason DENIED. AssertionError stopped final report serialization after timing loops.",
+  "exception": "AssertionError at benchmark.py compare_host missing-grant assertion",
+  "observed_denials": [
+    {
+      "call": "ad0ac0ab-075d-458e-8203-6d28c30c7ebe",
+      "state": "blocked",
+      "reason": "DENIED",
+      "receipt_path": "candidate-ccstore/attempts/ad0ac0ab-075d-458e-8203-6d28c30c7ebe/receipt.json"
+    }
+  ],
+  "candidate_source_sha256": "87ec848e50797ff901f4c88dba54d0e2c3940f8c1d45c4b7201c5a141d036cfc",
+  "corrective_action": "Harness now asserts state blocked and reason DENIED. Entire experiment rerun into cc-native-inventory-once-002; use only that completed report for performance claims.",
+  "production_host_modified": false
+}

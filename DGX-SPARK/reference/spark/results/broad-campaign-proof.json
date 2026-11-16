@@ -1,0 +1,514 @@
+{
+  "task_id": "spark-broad-throughput-004",
+  "real_jiuwenswarm": true,
+  "model": "gpt-6.1-sol",
+  "initial_experiment_budget": 10,
+  "experiments_reserved": 1,
+  "experiments_dispatched": 1,
+  "cycles": [
+    {
+      "task_id": "spark-broad-throughput-004-loop-1",
+      "attempt_id": "2e84dd3da6564e0e9ef7defbafe2b689",
+      "state": "succeeded",
+      "template_id": "aa-aa",
+      "contract_sha256": "887ae584f824b12ace28c5a369fdf99ef70fb9027e6c3e5e27644d79e01f480c",
+      "source_identity": {
+        "benchmark.py": "d75caa55fe58f0e7e84263172d7f33f42cf2263411677d88d6bd665c36fdaeb5",
+        "benchmark_analysis.py": "507cbfbc2c0dd265f0e43dab21eca178c869a3b482805f8ffee0756ee50c5fb7",
+        "benchmark_data.py": "0466b42cbfe38b58accb3e1d3ea5bf527b1261f0c75c3321c3b78c8202618eb4",
+        "benchmark_worker.py": "c89108b6ec4764d748bb62b20c32fe0fa9f469aeed521d22ccaf1c8b7b1f194a",
+        "broad_benchmark.py": "e61d2c70aa83a3823605fa8fd2cb655491a0552c380bc9be9b1042104165310b",
+        "lab_lifecycle.py": "6fbbbe76bb48f47800669641e4c1bfedd524204d7d6451e19c9bc9c6330970c9",
+        "lab_recorder.py": "34cafbfe5f20160b8761195f293ab5c33e494d79d7d7b1d735946d6723cc3403"
+      },
+      "quiet": {
+        "attempt_id": "2e84dd3da6564e0e9ef7defbafe2b689",
+        "boot_id": "f4b7dbde-596c-4863-a21e-79d1ec3cfa04",
+        "control_container_id": "1683ec0d038079406d1c34d5cc90a597a135a135d1d0eee040e01b35429838dd",
+        "control_image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+        "control_stopped": true,
+        "recorded_at": 1794698176.2282083
+      },
+      "elapsed_s": 381.8332967981696,
+      "error": null,
+      "report": {
+        "campaign_stage": "aa",
+        "configuration_change": "aa",
+        "gates": {
+          "aa_timing_stable": true,
+          "baseline_accuracy_valid": true,
+          "candidate_mechanism_engaged": true,
+          "exact_aa_tokens_and_finish": false,
+          "sampled_no_per_question_regression": true
+        },
+        "limitations": [
+          "Eight-question screens are exploratory, not full quality validation.",
+          "First after initialization is not cold storage. Startup/tokenization excluded.",
+          "Single pair screens have no independent confidence interval; all failed/null episodes retained.",
+          "aa_valid establishes token/finish repeatability only; independent timing stability is required for acceptance."
+        ],
+        "performance_acceptance_evaluated": false,
+        "promotion_authorized": false,
+        "quality": {
+          "accuracy": {
+            "A": 1.0,
+            "B": 1.0
+          },
+          "all_answers_valid": true,
+          "case_count": 8,
+          "regression_question_ids": []
+        },
+        "raw_token_equal": false,
+        "schema_version": 3,
+        "scope": "sampled_public_quality_plus_fixed_native_throughput",
+        "speed": {
+          "aa_speed_ratio_B_over_A": 1.005184717518988,
+          "cells": [
+            {
+              "arm": "A",
+              "decode_tokens_per_second": 14.437338566868563,
+              "index": 1,
+              "prefill_plus_decode_ms": 42032.0,
+              "tokens_per_second": 9.135896459840122
+            },
+            {
+              "arm": "B",
+              "decode_tokens_per_second": 14.403114673548155,
+              "index": 2,
+              "prefill_plus_decode_ms": 41815.200000000004,
+              "tokens_per_second": 9.183263502267117
+            }
+          ],
+          "geometric_mean_ratio_B_over_A": 1.005184717518988,
+          "pairs": [
+            1.005184717518988
+          ],
+          "primary_metric": "prefill_plus_decode_output_tokens_per_second",
+          "warmup_requests_discarded_per_cell": 1
+        },
+        "verdict": "aa_invalid",
+        "verification": {
+          "complete_cells": 2,
+          "independent_native_parse": true,
+          "raw_files_verified": true
+        }
+      },
+      "cleanup": [
+        {
+          "cell": "cell-001-A",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-001-A",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "quality",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        },
+        {
+          "cell": "cell-002-B",
+          "phase": "speed",
+          "reason": "completed",
+          "container_exit_code": 0,
+          "quiescent": true,
+          "container_removed": true,
+          "oom": false
+        }
+      ]
+    }
+  ],
+  "native_calls": [
+    {
+      "time": 1794698126.3546166,
+      "cc": "factory.cc_qualification",
+      "capability": "inspect_package",
+      "tool_call_id": "exec-5066f2dd-d4c0-4dc2-b82d-381d90257fa6"
+    },
+    {
+      "time": 1794698131.286036,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-536cd6c5-7143-430e-8a9b-a518cb3566c0"
+    },
+    {
+      "time": 1794698131.583204,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-717a857d-1993-4c35-97b8-e76b3cbc2082"
+    },
+    {
+      "time": 1794698131.9172454,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-0000ead7-7590-4bee-b1de-45b14d8b23c4"
+    },
+    {
+      "time": 1794698132.2772038,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "inspect",
+      "tool_call_id": "exec-a59b840b-aa9a-43bd-899e-45822a514c1c"
+    },
+    {
+      "time": 1794698136.9136655,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-bfc7f163-f53f-4327-8c2d-b252af6098f7"
+    },
+    {
+      "time": 1794698137.2152622,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-9246cd69-5568-4f65-9876-2e4983c02d67"
+    },
+    {
+      "time": 1794698137.5568645,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-053eda4c-6a23-46b5-997e-b574ce699862"
+    },
+    {
+      "time": 1794698137.8894348,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "design",
+      "tool_call_id": "exec-906a173c-44a0-407d-8ed7-8d58b4ad9958"
+    },
+    {
+      "time": 1794698141.8474965,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-3eca4d0e-84a5-4724-a8a9-fdd3665cb7d4"
+    },
+    {
+      "time": 1794698142.173597,
+      "cc": "factory.evidence",
+      "capability": "plan_get",
+      "tool_call_id": "exec-a241a203-ba7f-4f16-b9f9-9a40ebf62586"
+    },
+    {
+      "time": 1794698149.084927,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "apply",
+      "tool_call_id": "exec-d833e689-1d10-4d1a-a5d9-fe7b552a9240"
+    },
+    {
+      "time": 1794698157.158577,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "verify_profile",
+      "tool_call_id": "exec-1d29356d-56ef-4199-8625-d850af383407"
+    },
+    {
+      "time": 1794698157.4805126,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-d9ae4d7e-2256-45cd-ace5-a4571f84673d"
+    },
+    {
+      "time": 1794698164.2445974,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-728f8c8c-f99c-45b9-8071-a4aab4f46296"
+    },
+    {
+      "time": 1794698168.5552318,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "select",
+      "tool_call_id": "exec-441fbd0c-bb51-43e7-a0fd-724647578fea"
+    },
+    {
+      "time": 1794698171.8100832,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "execute",
+      "tool_call_id": "exec-dfbe9ab7-62aa-4169-b47d-31248492a7c9"
+    },
+    {
+      "time": 1794698577.4238324,
+      "cc": "factory.cc_qualification",
+      "capability": "inspect_package",
+      "tool_call_id": "exec-ced59fe6-7cbe-40ce-94fe-1da486d87542"
+    },
+    {
+      "time": 1794698577.9321,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-7b888ae2-e55e-4016-9b85-38d0af1e51d4"
+    },
+    {
+      "time": 1794698578.2131114,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "loop_status",
+      "tool_call_id": "exec-c31ed52f-c775-4d54-97d7-1ebbb6c4fd9a"
+    },
+    {
+      "time": 1794698583.142519,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-7351d1c2-4ec0-4ee0-9e6f-2eeb63b4b541"
+    },
+    {
+      "time": 1794698583.4303901,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "collect",
+      "tool_call_id": "exec-7fe840a3-13da-4f41-b55d-deab8428c299"
+    },
+    {
+      "time": 1794698585.3286781,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-173809db-74aa-4b92-a68d-3b0686aa9150"
+    },
+    {
+      "time": 1794698585.631193,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "inspect",
+      "tool_call_id": "exec-7fb2d2f1-6141-48a0-afc3-e3fb6f2f0331"
+    },
+    {
+      "time": 1794698592.375158,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-8081a100-09e0-4143-ac78-08a3d07e24fd"
+    },
+    {
+      "time": 1794698592.6931412,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-398f3909-aa06-40f8-a804-b9b37325a7d2"
+    },
+    {
+      "time": 1794698592.9845977,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-3a8002bf-5637-42b9-9d25-136ee1ef42b7"
+    },
+    {
+      "time": 1794698593.2625303,
+      "cc": "factory.evidence",
+      "capability": "plan_get",
+      "tool_call_id": "exec-d39dfeee-5c3f-4b21-9abd-ad16a2ce8d6b"
+    },
+    {
+      "time": 1794698601.6991549,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "read",
+      "tool_call_id": "exec-2239d516-43cf-4a71-bbf2-6bfbae27e20c"
+    },
+    {
+      "time": 1794698601.9882796,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "query",
+      "tool_call_id": "exec-779a2a4b-b122-49cc-8cc9-3ab7e294d2d5"
+    },
+    {
+      "time": 1794698602.2613194,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "design",
+      "tool_call_id": "exec-4e81c54c-fe1c-428e-a918-78791c1e4540"
+    },
+    {
+      "time": 1794698608.184137,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "apply",
+      "tool_call_id": "exec-2a7a9869-b11e-4433-bef3-cdf935a263b3"
+    },
+    {
+      "time": 1794698614.555617,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "verify_profile",
+      "tool_call_id": "exec-5b49c15b-8019-44c9-a634-62385649c317"
+    },
+    {
+      "time": 1794698614.8232687,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "followup",
+      "tool_call_id": "exec-54517bbf-4a16-4a93-8622-f41ede0b58ae"
+    },
+    {
+      "time": 1794698615.1160448,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "stop",
+      "tool_call_id": "exec-268d0700-8028-480f-89f1-3a621f42f004"
+    },
+    {
+      "time": 1794698631.537756,
+      "cc": "engine.strata_throughput_workbench",
+      "capability": "publish",
+      "tool_call_id": "exec-96f82f53-fcd2-4de0-ae01-02a4b2644aaf"
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "spark-broad-throughput-004:decision:1",
+      "task_id": "spark-broad-throughput-004",
+      "rev": 1,
+      "parent_rev": 0,
+      "evidence_ids": [
+        "campaign-leads",
+        "feaef47610c6498fae66fbbed8ebac6c"
+      ],
+      "observations": [
+        {
+          "admission_requirements": [
+            "operator-frozen contract",
+            "independent A/A validity",
+            "complete mechanism engagement",
+            "observer overhead within contract",
+            "host admission and quiet lease"
+          ],
+          "candidate": {
+            "engine_slice": "quality",
+            "evidence_ids": [
+              "campaign-leads",
+              "feaef47610c6498fae66fbbed8ebac6c"
+            ],
+            "expected_benefit": "unknown",
+            "hypothesis": "A fixed no-draft/static-cache baseline can establish comparable output and latency.",
+            "id": "establish_repeatability",
+            "prerequisites": [
+              "fixed model/tokenizer/workload",
+              "full-expert policy",
+              "explicit cache protocol"
+            ],
+            "reason": "Repeatability is different or not established; a treatment gain cannot yet be scored.",
+            "single_change": "diagnostic A/A campaign",
+            "status": "proposal_only"
+          },
+          "evidence_sources": [
+            {
+              "evidence_id": "campaign-leads",
+              "task_id": "spark-broad-throughput-004"
+            },
+            {
+              "evidence_id": "feaef47610c6498fae66fbbed8ebac6c",
+              "task_id": "spark-broad-throughput-004"
+            }
+          ],
+          "execution_order": [
+            "A",
+            "A",
+            "A"
+          ],
+          "final_combined_validation": "Compare the final stack directly against the frozen original; do not multiply individual gains.",
+          "freeze": [
+            "image/source identities except the declared change",
+            "workload/tokenizer/model",
+            "full-expert and correctness policy",
+            "cache/warmup protocol",
+            "resource limits"
+          ],
+          "maximum_changed_variables": 1,
+          "maximum_trials": 3,
+          "mode": "diagnostic_non_scoring",
+          "schema_version": 1,
+          "scoring_ready": false,
+          "status": "proposal_only",
+          "stop_conditions": [
+            "correctness failure",
+            "memory guard/OOM",
+            "missing engagement",
+            "incomplete evidence",
+            "budget exhausted"
+          ]
+        }
+      ],
+      "hypothesis": "A fixed no-draft/static-cache baseline can establish comparable output and latency.",
+      "uncertainty": "Repeatability is different or not established; a treatment gain cannot yet be scored.",
+      "action": {
+        "capability": "factory_loop.execute",
+        "cycle_id": "broad-01-aa",
+        "template_id": "aa-aa",
+        "type": "measure"
+      },
+      "expected_evidence": "Pinned benchmark result plus bounded follow-up proposal",
+      "budget": {
+        "max_experiments": 1
+      },
+      "stop_condition": "Correctness failure, incomplete evidence, cancellation or exhausted policy",
+      "reason_for_change": "Agent selected a report-backed hypothesis under the admitted template envelope",
+      "created": 1794698168.830778,
+      "plan_patch": null,
+      "expected_graph_rev": null
+    },
+    {
+      "decision_id": "spark-broad-throughput-004:decision:2",
+      "task_id": "spark-broad-throughput-004",
+      "rev": 2,
+      "parent_rev": 1,
+      "evidence_ids": [
+        "campaign-leads",
+        "feaef47610c6498fae66fbbed8ebac6c",
+        "loop-contract:1",
+        "loop-result:1",
+        "loop:1:4"
+      ],
+      "observations": "Only experiment 1 executed: broad-01-aa, attempt 2e84dd3da6564e0e9ef7defbafe2b689. Child lifecycle succeeded, scientific verdict aa_invalid. Exact A/A tokens-and-finish gate failed and raw_token_equal=false. Sampled ARC quality was 8/8 for both arms with no per-question regression. Both raw cells verified with independent native parsing. Combined rates A=9.135896459840122 and B=9.183263502267117 output tokens/s; ratio=1.005184717518988, timing stable within 1.10. Decode rates A=14.437338566868563 and B=14.403114673548155. These are same-profile observations, not treatment gains. Warmup first request discarded. Package inspection failed INVALID_INPUT (verification_units has invalid or missing fields), both in retained preflight and recovery receipt 885964b6-2f0e-4c3c-b152-0f8d8e6b348b; independent package qualification is not established. Static apply/verify_profile cpu8-to4 succeeded only as profile preparation; never selected or run. Child evidence query was scope-denied; collected parent result remains the authorized retained evidence.",
+      "hypothesis": "establish_repeatability was falsified under the frozen exact token/finish prerequisite; baseline output repeatability is not established.",
+      "uncertainty": "The location and cause of token divergence are unresolved. Equal sampled answer accuracy does not establish full-generation equivalence or 64-question quality. No CPU, Engram, cache, ahead or drafting benefit was measured. No independent confirmation exists.",
+      "action": {
+        "reason": "Mandatory stop on aa_invalid; stop intent persisted. No further experiments, retries, builds, source edits, default promotion or deployment.",
+        "type": "report_inconclusive"
+      },
+      "expected_evidence": "No further lab work in this campaign. A future separately scoped diagnostic should locate the first divergent request/token and distinguish native nondeterminism from extraction or comparison issues without altering this failed contract.",
+      "budget": {
+        "builds": 0,
+        "confirms": 0,
+        "experiments_consumed": 1,
+        "experiments_limit": 10,
+        "treatment_screens": 0,
+        "unspent": 9
+      },
+      "stop_condition": "Terminal now: exact A/A prerequisite failed. Future admission stopped.",
+      "reason_for_change": "loop-result:1 disproves the mandatory prerequisite despite stable timing and sampled quality; campaign-leads explicitly warns A/A mismatch invalidates screening. Preserve the failure and stop rather than relax gates or spend remaining slots.",
+      "created": 1794698631.7695804,
+      "plan_patch": null,
+      "expected_graph_rev": null
+    }
+  ],
+  "stopped_control_containers": [
+    {
+      "id": "d5b7fd5056590940958cb8d8173dd67818725defb72160759d2e9746e68850d1",
+      "image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+      "running": false,
+      "pid": 0,
+      "exit_code": 0,
+      "started": "2026-11-14T23:22:35.197988559Z",
+      "finished": "2026-11-14T23:23:57.085920713Z"
+    },
+    {
+      "id": "1683ec0d038079406d1c34d5cc90a597a135a135d1d0eee040e01b35429838dd",
+      "image": "sha256:8923ae85eb0aa37d90d4ca44b0516be9ec98de8f98d70858bbbc1099f6d7b80b",
+      "running": false,
+      "pid": 0,
+      "exit_code": 0,
+      "started": "2026-11-14T23:15:09.246402428Z",
+      "finished": "2026-11-14T23:16:15.697456656Z"
+    }
+  ],
+  "supervisor": {
+    "elapsed_s": 528.3230290710926,
+    "generations": 2,
+    "outcome": "report_inconclusive",
+    "task_id": "spark-broad-throughput-004"
+  },
+  "limitations": [
+    "Configuration screens reuse the pinned engine image; no source-changing engine optimization is demonstrated.",
+    "Small sampled screens are exploratory; full quality confirmation remains a separate experiment.",
+    "CPU/unit tests, real agent calls, GPU measurements and accepted improvements are distinct evidence classes.",
+    "The running agent uses a read-only source bind; standalone refreshed image qualification is separate."
+  ]
+}

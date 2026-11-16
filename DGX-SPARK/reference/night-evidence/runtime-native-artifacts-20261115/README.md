@@ -1,0 +1,3 @@
+# Explicit native experiment artifacts
+
+These ARM64 Linux executables were compiled and run manually on NVIDIA GB10 during the serialized 2026-11-15 round. They are excluded from portable CC packages. Do not copy them into x86 bundles or execute them through CPU-only missions. Matching source, build commands, raw timing scope and SHA256 values are retained in the respective CC ROUND1.json. Reproduction requires an explicit local build; GPU reproduction additionally requires operator admission and an exclusive measurement slot. These retained executables are evidence, not automatically activated dependencies.

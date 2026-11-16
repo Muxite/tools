@@ -1,0 +1,70 @@
+{
+  "selected_target": "Existing DeepSeek assets with newer Strata",
+  "user_direction": "Finish main setup and end local turn; Codex is now available on Spark",
+  "source": "/home/user2/strata-baseline/Strata",
+  "commit": "ffa80d73133ea5c548aefe57889a16e8085a938f",
+  "engine": "/home/user2/strata-baseline/Strata/build-spark-dsv41/strata-dsv41",
+  "engine_version": "strata-dsv41 0.1.56 build ffa80d731",
+  "engine_sha256": "e3c9cbfd69b51405cf94bba8870523e6270fc86e1275587c38a855e950f1602f",
+  "pack": "/home/user2/strata-baseline/Strata-data/packs/deepseek-v4.1-flash-ist-das-2.00bpw",
+  "model_checks": [
+    {
+      "path": "/home/user2/strata-baseline/Strata-data/models/deepseek-v4.1-flash-IST-DAS-2.00bpw/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00001-of-00004.gguf",
+      "bytes": 39075714624,
+      "size_matches": true,
+      "mtime_matches": true
+    },
+    {
+      "path": "/home/user2/strata-baseline/Strata-data/models/deepseek-v4.1-flash-IST-DAS-2.00bpw/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00002-of-00004.gguf",
+      "bytes": 39388449504,
+      "size_matches": true,
+      "mtime_matches": true
+    },
+    {
+      "path": "/home/user2/strata-baseline/Strata-data/models/deepseek-v4.1-flash-IST-DAS-2.00bpw/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00003-of-00004.gguf",
+      "bytes": 39246891616,
+      "size_matches": true,
+      "mtime_matches": true
+    },
+    {
+      "path": "/home/user2/strata-baseline/Strata-data/models/deepseek-v4.1-flash-IST-DAS-2.00bpw/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00004-of-00004.gguf",
+      "bytes": 20527837312,
+      "size_matches": true,
+      "mtime_matches": true
+    },
+    {
+      "path": "/home/user2/strata-baseline/Strata-data/models/deepseek-v4.1-flash-shared/DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf",
+      "bytes": 110595290816,
+      "size_matches": true,
+      "mtime_matches": true
+    },
+    {
+      "path": "/home/user2/strata-baseline/Strata-data/models/deepseek-v4.1-flash-shared/dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf",
+      "bytes": 7976914240,
+      "size_matches": true,
+      "mtime_matches": true
+    }
+  ],
+  "verification_limit": "Sizes and nanosecond mtimes match existing pack provenance; full model hashes were not recomputed in this turn.",
+  "factory_source": "/home/user2/software-factory-spark-20261113/sources/cc-siminfeng-c7891472",
+  "ssh_adapter": "/home/user2/software-factory-spark-20261113/tools/remote_v3.py",
+  "shared_queue": "/home/user2/rsi-expert-streaming-spark-002/paired-retry-001/jobq",
+  "inference_started": false,
+  "next_action": "Submit one bounded DeepSeek smoke through the shared GPU queue, record output and cleanup. Read the source AGENTS.md and existing collector before execution.",
+  "existing_configuration": "/home/user2/strata-baseline/Strata/strata-deepseek-v4.1-flash-ist-das-2.00bpw.json",
+  "qualified_collector_reference": "/home/user2/strata-rsi-engine-capability-004-20261112/controller/lab_driver_v7.py",
+  "resource_rules": [
+    "No simultaneous build and inference jobs",
+    "Keep reasoning local or checkpoint and exit owned remote controller before inference",
+    "Retain the small queue worker",
+    "Check unrelated compute and available host memory before admission",
+    "Stop only explicitly owned processes and containers; do not flush shared host caches",
+    "Bound memory, swap, runtime and output; verify container cleanup after run"
+  ],
+  "caveats": [
+    "The newly built shi3z fork image targets Qwen and is not the DeepSeek executable",
+    "Historical experiments used modified binaries; do not label them the unmodified current baseline",
+    "No autonomous remote controller shutdown implemented yet",
+    "No new model inference or performance result in this handoff"
+  ]
+}

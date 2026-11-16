@@ -1,0 +1,1 @@
+ARC-derived datasets: CC-BY-SA-4.0; AI2 Reasoning Challenge, Peter Clark et al., 2018; allenai/ai2_arc revision210d026faf9955653af8916fad021475a3f00453. Adaptations and exact source references are recorded in each dataset provenance. Long speed text is derived from the source-pinned Strata HOW_IT_WORKS.md under its recorded MIT license. No model weights are included.

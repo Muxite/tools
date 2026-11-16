@@ -1,0 +1,153 @@
+{
+  "acceptance_authorized": false,
+  "allocated": {
+    "cpu_seconds": 54,
+    "gpu_seconds": 0
+  },
+  "blocked_reasons": {},
+  "branches": [
+    {
+      "allocation": {
+        "cpu_seconds": 12,
+        "gpu_seconds": 0
+      },
+      "capabilities": [
+        "engine.memory_residency_lab.plan",
+        "engine.memory_residency_lab.verify",
+        "engine.strata_budget_workbench.verify_startup",
+        "engine.strata_budget_workbench.summarize_memory"
+      ],
+      "depends_on": [],
+      "evidence_ids": [
+        "obs-residency-audit",
+        "manual-engine-evidence",
+        "input-memory-round1"
+      ],
+      "hypothesis": "Scratch arena reuse could reduce held scratch payload while retaining full routing and expert budget; real Strata async liveness and physical memory effects are missing. Contrast verified reference lifetimes with actual native residency/accounting before judging transfer.",
+      "measurement": null,
+      "node_id": "scratch-residency",
+      "outcome": "inconclusive: reference payload reuse verified; real Strata async liveness and physical peak savings absent",
+      "parent_id": null,
+      "reason": "",
+      "stage": "inconclusive",
+      "state": "done"
+    },
+    {
+      "allocation": {
+        "cpu_seconds": 12,
+        "gpu_seconds": 0
+      },
+      "capabilities": [
+        "engine.strata_prefill_chunk.coverage"
+      ],
+      "depends_on": [],
+      "evidence_ids": [
+        "obs-prefill-coverage",
+        "manual-engine-evidence",
+        "operator-extra-1",
+        "operator-extra-2"
+      ],
+      "hypothesis": "Changing only prefill chunk256 to1024 targets prompt work and merits a boundary-exposed correctness test. The later pg4096/tg16 and ARC16 signals must stay separate from the original pg512/tg128 token divergence.",
+      "measurement": null,
+      "node_id": "prefill-scope",
+      "outcome": "inconclusive: scoped prompt-heavy signal with later boundary-exposed sample; long-generation and broad quality remain open",
+      "parent_id": "scratch-residency",
+      "reason": "",
+      "stage": "inconclusive",
+      "state": "done"
+    },
+    {
+      "allocation": {
+        "cpu_seconds": 12,
+        "gpu_seconds": 0
+      },
+      "capabilities": [
+        "factory.cc_workflow_lab.analyze_receipts",
+        "factory.cc_workflow_lab.run_batch"
+      ],
+      "depends_on": [],
+      "evidence_ids": [
+        "obs-workflow-costs",
+        "operator-extra-3",
+        "operator-extra-4"
+      ],
+      "hypothesis": "For cohesive seven-operation CPU analysis jobs, reducing fresh Host/native invocation boundaries by admitted batching is a stronger overhead lever than sealed-release reuse alone; pinned observations can support this scope without any new timing run.",
+      "measurement": null,
+      "node_id": "workflow-batch",
+      "outcome": "inconclusive: historical and pinned real CPU overhead favor cohesive batching; current implementation and engine gains unmeasured",
+      "parent_id": "scratch-residency",
+      "reason": "",
+      "stage": "inconclusive",
+      "state": "done"
+    },
+    {
+      "allocation": {
+        "cpu_seconds": 6,
+        "gpu_seconds": 0
+      },
+      "capabilities": [
+        "factory.cc_workflow_lab.analyze_receipts"
+      ],
+      "depends_on": [],
+      "evidence_ids": [
+        "obs-workflow-costs",
+        "operator-extra-3",
+        "operator-extra-4"
+      ],
+      "hypothesis": "If warm preparation dominates the cohesive CPU job, sealed-release reuse alone should capture most of the overhead reduction; compare the pinned release-reuse scope with batching before prioritizing this alternative.",
+      "measurement": null,
+      "node_id": "workflow-release-only",
+      "outcome": null,
+      "parent_id": "workflow-batch",
+      "reason": "obs-workflow-costs, operator-extra-3 and operator-extra-4 reject the hypothesis that warm preparation alone captures most workflow savings: pinned release reuse1.254159276\u21921.1921147625s (1.052046 ratio) versus distinct matched batching1.241108945\u21920.170405124s (7.283284 ratio). Preserve the small release-reuse effect and separate fresh-inventory1.524048 Host ratio; do not multiply them. No execution failure or engine-performance rejection is inferred.",
+      "stage": "pruned",
+      "state": "cancelled"
+    },
+    {
+      "allocation": {
+        "cpu_seconds": 12,
+        "gpu_seconds": 0
+      },
+      "capabilities": [
+        "factory.methodology_transfer_lab.design_trial",
+        "engine.strata_prefill_chunk.coverage"
+      ],
+      "depends_on": [
+        "prefill-scope"
+      ],
+      "evidence_ids": [
+        "obs-prefill-divergence-design",
+        "obs-prefill-coverage",
+        "manual-engine-evidence",
+        "operator-extra-1",
+        "operator-extra-2"
+      ],
+      "hypothesis": "The later boundary-exposed ARC16 and pg4096/tg16 agreements narrow the initial quality gap, but original pg512/tg128 token divergence persists. Preserve that known failing shape and design a one-variable chunk256\u21921024 operator-reference/trajectory diagnostic before any larger runtime comparison.",
+      "measurement": null,
+      "node_id": "prefill-divergence",
+      "outcome": "inconclusive: original same-input trajectories first differ at token50; bounded one-variable reference diagnostic designed, execution/numerical reference absent",
+      "parent_id": "prefill-scope",
+      "reason": "",
+      "stage": "inconclusive",
+      "state": "done"
+    }
+  ],
+  "execution_authorized": false,
+  "graph_rev": 13,
+  "limitations": [
+    "Allocations are bookkeeping; existing CC grants and job admission remain required.",
+    "Metrics are reported evidence claims; missing metrics remain unknown."
+  ],
+  "limits": {
+    "cpu_seconds": 60,
+    "gpu_seconds": 0,
+    "max_branches": 8
+  },
+  "ready": [],
+  "remaining": {
+    "cpu_seconds": 6,
+    "gpu_seconds": 0
+  },
+  "schema": "factory.branch-workbench/1",
+  "task_id": "night-branch-jiuwen-v1"
+}

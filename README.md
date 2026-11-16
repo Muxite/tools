@@ -1,5 +1,9 @@
 # AI4Research notes and CC v2 handoff
 
+## Active DGX Spark work, November 15
+
+Start at **[DGX Spark software-factory handoff](DGX-SPARK/README.md)** for the move from Jetson Orin Nano, the qualified Strata baseline, current factory loops, measured results, numerical failures, source snapshots and next-agent instructions. This package includes the latest inspected Spark work; the November 4 qualification statements below describe the older CC protocol transfer, not the current Spark campaign.
+
 Start with [the continuation guide](TRANSFER/CONTINUE.md). It states what works, what remains open, and how to resume on another machine.
 
 ## Current task
