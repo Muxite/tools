@@ -1,0 +1,42 @@
+schema: lab-delivery/v1
+task:
+  schema: lab-task/v1
+  request_id: test-042
+  image:
+    ref: registry.example/engine@sha256:1c06da2a05c1e42e9160e8cb87dbf8b9575cc545d5cb38dc6cf87461bbebc2bd
+    manifest: build-manifest@v1
+  question: Can this expert-store change reduce peak host memory within the fixed
+    quality and speed limits?
+  required_returns:
+    policy: returns-policy@v1
+    items:
+    - verdict
+    - peak_memory
+    - profile
+  inspection_context:
+    source: repo@de8f3f54bb299dc82891df2999441fbdc8b75be3
+    docs: code-state@v3
+    changed_areas:
+    - expert_store
+    known_issues: issues@v2
+    guidance: inspect-residency@v1
+  inputs: inputs.lock@v1
+  resources: spark-budget@v1
+  constraints: acceptance-and-recovery@v1
+  available_ccs: catalog@v12
+  recommended_ccs:
+  - inspector
+  - trace-reader
+delivery:
+  caller_id: coder-A
+  task_sha256: sha256:6a88b4b7b43b61f086cf154a17bd32701ca2c2009643f3ef687aee6c33ad504d
+  assignment_id: assign-042-1
+  lab_id: spark-1
+  execution_generation: 1
+  telemetry:
+    events_endpoint: https://manager.example/events
+    artifacts_endpoint: https://manager.example/artifacts
+    schema: lab-event/v1
+    credential_ref: scoped-credential-handle
+    spool_max_bytes: 1073741824
+  grant_policy: lab-grants@v1

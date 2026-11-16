@@ -1,0 +1,27 @@
+schema: lab-task/v1
+request_id: test-042
+image:
+  ref: registry.example/engine@sha256:1c06da2a05c1e42e9160e8cb87dbf8b9575cc545d5cb38dc6cf87461bbebc2bd
+  manifest: build-manifest@v1
+question: Can this expert-store change reduce peak host memory within the fixed quality
+  and speed limits?
+required_returns:
+  policy: returns-policy@v1
+  items:
+  - verdict
+  - peak_memory
+  - profile
+inspection_context:
+  source: repo@de8f3f54bb299dc82891df2999441fbdc8b75be3
+  docs: code-state@v3
+  changed_areas:
+  - expert_store
+  known_issues: issues@v2
+  guidance: inspect-residency@v1
+inputs: inputs.lock@v1
+resources: spark-budget@v1
+constraints: acceptance-and-recovery@v1
+available_ccs: catalog@v12
+recommended_ccs:
+- inspector
+- trace-reader

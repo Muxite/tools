@@ -2,6 +2,13 @@
 
 Snapshot date: **2026-11-15, America/Toronto**. Some source documents use November 16 UTC; those original names and timestamps are preserved. This is an engineering handoff, not a new presentation, experiment authorization, or claim that every included source is production-ready.
 
+## Goals, components, presentations and plans
+
+- [Goals and roadmap](GOALS-AND-ROADMAP.md): intended outcomes, milestones, research directions and decision evolution.
+- [Component catalog](COMPONENTS.md): actual capsule declarations, roles, versions and callable interfaces.
+- [Recent presentations](PRESENTATIONS.md): original decks, demo video, searchable slide text and evidence reader.
+- [Planning materials](PLANNING-INDEX.md): implementation briefs, RSI assignments, workshop notes and illustrative contracts.
+
 ## Start here
 
 The user's intention is to move the active inference-engine software-factory work from Jetson Orin Nano to DGX Spark, use Strata as the working baseline, and run evidence-driven loops that build, measure and improve engines and the reusable methods supporting that work. Build a software factory **using Capability Capsules**, not merely a growing catalog of capsules. The useful product is a reproducible engine/configuration and a trustworthy learning loop, including negative results.

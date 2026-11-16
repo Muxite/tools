@@ -1,0 +1,10 @@
+flowchart LR
+  request["Request CC<br/>desired interface + materials + open choices"] --> builder["Unified coding agent<br/>inspect, code, build, package"]
+  tools["Prebuilt CCs<br/>inspection / build / correctness / tuning"] --> builder
+  builder --> engine["Implemented engine CC<br/>native product or image + interface"]
+  builder --> supporting["Supporting CCs<br/>sensors / dyno / tools / knowledge"]
+  engine --> lab["Existing lab boundary<br/>worker + engine + test tools"]
+  supporting --> lab
+  lab --> evidence["Memory + quality + speed evidence<br/>failures and coverage included"]
+  evidence -->|"next candidate / tool / recipe"| builder
+  supporting --> tools

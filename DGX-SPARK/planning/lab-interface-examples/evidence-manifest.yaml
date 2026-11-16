@@ -1,0 +1,28 @@
+reference: evidence-manifest@v1
+request_id: test-042
+required_outputs:
+- item: verdict
+  state: present
+  location: result.yaml
+- item: peak_memory
+  state: unavailable
+  reason: sample missing
+- item: profile
+  state: missing
+  reason: local capture lost before durable upload
+  receipt: null
+streams:
+- producer_id: spark-1
+  epoch: boot-7
+  durable_contiguous_seq: 1
+  received_ranges:
+  - - 1
+    - 1
+  - - 3
+    - 4
+  missing_ranges:
+  - - 2
+    - 2
+  required: true
+artifacts: []
+complete: false

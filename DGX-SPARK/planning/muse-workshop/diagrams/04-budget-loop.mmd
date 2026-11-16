@@ -1,0 +1,13 @@
+flowchart TB
+  candidate["Identified engine CC + native product"] --> identity["Start and verify loaded generation<br/>fixed workload/state/policy"]
+  identity --> qualify{"Relevant memory paths<br/>accounted and constrained?"}
+  qualify -->|"no"| gap["Report coverage gap<br/>no hard-budget claim"]
+  qualify -->|"yes"| budget["Trial at explicit byte budget<br/>40 to 39 GB is an example"]
+  budget --> runs["Repeated baseline/candidate runs<br/>diagnostics separate from timing"]
+  runs --> results["Peak memory + client timings<br/>correctness + standard benchmark"]
+  results --> judge{"Quality and speed gates met<br/>within tested budget?"}
+  judge -->|"yes"| lower["Record passing point<br/>lower budget per run policy"]
+  lower --> budget
+  judge -->|"no / incomplete"| report["Keep failure class and raw evidence<br/>report tested boundary and uncertainty"]
+  report --> agent["Same coding agent / RSI<br/>revise engine, tool or recipe"]
+  agent --> candidate

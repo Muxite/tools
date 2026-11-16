@@ -1,0 +1,58 @@
+{
+  "format": "cc-request/2",
+  "id": "muse.engine.design-example",
+  "desired": {
+    "cc": "2",
+    "id": "muse.engine",
+    "version": "0.1.0",
+    "bindings": {},
+    "capabilities": {
+      "api": {
+        "does": "Serve the requested inference engine through its native HTTP interface; actual Muse support and quality must be established.",
+        "changes": [
+          "process.exec",
+          "network.listen",
+          "gpu.use",
+          "network.request"
+        ],
+        "serves": {
+          "interfaces": {
+            "api": {
+              "protocol": "http",
+              "port": 8080,
+              "path": "/",
+              "contract": "api.json"
+            }
+          },
+          "ready": {
+            "interface": "api",
+            "path": "/health"
+          }
+        }
+      }
+    },
+    "materials": {
+      "ontology": {
+        "path": "engine-system.desired.json",
+        "media_type": "application/json",
+        "description": "Candidate desired engine structure; not the assigned ontology owner final model description."
+      },
+      "ontology-profile": {
+        "path": "inference-description.schema.json",
+        "media_type": "application/schema+json",
+        "description": "Illustrative structural profile for the accompanying candidate description."
+      },
+      "references": {
+        "path": "reference-materials.json",
+        "media_type": "application/json",
+        "description": "Pinned engineering reference repositories; not an existing Muse backend."
+      }
+    }
+  },
+  "open": {
+    "/bindings/default": {
+      "owner": "implementer",
+      "question": "Supply a compatible actual implementation binding and files; this request itself cannot execute."
+    }
+  }
+}

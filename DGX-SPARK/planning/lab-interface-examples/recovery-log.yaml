@@ -1,0 +1,14 @@
+reference: recovery-log@v1
+entries:
+- attempt_id: attempt-01
+  event: container_failed
+  action: capture partial output and inspect remaining process tree
+- receipt_id: stop-001
+  issuer: lab-runtime
+  attempt_id: attempt-01
+  execution_generation: 1
+  state: stopped
+  scope: container and descendant processes
+  evidence: runtime inspection fixture
+- event: required_data_missing
+  action: return inconclusive; no retry claimed

@@ -1,0 +1,68 @@
+## AI4Research Workshop — Key Takeaways (Nov 6)
+
+### 1. Software Factory Architecture
+
+- Software Factory (SF) is the overall system; its target deliverable is a runnable inference engine packaged as a container image.
+- CC Factory is a subsystem that produces reusable Capability Capsules (CCs), not complete applications.
+- CC ≠ Contract ≠ Software Image: CC defines reusable capabilities; Contract specifies the product requirements; Image is the actual software deliverable.
+- Core pipeline: Intent Compiler + System Ontology → Requirements Compiler → Contract → Planner → Agents + CCs → Builder → System Lab → Feedback.
+
+### 2. CC Factory
+
+- All-to-CC: Convert heterogeneous sources (papers, repositories, code, etc.) into reusable capabilities.
+- CC2CC: Support both temporary workflow composition and persistent Composite CC creation.
+- Two CC categories: Capabilities used to operate/improve the factory versus capabilities incorporated into its products.
+- Critical architecture question: Why maintain a separate CC Factory workflow when the existing SF workflow could be reused?
+- Supervisor's proposed direction: Reuse SF workflows, add source-specific agents, and dynamically combine workflows through a shared Orchestrator.
+- Workflow itself should be composable: Existing workflows can be selected, reused, and combined into new workflows.
+- Optimization: Explore SkyDiscover integration, multi-iteration campaigns, candidate evaluation, and feedback-driven CC improvement.
+
+### 3. System Lab
+
+- Deploy the generated inference engine image onto DGX Spark for testing.
+- Run correctness tests first, followed by detailed performance profiling.
+- Lab Agent coordinates testing, handles recoverable failures, and reports results.
+- Lab management must survive engine crashes and support checkpoint-based recovery.
+- Distinguish configurable runtime policies from source-code modifications requiring a rebuilt image.
+
+### 4. RSI and Optimization
+
+- RSI should use shared telemetry and execution history to identify improvement opportunities.
+- Main missing capability: Concrete policies for deciding what to change and how.
+- Potential improvement targets include Contract, CC, Planner, Verifier/Gates, and implementation.
+- Contract changes affecting fundamental requirements require human approval; permitted implementation or CC-selection changes can be automated.
+- Use the same Software Factory for both initial generation and subsequent improvement.
+
+### 5. System Ontology and Profiling
+
+- Start with a manually defined, domain-specific System Ontology; automate its generation and evolution later.
+- Establish unified terminology and representations across Intent Compiler, Ontology, Contract, and CCs.
+- Benchmarking ≠ Profiling: TTFT, TPOT, and throughput measure results; internal diagnostics explain performance bottlenecks.
+- Capture detailed CPU/GPU memory usage, expert placement, scheduling, and execution behavior to guide improvements.
+
+### 6. Immediate Priorities
+
+- CC Factory: Redesign around SF workflow reuse and dynamic orchestration; begin with practical inference-engine-related and paper-to-CC examples.
+- RSI: Define actionable optimization policies rather than only collecting telemetry.
+- Ontology: Establish an initial domain-specific template and consistent vocabulary.
+- System Lab: Implement reliable testing, profiling, failure recovery, and feedback collection.
+- Team: Clarify ownership, redistribute implementation work, and narrow initial scope to match available engineering capacity.
+
+
+
+we will make revised post presentation slides. inference engine will not be wrapped by CC anymore and will have its own running system. lab agent will be moved out of the incus lab so that a crash wont kill it. there will be a lab manager on the software factory side who talks to lab agent. lab agent will set up the incus and such. we will also have 2 sets of CCs, tool CCs that help the agents do a job, and other CCs which act as functional components that can be incorporated into the inference engine code itself.  you should update the presentation accordingly and make renames to components which are now wrong. like the input to software factory should be plaintext human input (what is the model) -> intent compiler -> contract compiler --(contract and ontology)-> coding agent swarm (builder)
+
+the builder gets both tool/skill CCs as well as component CCs.
+
+
+
+CC doesnt really need to evolve much anymore from known requirements to usable software, and that diagram should be made just for CCs, not for the software factory as a whole. so adjust that and present it different.
+
+update the muse operation to tools
+
+revise and update tools become reusable CCs with useful outputs
+
+proposed engine deployment engine looks alright except for the lab agent positioning, it should probably be outside incus so that it can survive the crash and continue the test or communicate back. trial runner should either be outside the lab or something else. alternatviely we need a way for the engine application to crash without bringing down the incus lab with it. thats important. because running the lab agent on the raw machine might not be allowed. if we can container the whole system that would be good. make sure you account for how to recover and save everything's state. GPU pass through should also be accounted for. 
+
+
+

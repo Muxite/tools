@@ -1,0 +1,17 @@
+flowchart LR
+  subgraph candidate["Measured engine scope"]
+    engine["Native engine / image<br/>API + runtime state"]
+    diag["Opt-in diagnostics<br/>routing / logits / stage events"]
+    engine --> diag
+  end
+  proc["Host /proc<br/>memory, process, I/O, faults"] --> collector
+  cg["Actual cgroup v2<br/>current, peak, stat, events, swap"] --> collector
+  nvml["NVML where supported<br/>utilization, power, temperature"] --> collector
+  collector["Protected host collector<br/>timestamp + units + coverage"] --> raw["Durable raw evidence<br/>attempt + generation + hashes"]
+  diag --> decode["Versioned diagnostic decoder<br/>preserve original bytes"]
+  decode --> raw
+  dyno["Protected client dyno<br/>monotonic event timestamps"] -->|"fixed HTTP workload"| engine
+  engine -->|"SSE events / usage"| dyno
+  dyno --> raw
+  raw --> compare["Memory + TTFT + token rate<br/>standardized benchmark result"]
+  compare --> agent["Agent diagnosis / next candidate"]

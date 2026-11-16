@@ -1,0 +1,423 @@
+{
+  "contract_version": "spark-cc-factory-work-order/3",
+  "artifact_kind": "implementation_assignment_not_runtime_config",
+  "objective": "Build the iterative CC inference software factory on JiuwenSwarm and prove a real component-to-image-to-lab flow.",
+  "source_pins": {
+    "jiuwenswarm": {
+      "url": "https://github.com/Stellven/jiuwenswarm.git",
+      "branch": "ai4r_ccv2",
+      "reference_commit": "2889a1d6342e9baa7721648eca196bbce79a31d4",
+      "role": "implementation_donor"
+    },
+    "engine": {
+      "url": "https://github.com/Muxite/siminfeng.git",
+      "branch": "main",
+      "reference_commit": "682c6377da20d9229ef1fdb705f63a7a751d14cb"
+    },
+    "ai4r_target": {
+      "url": "https://github.com/Stellven/jiuwenswarm.git",
+      "branch": "AI4Research-Main",
+      "commit": "141c1c401138f916af0a41aca791adf226d814c7",
+      "status": "selected_major_native_revision_no_adapter"
+    }
+  },
+  "feature_branch_proposal": "ai4r/iterative-cc-factory",
+  "architecture": {
+    "control": "iterative_evidence_driven_agent",
+    "plan": "revisable_decisions_with_evidence_refs",
+    "data_exchange": "task_scoped_store_and_artifact_references",
+    "lab_ingestion": "through_manager_only",
+    "long_jobs": "durable_supervisor_with_short_CC_submit_status_calls",
+    "ai4r": "major_native_revision_with_verified_ancestry_no_adapter",
+    "deployment": "single Satay host; controller/Manager/worker/runner outside tested container; local image admission"
+  },
+  "operator_inputs": {
+    "control_host": "Satay: user-named Jetson Orin Nano; inspect actual local hardware/software",
+    "execution_target": {
+      "name": "Satay",
+      "device": "Jetson Orin Nano",
+      "provider": "local",
+      "build_target": "jetson-orin",
+      "expected_architecture": "aarch64 / sm_87, verify locally"
+    },
+    "model_identity_and_path": null,
+    "model_provider_profile": "discover existing approved configuration; do not export secrets",
+    "build_runtime_and_dependency_recipe": null,
+    "correctness_contract_and_reference": null,
+    "job_deadline_seconds": null,
+    "task_iteration_and_resource_budget": null,
+    "remote_provider_endpoint": "not required for same-host demo",
+    "allowed_effects": "resolve from operator grants; no implied authority expansion"
+  },
+  "readiness": {
+    "cc_demo_ready": false,
+    "rsi_improvement_required": false,
+    "fixtures_count_as_live": false,
+    "ai4r_lineage_and_migration_verified": false
+  },
+  "capsules": [
+    {
+      "id": "factory.engine_component",
+      "form": "passive_materials",
+      "capabilities": [],
+      "materials": [
+        "component manifest",
+        "identified source patch/files",
+        "applicability and rollback"
+      ],
+      "required_proof": "built image contains the intended change; changed path is exercised"
+    },
+    {
+      "id": "factory.integration_skill",
+      "form": "passive_materials",
+      "capabilities": [],
+      "materials": [
+        "integration and repair procedure",
+        "preflight and effective-config procedure",
+        "evidence/replanning procedure"
+      ],
+      "required_proof": "real agent reads and follows it; material read grants no execution authority"
+    },
+    {
+      "id": "factory.engine_inspector",
+      "form": "finite",
+      "capabilities": [
+        "inspect",
+        "preflight",
+        "verify_effective_config"
+      ],
+      "required_proof": "actual selected binary flags and configuration checked; structured unsupported-input failure"
+    },
+    {
+      "id": "factory.builder",
+      "form": "finite_job_client",
+      "capabilities": [
+        "submit",
+        "status",
+        "cancel",
+        "result"
+      ],
+      "required_proof": "durable job and actual dependency acquisition/build; submission is not success"
+    },
+    {
+      "id": "factory.lab_client",
+      "form": "finite_job_client",
+      "capabilities": [
+        "submit",
+        "status",
+        "cancel",
+        "result"
+      ],
+      "required_proof": "Manager admission, real inference, durable result acknowledgment"
+    },
+    {
+      "id": "factory.evidence",
+      "form": "finite",
+      "capabilities": [
+        "query",
+        "read",
+        "publish"
+      ],
+      "required_proof": "task-scoped immutable records with verified identities"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T01",
+      "title": "Pin sources and inspect Satay without disturbing its queue",
+      "depends_on": [],
+      "status": "not_started",
+      "deliverables": [
+        "intake.json",
+        "feature-scoped architecture amendment",
+        "operator configuration without secrets"
+      ],
+      "acceptance": [
+        "Record fetched versus reference pins and preserve unrelated work",
+        "Verify local Orin board, JetPack/CUDA, Docker, memory/disk and queue; no Spark provisioning or competing GPU/build job",
+        "AI4Research-Main target and CC-v2 donor ancestry are rechecked; preserve concurrent changes"
+      ]
+    },
+    {
+      "id": "T02",
+      "title": "Implement durable shared evidence",
+      "depends_on": [
+        "T01"
+      ],
+      "status": "not_started",
+      "deliverables": [
+        "task/artifact/observation/decision store",
+        "scoped evidence API"
+      ],
+      "acceptance": [
+        "Same evidence bytes survive process restart",
+        "Stale decision revision cannot overwrite a newer decision",
+        "Same artifact identity with different bytes is rejected",
+        "No success acknowledgment when persistence fails",
+        "Cross-task access is denied unless explicitly authorized"
+      ]
+    },
+    {
+      "id": "T03",
+      "title": "Build durable jobs and real Builder",
+      "depends_on": [
+        "T01",
+        "T02"
+      ],
+      "status": "not_started",
+      "deliverables": [
+        "job supervisor/provider adapter",
+        "dependency preparation",
+        "builder submit/status/cancel/result"
+      ],
+      "acceptance": [
+        "Actual build longer than 60 seconds survives client disconnect and reconnect",
+        "Identical key and request returns the same job; changed request with same key conflicts",
+        "Changed inputs cannot reuse incompatible completed output",
+        "Observed cancellation and cleanup; no untracked children or duplicate recovery launch",
+        "Pinned dependency preparation and real image construction produce linked receipts",
+        "Reuse qualified native jetson-orin recipe; no x86/Spark image substitution"
+      ]
+    },
+    {
+      "id": "T04",
+      "title": "Implement and package six CCs",
+      "depends_on": [
+        "T01",
+        "T02"
+      ],
+      "status": "not_started",
+      "deliverables": [
+        "component and skill material packages",
+        "inspector/builder/lab-client/evidence declarations and implementations"
+      ],
+      "acceptance": [
+        "Validate against actual CC-v2 schemas and all material paths",
+        "Preserve existing runner receipt/replay/grant behavior",
+        "Run live JiuwenSwarm discovery, material read and executable invocation",
+        "Treat denied grants and failed receipt states as failures, not normal success"
+      ]
+    },
+    {
+      "id": "T05",
+      "title": "Connect adaptive agent decision loop",
+      "depends_on": [
+        "T02",
+        "T04"
+      ],
+      "status": "not_started",
+      "deliverables": [
+        "JiuwenSwarm factory controller",
+        "decision revisions and evidence retrieval"
+      ],
+      "acceptance": [
+        "Controlled actual preflight/config rejection leads to queried evidence and a revised next action",
+        "Successful corrected attempt retains original failure and its cost",
+        "No hard-coded repair/success transcript",
+        "Budget exhaustion yields partial outcome with pending work"
+      ]
+    },
+    {
+      "id": "T06",
+      "title": "Deliver image through Manager to real demo lab",
+      "depends_on": [
+        "T03",
+        "T04",
+        "T05"
+      ],
+      "status": "not_started",
+      "deliverables": [
+        "deterministic Manager",
+        "external lab runner",
+        "real inference evidence bundle"
+      ],
+      "acceptance": [
+        "Manager admits and verifies the exact local image on Satay; same-host delivery is labeled honestly",
+        "Actual model executes with declared settings and frozen scoped correctness check",
+        "Wrong target/image, failed correctness and upload failure are distinct outcomes",
+        "Manager persists evidence and acknowledges; lab spool retries idempotently",
+        "No lab direct write to primary factory evidence storage"
+      ]
+    },
+    {
+      "id": "T07",
+      "title": "Implement the major AI4R revision and verify lineage/migration",
+      "depends_on": [
+        "T01",
+        "T02"
+      ],
+      "status": "not_started",
+      "deliverables": [
+        "AI4Research-Main-derived feature branch",
+        "reviewed old-to-new runtime migration map",
+        "updated native startup/configuration/architecture instructions",
+        "ancestry and integration receipts"
+      ],
+      "acceptance": [
+        "Target revision is a genuine ancestor of the feature branch",
+        "CC-v2 donor changes and legacy removals are reviewed and recorded",
+        "One native factory execution path; no AI4R adapter or restored fixed-plan pipeline",
+        "Unsupported legacy config fails with a migration explanation",
+        "Real factory run through the native JiuwenSwarm entrypoint",
+        "Shared AI4Research-Main remains unchanged until separately authorized publication/merge"
+      ]
+    },
+    {
+      "id": "T08",
+      "title": "Rehearse and deliver",
+      "depends_on": [
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07"
+      ],
+      "status": "not_started",
+      "deliverables": [
+        "setup and start runbook",
+        "sanitized live transcript and recording",
+        "ten-minute demonstration",
+        "completion report"
+      ],
+      "acceptance": [
+        "CC-only running order fits ten minutes",
+        "All required live acceptance evidence is linked and reproducible",
+        "RSI profiling and second improvement are excluded from readiness",
+        "Report cc_demo_ready and ai4r_lineage_and_migration_verified without implying a shared-branch merge"
+      ]
+    }
+  ],
+  "logical_interfaces": {
+    "builder.submit": {
+      "inputs": [
+        "task_id",
+        "source_identity",
+        "component_identity",
+        "build_recipe_ref",
+        "target_ref",
+        "idempotency_key"
+      ],
+      "outputs": [
+        "job_ref",
+        "submission_receipt"
+      ]
+    },
+    "lab.submit": {
+      "inputs": [
+        "task_id",
+        "image_transport_ref",
+        "expected_image_identity",
+        "model_ref",
+        "config_ref",
+        "test_contract_ref",
+        "idempotency_key"
+      ],
+      "outputs": [
+        "job_ref",
+        "admission_state"
+      ]
+    },
+    "evidence.publish": {
+      "inputs": [
+        "task_id",
+        "attempt_id",
+        "artifact_bytes_or_authorized_resolver",
+        "expected_digest",
+        "metadata"
+      ],
+      "outputs": [
+        "artifact_ref",
+        "durable_ack"
+      ]
+    },
+    "decision.append": {
+      "inputs": [
+        "task_id",
+        "expected_task_revision",
+        "parent_decision_ref",
+        "evidence_refs",
+        "hypothesis",
+        "next_action",
+        "budget",
+        "stop_condition"
+      ],
+      "outputs": [
+        "decision_ref",
+        "new_task_revision"
+      ]
+    },
+    "native_factory_entrypoint": {
+      "operations": [
+        "submit_task",
+        "get_status",
+        "append_evidence",
+        "cancel_task",
+        "get_result",
+        "resolve_artifact"
+      ],
+      "note": "Native factory interfaces in the resulting AI4Research feature branch, not an AI4R compatibility adapter."
+    }
+  },
+  "job_states": [
+    "queued",
+    "running",
+    "succeeded",
+    "failed",
+    "cancel_requested",
+    "cancelled",
+    "unknown"
+  ],
+  "results_must_separate": [
+    "execution_outcome",
+    "correctness_assessment",
+    "evidence_completeness",
+    "cleanup_state"
+  ],
+  "ten_minute_schedule": [
+    {
+      "from": "00:00",
+      "to": "01:00",
+      "topic": "Factory task and CC roles"
+    },
+    {
+      "from": "01:00",
+      "to": "02:00",
+      "topic": "Baseline and component"
+    },
+    {
+      "from": "02:00",
+      "to": "04:30",
+      "topic": "Skill-guided integration or repair with observed replanning"
+    },
+    {
+      "from": "04:30",
+      "to": "06:30",
+      "topic": "Builder dependencies, build and image receipt"
+    },
+    {
+      "from": "06:30",
+      "to": "08:45",
+      "topic": "Manager and real inference lab"
+    },
+    {
+      "from": "08:45",
+      "to": "09:30",
+      "topic": "Connected artifact evidence"
+    },
+    {
+      "from": "09:30",
+      "to": "10:00",
+      "topic": "Handoff to separate RSI presenter"
+    }
+  ],
+  "lineage": {
+    "checked_ancestor": "141c1c401138f916af0a41aca791adf226d814c7",
+    "checked_descendant": "2889a1d6342e9baa7721648eca196bbce79a31d4",
+    "is_ancestor": true,
+    "recheck_after_fetch": true,
+    "shared_branch_changed_by_handoff": false
+  },
+  "contract_namespace_note": "Historical contract namespace retained; execution host is Satay, not Spark.",
+  "assignment_status": "superseded_demo_direction",
+  "current_assignment": "20261112 Satay Expert Streaming Demo Agent Prompt prepresentation.md"
+}

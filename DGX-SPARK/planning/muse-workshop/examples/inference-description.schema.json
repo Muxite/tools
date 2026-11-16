@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Illustrative inference description; not the assigned owner ontology",
+  "type": "object",
+  "required": [
+    "status",
+    "model",
+    "components",
+    "relations",
+    "properties",
+    "unknowns"
+  ],
+  "properties": {
+    "status": {
+      "const": "candidate-illustration"
+    },
+    "model": {
+      "type": "object"
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "role"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "from",
+          "relation",
+          "to"
+        ],
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "relation": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "properties": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "classification",
+          "statement"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "classification": {
+            "enum": [
+              "required",
+              "tunable",
+              "build-derived",
+              "runtime-observation"
+            ]
+          },
+          "statement": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

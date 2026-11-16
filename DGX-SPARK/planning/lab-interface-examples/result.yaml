@@ -1,0 +1,36 @@
+schema: lab-result/v1
+request_id: test-042
+submitted_image: registry.example/engine@sha256:1c06da2a05c1e42e9160e8cb87dbf8b9575cc545d5cb38dc6cf87461bbebc2bd
+variants: []
+attempts:
+- attempt_id: attempt-01
+  experiment_id: exp-01
+  assignment_id: assign-042-1
+  execution_generation: 1
+  image: registry.example/engine@sha256:1c06da2a05c1e42e9160e8cb87dbf8b9575cc545d5cb38dc6cf87461bbebc2bd
+  variant_id: null
+  settings: settings@v1
+  workload: workload@v1
+  acceptance_policy: acceptance-and-recovery@v1
+  state: failed
+  stop_receipt: stop-001
+verdict: inconclusive
+explanation: Required profile was lost; peak memory is unavailable. No supported performance
+  conclusion.
+metrics:
+  peak_memory:
+    value: null
+    unit: bytes
+    status: unavailable
+    reason: required observation interval missing
+evidence: evidence-manifest@v1
+selected_ccs: selection.lock@v1
+changes: []
+recovery_history: recovery-log@v1
+limitations:
+- missing_required_capture
+- missing_required_stream_interval
+- Spark integration unqualified
+cleanup:
+  state: confirmed
+  receipt: stop-001

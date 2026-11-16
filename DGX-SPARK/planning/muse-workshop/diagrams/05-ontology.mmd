@@ -1,0 +1,15 @@
+flowchart LR
+  subgraph request["Non-executable request CC"]
+    desired["desired.capabilities + open<br/>engine interface and absent choices"]
+    materials["desired.materials<br/>ontology / profile / source / image records"]
+  end
+  ontology["Assigned ontology contributor<br/>desired internal structure"] --> materials
+  desired --> build["Coding agent<br/>read materials, implement, build"]
+  materials --> build
+  build --> product["Implemented engine CC<br/>bindings + serves + materials<br/>native product / realized description"]
+  build --> tools["Supporting tool CCs"]
+  product --> host["Current CC Host + agent tools<br/>prepare / start / call / stop"]
+  tools --> host
+  host --> future["Inference lab integration<br/>qualified model, memory and benchmark"]
+  future --> evidence["Actual generation and measurement evidence<br/>not metadata alone"]
+  evidence -->|"next candidate / tool / recipe"| build

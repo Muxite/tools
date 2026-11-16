@@ -1,0 +1,21 @@
+illustrative_only: true
+description: Separate example for an allowed rebuilt candidate, not a variant claimed
+  in result.yaml
+variant_id: variant-01
+parent_image: registry.example/engine@sha256:1c06da2a05c1e42e9160e8cb87dbf8b9575cc545d5cb38dc6cf87461bbebc2bd
+patch:
+  ref: candidate.patch
+  hash: sha256:b8212af299da31187ffeeec6631b51178bf43fdeb012780a62f134c8ff71c833
+image: registry.example/engine@sha256:a0ef56030b56974998e739caa0a1933c99e3d43a1825feb45c7f390d59894437
+build_manifest: candidate-manifest@v1
+changed_settings:
+  expert_cache_policy: candidate-policy
+comparison:
+  baseline_image: registry.example/engine@sha256:1c06da2a05c1e42e9160e8cb87dbf8b9575cc545d5cb38dc6cf87461bbebc2bd
+  workload: workload@v1
+  acceptance_policy: acceptance-and-recovery@v1
+  attempts:
+  - baseline-attempt
+  - candidate-attempt
+  state: planned_not_measured
+factory_source_updated: false

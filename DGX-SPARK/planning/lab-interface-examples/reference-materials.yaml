@@ -1,0 +1,67 @@
+illustrative_only: true
+references:
+  build-manifest@v1:
+    image: registry.example/engine@sha256:1c06da2a05c1e42e9160e8cb87dbf8b9575cc545d5cb38dc6cf87461bbebc2bd
+    source_revision: repo@de8f3f54bb299dc82891df2999441fbdc8b75be3
+    runtime:
+      architecture: arm64
+      entrypoint: /opt/engine/run
+      driver_requirement: qualified target driver profile required
+    components:
+      expert-store: 0.1.0
+    qualification: not-qualified-on-Spark
+  returns-policy@v1:
+    verdict:
+      required: true
+    peak_memory:
+      required: true
+      unit: bytes
+      scope: peak host process tree memory; resource counter definition pinned in
+        trial record
+    profile:
+      required: true
+      type: .nsys-rep
+      original_required: true
+    fully_supported_requires: all required measurements valid and artifacts durably
+      received, with no required stream gaps
+  inputs.lock@v1:
+    weights:
+      ref: weights@v1
+      hash: sha256:0c03a94d01ca19df3ca30e79127ec2afad61c5ea1289f58c53c4835cdf36194b
+    workload:
+      ref: workload@v1
+      hash: sha256:f1ab88e5b8ad883b818598161a322a2555747db55851448de6b5a71c6f4da6dc
+    baseline_policy: paired comparison to submitted baseline; no measured baseline
+      claimed
+  spark-budget@v1:
+    host: spark-1
+    max_active_tasks: 1
+    wall_time_seconds: 1800
+    max_attempts: 3
+  acceptance-and-recovery@v1:
+    acceptance: compare matched workload and settings; fixed quality and speed thresholds
+      must be supplied before a supported claim
+    local_variants_allowed: true
+    preserve_submitted_image: true
+    max_retries: 2
+    new_attempt_requires: prior execution confirmed stopped or fenced by lab runtime
+    change_acceptance_requires: new approved request revision
+  catalog@v12:
+    inspectable:
+    - inspector@0.1.0
+    - trace-reader@0.1.0
+    - resource-watch@0.1.0
+    - capture-kit@0.1.0
+    execution_permission: separate lab-grants@v1; discovery is not permission
+  lab-grants@v1:
+    issuer: configured lab runtime administrator
+    scope: assignment + tool + target resources
+    lab_agent_can_self_grant: false
+  code-state@v3:
+    description: immutable documentation snapshot of changed source, build and known
+      gaps
+  issues@v2:
+  - Spark image and measurement integration unqualified
+  inspect-residency@v1:
+    focus: expert residency and failed allocations; experimental method chosen by
+      Lab Agent

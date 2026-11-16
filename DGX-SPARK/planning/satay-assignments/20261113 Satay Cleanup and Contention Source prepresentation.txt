@@ -1,0 +1,67 @@
+
+❯ also 1 final question how bad is cpu contention and memory contention for inference? id like to justify why its hard to record results as they come out. given what i know about this machine is theres limited compute and doing recordings doing image builds or transferring files is gonna create noise and impact our ability to get results, is this true?
+
+  Ran 1 shell command
+
+Cleanup is done. Before answering your contention question, I'll pull the measured numbers that back it up.
+
+  Searched for 1 pattern
+
+Done. Your data is on Danta, Satay is cleaned up for RSI, and your contention concern holds up against the recorded data.
+
+Data on Danta
+
+I added satay-profiling-20261113/ next to the evidence bundle. It's 359 MB and 896 files, copied straight from existing records with nothing rerun, and the checksums matched on the drive. The drive is ejected.
+
+┌────────────────────┬────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│       Folder       │                                                            What's in it                                                            │
+├────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ J-OM13             │ The headline experiment: all 12 runs, each with per-thread samples taken 100 times a second, about 800 system telemetry samples    │
+│                    │ (CPU per core, GPU, disk, page faults, memory), output, and logs                                                                   │
+├────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ J-OM14             │ Nsight trace summaries                                                                                                             │
+├────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ J-XS4              │ The expert activity view (activity.html)                                                                                           │
+├────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Live-image screen  │ The profiling data for the exact engine shown live                                                                                 │
+│ run                │                                                                                                                                    │
+├────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ J-ASK1             │ Labelled null, context only                                                                                                        │
+├────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ J-OM8–J-OM12 and   │ Development history                                                                                                                │
+│ J-XS2              │                                                                                                                                    │
+├────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Collector source   │ The scripts that recorded the data, so the field definitions are exact                                                             │
+└────────────────────┴────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+INDEX.md explains each file format, suggests three charts, and gives the plain-vs-factory thread table. Run 5 is excluded.
+
+Satay cleanup
+
+- Stopped the job-queue worker. It was using about 43% of a CPU core while idle. It's still enabled, so restart it before any factory build or lab job with systemctl --user start satay-jobq.
+- Closed the update-manager popup.
+- Nothing else is running apart from the desktop and this session. No containers are running and the queue is empty.
+- Freed about 5 GB (26 GB → 30 GB free). I deleted:
+  - the restore-check scratch folder (2.4 GB);
+  - the extracted v1 and v2 package folders, whose zips stay in ~/backup and on Danta;
+  - a headless-Chrome cache;
+  - my scratch copies of the bundles.
+- Deliberately kept:
+  - all engine images, because the shared README forbids removing them and RSI uses them;
+  - the Docker build cache and ccache, so RSI's builder timings aren't skewed by a cold cache;
+  - the extracted v3 folder, which is the base for the next package build;
+  - one 1.3 GB image archive that the project notes say was kept on purpose.
+
+Is contention really a problem? Yes, and there's measured evidence
+
+- Memory is the main issue. The model is a 22 GB file on a board with 7.4 GB of RAM. The engine relies on the parts of the model already held in memory as cache. Anything that reads or writes lots of data, such as copying a 580 MB zip, loading another Docker image, or a compile, pushes those parts out. The engine then has to read them back from disk.
+  - A run that started with nothing cached measured 1,290 ms/token, against about 711 for the same engine with a warm cache: about 80% slower from cache state alone.
+  - Today's live pair shows the same effect: model load took 67 s for the first run and 51 s for the second, because the second ran after the first had already pulled the model into memory.
+- The disk is shared. During generation the engine reads about 0.2–0.3 GB from disk per token. File transfers and Docker image loads compete for that same disk.
+- CPU is limited. There are only 6 cores. The fill feature runs 16 reader threads, and a compile wants every core.
+  - On 10 Nov a lab run was thrown out because a C++ build was compiling at the same time. The memory watchdog also tripped on that run.
+  - That's why builds and GPU runs now share one exclusive queue, and every run records whether anything else was competing.
+  - Even the idle queue worker took about 45% of a core.
+- Noise sets what you can detect. Run-to-run variation on this machine went from about 1.7% to 3.4% between 11 and 13 Nov. Because the significance threshold is based on that variation, it doubled too. That's why several real 8–12% gains came out "null".
+
+A sentence you can use: "On an 8 GB board running a 22 GB model, the engine depends on what's already in memory and on disk bandwidth. Screen recording, builds or file transfers push the model out of memory and compete for disk and CPU. We measured up to about 80% slowdowns from cache state alone, and a run spoiled by a concurrent compile. So timed results must run with nothing else on the machine, and capture happens afterwards from the logged evidence."

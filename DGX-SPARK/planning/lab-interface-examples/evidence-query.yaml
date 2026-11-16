@@ -1,0 +1,17 @@
+schema: evidence-query/v1
+caller_id: coder-B
+filters:
+  request_id: test-042
+  image: registry.example/engine@sha256:1c06da2a05c1e42e9160e8cb87dbf8b9575cc545d5cb38dc6cf87461bbebc2bd
+include:
+- request_journal
+- attempts
+- lab_verdict
+- events
+- artifact_receipts
+- factory_work_journals
+- build_logs
+access: factory workspace read policy; request mutation remains caller-scoped
+pagination:
+  limit: 100
+  cursor: null

@@ -1,0 +1,28 @@
+sequenceDiagram
+  participant A as JiuwenSwarm / Codex agent
+  participant M as CC MCP front door
+  participant H as Local CC Host
+  participant E as Native / Docker service
+  participant D as Native client CC
+  A->>M: cc_list / cc_describe / cc_material
+  M->>H: Prepare and inspect selected packages
+  M-->>A: Declarations, material and granted handles
+  A->>M: cc_start(cc, api, inputs, key)
+  M->>H: Host.start selected served capability
+  H->>E: Start identified implementation
+  E-->>H: Health response / provider observations
+  H-->>M: Instance state, endpoint and identity
+  M-->>A: Instance + environment handle
+  A->>M: cc_call(client, benchmark, engine handle, key)
+  M->>H: Bind inputs/resources and reserve key
+  H->>D: Finite process packet
+  D->>E: Native HTTP request
+  E-->>D: Business response
+  D-->>H: Metrics / artifact output
+  H-->>M: Receipt and retained output references
+  M-->>A: Result with receipt state to inspect
+  A->>M: cc_stop(instance)
+  M->>H: Stop session-owned instance
+  H->>E: Stop and confirm cessation
+  H-->>M: Confirmed stopped status
+  M-->>A: Tool result with stopped state

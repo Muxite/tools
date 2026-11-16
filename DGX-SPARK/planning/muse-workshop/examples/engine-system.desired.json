@@ -1,0 +1,101 @@
+{
+  "status": "candidate-illustration",
+  "model": {
+    "repository": "meta-models/Muse-Spark-Open-816B-A42B",
+    "checkpoint_status": "not supplied; not a qualified execution model"
+  },
+  "components": [
+    {
+      "id": "loader",
+      "role": "read and validate approved tensor pack"
+    },
+    {
+      "id": "weight-store",
+      "role": "serve selected representations and residency/streaming policy"
+    },
+    {
+      "id": "executor",
+      "role": "model-specific operators and generation"
+    },
+    {
+      "id": "session-state",
+      "role": "session and context state managed by executor"
+    },
+    {
+      "id": "scheduler",
+      "role": "admit work and sequence execution"
+    },
+    {
+      "id": "api",
+      "role": "expose declared inference operations"
+    },
+    {
+      "id": "diagnostics",
+      "role": "expose supported work and memory observations"
+    }
+  ],
+  "relations": [
+    {
+      "from": "loader",
+      "relation": "loads",
+      "to": "weight-store"
+    },
+    {
+      "from": "executor",
+      "relation": "reads",
+      "to": "weight-store"
+    },
+    {
+      "from": "executor",
+      "relation": "manages",
+      "to": "session-state"
+    },
+    {
+      "from": "scheduler",
+      "relation": "schedules",
+      "to": "executor"
+    },
+    {
+      "from": "api",
+      "relation": "submits-to",
+      "to": "scheduler"
+    },
+    {
+      "from": "diagnostics",
+      "relation": "observes",
+      "to": "executor"
+    }
+  ],
+  "properties": [
+    {
+      "name": "target",
+      "classification": "required",
+      "statement": "DGX Spark; exact assigned host/driver/toolkit bound for evaluation."
+    },
+    {
+      "name": "quality",
+      "classification": "required",
+      "statement": "Use the externally supplied standardized benchmark and bound acceptance policy."
+    },
+    {
+      "name": "memory-policy",
+      "classification": "tunable",
+      "statement": "Representation, residency, cache, streaming and workspace choices are candidate dimensions; semantic changes are labeled and evaluated."
+    },
+    {
+      "name": "built-artifact",
+      "classification": "build-derived",
+      "statement": "Realized description must identify actual binary/image/native manifest and toolchain."
+    },
+    {
+      "name": "peak-memory",
+      "classification": "runtime-observation",
+      "statement": "Only attempt/generation-specific qualified measurements establish actual peak and limit coverage."
+    }
+  ],
+  "unknowns": [
+    "Approved checkpoint, formats, tensor layouts, model operators and supported backend",
+    "Exact state-machine requirements and compatible speculation",
+    "Evaluation-specific quality and speed thresholds"
+  ]
+}
