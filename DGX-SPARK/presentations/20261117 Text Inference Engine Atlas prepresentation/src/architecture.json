@@ -1,0 +1,20 @@
+{
+ "edges":[
+ ["startup","interface","Ready engine handle","invokes"],
+ ["interface","schedule","Token IDs and request limits","invokes"],
+ ["schedule","generate","Admitted sequences and token budget","invokes"],
+ ["generate","model","Input IDs, positions and state handles","invokes"],
+ ["model","backend","Tensor operations and layout contracts","invokes"],
+ ["backend","host","Launches, copies and completion events","invokes"],
+ ["startup","state","Maps weights and reserves arenas","writes"],
+ ["schedule","state","Reserves slots and page credits","writes"],
+ ["model","state","Reads weights and appends K/V","writes"],
+ ["backend","state","Borrows scratch and signals reuse","reads"],
+ ["generate","interface","Committed tokens, finish reason","returns"]
+ ],
+ "traces":[
+ {"id":"token","title":"One request","intro":"Follow a prompt through its first token and the next decode step.","steps":[["interface","tokenizer.prepare_request","Render the declared template and encode text to token IDs."],["schedule","batch.execution_layout","Admit the request and assemble positions, sequence IDs and state handles."],["generate","decode.advance_sequence","Prefill the prompt and advance the committed position."],["model","model.logit_head","Project the final hidden state into vocabulary logits."],["generate","sampling.select_tokens","Apply the sampling contract and commit a token. Feed that token and its position to the next decode iteration."],["interface","output.response_stream","Decode the committed token, buffer incomplete text and stream the response."],["schedule","scheduler.request_lifecycle","On stop or cancellation, retire the sequence and release its claims after outstanding work completes."]]},
+ {"id":"moe","title":"One MoE token","intro":"Follow authoritative routing through weight readiness and the inverse token permutation.","steps":[["model","model.expert_routing","Rank routed experts with the checkpoint rule. Record selected IDs and aligned mixture weights."],["model","experts.routed_forward","Pack rows by expert and preserve the inverse mapping."],["state","engine.expert_streaming","Force an incorrect prefetch. Join or fetch the actual selected weights and wait for readiness."],["model","experts.routed_forward","Evaluate each selected expert’s gate, up and down projections."],["model","experts.shared_forward","Execute the shared branch if the checkpoint declares it. Its width and gate are independent of routed k."],["model","merge.expert_contributions","Restore token order, weight each routed contribution and add the declared shared contribution. Compare against an unfused reference."]]},
+ {"id":"latency","title":"Slow decode","intro":"Use a matched workload. Start with the symptom and distinguish queue delay, weight waits and device execution.","steps":[["interface","observability.runtime_events","Separate time to first token from steady inter-token gaps. Record client and engine clock boundaries."],["schedule","scheduler.request_lifecycle","Inspect ready-to-run delay, active sequences and token budget. Long queue wait with idle GPU time suggests admission or host scheduling."],["state","engine.expert_streaming","Correlate demand timestamps with weight-ready events. Count missed bytes, wait time and overlap at the actual tier boundary."],["backend","backend.execute_operators","Compare CPU submission, device start and completion. Inspect occupancy and measured bandwidth at the observed shape."],["f_profile","factory.runtime_profiling","Repeat with fixed input lengths, concurrency and cache state. Attribute nested or overlapping intervals on a timeline before ranking causes."]]}
+ ]
+}
