@@ -1,0 +1,72 @@
+"""Generate the standalone atlas with Python's standard library."""
+import json
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+def read(name):
+    return json.loads((HERE/name).read_text('utf-8-sig'))
+
+def assemble():
+    evidence = read('evidence.json')
+    taxonomy = read('text_factory.json')
+    architecture = read('architecture.json')
+    engine = read('text_engine.json')
+    merged, removed = taxonomy['merge'], set(taxonomy['remove'])
+    def current(key):
+        return merged.get(key, key)
+    old = {r['id']:r for r in evidence['roles']}
+    aliases = {k:current(v) for k,v in evidence['aliases'].items()}
+    aliases.update({k:current(k) for k in old})
+    roles = {k:r for k,r in old.items() if k not in merged and k not in removed}
+    for k,r in roles.items():
+        r['why'] = taxonomy['rationale'][k]
+        r['when'] = taxonomy['conditional'].get(k,'Required when this operation is present in the target engine or workflow.')
+        r['variantJobs'] = []
+    for former,survivor in merged.items():
+        roles[survivor]['variantJobs'].append({k:old[former][k] for k in ['id','reason','check','capabilities']})
+        for field in ['ex','reuse']:
+            roles[survivor][field]=list(dict.fromkeys(roles[survivor][field]+old[former][field]))
+    factory = taxonomy['layers']
+    sites = {k:[] for k in roles}
+    for layer in engine+factory:
+        ids = {o['id'] for o in layer['ops']}
+        assert len(ids)==len(layer['ops']),layer['id']
+        for a,b,*rest in layer['edges']:
+            assert a in ids and b in ids and rest[0],(layer['id'],a,b)
+        for op in layer['ops']:
+            op['cc']=list(dict.fromkeys(current(k) for k in op['cc']))
+            for k in op['cc']:
+                assert k in roles,(op,k)
+                sites[k].append([layer['id'],op['id']])
+    for k,places in sites.items():
+        assert places,'Unreachable CC '+k
+        roles[k]['sites']=places
+    sources = []
+    for row in evidence['sources']:
+        row['assigned']=current(row['assigned'])
+        if row['assigned'] in roles:sources.append(row)
+    for asset in evidence['assets']:
+        asset['assigned']=current(asset['assigned'])
+    paths={l['id']:{o['id'] for o in l['ops']} for l in engine+factory}
+    for a,b,*_ in architecture['edges']+taxonomy['edges']:
+        assert a in paths and b in paths
+    for tr in architecture['traces']:
+        for item in tr['steps']:
+            lay,k,note=item[:3]
+            if lay not in paths:lay=sites[k][0][0]
+            where=next(((l,o) for l,o in sites[k] if l==lay),sites[k][0])
+            if len(item)>3:
+                assert item[3] in paths[lay]
+                where=(lay,item[3])
+            item[:]=[*where,k,note]
+    return dict(engine=engine,factory=factory,edges=architecture['edges'],factoryEdges=taxonomy['edges'],roles=list(roles.values()),aliases=aliases,excluded=sorted(removed),sources=sources,assets=evidence['assets'],repositories=evidence['repositories'],traces=architecture['traces'],transfers=evidence['transfers'],mergers=merged)
+
+if __name__=='__main__':
+    data=assemble()
+    page=(HERE/'site.html').read_text('utf-8')
+    for token,names in [('/*GRAPH_JS*/',['text_graph.js']),('/*SITE_JS*/',['site.js','navigation.js']),('/*SITE_CSS*/',['site.css','text_graph.css'])]:
+        page=page.replace(token,'\n'.join((HERE/n).read_text('utf-8') for n in names))
+    page=page.replace('__ATLAS__',json.dumps(data,ensure_ascii=False,separators=(',',':')).replace('<','\\u003c'))
+    out=HERE.parent/'20261117 Text Inference Engine Atlas prepresentation.html'
+    out.write_bytes(page.encode('utf-8'))
+    print(f"{len(data['roles'])} CCs, {sum(len(l['ops']) for l in data['engine'])} engine operations, {len(data['sources'])} source bindings.")
