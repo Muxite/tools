@@ -111,8 +111,14 @@
     ],
     [
      "interface",
-     "output.response_stream",
-     "Decode the committed token, buffer incomplete text and stream the response.",
+     "tokenizer.prepare_request",
+     "Decode committed vocabulary IDs, retaining incomplete byte sequences until a complete text segment is available.",
+     "detok"
+    ],
+    [
+     "interface",
+     "serving.request_gateway",
+     "Emit decoded text in order, deliver the finish reason and complete the request.",
      "emit"
     ],
     [
@@ -142,7 +148,7 @@
     ],
     [
      "model",
-     "experts.routed_forward",
+     "merge.expert_contributions",
      "Pack rows by expert and preserve the inverse mapping.",
      "dispatch"
     ],
@@ -160,14 +166,8 @@
     ],
     [
      "model",
-     "experts.shared_forward",
-     "Execute the shared branch if the checkpoint declares it. Its width and gate are independent of routed k.",
-     "shared"
-    ],
-    [
-     "model",
      "merge.expert_contributions",
-     "Restore token order, weight each routed contribution and add the declared shared contribution. Compare against an unfused reference.",
+     "Restore token order, apply each aligned mixture weight once, and compare the per-token sum against an unfused reference.",
      "combine"
     ]
    ]
@@ -229,7 +229,7 @@
     [
      "model",
      "model.expert_routing",
-     "Implement a reference selector. Keep score corrections, shared width and the downstream dispatch interface explicit.",
+     "Implement a reference selector. Preserve the checkpoint scoring rule, routed width and dispatch interface.",
      "route"
     ],
     [

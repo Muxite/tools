@@ -1,1122 +1,1157 @@
 {
-  "attention.dense_execution": {
-    "title": "Build position-aware causal attention",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Dense attention operators",
-        "detail": "Suggested runtime code for masked score normalization and value accumulation, with rotary position transforms and stable partial-state merging."
-      },
-      {
-        "kind": "tool",
-        "name": "Attention reference comparator",
-        "detail": "Suggested test executable comparing prefill and paged decode against the same FP32 mask, head geometry and positional configuration."
-      },
-      {
-        "kind": "skill",
-        "name": "Bind an attention backend",
-        "detail": "Suggested integration instructions for checking head sizes, cache layouts, device eligibility and fallback before enabling fused attention."
-      }
-    ]
-  },
-  "attention.sparse_execution": {
-    "title": "Build indexed sparse attention",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Sparse candidate and attention pipeline",
-        "detail": "Suggested runtime code for index updates, candidate scoring, bounded selection, KV gather and sparse attention."
-      },
-      {
-        "kind": "tool",
-        "name": "Candidate coverage and output checker",
-        "detail": "Suggested checker comparing selected IDs and results to a scalar reference using identical candidates, including ties and repeated indices."
-      },
-      {
-        "kind": "method",
-        "name": "Sparse visibility validation procedure",
-        "detail": "Suggested procedure for checking causal eligibility, shortlist coverage and prompt-versus-step agreement across context boundaries."
-      }
-    ]
-  },
-  "backend.execute_operators": {
-    "title": "Bind operators to supported execution backends",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Operator admission and dispatch adapters",
-        "detail": "Suggested runtime adapters resolving supported shapes, types and layouts to CPU or accelerator implementations with explicit fallback."
-      },
-      {
-        "kind": "component",
-        "name": "CPU worker idle and wakeup policy",
-        "detail": "Suggested reusable worker code for bounded spin, relaxation, yield and sleep without changing synchronization semantics."
-      },
-      {
-        "kind": "tool",
-        "name": "Backend path and eligibility probe",
-        "detail": "Suggested executable reporting actual implementation selection and checking unsupported dtype, architecture and compilation-cache cases."
-      },
-      {
-        "kind": "skill",
-        "name": "Integrate a target backend",
-        "detail": "Suggested instructions for binding streams, thread pools, libraries and JIT keys to the target operator interface."
-      }
-    ]
-  },
-  "batch.execution_layout": {
-    "title": "Preserve sequence identity through ragged batches",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Ragged batch layout builder",
-        "detail": "Suggested runtime code emitting positions, offsets, state handles and microbatch partitions while retaining source-sequence provenance."
-      },
-      {
-        "kind": "tool",
-        "name": "Batch reconstruction checker",
-        "detail": "Suggested fixture runner reconstructing original sequence order from split or padded batches, including unequal lengths and early EOS."
-      },
-      {
-        "kind": "skill",
-        "name": "Adapt worker batch metadata",
-        "detail": "Suggested instructions mapping canonical batch fields into native lane, request-index and graph-bucket conventions."
-      }
-    ]
-  },
-  "compiler.engine_contract": {
-    "title": "Compile engine requirements into verifiable obligations",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Engine contract compiler",
-        "detail": "Suggested agent-callable compiler emitting model semantics, interface obligations, allowed substitutions and measurable acceptance fields from a reviewed brief."
-      },
-      {
-        "kind": "method",
-        "name": "Obligation and oracle assignment",
-        "detail": "Suggested procedure assigning each requirement to an owner, artifact, independent check and declared tolerance."
-      },
-      {
-        "kind": "skill",
-        "name": "Prepare an implementation handoff",
-        "detail": "Suggested guidance for expressing both existing-source adaptation and greenfield construction without treating source availability as acceptance."
-      }
-    ]
-  },
-  "compiler.intent_brief": {
-    "title": "Resolve the requested engine and deployment intent",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Structured intent brief builder",
-        "detail": "Suggested intake tool capturing model revision, hardware, service mode, budgets and success criteria with unresolved decisions."
-      },
-      {
-        "kind": "method",
-        "name": "Contract-changing ambiguity review",
-        "detail": "Suggested procedure separating preferences, observed facts and assumptions, then resolving only questions that change implementation feasibility."
-      },
-      {
-        "kind": "skill",
-        "name": "Release a reviewed brief",
-        "detail": "Suggested guidance for presenting concrete choices and preserving the approved scope for downstream contract compilation."
-      }
-    ]
-  },
-  "decode.advance_sequence": {
-    "title": "Advance prompts and tokens with aligned sequence state",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Prompt timeline and forward driver",
-        "detail": "Suggested runtime code choosing prefill, extend or decode and committing positions and state at explicit boundaries."
-      },
-      {
-        "kind": "tool",
-        "name": "Frontier replay comparator",
-        "detail": "Suggested test runner comparing extend, shorten and replace operations to fresh replay at the same prefix."
-      },
-      {
-        "kind": "skill",
-        "name": "Bind native context transitions",
-        "detail": "Suggested integration guidance for invalidating divergent suffixes and preserving state handles across runner modes."
-      }
-    ]
-  },
-  "decode.speculative_execution": {
-    "title": "Build draft generation with exact target verification",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Draft proposal and arbitration adapters",
-        "detail": "Suggested runtime code for suffix, n-gram or model proposals and bounded adaptive speculation effort."
-      },
-      {
-        "kind": "component",
-        "name": "Target acceptance and rollback controller",
-        "detail": "Suggested runtime state machine committing accepted tokens and restoring rejected target and draft suffix state."
-      },
-      {
-        "kind": "tool",
-        "name": "Forced-rejection state checker",
-        "detail": "Suggested fixture runner forcing rejection at every draft position and comparing the next target state with ordinary decoding."
-      },
-      {
-        "kind": "method",
-        "name": "Speculation benefit evaluation",
-        "detail": "Suggested procedure separating acceptance rate, proposal cost, target cost and memory requirements before selecting an effort policy."
-      }
-    ]
-  },
-  "dense.feed_forward": {
-    "title": "Build dense projections and gated feed-forward arithmetic",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Projection and gated activation operators",
-        "detail": "Suggested runtime code for gate/up/down projections and model-defined activation, including eligible fused paths."
-      },
-      {
-        "kind": "component",
-        "name": "Activation encoding adapters",
-        "detail": "Suggested codecs supplying quantized rows, scales and saturation semantics expected by the chosen projection kernels."
-      },
-      {
-        "kind": "tool",
-        "name": "Quantized FFN numerical comparator",
-        "detail": "Suggested checker comparing odd rows, tile tails and extreme activations to independently dequantized dense arithmetic."
-      }
-    ]
-  },
-  "engine.expert_streaming": {
-    "title": "Keep demanded expert weights ready within capacity",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Demand-safe expert cache and fill controller",
-        "detail": "Suggested runtime code owning bounded slots, protected consumers, pending/ready generations and exact-demand fills."
-      },
-      {
-        "kind": "component",
-        "name": "Storage and peer expert service adapters",
-        "detail": "Suggested reusable adapters for aligned range reads, transfer completion and optional peer or remote expert service."
-      },
-      {
-        "kind": "tool",
-        "name": "Readiness and slot-reuse stress runner",
-        "detail": "Suggested tests delaying and reordering reads, racing hints with demand and checking loaded bytes before every consumer."
-      },
-      {
-        "kind": "method",
-        "name": "Resident-set selection procedure",
-        "detail": "Suggested fixed-budget or profile-guided placement procedure with per-layer capacity accounting and explicit refresh rules."
-      },
-      {
-        "kind": "skill",
-        "name": "Connect prefetch hints to authoritative demand",
-        "detail": "Suggested integration instructions joining matching in-flight transfers without allowing predictions to alter routing or expose stale slots."
-      }
-    ]
-  },
-  "factory.builder": {
-    "title": "Build and package an identified runnable engine",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Source-bound build and collection client",
-        "detail": "Suggested tool submitting exact source and dependencies, polling attempts and collecting durable build outputs."
-      },
-      {
-        "kind": "component",
-        "name": "Runtime package assembler",
-        "detail": "Suggested reusable assembly code bundling executable, libraries, generated kernels and asset manifests with content hashes."
-      },
-      {
-        "kind": "method",
-        "name": "Clean-host image acceptance",
-        "detail": "Suggested procedure unpacking the package, checking identities and dependencies, and reaching readiness on a compatible target."
-      }
-    ]
-  },
-  "factory.cc_qualification": {
-    "title": "Qualify a component or engine for a declared contract",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Qualification manifest checker",
-        "detail": "Suggested tool checking release identity, operation ports, required artifacts and verification-unit declarations against the requested scope."
-      },
-      {
-        "kind": "method",
-        "name": "Scoped admission verdict",
-        "detail": "Suggested procedure distinguishing source inspection, executable trials and unsupported obligations before issuing pass, fail or inconclusive."
-      },
-      {
-        "kind": "skill",
-        "name": "Inspect sealed and offline handoffs",
-        "detail": "Suggested guidance for qualifying delivered artifacts using declared interfaces without assuming inaccessible implementation behavior."
-      }
-    ]
-  },
-  "factory.evidence": {
-    "title": "Publish recoverable evidence for construction decisions",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Evidence publication and query interface",
-        "detail": "Suggested agent-facing tool storing results and retrieving them by candidate, workload, target, obligation and attempt identity."
-      },
-      {
-        "kind": "component",
-        "name": "Provenance and artifact index",
-        "detail": "Suggested reusable record structures connecting raw artifacts, invocation receipts, task dependencies and scoped verdicts."
-      },
-      {
-        "kind": "method",
-        "name": "Decision evidence completeness review",
-        "detail": "Suggested procedure confirming that every accepted claim can be traced to recoverable inputs, identities, observations and check scope."
-      }
-    ]
-  },
-  "factory.experiment_design": {
-    "title": "Design bounded experiments that distinguish explanations",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Experiment plan builder",
-        "detail": "Suggested tool recording hypotheses, alternatives, controlled variables, predicted observations, budgets and stopping rules."
-      },
-      {
-        "kind": "method",
-        "name": "Single-change ablation design",
-        "detail": "Suggested procedure choosing the smallest intervention and control that discriminate the competing causes."
-      },
-      {
-        "kind": "skill",
-        "name": "Plan compatibility and transfer trials",
-        "detail": "Suggested guidance separating portable behavior from engine-specific bindings and defining evidence needed before claiming transfer."
-      }
-    ]
-  },
-  "factory.lab_execution": {
-    "title": "Run and reconcile experiments on the intended target",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Lab submission and artifact collector",
-        "detail": "Suggested client submitting admitted images and workloads, polling attempts and exporting raw logs and measurements."
-      },
-      {
-        "kind": "component",
-        "name": "Attempt ownership reconciler",
-        "detail": "Suggested reusable lifecycle code tracking leases, live processes, interrupted attempts and owned cleanup."
-      },
-      {
-        "kind": "method",
-        "name": "Bounded recovery procedure",
-        "detail": "Suggested recovery protocol distinguishing retryable infrastructure failure from candidate failure while preserving original evidence."
-      }
-    ]
-  },
-  "factory.methodology_ab": {
-    "title": "Compare candidate and baseline under frozen controls",
-    "capabilities": [
-      {
-        "kind": "method",
-        "name": "Counterbalanced paired comparison",
-        "detail": "Suggested protocol freezing workload, hardware, images, warmup, cache state and phase definitions before alternating baseline and candidate runs."
-      },
-      {
-        "kind": "tool",
-        "name": "Paired result and stability analyzer",
-        "detail": "Suggested analysis tool checking A/A variability and paired quality/performance differences with consistent units."
-      },
-      {
-        "kind": "method",
-        "name": "Screen and independent confirmation gates",
-        "detail": "Suggested procedure separating exploratory screening from a separately scheduled confirmation with a predefined effect threshold."
-      }
-    ]
-  },
-  "factory.precision_lab": {
-    "title": "Evaluate precision choices against quality and memory",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Representation and memory calculator",
-        "detail": "Suggested calculator accounting packed weights, scales, padding and reconstruction error for candidate representations."
-      },
-      {
-        "kind": "method",
-        "name": "Calibration and quality trial design",
-        "detail": "Suggested procedure freezing calibration inputs, held-out quality checks and acceptable downstream loss before choosing precision."
-      },
-      {
-        "kind": "skill",
-        "name": "Prepare a precision-change experiment",
-        "detail": "Suggested guidance binding format metadata, activation scales and operator support to a reproducible candidate without confusing codec agreement with model quality."
-      }
-    ]
-  },
-  "factory.resource_lab": {
-    "title": "Measure feasible capacity and placement tradeoffs",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Live-byte and capacity model",
-        "detail": "Suggested tool estimating packed weights, KV, arenas and expert working sets against usable target memory."
-      },
-      {
-        "kind": "tool",
-        "name": "Budget and placement sweep runner",
-        "detail": "Suggested runner testing bounded residency, layer placement or model-size ladders while retaining workload and target identity."
-      },
-      {
-        "kind": "method",
-        "name": "Measured resource frontier analysis",
-        "detail": "Suggested procedure comparing latency, throughput, memory headroom and transfer demand, separating model estimates from target observations."
-      }
-    ]
-  },
-  "factory.runtime_profiling": {
-    "title": "Identify runtime bottlenecks from correlated observations",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Phase and resource profile collector",
-        "detail": "Suggested tool collecting request phases, memory, storage, thread and accelerator activity with common run identity."
-      },
-      {
-        "kind": "tool",
-        "name": "Actual dispatch and thread attribution inspector",
-        "detail": "Suggested instrumentation checking launched kernels, native threads and operator ownership rather than inferred configuration."
-      },
-      {
-        "kind": "method",
-        "name": "Observer overhead and bottleneck diagnosis",
-        "detail": "Suggested procedure measuring collection overhead and testing whether host, queue, I/O or device stalls explain the observed delay."
-      }
-    ]
-  },
-  "factory.source_inspection": {
-    "title": "Inspect the implementation and settings actually present",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Checkout and image inventory inspector",
-        "detail": "Suggested tool recording exact revisions, binaries, compiled paths, model identity and available dependency versions."
-      },
-      {
-        "kind": "tool",
-        "name": "Effective configuration extractor",
-        "detail": "Suggested probe reporting active placement, backend, format and runtime settings rather than advertised defaults."
-      },
-      {
-        "kind": "method",
-        "name": "Compatibility and gap assessment",
-        "detail": "Suggested procedure matching observed assets and interfaces to contract obligations, with absent or unverified behavior listed explicitly."
-      }
-    ]
-  },
-  "factory.source_integration": {
-    "title": "Implement a scoped source change and reproducible handoff",
-    "capabilities": [
-      {
-        "kind": "skill",
-        "name": "Adapt native interfaces and ownership",
-        "detail": "Suggested integration guidance mapping reusable code to target ABI, tensor layout, lifetimes, error handling and synchronization."
-      },
-      {
-        "kind": "tool",
-        "name": "Scoped source lowering and project emitter",
-        "detail": "Suggested code-generation tool emitting buildable C++ or supported CUDA reference operations within a declared arithmetic and synchronization scope."
-      },
-      {
-        "kind": "tool",
-        "name": "Candidate revision and handoff recorder",
-        "detail": "Suggested tool capturing task-owned patches, dependency order, exact revision and build/evaluation manifests."
-      },
-      {
-        "kind": "method",
-        "name": "Reviewable patch acceptance",
-        "detail": "Suggested procedure checking the change against allowed scope, focused correctness checks and unresolved integration obligations."
-      }
-    ]
-  },
-  "factory.streaming_lab": {
-    "title": "Evaluate expert streaming with controlled demand and storage",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Expert-cache and prediction trace replay",
-        "detail": "Suggested simulator or replay runner separating demanded, predicted, resident and transferred experts with byte and stall accounting."
-      },
-      {
-        "kind": "tool",
-        "name": "Positional-read and coalescing fixture runner",
-        "detail": "Suggested target tool checking storage read correctness, alignment, completion order and aggregation behavior."
-      },
-      {
-        "kind": "method",
-        "name": "Warm and cold storage trial protocol",
-        "detail": "Suggested procedure controlling cache state and frozen traces before comparing readiness, exposed demand stalls and wasted bytes."
-      }
-    ]
-  },
-  "factory.workflow_planning": {
-    "title": "Plan bounded CC invocations from required artifacts",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Artifact-backward workflow planner",
-        "detail": "Suggested planner expanding required outputs into typed CC invocations with explicit dependency and port bindings."
-      },
-      {
-        "kind": "tool",
-        "name": "Invocation receipt and branch workbench",
-        "detail": "Suggested tool comparing outcomes, preserving receipts and pruning task-owned alternatives under a bounded budget."
-      },
-      {
-        "kind": "method",
-        "name": "Evidence-driven replanning procedure",
-        "detail": "Suggested procedure deciding repair, retry, alternative binding or stop from observed failures without silently changing contract requirements."
-      }
-    ]
-  },
-  "graph.lower_capture_replay": {
-    "title": "Build execution graphs with safe reusable capture",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Typed graph lowering and capture cache",
-        "detail": "Suggested runtime code constructing dependencies and caching eligible executions by shape, address and mutable-state identity."
-      },
-      {
-        "kind": "tool",
-        "name": "Eager versus replay comparator",
-        "detail": "Suggested test runner checking graph shapes, output agreement and recapture after changed keys or buffers."
-      },
-      {
-        "kind": "skill",
-        "name": "Bind capture lifetime and stream rules",
-        "detail": "Suggested guidance connecting native buffers, adapter changes and launch streams to capture eligibility and invalidation."
-      }
-    ]
-  },
-  "memory.kv_tiering": {
-    "title": "Move live KV pages safely across storage tiers",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "KV migration and remapping controller",
-        "detail": "Suggested runtime code tracking source ownership, in-flight copies, destination readiness and page-table updates."
-      },
-      {
-        "kind": "component",
-        "name": "Indexed page transfer adapters",
-        "detail": "Suggested copy implementations preserving noncontiguous page IDs, payload layout and completion dependencies."
-      },
-      {
-        "kind": "tool",
-        "name": "Tier pressure and restoration checker",
-        "detail": "Suggested fixtures forcing eviction/restage and verifying untouched pages plus decode agreement with resident KV."
-      }
-    ]
-  },
-  "memory.reusable_sessions": {
-    "title": "Reuse prefixes and restore matching sequence sessions",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Prefix index and protected eviction",
-        "detail": "Suggested runtime code finding longest reusable prefixes while retaining active references and reclaiming idle branches."
-      },
-      {
-        "kind": "component",
-        "name": "Identity-bound session snapshot codec",
-        "detail": "Suggested persistence code validating model, tokenizer, configuration and version before restoring state."
-      },
-      {
-        "kind": "tool",
-        "name": "Reuse and resume replay checker",
-        "detail": "Suggested fixtures testing near matches, branch splits, stale identities and resumed next logits against fresh replay."
-      }
-    ]
-  },
-  "memory.runtime_arenas": {
-    "title": "Allocate runtime buffers with sound capacity and lifetimes",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Lifetime-aware workspace allocator",
-        "detail": "Suggested runtime code reusing storage only across disjoint live ranges and exposing peak allocations."
-      },
-      {
-        "kind": "component",
-        "name": "Mapped, pinned and virtual memory adapters",
-        "detail": "Suggested code providing checked addressable weight views and stable staging allocations with bounded ownership."
-      },
-      {
-        "kind": "tool",
-        "name": "Allocation lifetime and mapping stress checker",
-        "detail": "Suggested tests covering allocation failure, overlapping consumers, unmap/recommit and cleanup after captured execution."
-      }
-    ]
-  },
-  "memory.sequence_kv": {
-    "title": "Own and encode each sequence KV position",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Sequence page and slot allocator",
-        "detail": "Suggested runtime code mapping logical positions to uniquely owned physical KV storage through append, copy and release."
-      },
-      {
-        "kind": "component",
-        "name": "Window and compact-KV update operators",
-        "detail": "Suggested runtime code enforcing retention windows and admitted quantization/compression layouts."
-      },
-      {
-        "kind": "tool",
-        "name": "KV position and codec conformance checker",
-        "detail": "Suggested tests crossing page/window boundaries and reused slots while checking decoded rows, error bounds and incremental logits."
-      }
-    ]
-  },
-  "merge.expert_contributions": {
-    "title": "Restore token order and combine expert contributions",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Inverse assignment and weighted reducer",
-        "detail": "Suggested runtime code restoring original token rows and accumulating aligned routed contributions once."
-      },
-      {
-        "kind": "component",
-        "name": "Shared contribution join",
-        "detail": "Suggested merge implementation adding the checkpoint-defined shared branch at the required weighting and residual boundary."
-      },
-      {
-        "kind": "tool",
-        "name": "Tagged contribution conservation checker",
-        "detail": "Suggested checker using distinct token tags and nonuniform weights to expose ordering, dropped-row and double-weighting errors."
-      }
-    ]
-  },
-  "model.decoder_architecture": {
-    "title": "Implement the checkpoint family decoder structure",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Architecture admission and layer composer",
-        "detail": "Suggested runtime code binding model dimensions, branch order and tensor names to an executable decoder stack."
-      },
-      {
-        "kind": "component",
-        "name": "Residual and hyper-connection mixer",
-        "detail": "Suggested architecture-specific code implementing required residual paths and any normalized multi-stream mixing."
-      },
-      {
-        "kind": "tool",
-        "name": "Layer-state reference comparator",
-        "detail": "Suggested fixture runner comparing intermediate hidden states and rejecting unknown families or inconsistent geometry."
-      }
-    ]
-  },
-  "model.embedding_service": {
-    "title": "Deliver the correct token and history-dependent embeddings",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Checked embedding row service",
-        "detail": "Suggested runtime code gathering vocabulary or per-layer rows and restoring requested order for duplicate or asynchronous reads."
-      },
-      {
-        "kind": "component",
-        "name": "History-dependent embedding address generator",
-        "detail": "Suggested optional code implementing checkpoint-defined n-gram hashes and reset semantics."
-      },
-      {
-        "kind": "tool",
-        "name": "Embedding address and row oracle",
-        "detail": "Suggested checker comparing raw table bytes and scalar history-derived addresses, including invalid IDs and resets."
-      }
-    ]
-  },
-  "model.expert_ffn": {
-    "title": "Build routed and shared expert feed-forward execution",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Routed row packing and expert FFN execution",
-        "detail": "Suggested runtime code grouping authoritative assignments and computing gate/up, activation and down projections for uneven or empty expert batches."
-      },
-      {
-        "kind": "component",
-        "name": "Independently invocable shared FFN branch",
-        "detail": "Suggested runtime code using the same projection machinery with checkpoint-defined always-on branch tensors and gating."
-      },
-      {
-        "kind": "component",
-        "name": "Expert worker and kernel selection adapters",
-        "detail": "Suggested code choosing eligible individual, grouped CPU or accelerator paths from active token counts and ready weight layouts."
-      },
-      {
-        "kind": "tool",
-        "name": "Routed and shared branch comparator",
-        "detail": "Suggested checker comparing each branch independently with scalar FFNs, including non-unit shared gates, ragged row counts and inverse token maps."
-      }
-    ]
-  },
-  "model.expert_routing": {
-    "title": "Select authoritative experts and their aligned weights",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Model-bound route selector",
-        "detail": "Suggested runtime code implementing score transforms, group rules, bias-separated weights, hash lookup and routed/shared width semantics."
-      },
-      {
-        "kind": "component",
-        "name": "Guarded routing fusion and dispatch",
-        "detail": "Suggested runtime code recognizing equivalent routing graphs and admitting only supported shapes, layouts and device specializations."
-      },
-      {
-        "kind": "tool",
-        "name": "Small routing oracle and differential checker",
-        "detail": "Suggested checker for near ties, bias-swapped winners, disagreeing group scorers and hash fixtures, comparing IDs and aligned weights."
-      },
-      {
-        "kind": "skill",
-        "name": "Bind checkpoint routing semantics",
-        "detail": "Suggested guidance preserving per-layer counts, shared policy and original weighting through native optimized or fallback paths."
-      }
-    ]
-  },
-  "model.logit_head": {
-    "title": "Project final hidden states into vocabulary logits",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Vocabulary projection head",
-        "detail": "Suggested runtime code applying output weights with checkpoint-defined tying, final normalization placement and vocabulary order."
-      },
-      {
-        "kind": "tool",
-        "name": "Logit projection comparator",
-        "detail": "Suggested checker comparing seeded hidden rows with independent host multiplication and validating tied-weight identity."
-      }
-    ]
-  },
-  "model.normalization": {
-    "title": "Implement normalization and residual update semantics",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "RMS and fused residual normalization operators",
-        "detail": "Suggested runtime code implementing specified axes, epsilon, scale broadcasting, accumulation precision and residual ordering."
-      },
-      {
-        "kind": "tool",
-        "name": "Normalization edge-case oracle",
-        "detail": "Suggested checker testing zero, near-zero and extreme rows and comparing both residual and normalized outputs to separate FP32 operations."
-      }
-    ]
-  },
-  "observability.runtime_events": {
-    "title": "Expose trustworthy runtime phases and actual routes",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Bounded runtime event emitters",
-        "detail": "Suggested instrumentation code recording request, token, layer and launch identity with ordered timestamps and overflow indication."
-      },
-      {
-        "kind": "component",
-        "name": "Metrics and trace export adapters",
-        "detail": "Suggested runtime export code producing counters, histograms and actual ID/weight traces in consumable formats."
-      },
-      {
-        "kind": "tool",
-        "name": "Event integrity and overhead checker",
-        "detail": "Suggested tool comparing traces to dispatched work and measuring instrumentation-on/off behavior and overhead."
-      }
-    ]
-  },
-  "output.response_stream": {
-    "title": "Emit ordered text and structured responses",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Incremental detokenizer and response writer",
-        "detail": "Suggested runtime code buffering incomplete bytes and emitting ordered events with one terminal response."
-      },
-      {
-        "kind": "component",
-        "name": "Stream continuation and structured serialization",
-        "detail": "Suggested code validating resume cursors and producing schema-aware response envelopes."
-      },
-      {
-        "kind": "tool",
-        "name": "Boundary and resume fixture runner",
-        "detail": "Suggested checker splitting multibyte text across events and testing expired offsets, malformed structures and completion order."
-      }
-    ]
-  },
-  "parallel.expert_exchange": {
-    "title": "Exchange routed tokens with the correct expert owners",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Logical-to-physical expert ownership mapper",
-        "detail": "Suggested runtime code resolving replicas and rank-local shared slots without changing logical expert identity or colliding slot ranges."
-      },
-      {
-        "kind": "component",
-        "name": "Expert dispatch and inverse combine adapters",
-        "detail": "Suggested transport code carrying token payloads, weights and provenance to owners and returning results to source order."
-      },
-      {
-        "kind": "tool",
-        "name": "Cross-rank token conservation checker",
-        "detail": "Suggested two-rank tests using uneven counts, replicas and shared slots to verify every token contribution returns exactly once."
-      }
-    ]
-  },
-  "parallel.model_execution": {
-    "title": "Coordinate model shards and transfer prefill state",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Topology and shard admission controller",
-        "detail": "Suggested runtime code checking rank membership, coverage, mode agreement and shard ownership before execution."
-      },
-      {
-        "kind": "component",
-        "name": "Collective and peer transport adapters",
-        "detail": "Suggested reusable reduction and exchange code preserving collective order, stream dependencies and negotiated fallback."
-      },
-      {
-        "kind": "tool",
-        "name": "Single-rank versus distributed comparator",
-        "detail": "Suggested runner checking known reductions, distributed prefill frontiers, withdrawn workers and deliberately mismatched peer flags."
-      },
-      {
-        "kind": "skill",
-        "name": "Integrate a distributed execution mode",
-        "detail": "Suggested guidance mapping native shard metadata and lifecycle to the target transport without assuming identical rank conventions."
-      }
-    ]
-  },
-  "placement.partition_model": {
-    "title": "Place model tensors within usable device and storage budgets",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Capacity-aware placement planner",
-        "detail": "Suggested runtime code assigning complete tensor/layer coverage to resident, storage-backed or optional peer tiers within effective capacity."
-      },
-      {
-        "kind": "component",
-        "name": "Ordered tensor movement adapters",
-        "detail": "Suggested copy and conversion code preserving strided source views, destination layout and completion dependencies."
-      },
-      {
-        "kind": "tool",
-        "name": "Placement coverage and capacity checker",
-        "detail": "Suggested tool detecting uncovered or overlapping assignments, invalid device support and budget overflow on asymmetric targets."
-      }
-    ]
-  },
-  "routing.forecast_expert_demand": {
-    "title": "Forecast expert demand without changing authoritative routes",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Causal demand predictor",
-        "detail": "Suggested optional runtime predictor emitting bounded early expert hints using only features available before actual demand."
-      },
-      {
-        "kind": "tool",
-        "name": "Held-out prediction scorer",
-        "detail": "Suggested replay tool separating predicted, demanded and cached sets and reporting precision, recall, lead time and wasted bytes."
-      },
-      {
-        "kind": "method",
-        "name": "Hint-budget selection procedure",
-        "detail": "Suggested procedure choosing speculation capacity from measured transfer cost and useful lead time while requiring demand-safe fallback."
-      }
-    ]
-  },
-  "sampling.select_tokens": {
-    "title": "Choose tokens under sampling and generation constraints",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Sampling policy and random-state controller",
-        "detail": "Suggested runtime code applying ordered temperature, truncation, penalties and draws with request-local random state."
-      },
-      {
-        "kind": "component",
-        "name": "Constraint compiler and token mask adapter",
-        "detail": "Suggested code advancing grammar or schema state and masking disallowed vocabulary entries before selection."
-      },
-      {
-        "kind": "tool",
-        "name": "Sampler and constraint conformance runner",
-        "detail": "Suggested checker for fixed-seed behavior, greedy edges, mask boundaries, concurrent grammar readiness and distribution histograms."
-      }
-    ]
-  },
-  "scheduler.request_lifecycle": {
-    "title": "Schedule and retire requests within resource limits",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Admission and request ownership state machine",
-        "detail": "Suggested runtime code managing queues, slots, reservations, cancellation and exactly-once retirement."
-      },
-      {
-        "kind": "component",
-        "name": "Prefill budgeting and overlap planner",
-        "detail": "Suggested code choosing prompt chunks and dependency-safe overlapping steps under token and memory limits."
-      },
-      {
-        "kind": "tool",
-        "name": "Concurrent lifecycle trace checker",
-        "detail": "Suggested runner verifying long-prompt progress, serial/overlap agreement and complete resource release under mixed cancellation and completion."
-      },
-      {
-        "kind": "method",
-        "name": "Fairness policy evaluation",
-        "detail": "Suggested procedure comparing waiting time and service progress on frozen mixed-length arrival traces rather than throughput alone."
-      }
-    ]
-  },
-  "sequence.recurrent_execution": {
-    "title": "Compute recurrent transitions and preserve hybrid sequence state",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Model-specific recurrent transition operators",
-        "detail": "Suggested runtime code implementing gated sequential or chunked scans with explicit carry state and family equations."
-      },
-      {
-        "kind": "component",
-        "name": "Recurrent and hybrid state owner",
-        "detail": "Suggested code handling initialization, copy, reset, snapshot and coordinated attention/recurrent ownership."
-      },
-      {
-        "kind": "tool",
-        "name": "Chunk versus step recurrence comparator",
-        "detail": "Suggested checker comparing final states and outputs across prompt chunks, repeated decode and save/restore boundaries."
-      }
-    ]
-  },
-  "serving.request_gateway": {
-    "title": "Validate requests and translate the serving protocol",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Readiness and request ingress controller",
-        "detail": "Suggested runtime code exposing the model only after required workers/resources are usable and preserving request identity and cancellation."
-      },
-      {
-        "kind": "component",
-        "name": "Provider payload and replica routing adapters",
-        "detail": "Suggested code translating supported external payloads into typed engine requests and selecting eligible healthy replicas."
-      },
-      {
-        "kind": "tool",
-        "name": "Gateway protocol and readiness probe",
-        "detail": "Suggested fixture client testing malformed payloads, startup failures, replica removal and identity-preserving completion."
-      }
-    ]
-  },
-  "serving.tool_conversations": {
-    "title": "Parse streamed tool calls and maintain conversation identity",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Tool dialect parsing state machines",
-        "detail": "Suggested runtime parsers for supported model text dialects with partial-tag buffering and escaped payload handling."
-      },
-      {
-        "kind": "component",
-        "name": "Multi-turn tool conversation state",
-        "detail": "Suggested code retaining call IDs and matched results across cached and resumed turns."
-      },
-      {
-        "kind": "tool",
-        "name": "Tool stream boundary fixture runner",
-        "detail": "Suggested tests splitting escaped delimiters at every byte and comparing resumed tool turns with fresh conversation replay."
-      }
-    ]
-  },
-  "tokenizer.prepare_request": {
-    "title": "Render and tokenize model-consistent request inputs",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Chat rendering and vocabulary codec",
-        "detail": "Suggested runtime code applying the selected template, special-token policy and Unicode vocabulary mapping."
-      },
-      {
-        "kind": "component",
-        "name": "Tokenizer request handoff adapter",
-        "detail": "Suggested code transporting token IDs, offsets, positions and original request identity to scheduling."
-      },
-      {
-        "kind": "tool",
-        "name": "Template and token golden-fixture runner",
-        "detail": "Suggested checker covering role markers, generation suffixes, empty/multilingual text and equivalent pretokenized inputs."
-      }
-    ]
-  },
-  "transfer.prefill_handoff": {
-    "title": "Transfer completed prompt state before remote decoding",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Prefill handoff ownership controller",
-        "detail": "Suggested runtime state machine reserving receiver capacity and binding request identity, position and KV descriptors across workers."
-      },
-      {
-        "kind": "component",
-        "name": "Completion and acknowledgment adapter",
-        "detail": "Suggested code preventing decode admission until all required matching state is ready and handling retry or failed transfer cleanup."
-      },
-      {
-        "kind": "tool",
-        "name": "Delayed handoff correctness runner",
-        "detail": "Suggested tests holding a page incomplete or delaying a receiver, then comparing first decode logits to a local prefill reference."
-      }
-    ]
-  },
-  "verification.numerical_conformance": {
-    "title": "Independently verify operator, sequence and model numerics",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Operator and device numerical oracle runner",
-        "detail": "Suggested independent checker progressing from allocation/launch smoke to CPU FP64 or declared reference comparisons on supported operations."
-      },
-      {
-        "kind": "tool",
-        "name": "Snapshot, logit and token-divergence comparator",
-        "detail": "Suggested tool aligning recorded frontiers and locating the first numerical or token disagreement under frozen identities and tolerances."
-      },
-      {
-        "kind": "tool",
-        "name": "Sequence-state and verifier fixture suite",
-        "detail": "Suggested targeted checks for prefix reuse, reference-counted page ownership and speculative rejection/rollback invariants."
-      },
-      {
-        "kind": "method",
-        "name": "Scoped quality acceptance procedure",
-        "detail": "Suggested protocol distinguishing exact comparisons, numeric tolerance, fixed-corpus likelihood and task-level quality from missing or inconclusive evidence."
-      }
-    ]
-  },
-  "verification.performance_measurement": {
-    "title": "Benchmark engine performance and compare revisions",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Phase-aware workload benchmark runner",
-        "detail": "Suggested tool measuring prompt, decode and end-to-end service intervals with pinned workload, build, hardware and cache conditions."
-      },
-      {
-        "kind": "tool",
-        "name": "Scheduling replay and prefill coverage analyzer",
-        "detail": "Suggested tool checking chunk coverage and comparing policy traces before controlled target trials."
-      },
-      {
-        "kind": "method",
-        "name": "Repeatable timing and population rules",
-        "detail": "Suggested procedure fixing warmup, synchronization, arrival schedule, excluded attempts and uncertainty reporting."
-      }
-    ]
-  },
-  "weights.adapter_binding": {
-    "title": "Bind and isolate request-specific low-rank adapters",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Adapter validation and projection binding",
-        "detail": "Suggested runtime code checking base identity, tensor geometry and low-rank application order."
-      },
-      {
-        "kind": "component",
-        "name": "Request-scoped adapter residency manager",
-        "detail": "Suggested code mounting, evicting and retaining adapters while requests or captured paths still own them."
-      },
-      {
-        "kind": "tool",
-        "name": "Interleaved adapter isolation checker",
-        "detail": "Suggested runner comparing two interleaved adapters with isolated executions and confirming base logits after unmount."
-      }
-    ]
-  },
-  "weights.decode_blocks": {
-    "title": "Decode and repack quantized weight blocks correctly",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Reference and target block codecs",
-        "detail": "Suggested reusable code interpreting packed lanes, signs and scales and exposing declared reconstruction semantics."
-      },
-      {
-        "kind": "component",
-        "name": "Kernel layout repacker",
-        "detail": "Suggested transformation code rearranging weight blocks for an admitted kernel while retaining numerical equivalence."
-      },
-      {
-        "kind": "tool",
-        "name": "Block edge and downstream-product comparator",
-        "detail": "Suggested checker covering signed extrema, zero scales, block tails and before/after-repack projection results."
-      }
-    ]
-  },
-  "weights.load_checkpoint": {
-    "title": "Load a complete validated checkpoint tensor inventory",
-    "capabilities": [
-      {
-        "kind": "component",
-        "name": "Format reader and sharded tensor binder",
-        "detail": "Suggested runtime code enumerating supported files, parsing bounded directories and resolving model tensor names to stored ranges."
-      },
-      {
-        "kind": "component",
-        "name": "Tensor schema and completeness validator",
-        "detail": "Suggested code rejecting missing shards, duplicates, truncated payload ranges and incompatible layer dimensions before execution."
-      },
-      {
-        "kind": "tool",
-        "name": "Checkpoint inventory and integrity inspector",
-        "detail": "Suggested tool exporting tensor names, offsets, shapes, types and hashes for golden or deliberately damaged fixtures."
-      }
-    ]
-  },
-  "weights.prepare_artifact": {
-    "title": "Convert and quantize a checkpoint into an admitted runtime artifact",
-    "capabilities": [
-      {
-        "kind": "tool",
-        "name": "Checkpoint conversion and packing pipeline",
-        "detail": "Suggested offline tool translating tensor names, metadata and vocabulary into a selected runtime format."
-      },
-      {
-        "kind": "component",
-        "name": "Quantization and scale configuration adapters",
-        "detail": "Suggested reusable code generating or validating block parameters and supplied scales expected by runtime operators."
-      },
-      {
-        "kind": "method",
-        "name": "Artifact fidelity acceptance",
-        "detail": "Suggested procedure checking conversion completeness, reconstruction error, operator agreement and downstream corpus quality against declared budgets."
-      }
-    ]
-  }
+ "attention.dense_execution": {
+  "title": "Build position-aware causal attention",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Dense attention operators",
+    "detail": "Suggested runtime code for masked score normalization and value accumulation, with rotary position transforms and stable partial-state merging."
+   },
+   {
+    "kind": "tool",
+    "name": "Attention reference comparator",
+    "detail": "Suggested test executable comparing prefill and paged decode against the same FP32 mask, head geometry and positional configuration."
+   },
+   {
+    "kind": "skill",
+    "name": "Bind an attention backend",
+    "detail": "Suggested integration instructions for checking head sizes, cache layouts, device eligibility and fallback before enabling fused attention."
+   }
+  ]
+ },
+ "attention.sparse_execution": {
+  "title": "Build indexed sparse attention",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Sparse candidate and attention pipeline",
+    "detail": "Suggested runtime code for index updates, candidate scoring, bounded selection, KV gather and sparse attention."
+   },
+   {
+    "kind": "tool",
+    "name": "Candidate coverage and output checker",
+    "detail": "Suggested checker comparing selected IDs and results to a scalar reference using identical candidates, including ties and repeated indices."
+   },
+   {
+    "kind": "method",
+    "name": "Sparse visibility validation procedure",
+    "detail": "Suggested procedure for checking causal eligibility, shortlist coverage and prompt-versus-step agreement across context boundaries."
+   }
+  ]
+ },
+ "backend.execute_operators": {
+  "title": "Bind operators to supported execution backends",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Operator admission and dispatch adapters",
+    "detail": "Suggested runtime adapters resolving supported shapes, types and layouts to CPU or accelerator implementations with explicit fallback."
+   },
+   {
+    "kind": "component",
+    "name": "CPU worker idle and wakeup policy",
+    "detail": "Suggested reusable worker code for bounded spin, relaxation, yield and sleep without changing synchronization semantics."
+   },
+   {
+    "kind": "tool",
+    "name": "Backend path and eligibility probe",
+    "detail": "Suggested executable reporting actual implementation selection and checking unsupported dtype, architecture and compilation-cache cases."
+   },
+   {
+    "kind": "skill",
+    "name": "Integrate a target backend",
+    "detail": "Suggested instructions for binding streams, thread pools, libraries and JIT keys to the target operator interface."
+   }
+  ]
+ },
+ "batch.execution_layout": {
+  "title": "Preserve sequence identity through ragged batches",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Ragged batch layout builder",
+    "detail": "Suggested runtime code emitting positions, offsets, state handles and microbatch partitions while retaining source-sequence provenance."
+   },
+   {
+    "kind": "tool",
+    "name": "Batch reconstruction checker",
+    "detail": "Suggested fixture runner reconstructing original sequence order from split or padded batches, including unequal lengths and early EOS."
+   },
+   {
+    "kind": "skill",
+    "name": "Adapt worker batch metadata",
+    "detail": "Suggested instructions mapping canonical batch fields into native lane, request-index and graph-bucket conventions."
+   }
+  ]
+ },
+ "compiler.engine_contract": {
+  "title": "Compile intent into a testable engine contract",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Engine contract compiler",
+    "detail": "Suggested agent-callable compiler emitting model semantics, interface obligations, allowed substitutions and measurable acceptance fields from a reviewed brief."
+   },
+   {
+    "kind": "method",
+    "name": "Obligation and oracle assignment",
+    "detail": "Suggested procedure assigning each requirement to an owner, artifact, independent check and declared tolerance."
+   },
+   {
+    "kind": "skill",
+    "name": "Prepare an implementation handoff",
+    "detail": "Suggested guidance for expressing both existing-source adaptation and greenfield construction without treating source availability as acceptance."
+   }
+  ]
+ },
+ "compiler.intent_brief": {
+  "title": "Resolve the requested engine and deployment intent",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Structured intent brief builder",
+    "detail": "Suggested intake tool capturing model revision, hardware, service mode, budgets and success criteria with unresolved decisions."
+   },
+   {
+    "kind": "method",
+    "name": "Contract-changing ambiguity review",
+    "detail": "Suggested procedure separating preferences, observed facts and assumptions, then resolving only questions that change implementation feasibility."
+   },
+   {
+    "kind": "skill",
+    "name": "Release a reviewed brief",
+    "detail": "Suggested guidance for presenting concrete choices and preserving the approved scope for downstream contract compilation."
+   }
+  ]
+ },
+ "decode.advance_sequence": {
+  "title": "Advance prompts and tokens with aligned sequence state",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Prompt timeline and forward driver",
+    "detail": "Suggested runtime code choosing prefill, extend or decode and committing positions and state at explicit boundaries."
+   },
+   {
+    "kind": "tool",
+    "name": "Frontier replay comparator",
+    "detail": "Suggested test runner comparing extend, shorten and replace operations to fresh replay at the same prefix."
+   },
+   {
+    "kind": "skill",
+    "name": "Bind native context transitions",
+    "detail": "Suggested integration guidance for invalidating divergent suffixes and preserving state handles across runner modes."
+   }
+  ]
+ },
+ "decode.speculative_execution": {
+  "title": "Build draft generation with exact target verification",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Draft proposal and arbitration adapters",
+    "detail": "Suggested runtime code for suffix, n-gram or model proposals and bounded adaptive speculation effort."
+   },
+   {
+    "kind": "component",
+    "name": "Target acceptance and rollback controller",
+    "detail": "Suggested runtime state machine committing accepted tokens and restoring rejected target and draft suffix state."
+   },
+   {
+    "kind": "tool",
+    "name": "Forced-rejection state checker",
+    "detail": "Suggested fixture runner forcing rejection at every draft position and comparing the next target state with ordinary decoding."
+   },
+   {
+    "kind": "method",
+    "name": "Speculation benefit evaluation",
+    "detail": "Suggested procedure separating acceptance rate, proposal cost, target cost and memory requirements before selecting an effort policy."
+   }
+  ]
+ },
+ "dense.feed_forward": {
+  "title": "Build dense projections and gated feed-forward arithmetic",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Projection and gated activation operators",
+    "detail": "Suggested runtime code for gate/up/down projections and model-defined activation, including eligible fused paths."
+   },
+   {
+    "kind": "component",
+    "name": "Activation encoding adapters",
+    "detail": "Suggested codecs supplying quantized rows, scales and saturation semantics expected by the chosen projection kernels."
+   },
+   {
+    "kind": "tool",
+    "name": "Quantized FFN numerical comparator",
+    "detail": "Suggested checker comparing odd rows, tile tails and extreme activations to independently dequantized dense arithmetic."
+   }
+  ]
+ },
+ "engine.expert_streaming": {
+  "title": "Keep demanded expert weights ready within capacity",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Demand-safe expert cache and fill controller",
+    "detail": "Suggested runtime code owning bounded slots, protected consumers, pending/ready generations and exact-demand fills."
+   },
+   {
+    "kind": "component",
+    "name": "Storage and peer expert service adapters",
+    "detail": "Suggested reusable adapters for aligned range reads, transfer completion and optional peer or remote expert service."
+   },
+   {
+    "kind": "tool",
+    "name": "Readiness and slot-reuse stress runner",
+    "detail": "Suggested tests delaying and reordering reads, racing hints with demand and checking loaded bytes before every consumer."
+   },
+   {
+    "kind": "method",
+    "name": "Resident-set selection procedure",
+    "detail": "Suggested fixed-budget or profile-guided placement procedure with per-layer capacity accounting and explicit refresh rules."
+   },
+   {
+    "kind": "skill",
+    "name": "Connect prefetch hints to authoritative demand",
+    "detail": "Suggested integration instructions joining matching in-flight transfers without allowing predictions to alter routing or expose stale slots."
+   }
+  ]
+ },
+ "factory.builder": {
+  "title": "Build and package an identified runnable engine",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Source-bound build and collection client",
+    "detail": "Suggested tool submitting exact source and dependencies, polling attempts and collecting durable build outputs."
+   },
+   {
+    "kind": "component",
+    "name": "Runtime package assembler",
+    "detail": "Suggested reusable assembly code bundling executable, libraries, generated kernels and asset manifests with content hashes."
+   },
+   {
+    "kind": "method",
+    "name": "Clean-host image acceptance",
+    "detail": "Suggested procedure unpacking the package, checking identities and dependencies, and reaching readiness on a compatible target."
+   }
+  ]
+ },
+ "factory.cc_qualification": {
+  "title": "Qualify a component or engine for a declared contract",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Qualification manifest checker",
+    "detail": "Suggested tool checking release identity, operation ports, required artifacts and verification-unit declarations against the requested scope."
+   },
+   {
+    "kind": "method",
+    "name": "Scoped admission verdict",
+    "detail": "Suggested procedure distinguishing source inspection, executable trials and unsupported obligations before issuing pass, fail or inconclusive."
+   },
+   {
+    "kind": "skill",
+    "name": "Inspect sealed and offline handoffs",
+    "detail": "Suggested guidance for qualifying delivered artifacts using declared interfaces without assuming inaccessible implementation behavior."
+   }
+  ]
+ },
+ "factory.evidence": {
+  "title": "Publish recoverable evidence for construction decisions",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Evidence publication and query interface",
+    "detail": "Suggested agent-facing tool storing results and retrieving them by candidate, workload, target, obligation and attempt identity."
+   },
+   {
+    "kind": "component",
+    "name": "Provenance and artifact index",
+    "detail": "Suggested reusable record structures connecting raw artifacts, invocation receipts, task dependencies and scoped verdicts."
+   },
+   {
+    "kind": "method",
+    "name": "Decision evidence completeness review",
+    "detail": "Suggested procedure confirming that every accepted claim can be traced to recoverable inputs, identities, observations and check scope."
+   }
+  ]
+ },
+ "factory.experiment_design": {
+  "title": "Design bounded experiments that distinguish explanations",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Experiment plan builder",
+    "detail": "Suggested tool recording hypotheses, alternatives, controlled variables, predicted observations, budgets and stopping rules."
+   },
+   {
+    "kind": "method",
+    "name": "Single-change ablation design",
+    "detail": "Suggested procedure choosing the smallest intervention and control that discriminate the competing causes."
+   },
+   {
+    "kind": "skill",
+    "name": "Plan compatibility and transfer trials",
+    "detail": "Suggested guidance separating portable behavior from engine-specific bindings and defining evidence needed before claiming transfer."
+   }
+  ]
+ },
+ "factory.lab_execution": {
+  "title": "Run and reconcile experiments on the intended target",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Lab submission and artifact collector",
+    "detail": "Suggested client submitting admitted images and workloads, polling attempts and exporting raw logs and measurements."
+   },
+   {
+    "kind": "component",
+    "name": "Attempt ownership reconciler",
+    "detail": "Suggested reusable lifecycle code tracking leases, live processes, interrupted attempts and owned cleanup."
+   },
+   {
+    "kind": "method",
+    "name": "Bounded recovery procedure",
+    "detail": "Suggested recovery protocol distinguishing retryable infrastructure failure from candidate failure while preserving original evidence."
+   }
+  ]
+ },
+ "factory.methodology_ab": {
+  "title": "Compare candidate and baseline under frozen controls",
+  "capabilities": [
+   {
+    "kind": "method",
+    "name": "Counterbalanced paired comparison",
+    "detail": "Suggested protocol freezing workload, hardware, images, warmup, cache state and phase definitions before alternating baseline and candidate runs."
+   },
+   {
+    "kind": "tool",
+    "name": "Paired result and stability analyzer",
+    "detail": "Suggested analysis tool checking A/A variability and paired quality/performance differences with consistent units."
+   },
+   {
+    "kind": "method",
+    "name": "Screen and independent confirmation gates",
+    "detail": "Suggested procedure separating exploratory screening from a separately scheduled confirmation with a predefined effect threshold."
+   }
+  ]
+ },
+ "factory.precision_lab": {
+  "title": "Evaluate precision choices against quality and memory",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Representation and memory calculator",
+    "detail": "Suggested calculator accounting packed weights, scales, padding and reconstruction error for candidate representations."
+   },
+   {
+    "kind": "method",
+    "name": "Calibration and quality trial design",
+    "detail": "Suggested procedure freezing calibration inputs, held-out quality checks and acceptable downstream loss before choosing precision."
+   },
+   {
+    "kind": "skill",
+    "name": "Prepare a precision-change experiment",
+    "detail": "Suggested guidance binding format metadata, activation scales and operator support to a reproducible candidate without confusing codec agreement with model quality."
+   }
+  ]
+ },
+ "factory.resource_lab": {
+  "title": "Measure feasible capacity and placement tradeoffs",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Live-byte and capacity model",
+    "detail": "Suggested tool estimating packed weights, KV, arenas and expert working sets against usable target memory."
+   },
+   {
+    "kind": "tool",
+    "name": "Budget and placement sweep runner",
+    "detail": "Suggested runner testing bounded residency, layer placement or model-size ladders while retaining workload and target identity."
+   },
+   {
+    "kind": "method",
+    "name": "Measured resource frontier analysis",
+    "detail": "Suggested procedure comparing latency, throughput, memory headroom and transfer demand, separating model estimates from target observations."
+   }
+  ]
+ },
+ "factory.runtime_profiling": {
+  "title": "Identify runtime bottlenecks from correlated observations",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Phase and resource profile collector",
+    "detail": "Suggested tool collecting request phases, memory, storage, thread and accelerator activity with common run identity."
+   },
+   {
+    "kind": "tool",
+    "name": "Actual dispatch and thread attribution inspector",
+    "detail": "Suggested instrumentation checking launched kernels, native threads and operator ownership rather than inferred configuration."
+   },
+   {
+    "kind": "method",
+    "name": "Observer overhead and bottleneck diagnosis",
+    "detail": "Suggested procedure measuring collection overhead and testing whether host, queue, I/O or device stalls explain the observed delay."
+   }
+  ]
+ },
+ "factory.source_inspection": {
+  "title": "Inspect the implementation and settings actually present",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Checkout and image inventory inspector",
+    "detail": "Suggested tool recording exact revisions, binaries, compiled paths, model identity and available dependency versions."
+   },
+   {
+    "kind": "tool",
+    "name": "Effective configuration extractor",
+    "detail": "Suggested probe reporting active placement, backend, format and runtime settings rather than advertised defaults."
+   },
+   {
+    "kind": "method",
+    "name": "Compatibility and gap assessment",
+    "detail": "Suggested procedure matching observed assets and interfaces to contract obligations, with absent or unverified behavior listed explicitly."
+   }
+  ]
+ },
+ "factory.source_integration": {
+  "title": "Implement a scoped source change and reproducible handoff",
+  "capabilities": [
+   {
+    "kind": "skill",
+    "name": "Adapt native interfaces and ownership",
+    "detail": "Suggested integration guidance mapping reusable code to target ABI, tensor layout, lifetimes, error handling and synchronization."
+   },
+   {
+    "kind": "tool",
+    "name": "Scoped source lowering and project emitter",
+    "detail": "Suggested code-generation tool emitting buildable C++ or supported CUDA reference operations within a declared arithmetic and synchronization scope."
+   },
+   {
+    "kind": "tool",
+    "name": "Candidate revision and handoff recorder",
+    "detail": "Suggested tool capturing task-owned patches, dependency order, exact revision and build/evaluation manifests."
+   },
+   {
+    "kind": "method",
+    "name": "Reviewable patch acceptance",
+    "detail": "Suggested procedure checking the change against allowed scope, focused correctness checks and unresolved integration obligations."
+   }
+  ]
+ },
+ "factory.streaming_lab": {
+  "title": "Evaluate expert streaming with controlled demand and storage",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Expert-cache and prediction trace replay",
+    "detail": "Suggested simulator or replay runner separating demanded, predicted, resident and transferred experts with byte and stall accounting."
+   },
+   {
+    "kind": "tool",
+    "name": "Positional-read and coalescing fixture runner",
+    "detail": "Suggested target tool checking storage read correctness, alignment, completion order and aggregation behavior."
+   },
+   {
+    "kind": "method",
+    "name": "Warm and cold storage trial protocol",
+    "detail": "Suggested procedure controlling cache state and frozen traces before comparing readiness, exposed demand stalls and wasted bytes."
+   }
+  ]
+ },
+ "factory.workflow_planning": {
+  "title": "Inspect the baseline and plan CC work orders",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Artifact-backward workflow planner",
+    "detail": "Suggested planner expanding required outputs into typed CC invocations with explicit dependency and port bindings."
+   },
+   {
+    "kind": "tool",
+    "name": "Invocation receipt and branch workbench",
+    "detail": "Suggested tool comparing outcomes, preserving receipts and pruning task-owned alternatives under a bounded budget."
+   },
+   {
+    "kind": "method",
+    "name": "Evidence-driven replanning procedure",
+    "detail": "Suggested procedure deciding repair, retry, alternative binding or stop from observed failures without silently changing contract requirements."
+   }
+  ]
+ },
+ "graph.lower_capture_replay": {
+  "title": "Build execution graphs with safe reusable capture",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Typed graph lowering and capture cache",
+    "detail": "Suggested runtime code constructing dependencies and caching eligible executions by shape, address and mutable-state identity."
+   },
+   {
+    "kind": "tool",
+    "name": "Eager versus replay comparator",
+    "detail": "Suggested test runner checking graph shapes, output agreement and recapture after changed keys or buffers."
+   },
+   {
+    "kind": "skill",
+    "name": "Bind capture lifetime and stream rules",
+    "detail": "Suggested guidance connecting native buffers, adapter changes and launch streams to capture eligibility and invalidation."
+   }
+  ]
+ },
+ "memory.kv_tiering": {
+  "title": "Move live KV pages safely across storage tiers",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "KV migration and remapping controller",
+    "detail": "Suggested runtime code tracking source ownership, in-flight copies, destination readiness and page-table updates."
+   },
+   {
+    "kind": "component",
+    "name": "Indexed page transfer adapters",
+    "detail": "Suggested copy implementations preserving noncontiguous page IDs, payload layout and completion dependencies."
+   },
+   {
+    "kind": "tool",
+    "name": "Tier pressure and restoration checker",
+    "detail": "Suggested fixtures forcing eviction/restage and verifying untouched pages plus decode agreement with resident KV."
+   }
+  ]
+ },
+ "memory.reusable_sessions": {
+  "title": "Reuse prefixes and restore matching sequence sessions",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Prefix index and protected eviction",
+    "detail": "Suggested runtime code finding longest reusable prefixes while retaining active references and reclaiming idle branches."
+   },
+   {
+    "kind": "component",
+    "name": "Identity-bound session snapshot codec",
+    "detail": "Suggested persistence code validating model, tokenizer, configuration and version before restoring state."
+   },
+   {
+    "kind": "tool",
+    "name": "Reuse and resume replay checker",
+    "detail": "Suggested fixtures testing near matches, branch splits, stale identities and resumed next logits against fresh replay."
+   }
+  ]
+ },
+ "memory.runtime_arenas": {
+  "title": "Allocate runtime buffers with sound capacity and lifetimes",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Lifetime-aware workspace allocator",
+    "detail": "Suggested runtime code reusing storage only across disjoint live ranges and exposing peak allocations."
+   },
+   {
+    "kind": "component",
+    "name": "Mapped, pinned and virtual memory adapters",
+    "detail": "Suggested code providing checked addressable weight views and stable staging allocations with bounded ownership."
+   },
+   {
+    "kind": "tool",
+    "name": "Allocation lifetime and mapping stress checker",
+    "detail": "Suggested tests covering allocation failure, overlapping consumers, unmap/recommit and cleanup after captured execution."
+   }
+  ]
+ },
+ "memory.sequence_kv": {
+  "title": "Own and encode each sequence KV position",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Sequence page and slot allocator",
+    "detail": "Suggested runtime code mapping logical positions to uniquely owned physical KV storage through append, copy and release."
+   },
+   {
+    "kind": "component",
+    "name": "Window and compact-KV update operators",
+    "detail": "Suggested runtime code enforcing retention windows and admitted quantization/compression layouts."
+   },
+   {
+    "kind": "tool",
+    "name": "KV position and codec conformance checker",
+    "detail": "Suggested tests crossing page/window boundaries and reused slots while checking decoded rows, error bounds and incremental logits."
+   }
+  ]
+ },
+ "merge.expert_contributions": {
+  "title": "Pack expert assignments and restore weighted token outputs",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Ragged dispatch map",
+    "detail": "Histogram expert assignments, calculate exclusive row offsets, group hidden rows and produce the inverse token/choice map, including empty experts and repeated tokens."
+   },
+   {
+    "kind": "component",
+    "name": "Weighted inverse gather",
+    "detail": "Restore the original token order and multiply each expert contribution by its aligned mixture weight exactly once."
+   },
+   {
+    "kind": "tool",
+    "name": "Assignment conservation oracle",
+    "detail": "Use distinct row tags, uneven expert loads and nonuniform weights to detect dropped, duplicated, permuted or double-scaled contributions."
+   }
+  ]
+ },
+ "model.decoder_architecture": {
+  "title": "Compose decoder blocks, norms and residual paths",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Architecture admission and layer composer",
+    "detail": "Suggested runtime code binding model dimensions, branch order and tensor names to an executable decoder stack."
+   },
+   {
+    "kind": "component",
+    "name": "Residual and hyper-connection mixer",
+    "detail": "Suggested architecture-specific code implementing required residual paths and any normalized multi-stream mixing."
+   },
+   {
+    "kind": "tool",
+    "name": "Layer-state reference comparator",
+    "detail": "Suggested fixture runner comparing intermediate hidden states and rejecting unknown families or inconsistent geometry."
+   }
+  ]
+ },
+ "model.embedding_service": {
+  "title": "Deliver the correct token and history-dependent embeddings",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Checked embedding row service",
+    "detail": "Suggested runtime code gathering vocabulary or per-layer rows and restoring requested order for duplicate or asynchronous reads."
+   },
+   {
+    "kind": "component",
+    "name": "History-dependent embedding address generator",
+    "detail": "Suggested optional code implementing checkpoint-defined n-gram hashes and reset semantics."
+   },
+   {
+    "kind": "tool",
+    "name": "Embedding address and row oracle",
+    "detail": "Suggested checker comparing raw table bytes and scalar history-derived addresses, including invalid IDs and resets."
+   }
+  ]
+ },
+ "model.expert_ffn": {
+  "title": "Compute expert feed-forward projections",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Grouped expert projections",
+    "detail": "Consume already grouped token rows and ready expert weights. Compute gate and up projections, apply the checkpoint activation and multiply by the up branch, then apply the down projection."
+   },
+   {
+    "kind": "skill",
+    "name": "Select expert kernels",
+    "detail": "Choose supported grouped or individual CPU/GPU matrix kernels from shape, dtype, strides and alignment; retain a correct path for empty and ragged batches."
+   },
+   {
+    "kind": "tool",
+    "name": "Expert arithmetic oracle",
+    "detail": "Compare the gated projection and per-row output to independent scalar evaluation before token-order restoration and routed weighting."
+   }
+  ]
+ },
+ "model.expert_routing": {
+  "title": "Select authoritative experts and their aligned weights",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Model-bound route selector",
+    "detail": "Suggested runtime code implementing score transforms, group rules, bias-separated weights, hash lookup and routed/shared width semantics."
+   },
+   {
+    "kind": "component",
+    "name": "Guarded routing fusion and dispatch",
+    "detail": "Suggested runtime code recognizing equivalent routing graphs and admitting only supported shapes, layouts and device specializations."
+   },
+   {
+    "kind": "tool",
+    "name": "Small routing oracle and differential checker",
+    "detail": "Suggested checker for near ties, bias-swapped winners, disagreeing group scorers and hash fixtures, comparing IDs and aligned weights."
+   },
+   {
+    "kind": "skill",
+    "name": "Bind checkpoint routing semantics",
+    "detail": "Suggested guidance preserving per-layer counts, shared policy and original weighting through native optimized or fallback paths."
+   }
+  ]
+ },
+ "model.logit_head": {
+  "title": "Project final hidden states into vocabulary logits",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Vocabulary projection head",
+    "detail": "Suggested runtime code applying output weights with checkpoint-defined tying, final normalization placement and vocabulary order."
+   },
+   {
+    "kind": "tool",
+    "name": "Logit projection comparator",
+    "detail": "Suggested checker comparing seeded hidden rows with independent host multiplication and validating tied-weight identity."
+   }
+  ]
+ },
+ "model.normalization": {
+  "title": "Implement normalization and residual update semantics",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "RMS and fused residual normalization operators",
+    "detail": "Suggested runtime code implementing specified axes, epsilon, scale broadcasting, accumulation precision and residual ordering."
+   },
+   {
+    "kind": "tool",
+    "name": "Normalization edge-case oracle",
+    "detail": "Suggested checker testing zero, near-zero and extreme rows and comparing both residual and normalized outputs to separate FP32 operations."
+   }
+  ]
+ },
+ "observability.runtime_events": {
+  "title": "Expose trustworthy runtime phases and actual routes",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Bounded runtime event emitters",
+    "detail": "Suggested instrumentation code recording request, token, layer and launch identity with ordered timestamps and overflow indication."
+   },
+   {
+    "kind": "component",
+    "name": "Metrics and trace export adapters",
+    "detail": "Suggested runtime export code producing counters, histograms and actual ID/weight traces in consumable formats."
+   },
+   {
+    "kind": "tool",
+    "name": "Event integrity and overhead checker",
+    "detail": "Suggested tool comparing traces to dispatched work and measuring instrumentation-on/off behavior and overhead."
+   }
+  ]
+ },
+ "output.response_stream": {
+  "title": "Emit ordered text and structured responses",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Incremental detokenizer and response writer",
+    "detail": "Suggested runtime code buffering incomplete bytes and emitting ordered events with one terminal response."
+   },
+   {
+    "kind": "component",
+    "name": "Stream continuation and structured serialization",
+    "detail": "Suggested code validating resume cursors and producing schema-aware response envelopes."
+   },
+   {
+    "kind": "tool",
+    "name": "Boundary and resume fixture runner",
+    "detail": "Suggested checker splitting multibyte text across events and testing expired offsets, malformed structures and completion order."
+   }
+  ]
+ },
+ "parallel.expert_exchange": {
+  "title": "Exchange routed tokens with the correct expert owners",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Logical-to-physical expert ownership mapper",
+    "detail": "Suggested runtime code resolving replicas and rank-local shared slots without changing logical expert identity or colliding slot ranges."
+   },
+   {
+    "kind": "component",
+    "name": "Expert dispatch and inverse combine adapters",
+    "detail": "Suggested transport code carrying token payloads, weights and provenance to owners and returning results to source order."
+   },
+   {
+    "kind": "tool",
+    "name": "Cross-rank token conservation checker",
+    "detail": "Suggested two-rank tests using uneven counts, replicas and shared slots to verify every token contribution returns exactly once."
+   }
+  ]
+ },
+ "parallel.model_execution": {
+  "title": "Coordinate model shards and transfer prefill state",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Topology and shard admission controller",
+    "detail": "Suggested runtime code checking rank membership, coverage, mode agreement and shard ownership before execution."
+   },
+   {
+    "kind": "component",
+    "name": "Collective and peer transport adapters",
+    "detail": "Suggested reusable reduction and exchange code preserving collective order, stream dependencies and negotiated fallback."
+   },
+   {
+    "kind": "tool",
+    "name": "Single-rank versus distributed comparator",
+    "detail": "Suggested runner checking known reductions, distributed prefill frontiers, withdrawn workers and deliberately mismatched peer flags."
+   },
+   {
+    "kind": "skill",
+    "name": "Integrate a distributed execution mode",
+    "detail": "Suggested guidance mapping native shard metadata and lifecycle to the target transport without assuming identical rank conventions."
+   }
+  ]
+ },
+ "placement.partition_model": {
+  "title": "Place model tensors within usable device and storage budgets",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Capacity-aware placement planner",
+    "detail": "Suggested runtime code assigning complete tensor/layer coverage to resident, storage-backed or optional peer tiers within effective capacity."
+   },
+   {
+    "kind": "component",
+    "name": "Ordered tensor movement adapters",
+    "detail": "Suggested copy and conversion code preserving strided source views, destination layout and completion dependencies."
+   },
+   {
+    "kind": "tool",
+    "name": "Placement coverage and capacity checker",
+    "detail": "Suggested tool detecting uncovered or overlapping assignments, invalid device support and budget overflow on asymmetric targets."
+   }
+  ]
+ },
+ "routing.forecast_expert_demand": {
+  "title": "Forecast expert demand without changing authoritative routes",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Causal demand predictor",
+    "detail": "Suggested optional runtime predictor emitting bounded early expert hints using only features available before actual demand."
+   },
+   {
+    "kind": "tool",
+    "name": "Held-out prediction scorer",
+    "detail": "Suggested replay tool separating predicted, demanded and cached sets and reporting precision, recall, lead time and wasted bytes."
+   },
+   {
+    "kind": "method",
+    "name": "Hint-budget selection procedure",
+    "detail": "Suggested procedure choosing speculation capacity from measured transfer cost and useful lead time while requiring demand-safe fallback."
+   }
+  ]
+ },
+ "sampling.select_tokens": {
+  "title": "Choose tokens under sampling and generation constraints",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Sampling policy and random-state controller",
+    "detail": "Suggested runtime code applying ordered temperature, truncation, penalties and draws with request-local random state."
+   },
+   {
+    "kind": "component",
+    "name": "Constraint compiler and token mask adapter",
+    "detail": "Suggested code advancing grammar or schema state and masking disallowed vocabulary entries before selection."
+   },
+   {
+    "kind": "tool",
+    "name": "Sampler and constraint conformance runner",
+    "detail": "Suggested checker for fixed-seed behavior, greedy edges, mask boundaries, concurrent grammar readiness and distribution histograms."
+   }
+  ]
+ },
+ "scheduler.request_lifecycle": {
+  "title": "Schedule and retire requests within resource limits",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Admission and request ownership state machine",
+    "detail": "Suggested runtime code managing queues, slots, reservations, cancellation and exactly-once retirement."
+   },
+   {
+    "kind": "component",
+    "name": "Prefill budgeting and overlap planner",
+    "detail": "Suggested code choosing prompt chunks and dependency-safe overlapping steps under token and memory limits."
+   },
+   {
+    "kind": "tool",
+    "name": "Concurrent lifecycle trace checker",
+    "detail": "Suggested runner verifying long-prompt progress, serial/overlap agreement and complete resource release under mixed cancellation and completion."
+   },
+   {
+    "kind": "method",
+    "name": "Fairness policy evaluation",
+    "detail": "Suggested procedure comparing waiting time and service progress on frozen mixed-length arrival traces rather than throughput alone."
+   }
+  ]
+ },
+ "sequence.recurrent_execution": {
+  "title": "Compute recurrent transitions and preserve hybrid sequence state",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Model-specific recurrent transition operators",
+    "detail": "Suggested runtime code implementing gated sequential or chunked scans with explicit carry state and family equations."
+   },
+   {
+    "kind": "component",
+    "name": "Recurrent and hybrid state owner",
+    "detail": "Suggested code handling initialization, copy, reset, snapshot and coordinated attention/recurrent ownership."
+   },
+   {
+    "kind": "tool",
+    "name": "Chunk versus step recurrence comparator",
+    "detail": "Suggested checker comparing final states and outputs across prompt chunks, repeated decode and save/restore boundaries."
+   }
+  ]
+ },
+ "serving.request_gateway": {
+  "title": "Validate requests and translate the serving protocol",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Readiness and request ingress controller",
+    "detail": "Suggested runtime code exposing the model only after required workers/resources are usable and preserving request identity and cancellation."
+   },
+   {
+    "kind": "component",
+    "name": "Provider payload and replica routing adapters",
+    "detail": "Suggested code translating supported external payloads into typed engine requests and selecting eligible healthy replicas."
+   },
+   {
+    "kind": "tool",
+    "name": "Gateway protocol and readiness probe",
+    "detail": "Suggested fixture client testing malformed payloads, startup failures, replica removal and identity-preserving completion."
+   },
+   {
+    "kind": "component",
+    "name": "Response event writer",
+    "detail": "Frame decoded text fragments in order, propagate finish and cancellation exactly once and close the caller response."
+   }
+  ]
+ },
+ "serving.tool_conversations": {
+  "title": "Parse streamed tool calls and maintain conversation identity",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Tool dialect parsing state machines",
+    "detail": "Suggested runtime parsers for supported model text dialects with partial-tag buffering and escaped payload handling."
+   },
+   {
+    "kind": "component",
+    "name": "Multi-turn tool conversation state",
+    "detail": "Suggested code retaining call IDs and matched results across cached and resumed turns."
+   },
+   {
+    "kind": "tool",
+    "name": "Tool stream boundary fixture runner",
+    "detail": "Suggested tests splitting escaped delimiters at every byte and comparing resumed tool turns with fresh conversation replay."
+   }
+  ]
+ },
+ "tokenizer.prepare_request": {
+  "title": "Encode prompt text and decode committed tokens",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Chat rendering and vocabulary codec",
+    "detail": "Suggested runtime code applying the selected template, special-token policy and Unicode vocabulary mapping."
+   },
+   {
+    "kind": "component",
+    "name": "Tokenizer request handoff adapter",
+    "detail": "Suggested code transporting token IDs, offsets, positions and original request identity to scheduling."
+   },
+   {
+    "kind": "tool",
+    "name": "Template and token golden-fixture runner",
+    "detail": "Suggested checker covering role markers, generation suffixes, empty/multilingual text and equivalent pretokenized inputs."
+   },
+   {
+    "kind": "component",
+    "name": "Incremental vocabulary decoder",
+    "detail": "Convert committed IDs back into model-consistent text. Preserve byte fragments across tokens and flush on the declared terminal policy."
+   },
+   {
+    "kind": "tool",
+    "name": "Codec boundary fixtures",
+    "detail": "Compare exact prompt IDs and emitted text against the pinned tokenizer with special IDs, role markers and multi-byte boundaries."
+   }
+  ]
+ },
+ "transfer.prefill_handoff": {
+  "title": "Transfer completed prompt state before remote decoding",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Prefill handoff ownership controller",
+    "detail": "Suggested runtime state machine reserving receiver capacity and binding request identity, position and KV descriptors across workers."
+   },
+   {
+    "kind": "component",
+    "name": "Completion and acknowledgment adapter",
+    "detail": "Suggested code preventing decode admission until all required matching state is ready and handling retry or failed transfer cleanup."
+   },
+   {
+    "kind": "tool",
+    "name": "Delayed handoff correctness runner",
+    "detail": "Suggested tests holding a page incomplete or delaying a receiver, then comparing first decode logits to a local prefill reference."
+   }
+  ]
+ },
+ "verification.numerical_conformance": {
+  "title": "Independently verify operator, sequence and model numerics",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Operator and device numerical oracle runner",
+    "detail": "Suggested independent checker progressing from allocation/launch smoke to CPU FP64 or declared reference comparisons on supported operations."
+   },
+   {
+    "kind": "tool",
+    "name": "Snapshot, logit and token-divergence comparator",
+    "detail": "Suggested tool aligning recorded frontiers and locating the first numerical or token disagreement under frozen identities and tolerances."
+   },
+   {
+    "kind": "tool",
+    "name": "Sequence-state and verifier fixture suite",
+    "detail": "Suggested targeted checks for prefix reuse, reference-counted page ownership and speculative rejection/rollback invariants."
+   },
+   {
+    "kind": "method",
+    "name": "Scoped quality acceptance procedure",
+    "detail": "Suggested protocol distinguishing exact comparisons, numeric tolerance, fixed-corpus likelihood and task-level quality from missing or inconclusive evidence."
+   }
+  ]
+ },
+ "verification.performance_measurement": {
+  "title": "Benchmark engine performance and compare revisions",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Phase-aware workload benchmark runner",
+    "detail": "Suggested tool measuring prompt, decode and end-to-end service intervals with pinned workload, build, hardware and cache conditions."
+   },
+   {
+    "kind": "tool",
+    "name": "Scheduling replay and prefill coverage analyzer",
+    "detail": "Suggested tool checking chunk coverage and comparing policy traces before controlled target trials."
+   },
+   {
+    "kind": "method",
+    "name": "Repeatable timing and population rules",
+    "detail": "Suggested procedure fixing warmup, synchronization, arrival schedule, excluded attempts and uncertainty reporting."
+   }
+  ]
+ },
+ "weights.adapter_binding": {
+  "title": "Bind and isolate request-specific low-rank adapters",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Adapter validation and projection binding",
+    "detail": "Suggested runtime code checking base identity, tensor geometry and low-rank application order."
+   },
+   {
+    "kind": "component",
+    "name": "Request-scoped adapter residency manager",
+    "detail": "Suggested code mounting, evicting and retaining adapters while requests or captured paths still own them."
+   },
+   {
+    "kind": "tool",
+    "name": "Interleaved adapter isolation checker",
+    "detail": "Suggested runner comparing two interleaved adapters with isolated executions and confirming base logits after unmount."
+   }
+  ]
+ },
+ "weights.decode_blocks": {
+  "title": "Decode and repack quantized weight blocks correctly",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Reference and target block codecs",
+    "detail": "Suggested reusable code interpreting packed lanes, signs and scales and exposing declared reconstruction semantics."
+   },
+   {
+    "kind": "component",
+    "name": "Kernel layout repacker",
+    "detail": "Suggested transformation code rearranging weight blocks for an admitted kernel while retaining numerical equivalence."
+   },
+   {
+    "kind": "tool",
+    "name": "Block edge and downstream-product comparator",
+    "detail": "Suggested checker covering signed extrema, zero scales, block tails and before/after-repack projection results."
+   }
+  ]
+ },
+ "weights.load_checkpoint": {
+  "title": "Load a complete validated checkpoint tensor inventory",
+  "capabilities": [
+   {
+    "kind": "component",
+    "name": "Format reader and sharded tensor binder",
+    "detail": "Suggested runtime code enumerating supported files, parsing bounded directories and resolving model tensor names to stored ranges."
+   },
+   {
+    "kind": "component",
+    "name": "Tensor schema and completeness validator",
+    "detail": "Suggested code rejecting missing shards, duplicates, truncated payload ranges and incompatible layer dimensions before execution."
+   },
+   {
+    "kind": "tool",
+    "name": "Checkpoint inventory and integrity inspector",
+    "detail": "Suggested tool exporting tensor names, offsets, shapes, types and hashes for golden or deliberately damaged fixtures."
+   }
+  ]
+ },
+ "weights.prepare_artifact": {
+  "title": "Convert and quantize a checkpoint into an admitted runtime artifact",
+  "capabilities": [
+   {
+    "kind": "tool",
+    "name": "Checkpoint conversion and packing pipeline",
+    "detail": "Suggested offline tool translating tensor names, metadata and vocabulary into a selected runtime format."
+   },
+   {
+    "kind": "component",
+    "name": "Quantization and scale configuration adapters",
+    "detail": "Suggested reusable code generating or validating block parameters and supplied scales expected by runtime operators."
+   },
+   {
+    "kind": "method",
+    "name": "Artifact fidelity acceptance",
+    "detail": "Suggested procedure checking conversion completeness, reconstruction error, operator agreement and downstream corpus quality against declared budgets."
+   }
+  ]
+ },
+ "factory.controlled_experiment": {
+  "title": "Run controlled experiments and qualify the result",
+  "capabilities": [
+   {
+    "kind": "method",
+    "name": "Bounded experiment design",
+    "detail": "Set the falsifiable question, scope, independent oracle, pass criteria, controls and permitted retries before any measurements."
+   },
+   {
+    "kind": "tool",
+    "name": "External trial executor",
+    "detail": "Pin candidate, target and workload, stage each attempt, correlate phase/transfer/kernel observations, retain partial results and clean up."
+   },
+   {
+    "kind": "tool",
+    "name": "Correctness and performance probes",
+    "detail": "Select operator, sequence, task-quality, timing or resource fixtures. Measure target behavior against its own baseline at matched shapes and cache state."
+   },
+   {
+    "kind": "method",
+    "name": "Reproducible decision record",
+    "detail": "Link raw observations to the exact image, input, configuration and target. Record uncertainty, independent confirmation and failed or unmeasured obligations."
+   }
+  ]
+ }
 }

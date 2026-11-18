@@ -13,18 +13,26 @@ def assemble():
     engine = read('text_engine.json')
     merged, removed = taxonomy['merge'], set(taxonomy['remove'])
     def current(key):
-        return merged.get(key, key)
+        visited = set()
+        while key in merged:
+            if key in visited:
+                raise ValueError(f"Cyclic CC alias at {key}")
+            visited.add(key)
+            key = merged[key]
+        return key
     old = {r['id']:r for r in evidence['roles']}
     old.update(taxonomy.get('definitions', {}))
     aliases = {k:current(v) for k,v in evidence['aliases'].items()}
     aliases.update({k:current(k) for k in old})
+    aliases.update(taxonomy.get('aliasOverrides', {}))
     roles = {k:r for k,r in old.items() if k not in merged and k not in removed}
     for k,r in roles.items():
         r['why'] = taxonomy['rationale'][k]
         r['when'] = taxonomy['conditional'].get(k,'Required when this operation is present in the target engine or workflow.')
         r.update(taxonomy.get('responsibilities', {}).get(k, {}))
         r['variantJobs'] = []
-    for former,survivor in merged.items():
+    for former in merged:
+        survivor=current(former)
         roles[survivor]['variantJobs'].append({k:old[former][k] for k in ['id','reason','check','capabilities']})
         for field in ['ex','reuse','capabilities']:
             roles[survivor][field]=list(dict.fromkeys(roles[survivor][field]+old[former][field]))
@@ -33,7 +41,7 @@ def assemble():
         role['title']=catalog[key]['title']
         role['contents']=list(catalog[key]['capabilities'])
     for key,entry in catalog.items():
-        if key in merged:
+        if key in merged and current(key) not in {'factory.controlled_experiment','model.expert_ffn','serving.request_gateway'}:
             roles[current(key)]['contents'].extend(entry['capabilities'])
     for role in roles.values():
         for cap in role['contents']:
@@ -46,6 +54,9 @@ def assemble():
         for a,b,*rest in layer['edges']:
             assert a in ids and b in ids and rest[0],(layer['id'],a,b)
         for op in layer['ops']:
+            operation=layer['id']+'/'+op['id']
+            op['target']=operation not in taxonomy['nonTargetOperations']
+            op['cc']=taxonomy.get('operationOwners',{}).get(operation,op['cc'])
             op['cc']=list(dict.fromkeys(current(k) for k in op['cc']))
             for k in op['cc']:
                 assert k in roles,(op,k)
@@ -55,7 +66,8 @@ def assemble():
         roles[k]['sites']=places
     sources = []
     for row in evidence['sources']:
-        row['assigned']=current(row['assigned'])
+        row['assigned']=current(taxonomy.get('sourceOwnerByPrevious',{}).get(row['previous'],row['assigned']))
+        row['target']=row['assigned'] not in taxonomy['nonTargetRoles'] and row['previous']!='experts.shared_forward'
         if row['assigned'] in roles:sources.append(row)
     for asset in evidence['assets']:
         asset['assigned']=current(asset['assigned'])
@@ -76,6 +88,8 @@ def assemble():
             if len(item)>3:
                 assert item[3] in paths[lay]
                 where=(lay,item[3])
+            assert where in [tuple(site) for site in sites[k]],(tr['id'],where,k)
+            assert '/'.join(where) not in taxonomy['nonTargetOperations'],(tr['id'],where)
             item[:]=[*where,k,note]
     baseline=read('essential.json')
     assert set(baseline['roles']) <= roles.keys()
@@ -85,8 +99,14 @@ def assemble():
         for op in l['ops']:
             op['essential']=op['id'] in baseline['operations'][l['id']]
     for k,r in roles.items():
+        r['target']=k not in taxonomy['nonTargetRoles']
         r['essential']=k in baseline['roles']
-    return dict(baseline=baseline['description'],cross=cross,engine=engine,factory=factory,edges=architecture['edges'],factoryEdges=taxonomy['edges'],roles=list(roles.values()),aliases=aliases,excluded=sorted(removed),sources=sources,assets=evidence['assets'],repositories=evidence['repositories'],traces=architecture['traces'],transfers=evidence['transfers'],mergers=merged)
+        if r['target'] and r.get('kind')!='factory':
+            assert any(s['assigned']==k and s.get('url','').startswith('https://github.com/') and '/blob/' in s['url'] for s in sources), 'No pinned source for '+k
+        if r['essential']:
+            assert r['target'],k
+    assert len([r for r in roles.values() if r.get('kind')=='factory'])==5
+    return dict(muse=read('muse_evidence.json'),baseline=baseline['description'],cross=cross,engine=engine,factory=factory,edges=architecture['edges'],factoryEdges=taxonomy['edges'],roles=list(roles.values()),aliases=aliases,excluded=sorted(removed),sources=sources,assets=evidence['assets'],repositories=evidence['repositories'],traces=architecture['traces'],transfers=evidence['transfers'],mergers=merged)
 
 if __name__=='__main__':
     data=assemble()

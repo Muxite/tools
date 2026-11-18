@@ -1,0 +1,373 @@
+{
+  "refs": [
+    {
+      "title": "Published text configuration defaults",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/configuration_muse_spark.py#L117",
+      "detail": "Reference defaults include 62 decoder layers, hidden width 8192, 128 Q heads, 16 KV heads, head size 64, 256 experts and eight routed picks. These values describe the public config class. Load the authorized pack’s actual config before allocating or selecting kernels."
+    },
+    {
+      "title": "Muse Spark Open model card",
+      "url": "https://huggingface.co/meta-models/Muse-Spark-Open-816B-A42B/tree/0fb02478b02565b2ce7fc57e6051c91172774ac9",
+      "detail": "The public model identity is 816B total / 42B active. The workshop did not qualify a particular gated checkpoint, tokenizer revision or memory representation."
+    },
+    {
+      "title": "Reference router formula",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L194",
+      "detail": "Compute FP32 router projection and multiply by output_multiplier. Apply sigmoid. Rank by score plus e_score_correction_bias, gather unbiased scores, divide by their sum plus 1e−15 and multiply by routed_scaling_factor."
+    },
+    {
+      "title": "SGLang fused Muse router",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/models/muse_spark.py#L639",
+      "detail": "The operator binds correction bias, output multiplier, normalization epsilon and route scale. A specialization must preserve the reference’s expert membership and aligned weights."
+    },
+    {
+      "title": "SGLang router fixtures",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/test/registered/kernels/ops/moe/test_muse_spark_routing.py#L36",
+      "detail": "Upstream fixtures exercise (256,8) and (128,4). Test-case shapes describe the kernel suite and do not set checkpoint geometry."
+    },
+    {
+      "title": "SGLang routed-only model guard",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/models/muse_spark.py#L478",
+      "detail": "Muse’s OSS SGLang MoE rejects a nonzero num_shared_experts. Its forward path uses routed FFNs. An independent shared branch belongs to a different model contract."
+    },
+    {
+      "title": "Expert activation and post-norm",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L240",
+      "detail": "Compute gate/up projections, activation product and down projection. Apply input-scaled RMSNorm to each expert output before multiplying its route weight and accumulating by original token row."
+    },
+    {
+      "title": "Expert input and output projections",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L255",
+      "detail": "Router reads input at model width. A separate pre-expert projection and centered norm prepare expert-width inputs. Post-expert projection returns the combined output to model width."
+    },
+    {
+      "title": "Centered and input-scaled RMSNorm",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L126",
+      "detail": "Centered RMSNorm normalizes then multiplies by 1 + learned weight. Input-scaled RMSNorm scales and rounds to input dtype before its reduction. Swapping those stages changes the result."
+    },
+    {
+      "title": "Reference decoder boundaries",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L474",
+      "detail": "Apply attention pre-norm, attention, post-norm and learned residual gate. Repeat the corresponding boundary around the FFN. The stream handed to the next block includes both gated contributions."
+    },
+    {
+      "title": "Learned residual gate",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L438",
+      "detail": "beta = sigmoid(g / T); alpha = sqrt(clamp(sigmoid(−g / T) × (1 + beta), min=eps)). The residual result is alpha × prior stream + beta × branch output."
+    },
+    {
+      "title": "Muse attention output gate",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L396",
+      "detail": "Apply Q/K normalization, layer-dependent positional encoding, KV update and scaled attention. Normalize each output head, apply sigmoid of an input-dependent gate and then the output projection."
+    },
+    {
+      "title": "Full and sliding attention defaults",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/configuration_muse_spark.py#L165",
+      "detail": "The config derives a per-layer full/sliding mask pattern and RoPE/NoPE schedule if the checkpoint supplies no override. Read the actual layer arrays and cache window."
+    },
+    {
+      "title": "Normalized token embeddings",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L578",
+      "detail": "Apply weightless RMSNorm to each gathered token embedding before the decoder stack."
+    },
+    {
+      "title": "Vocabulary projection and softcap",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L1684",
+      "detail": "The reference multiplies vocabulary logits by output_multiplier before the configured tanh softcap. Sampling consumes the transformed scores."
+    },
+    {
+      "title": "Tokenizer and template inputs",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/test/muse_spark_utils.py#L14",
+      "detail": "The cache helper names tokenizer.json, tokenizer_config.json, chat_template.jinja and generation_config.json. Read the files from the chosen revision and compare the rendered prompt and token IDs."
+    },
+    {
+      "title": "Muse text parsers",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/docs/cookbook/autoregressive/Meta/MuseSparkOpen.mdx#L121",
+      "detail": "The SGLang recipe explicitly selects Muse reasoning and tool-call parsers. Enable these on the text interface only when the serving contract requests those outputs."
+    },
+    {
+      "title": "Bounded expert residency design",
+      "url": "https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/DGX-SPARK/history/muse-spark-handbook-20261110/HANDBOOK.md#L245",
+      "detail": "Local workshop recommends an exact miss path and bounded resident set first. Evaluate cache policy on held-out traces, then qualify coalescing or prefetch against the target’s actual storage and memory budget. This is a construction requirement, not a measured Muse run."
+    },
+    {
+      "title": "Checkpoint and capacity evidence",
+      "url": "https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/DGX-SPARK/history/muse-spark-handbook-20261110/HANDBOOK.md#L713",
+      "detail": "The workshop records the 816B/42B card and missing selected checkpoint bytes, tokenizer and accepted reference. Actual pack inventory and sustained access costs determine whether the target meets its memory and latency gates."
+    }
+  ],
+  "byRole": {
+    "model.expert_routing": [
+      {
+        "title": "Reference router formula",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L194",
+        "detail": "Compute FP32 router projection and multiply by output_multiplier. Apply sigmoid. Rank by score plus e_score_correction_bias, gather unbiased scores, divide by their sum plus 1e−15 and multiply by routed_scaling_factor."
+      },
+      {
+        "title": "SGLang fused Muse router",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/models/muse_spark.py#L639",
+        "detail": "The operator binds correction bias, output multiplier, normalization epsilon and route scale. A specialization must preserve the reference’s expert membership and aligned weights."
+      },
+      {
+        "title": "SGLang router fixtures",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/test/registered/kernels/ops/moe/test_muse_spark_routing.py#L36",
+        "detail": "Upstream fixtures exercise (256,8) and (128,4). Test-case shapes describe the kernel suite and do not set checkpoint geometry."
+      },
+      {
+        "title": "SGLang routed-only model guard",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/models/muse_spark.py#L478",
+        "detail": "Muse’s OSS SGLang MoE rejects a nonzero num_shared_experts. Its forward path uses routed FFNs. An independent shared branch belongs to a different model contract."
+      }
+    ],
+    "model.decoder_architecture": [
+      {
+        "title": "Reference decoder boundaries",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L474",
+        "detail": "Apply attention pre-norm, attention, post-norm and learned residual gate. Repeat the corresponding boundary around the FFN. The stream handed to the next block includes both gated contributions."
+      },
+      {
+        "title": "Learned residual gate",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L438",
+        "detail": "beta = sigmoid(g / T); alpha = sqrt(clamp(sigmoid(−g / T) × (1 + beta), min=eps)). The residual result is alpha × prior stream + beta × branch output."
+      },
+      {
+        "title": "Published text configuration defaults",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/configuration_muse_spark.py#L117",
+        "detail": "Reference defaults include 62 decoder layers, hidden width 8192, 128 Q heads, 16 KV heads, head size 64, 256 experts and eight routed picks. These values describe the public config class. Load the authorized pack’s actual config before allocating or selecting kernels."
+      }
+    ],
+    "model.normalization": [
+      {
+        "title": "Centered and input-scaled RMSNorm",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L126",
+        "detail": "Centered RMSNorm normalizes then multiplies by 1 + learned weight. Input-scaled RMSNorm scales and rounds to input dtype before its reduction. Swapping those stages changes the result."
+      },
+      {
+        "title": "Learned residual gate",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L438",
+        "detail": "beta = sigmoid(g / T); alpha = sqrt(clamp(sigmoid(−g / T) × (1 + beta), min=eps)). The residual result is alpha × prior stream + beta × branch output."
+      },
+      {
+        "title": "Reference decoder boundaries",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L474",
+        "detail": "Apply attention pre-norm, attention, post-norm and learned residual gate. Repeat the corresponding boundary around the FFN. The stream handed to the next block includes both gated contributions."
+      }
+    ],
+    "attention.dense_execution": [
+      {
+        "title": "Muse attention output gate",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L396",
+        "detail": "Apply Q/K normalization, layer-dependent positional encoding, KV update and scaled attention. Normalize each output head, apply sigmoid of an input-dependent gate and then the output projection."
+      },
+      {
+        "title": "Full and sliding attention defaults",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/configuration_muse_spark.py#L165",
+        "detail": "The config derives a per-layer full/sliding mask pattern and RoPE/NoPE schedule if the checkpoint supplies no override. Read the actual layer arrays and cache window."
+      }
+    ],
+    "memory.sequence_kv": [
+      {
+        "title": "Muse attention output gate",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L396",
+        "detail": "Apply Q/K normalization, layer-dependent positional encoding, KV update and scaled attention. Normalize each output head, apply sigmoid of an input-dependent gate and then the output projection."
+      },
+      {
+        "title": "Full and sliding attention defaults",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/configuration_muse_spark.py#L165",
+        "detail": "The config derives a per-layer full/sliding mask pattern and RoPE/NoPE schedule if the checkpoint supplies no override. Read the actual layer arrays and cache window."
+      }
+    ],
+    "experts.routed_forward": [
+      {
+        "title": "Expert input and output projections",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L255",
+        "detail": "Router reads input at model width. A separate pre-expert projection and centered norm prepare expert-width inputs. Post-expert projection returns the combined output to model width."
+      },
+      {
+        "title": "Expert activation and post-norm",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L240",
+        "detail": "Compute gate/up projections, activation product and down projection. Apply input-scaled RMSNorm to each expert output before multiplying its route weight and accumulating by original token row."
+      },
+      {
+        "title": "SGLang routed-only model guard",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/models/muse_spark.py#L478",
+        "detail": "Muse’s OSS SGLang MoE rejects a nonzero num_shared_experts. Its forward path uses routed FFNs. An independent shared branch belongs to a different model contract."
+      }
+    ],
+    "experts.shared_forward": [
+      {
+        "title": "SGLang routed-only model guard",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/models/muse_spark.py#L478",
+        "detail": "Muse’s OSS SGLang MoE rejects a nonzero num_shared_experts. Its forward path uses routed FFNs. An independent shared branch belongs to a different model contract."
+      }
+    ],
+    "merge.expert_contributions": [
+      {
+        "title": "Expert activation and post-norm",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L240",
+        "detail": "Compute gate/up projections, activation product and down projection. Apply input-scaled RMSNorm to each expert output before multiplying its route weight and accumulating by original token row."
+      },
+      {
+        "title": "Expert input and output projections",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L255",
+        "detail": "Router reads input at model width. A separate pre-expert projection and centered norm prepare expert-width inputs. Post-expert projection returns the combined output to model width."
+      }
+    ],
+    "model.embedding_service": [
+      {
+        "title": "Normalized token embeddings",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L578",
+        "detail": "Apply weightless RMSNorm to each gathered token embedding before the decoder stack."
+      }
+    ],
+    "model.logit_head": [
+      {
+        "title": "Vocabulary projection and softcap",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L1684",
+        "detail": "The reference multiplies vocabulary logits by output_multiplier before the configured tanh softcap. Sampling consumes the transformed scores."
+      }
+    ],
+    "tokenizer.prepare_request": [
+      {
+        "title": "Tokenizer and template inputs",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/test/muse_spark_utils.py#L14",
+        "detail": "The cache helper names tokenizer.json, tokenizer_config.json, chat_template.jinja and generation_config.json. Read the files from the chosen revision and compare the rendered prompt and token IDs."
+      }
+    ],
+    "serving.request_gateway": [
+      {
+        "title": "Tokenizer and template inputs",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/test/muse_spark_utils.py#L14",
+        "detail": "The cache helper names tokenizer.json, tokenizer_config.json, chat_template.jinja and generation_config.json. Read the files from the chosen revision and compare the rendered prompt and token IDs."
+      },
+      {
+        "title": "Muse text parsers",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/docs/cookbook/autoregressive/Meta/MuseSparkOpen.mdx#L121",
+        "detail": "The SGLang recipe explicitly selects Muse reasoning and tool-call parsers. Enable these on the text interface only when the serving contract requests those outputs."
+      }
+    ],
+    "output.response_stream": [
+      {
+        "title": "Muse text parsers",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/docs/cookbook/autoregressive/Meta/MuseSparkOpen.mdx#L121",
+        "detail": "The SGLang recipe explicitly selects Muse reasoning and tool-call parsers. Enable these on the text interface only when the serving contract requests those outputs."
+      }
+    ],
+    "serving.tool_conversations": [
+      {
+        "title": "Muse text parsers",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/docs/cookbook/autoregressive/Meta/MuseSparkOpen.mdx#L121",
+        "detail": "The SGLang recipe explicitly selects Muse reasoning and tool-call parsers. Enable these on the text interface only when the serving contract requests those outputs."
+      },
+      {
+        "title": "Tokenizer and template inputs",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/test/muse_spark_utils.py#L14",
+        "detail": "The cache helper names tokenizer.json, tokenizer_config.json, chat_template.jinja and generation_config.json. Read the files from the chosen revision and compare the rendered prompt and token IDs."
+      }
+    ],
+    "engine.expert_streaming": [
+      {
+        "title": "Bounded expert residency design",
+        "url": "https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/DGX-SPARK/history/muse-spark-handbook-20261110/HANDBOOK.md#L245",
+        "detail": "Local workshop recommends an exact miss path and bounded resident set first. Evaluate cache policy on held-out traces, then qualify coalescing or prefetch against the target’s actual storage and memory budget. This is a construction requirement, not a measured Muse run."
+      },
+      {
+        "title": "Checkpoint and capacity evidence",
+        "url": "https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/DGX-SPARK/history/muse-spark-handbook-20261110/HANDBOOK.md#L713",
+        "detail": "The workshop records the 816B/42B card and missing selected checkpoint bytes, tokenizer and accepted reference. Actual pack inventory and sustained access costs determine whether the target meets its memory and latency gates."
+      }
+    ],
+    "engine.expert_residency": [
+      {
+        "title": "Bounded expert residency design",
+        "url": "https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/DGX-SPARK/history/muse-spark-handbook-20261110/HANDBOOK.md#L245",
+        "detail": "Local workshop recommends an exact miss path and bounded resident set first. Evaluate cache policy on held-out traces, then qualify coalescing or prefetch against the target’s actual storage and memory budget. This is a construction requirement, not a measured Muse run."
+      },
+      {
+        "title": "Checkpoint and capacity evidence",
+        "url": "https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/DGX-SPARK/history/muse-spark-handbook-20261110/HANDBOOK.md#L713",
+        "detail": "The workshop records the 816B/42B card and missing selected checkpoint bytes, tokenizer and accepted reference. Actual pack inventory and sustained access costs determine whether the target meets its memory and latency gates."
+      }
+    ],
+    "routing.forecast_expert_demand": [
+      {
+        "title": "Bounded expert residency design",
+        "url": "https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/DGX-SPARK/history/muse-spark-handbook-20261110/HANDBOOK.md#L245",
+        "detail": "Local workshop recommends an exact miss path and bounded resident set first. Evaluate cache policy on held-out traces, then qualify coalescing or prefetch against the target’s actual storage and memory budget. This is a construction requirement, not a measured Muse run."
+      }
+    ],
+    "weights.load_checkpoint": [
+      {
+        "title": "Published text configuration defaults",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/configuration_muse_spark.py#L117",
+        "detail": "Reference defaults include 62 decoder layers, hidden width 8192, 128 Q heads, 16 KV heads, head size 64, 256 experts and eight routed picks. These values describe the public config class. Load the authorized pack’s actual config before allocating or selecting kernels."
+      },
+      {
+        "title": "Checkpoint and capacity evidence",
+        "url": "https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/DGX-SPARK/history/muse-spark-handbook-20261110/HANDBOOK.md#L713",
+        "detail": "The workshop records the 816B/42B card and missing selected checkpoint bytes, tokenizer and accepted reference. Actual pack inventory and sustained access costs determine whether the target meets its memory and latency gates."
+      }
+    ],
+    "placement.partition_model": [
+      {
+        "title": "Checkpoint and capacity evidence",
+        "url": "https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/DGX-SPARK/history/muse-spark-handbook-20261110/HANDBOOK.md#L713",
+        "detail": "The workshop records the 816B/42B card and missing selected checkpoint bytes, tokenizer and accepted reference. Actual pack inventory and sustained access costs determine whether the target meets its memory and latency gates."
+      },
+      {
+        "title": "Bounded expert residency design",
+        "url": "https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/DGX-SPARK/history/muse-spark-handbook-20261110/HANDBOOK.md#L245",
+        "detail": "Local workshop recommends an exact miss path and bounded resident set first. Evaluate cache policy on held-out traces, then qualify coalescing or prefetch against the target’s actual storage and memory budget. This is a construction requirement, not a measured Muse run."
+      }
+    ],
+    "backend.execute_operators": [
+      {
+        "title": "SGLang fused Muse router",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/models/muse_spark.py#L639",
+        "detail": "The operator binds correction bias, output multiplier, normalization epsilon and route scale. A specialization must preserve the reference’s expert membership and aligned weights."
+      },
+      {
+        "title": "SGLang router fixtures",
+        "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/test/registered/kernels/ops/moe/test_muse_spark_routing.py#L36",
+        "detail": "Upstream fixtures exercise (256,8) and (128,4). Test-case shapes describe the kernel suite and do not set checkpoint geometry."
+      }
+    ],
+    "sampling.select_tokens": [
+      {
+        "title": "Vocabulary projection and softcap",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L1684",
+        "detail": "The reference multiplies vocabulary logits by output_multiplier before the configured tanh softcap. Sampling consumes the transformed scores."
+      }
+    ],
+    "dense.feed_forward": [
+      {
+        "title": "Expert input and output projections",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L255",
+        "detail": "Router reads input at model width. A separate pre-expert projection and centered norm prepare expert-width inputs. Post-expert projection returns the combined output to model width."
+      },
+      {
+        "title": "Expert activation and post-norm",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L240",
+        "detail": "Compute gate/up projections, activation product and down projection. Apply input-scaled RMSNorm to each expert output before multiplying its route weight and accumulating by original token row."
+      }
+    ]
+  },
+  "routing": {
+    "referenceDefaults": {
+      "experts": 256,
+      "routedPerToken": 8,
+      "hidden": 8192,
+      "expertHidden": 4096,
+      "layers": 62,
+      "queryHeads": 128,
+      "kvHeads": 16,
+      "headDim": 64
+    },
+    "referenceSource": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/configuration_muse_spark.py#L117",
+    "checkpointStatus": "The public repository identity and advertised parameter totals are recorded. Selected checkpoint tensor shapes, tokenizer bytes and pack layout remain unverified.",
+    "sharedPolicy": "The audited SGLang Muse path accepts zero shared experts.",
+    "score": "sigmoid(output_multiplier × FP32 linear(hidden, W_router))",
+    "rank": "topk(score + correction_bias, k)",
+    "weight": "routed_scaling_factor × score[id] / (sum_selected(score) + 1e−15)"
+  }
+}
