@@ -3,6 +3,81 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
+async function verifyConstruction(page, roleRecords, jump) {
+  const jobs = await page.evaluate(() => constructionJobs);
+  const roles = new Set(roleRecords.map(r => r.id));
+  const assigned = new Set(jobs.flatMap(job => job.cc));
+  for (const role of roleRecords.filter(r => r.essential)) {
+    assert(assigned.has(role.id),'No construction order owns essential CC ' + role.id);
+  }
+  const byID = new Map(jobs.map(job => [job.id,job]));
+  assert(jobs.length && byID.size === jobs.length, 'Work orders need unique IDs');
+  const visiting = new Set(), complete = new Set();
+  function visit(id) {
+    if (complete.has(id)) return;
+    assert(!visiting.has(id), 'Cycle in work orders at ' + id);
+    visiting.add(id);
+    const job = byID.get(id);
+    assert(job.agent && job.output && job.work && job.lane && job.cc.length, 'Incomplete work order: ' + id);
+    for (const cc of job.cc) assert(roles.has(cc), id + ' references missing CC ' + cc);
+    for (const [provider,receipt] of job.needs) {
+      assert(byID.has(provider) && receipt, id + ' needs a provider and receipt');
+      visit(provider);
+    }
+    visiting.delete(id);
+    complete.add(id);
+  }
+  for (const id of byID.keys()) visit(id);
+  await jump('#construction');
+  await page.locator('#engine-variations').waitFor({state:'attached'});
+  const simulator=page.locator('#ready-jobs');
+  const ready=()=>simulator.locator('[data-accept]').evaluateAll(buttons=>buttons.map(b=>b.dataset.accept).sort());
+  const accept=id=>simulator.locator('[data-accept="'+id+'"]').click();
+  assert.deepEqual(await ready(),['contract']);
+  await accept('contract');
+  assert.deepEqual(await ready(),['plan']);
+  await accept('plan');
+  assert.deepEqual(await ready(),['reference','routing','serving','state','weights']);
+  await accept('weights');
+  assert(!(await ready()).includes('placement'));
+  await accept('state');
+  assert((await ready()).includes('placement'),'Placement must unlock when weights and state receipts are available');
+  await simulator.locator('#undo-build').click();
+  assert(!(await ready()).includes('placement') && (await ready()).includes('state'),'Undo must withdraw the downstream placement admission');
+  const index = await page.locator('a[data-job]').evaluateAll(links => links.map(a=>[a.dataset.job,a.getAttribute('href')]));
+  assert.deepEqual([...new Set(index.map(([id])=>id))].sort(),[...byID.keys()].sort(),'Construction overview misses work orders');
+  for (const [id,href] of index) assert.equal(href,'#construction/'+id);
+  const detail = page.locator('#work-order');
+  const example = jobs.find(job=>job.needs.length);
+  assert(example, 'No linked producer/consumer work orders');
+  await page.locator('a[data-job="'+example.id+'"]').first().click();
+  await detail.waitFor();
+  await detail.locator('a[href="#construction/'+example.needs[0][0]+'"]').first().click();
+  await page.waitForFunction(id=>location.hash === '#construction/'+id,example.needs[0][0]);
+  await page.locator('#page-back').click();
+  await page.waitForFunction(id=>location.hash === '#construction/'+id,example.id);
+  await page.locator('#page-back').click();
+  await page.waitForFunction(()=>location.hash==='#construction');
+  for (const job of jobs) {
+    await jump('#construction/'+job.id);
+    await detail.waitFor();
+    const hrefs = new Set(await detail.locator('a[href]').evaluateAll(links=>links.map(a=>a.getAttribute('href'))));
+    for (const cc of job.cc) assert(hrefs.has('#cc/'+cc),job.id+' has no working CC link to '+cc);
+    for (const [provider,receipt] of job.needs) {
+      assert(hrefs.has('#construction/'+provider),job.id+' has no link to '+provider);
+      assert((await detail.textContent()).includes(receipt),job.id+' does not identify consumed receipt '+receipt);
+    }
+    assert((await detail.textContent()).includes(job.output),job.id+' omits its deliverable');
+  }
+  await jump('#construction/'+example.id);
+  const cc = example.cc[0];
+  await detail.locator('a[href="#cc/'+cc+'"]').first().click();
+  await page.locator('.receipt').first().waitFor();
+  await page.locator('#page-back').click();
+  await page.waitForFunction(id=>location.hash === '#construction/'+id,example.id);
+  return example.id;
+}
+
 async function main() {
   const location = process.argv[2];
   assert(location && path.isAbsolute(location), 'Pass the absolute path of the built HTML site.');
@@ -219,8 +294,9 @@ async function main() {
       }
       await jump('#engine');
     }
+    const jobId=await verifyConstruction(page,data.roles,jump);
     await page.setViewportSize({ width:390, height:844 });
-    for (const h of ['#engine','#engine/model?op=' + route.id,'#factory','#library','#sources','#quantization','#sources/weights.decode_blocks?engine=Strata']) {
+    for (const h of ['#engine','#engine/model?op=' + route.id,'#factory','#library','#sources','#quantization','#sources/weights.decode_blocks?engine=Strata','#construction','#construction/'+jobId]) {
       await jump(h);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Horizontal page overflow at ' + h);
     }

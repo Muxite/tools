@@ -118,7 +118,7 @@ def assemble():
         bucket=roles[current(key)]['examples']
         if not any(x['url']==row['url'] for x in bucket):
             bucket.append(row)
-    for name in ['evidence_runtime.json','evidence_math.json','evidence_peers.json','evidence_ds4_deep.json','evidence_strata_deep.json']:
+    for name in ['evidence_runtime.json','evidence_math.json','evidence_peers.json','evidence_ds4_deep.json','evidence_strata_deep.json','evidence_variants.json']:
         for key,rows in read(name).items():
             for row in rows:
                 example(key,row)
@@ -135,7 +135,7 @@ def assemble():
 if __name__=='__main__':
     data=assemble()
     page=(HERE/'site.html').read_text('utf-8')
-    for token,names in [('/*GRAPH_JS*/',['text_graph.js']),('/*SITE_JS*/',['site.js','experiments.js','navigation.js']),('/*SITE_CSS*/',['site.css','text_graph.css'])]:
+    for token,names in [('/*GRAPH_JS*/',['text_graph.js']),('/*SITE_JS*/',['site.js','experiments.js','construction_options.js','variations.js','construction.js','navigation.js']),('/*SITE_CSS*/',['site.css','text_graph.css'])]:
         page=page.replace(token,'\n'.join((HERE/n).read_text('utf-8') for n in names))
     page=page.replace('__ATLAS__',json.dumps(data,ensure_ascii=False,separators=(',',':')).replace('<','\\u003c'))
     out=HERE.parent/'20261117 Text Inference Engine Atlas prepresentation.html'

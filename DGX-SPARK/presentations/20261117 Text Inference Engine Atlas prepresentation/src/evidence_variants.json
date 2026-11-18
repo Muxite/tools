@@ -1,0 +1,108 @@
+{
+  "weights.adapter_binding": [
+    {
+      "engine": "llama.cpp",
+      "title": "LoRA deltas enter the actual projection graph",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-graph.cpp#L1703-L1718",
+      "detail": "build_lora_mm finds each adapter weight for the base projection, computes B(Ax), scales it and adds it to the base result. This demonstrates executable adapter arithmetic, not merely an adapter file reader. The checkpoint, target layers and scale convention still require admission."
+    },
+    {
+      "engine": "SGLang",
+      "title": "Per-batch adapter routing and residency are prepared before execution",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/lora/lora_manager.py#L497-L535",
+      "detail": "prepare_lora_batch clears inactive routing for the relevant backend, selects eager/captured batch metadata, gathers active IDs under attention DP, validates pool capacity and fetches adapters. This is request/batch integration; no isolated-output test was run in this audit."
+    }
+  ],
+  "sequence.recurrent_execution": [
+    {
+      "engine": "llama.cpp",
+      "title": "Qwen graph invokes a recurrent state transition",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/models/qwen3next.cpp#L526-L536",
+      "detail": "The Qwen3Next graph passes persistent state, transformed Q/K/V, gate and beta to build_recurrent_attn, then applies gated normalization. This is a family-specific alternative to attention-only KV state, not a mechanism to add to Muse by configuration."
+    },
+    {
+      "engine": "ds4",
+      "title": "Qwen CUDA recurrent scan checks state and geometry before launch",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_qwen4_cuda.cuh#L1805-L1823",
+      "detail": "The GDN scan entry validates token/head/state-buffer geometry and dispatches supported dimensions with prompt-length-dependent row specializations. This is concrete recurrent compute, but a complete reset/copy/resume proof requires its model and session call sites."
+    }
+  ],
+  "attention.sparse_execution": [
+    {
+      "engine": "SGLang",
+      "title": "Configured DSA models construct and share actual indexers",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/models/deepseek_v2.py#L2168-L2207",
+      "detail": "When use_dsa is active, layer-specific rules decide whether to compute or reuse top-k indices. The model instantiates a standard or pooled DSA indexer with configuration-derived geometry. This corrects an audit gap: pinned SGLang has model-integrated sparse attention, not just a standalone helper."
+    },
+    {
+      "engine": "SGLang",
+      "title": "Sparse decode turns selected indices into KV page access",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/layers/attention/dsa_backend.py#L3152-L3178",
+      "detail": "The backend aligns selected top-k rows and chooses hierarchical swap-in, fused indexing or explicit index-to-page transformation before dispatching flashmla_sparse. This is the actual selected-KV consumption boundary; hardware/backend validation and model-family rules constrain reuse."
+    }
+  ],
+  "parallel.model_execution": [
+    {
+      "engine": "llama.cpp",
+      "title": "Pipeline execution is enabled only under explicit device and cache guards",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-context.cpp#L574-L603",
+      "detail": "Pipeline mode requires multiple devices, the appropriate layer split/offload coverage, no tensor overrides and zero MoE cache size. All non-CPU devices must expose asynchronous compute and events. Thus the pinned engine has real model splitting, while pipeline plus MoE-cache composition is explicitly restricted."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Tensor split admission depends on architecture implementation",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-model.cpp#L397-L403",
+      "detail": "llama_model_create rejects LLAMA_SPLIT_MODE_TENSOR when the architecture does not implement that mode. This corrects a missing parallel-execution binding without claiming arbitrary model/topology support."
+    },
+    {
+      "engine": "ds4",
+      "title": "Tensor-parallel peers negotiate matching execution modes",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_tp.c#L2516-L2537",
+      "detail": "Peers exchange a magic value and mode flags, reject unknown/mismatched ownership modes and agree on the optional full-expert setting. This is actual TP admission/coordination, not proof of throughput or compatibility with another engine transport."
+    }
+  ],
+  "parallel.expert_exchange": [
+    {
+      "engine": "SGLang",
+      "title": "Expert dispatch and combine share a checked stage lifecycle",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/layers/moe/token_dispatcher/deepep.py#L1047-L1099",
+      "detail": "The dispatcher passes hidden rows and TopKOutput to the selected implementation, retains intermediate state, and reverses the lifecycle using result rows, expert IDs and weights. These are real distributed expert-exchange interfaces. Multi-rank token conservation remains a separate test."
+    }
+  ],
+  "decode.speculative_execution": [
+    {
+      "engine": "Strata",
+      "title": "Draft arbitration chooses an eligible continuation source",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/spec/draft_source.cpp#L13-L33",
+      "detail": "propose_from_sources requests bounded candidates from the primary and extra sources, rejects missing or below-threshold matches and retains the strongest match. This demonstrates proposal arbitration only; the target verifier and state rollback must be checked separately."
+    },
+    {
+      "engine": "SGLang",
+      "title": "N-gram speculation uses corpus proposals without a draft model",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/speculative/ngram_worker.py#L152-L159",
+      "detail": "NgramWorker explicitly has no draft model and maintains a CPU-side corpus that can be reset. A model-based proposer is therefore not mandatory for speculative decoding. The base verifier remains responsible for accepted state."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Accepted draft counts return to the proposer state interface",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/common/speculative.cpp#L3522-L3547",
+      "detail": "common_speculative_accept resolves the sequence proposer, accounts accepted tokens and calls its accept interface. This connects proposal bookkeeping to sequence identity; complete target-state rollback still requires its verifier path and fixtures."
+    }
+  ],
+  "routing.forecast_expert_demand": [
+    {
+      "engine": "Strata",
+      "title": "Lookahead startup connects optional predictions to the expert source",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/program/generate.cpp#L9609-L9647",
+      "detail": "Startup admits router lookahead only for applicable warming/swap/statistics modes, verifies per-layer BF16 router geometry and connects the thread to ExpertDispatch. It can detach when all experts are resident. This predicts early readiness hints; the authoritative router remains the model path."
+    }
+  ],
+  "engine.expert_streaming": [
+    {
+      "engine": "llama.cpp",
+      "title": "Exact-demand cache reads selected IDs before planning uploads",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-moe-cache.cpp#L790-L821",
+      "detail": "The cache requires authoritative expert selection in an earlier split, reads those actual IDs and plans fills from them. It is demand-driven residency, not evidence of a future expert-demand predictor. Missing predictor evidence must remain an audit gap rather than a repository-wide absence claim."
+    }
+  ]
+}
