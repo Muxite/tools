@@ -94,6 +94,11 @@
       "title": "Checkpoint and capacity evidence",
       "url": "https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/DGX-SPARK/history/muse-spark-handbook-20261110/HANDBOOK.md#L713",
       "detail": "The workshop records the 816B/42B card and missing selected checkpoint bytes, tokenizer and accepted reference. Actual pack inventory and sustained access costs determine whether the target meets its memory and latency gates."
+    },
+    {
+      "title": "Reference dense FFN",
+      "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L165",
+      "detail": "For a configured dense MLP layer the Muse reference computes activation(gate_proj(x)) times up_proj(x), followed by down_proj. The layer type in the selected configuration decides if this path runs."
     }
   ],
   "byRole": {
@@ -341,14 +346,9 @@
     ],
     "dense.feed_forward": [
       {
-        "title": "Expert input and output projections",
-        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L255",
-        "detail": "Router reads input at model width. A separate pre-expert projection and centered norm prepare expert-width inputs. Post-expert projection returns the combined output to model width."
-      },
-      {
-        "title": "Expert activation and post-norm",
-        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L240",
-        "detail": "Compute gate/up projections, activation product and down projection. Apply input-scaled RMSNorm to each expert output before multiplying its route weight and accumulating by original token row."
+        "title": "Reference dense FFN",
+        "url": "https://github.com/huggingface/transformers/blob/fd3cf0140de03f7619ac95b5cfed05b711ff9e22/src/transformers/models/muse_spark/modeling_muse_spark.py#L165",
+        "detail": "For a configured dense MLP layer the Muse reference computes activation(gate_proj(x)) times up_proj(x), followed by down_proj. The layer type in the selected configuration decides if this path runs."
       }
     ]
   },

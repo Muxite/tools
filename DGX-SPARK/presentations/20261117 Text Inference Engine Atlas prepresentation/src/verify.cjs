@@ -97,17 +97,21 @@ async function main() {
     await jump('#cc/routing.top_k');
     assert((await page.locator('main').innerText()).includes('model.expert_routing'), 'Legacy routing link failed');
     const router = page.locator('#routing-case');
-    const outputs = new Set();
-    for (const choice of ['5 routed','6 routed','5 routed + 1 shared']) {
-      await router.selectOption({label:choice});
-      outputs.add(await page.locator('#routing-out').innerText());
+    await router.selectOption('0.08');
+    assert((await page.locator('#routing-out').innerText()).includes('E0 and E2'));
+    assert((await page.locator('#routing-out').innerText()).includes('0.4286'));
+    await router.selectOption('0');
+    assert((await page.locator('#routing-out').innerText()).includes('E0 and E1'));
+    assert.equal(data.roles.filter(r=>r.kind==='factory').length,5);
+    for(const r of data.roles.filter(r=>r.kind!=='factory'&&r.target!==false)){
+      assert(data.sources.some(s=>s.assigned===r.id&&s.url)||data.muse.byRole[r.id]?.length,r.id);
     }
-    assert.equal(outputs.size, 3, 'Changing the routing contract must change its visible explanation');
-    for (const repository of data.repositories) {
-      await jump('#engine/model?op=' + route.id + '&overlay=' + encodeURIComponent(repository.engine));
-      await graphNode('model.expert_routing').waitFor();
-      assert((await page.locator('main').innerText()).includes(repository.engine), 'Missing source overlay for ' + repository.engine);
-    }
+    await jump('#cc/model.normalization');
+    await page.getByRole('heading',{name:'Normalization at a decoder site'}).waitFor();
+    await jump('#factory/f_lab');
+    assert.equal(await page.locator('.ax-canvas [data-ax-id="factory.controlled_experiment"]').count(),1);
+    await graphNode('factory.controlled_experiment').click();
+    await page.waitForFunction(()=>location.hash.includes('cc=factory.controlled_experiment'));
     await jump('#factory');
     await page.locator('.ax-factory svg').waitFor();
     assert.equal(await page.locator('.ax-canvas .ax-wire').count(), data.factoryEdges.length, 'Factory overview omits a handoff');
@@ -156,7 +160,7 @@ async function main() {
     }
     await jump('#cc/engine.expert_residency');
     await graphNode('engine.expert_streaming').waitFor();
-    for (const [former,current] of [['serving.tool_conversations','serving.request_gateway'],['factory.methodology_ab','verification.performance_measurement'],['transfer.prefill_handoff','parallel.model_execution']]){
+    for (const [former,current] of [['serving.tool_conversations','serving.request_gateway'],['factory.methodology_ab','factory.controlled_experiment'],['transfer.prefill_handoff','parallel.model_execution']]){
       await jump('#cc/'+former);
       await graphNode(current).waitFor();
       assert(await page.locator('.cap-row .cap-kind').count()>0);

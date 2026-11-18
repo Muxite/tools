@@ -154,6 +154,8 @@ function drawAtlas(container, options) {
     const leaf=(remoteLayer||selectedLayer)?.ops.find(o=>o.id===(remoteLayer?id.split('/')[1]:id));
     const aggregate=group?selectedLayer?.ops.filter(o=>o.group===group):layerRef?.ops;
     essentialMark(g,cc?options.roles.get(id)?.essential:aggregate?aggregate.some(o=>o.essential):leaf?.essential,x+w-25,y+12,!!aggregate);
+    const secondary = cc ? options.roles.get(id)?.target===false : leaf?.target===false;
+    if(secondary)g.classList.add('ax-secondary');
     markBinding(g,bindingKey,x+w-12,y+12);
     const px = x + 14, titleWidth = w - 35;
     const lineLen = Math.floor(titleWidth / (cc ? 7.8 : 8.1));
@@ -316,7 +318,7 @@ function drawAtlas(container, options) {
   }
   function layerComposition() {
     const l=selectedLayer;
-    if(groupNames.length<2){operationMap(l.ops,l.edges,'op');return}
+    if(groupNames.length<2){ownershipMap(l.ops,l.edges);return}
     const groups=new Map(groupNames.map(g=>[g,{id:groupKey(g),title:g,ops:l.ops.filter(o=>o.group===g)}]));
     const opGroups=new Map(l.ops.map(o=>[o.id,o.group]));
     for(const [g,r] of groups){
@@ -333,26 +335,125 @@ function drawAtlas(container, options) {
       }
       operationMap([...groups.values()],[...links.values()],'groups');return;
     }
-    const records=[...groups.get(activeGroup).ops],seen=new Set(records.map(r=>r.id)),edges=[];
-    for(const [a,b,label,kind] of l.edges){
-      const from=opGroups.get(a),to=opGroups.get(b);
-      if(from!==activeGroup&&to!==activeGroup)continue;
-      for(const other of [from,to]){
-        if(other===activeGroup || !other || seen.has(groupKey(other)))continue;
-        records.push({...groups.get(other),boundary:true});seen.add(groupKey(other));
-      }
-      edges.push([from===activeGroup?a:groupKey(from),to===activeGroup?b:groupKey(to),label,kind]);
-    }
-    operationMap(records,edges,'op');
+    const records=groups.get(activeGroup).ops;
+    ownershipMap(records,l.edges);
   }
-  function focusedOp(){
-    const o=selectedOp,parent=selectedLayer, ops=new Map(parent.ops.map(r=>[r.id,r]));
-    const inc=parent.edges.filter(([a,b])=>b===o.id&&a!==o.id&&ops.has(a));
-    const out=parent.edges.filter(([a,b])=>a===o.id&&b!==o.id&&ops.has(b));
-    const sideRows=Math.max(inc.length,out.length,1),sideBottom=72+sideRows*89,cy=72+(sideRows-1)*44.5;
-    const center={x:355,y:cy,w:290,h:74};
-    const ccs=[...new Set(o.cc.map(getCC).filter(Boolean))],ccY=sideBottom+65;
-    const localHeight=ccY+Math.ceil(ccs.length/3)*113+24;
+  function ownershipMap(records,edges) {
+    const layer=selectedLayer, jobs=new Map(), positions=new Map();
+    const opIndex=new Map(layer.ops.map(o=>[o.id,o]));
+    const visible=new Set(records.map(o=>o.id));
+    if(selectedRole){
+      const other=layer.ops.filter(o=>!visible.has(o.id)&&o.cc.map(getCC).includes(selectedRole));
+      if(other.length){
+        const strip=html('div','ax-other-sites');
+        strip.append(html('strong','','Same CC in '+stripLevel(layer.title)));
+        for(const o of other){
+          const b=button(strip,(o.group?o.group+' · ':'')+o.title,()=>onRole?.(selectedRole,layer.id,o.id),'ax-site-link');
+          b.setAttribute('aria-label',selectedRole+' also serves '+o.title+' in '+o.group);
+        }
+        shell.insertBefore(strip,viewport);
+      }
+    }
+    records.forEach((o,i)=>{
+      for(const id of new Set(o.cc.map(getCC))){
+        if(!jobs.has(id))jobs.set(id,[]);
+        jobs.get(id).push(i);
+      }
+    });
+    const center=rows=>rows.reduce((sum,n)=>sum+n,0)/rows.length;
+    const owners=[...jobs].sort((a,b)=>center(a[1])-center(b[1])||a[1][0]-b[1][0]||a[0].localeCompare(b[0]));
+    const opH=59,ccH=89,top=60;
+    const span=Math.max(records.length*104,owners.length*103);
+    const yOf=(i,n,h)=>top+span*(i+0.5)/Math.max(1,n)-h/2;
+    const xOp=180,wOp=352,xCC=665,wCC=310;
+    for(const [i,o] of records.entries())positions.set(o.id,{x:xOp,y:yOf(i,records.length,opH),w:wOp,h:opH,i});
+    for(const [i,[id]] of owners.entries())positions.set(id,{x:xCC,y:yOf(i,owners.length,ccH),w:wCC,h:ccH});
+    const floor=top+span+12;
+    region(8,7,558,floor-7,'OPERATION FLOW');
+    region(645,7,343,floor-7,'IMPLEMENTATION CCS','ax-owner-region');
+    svgEl(back,'text',{x:665,y:46,class:'ax-owner-help'},'Select a CC to highlight its operations.');
+    const selectedOwners=new Set(selectedOp?.cc.map(getCC)||[]);
+    const selectedSpan=new Set((jobs.get(selectedRole)||[]).map(i=>records[i].id));
+    let rail=0;
+    const railLabelCenters=[];
+    const outside=[];
+    for(const [a,b,label,kind] of edges){
+      if(!visible.has(a)||!visible.has(b)){
+        if(visible.has(a)!==visible.has(b))outside.push([a,b,label,kind]);
+        continue;
+      }
+      const A=positions.get(a),B=positions.get(b);
+      if(B.i===A.i+1){
+        const x=xOp+wOp/2;
+        wire(a,b,label,'M'+x+','+(A.y+opH)+' V'+(B.y-2),x,(A.y+opH+B.y)/2,kindFor(a,b,kind),310);
+      }else{
+        const track=26+(rail++%7)*16,fromY=A.y+opH*.7,toY=B.y+opH*.35;
+        const low=Math.min(fromY,toY), high=Math.max(fromY,toY);
+        let ly=(fromY+toY)/2;
+        const candidates=[ly];
+        for(let shift=19;shift<(high-low)/2;shift+=19)candidates.push(ly-shift,ly+shift);
+        ly=candidates.find(candidate=>railLabelCenters.every(prev=>Math.abs(prev-candidate)>34))??ly;
+        railLabelCenters.push(ly);
+        wire(a,b,label,'M'+xOp+','+fromY+' H'+track+' V'+toY+' H'+(xOp-2),88,ly,B.i<=A.i?'feedback':kindFor(a,b,kind),140);
+        if(selectedOp && (selectedOp.id===a || selectedOp.id===b)){
+          const n=drawn.at(-1);
+          n.g.classList.add('ax-route-active');
+        }
+      }
+    }
+    for(const [id,rows] of owners){
+      const C=positions.get(id);
+      rows.forEach((index,j)=>{
+        const o=records[index],A=positions.get(o.id),start=A.y+opH/2;
+        const end=C.y+ccH/2+(j-(rows.length-1)/2)*Math.min(7,44/rows.length);
+        const path='M'+(xOp+wOp)+','+start+' C595,'+start+' 604,'+end+' '+(xCC-2)+','+end;
+        wire(o.id,id,'agent uses',path,596,(start+end)/2,'build',92,false);
+        const edge=drawn.at(-1).g;
+        edge.classList.add('ax-ownership');
+        if(selectedRole===id || (!selectedRole&&selectedOp?.id===o.id))edge.classList.add('ax-owner-active');
+      });
+    }
+    function emphasizeOwner(id,on){
+      for(const g of blocks.querySelectorAll('[data-job-ids]')){
+        const owns=g.dataset.jobIds.split(' ').includes(id);
+        g.classList.toggle('ax-owned-hover',on&&owns);
+      }
+      for(const {b,g} of drawn)if(g.classList.contains('ax-ownership'))g.classList.toggle('ax-owner-hover',on&&b===id);
+    }
+    for(const o of records){
+      const g=node({...positions.get(o.id),id:o.id,title:o.title,code:o.target===false?'REFERENCE OPERATION':'OPERATION',
+        tone:'operation',selected:selectedOp?.id===o.id,onClick:()=>onOp?.(layer.id,o.id)});
+      g.dataset.jobIds=o.cc.map(getCC).join(' ');
+      if(selectedSpan.has(o.id))g.classList.add('ax-owned');
+    }
+    for(const [id,rows] of owners){
+      const job=options.roles.get(id),anchor=selectedOwners.has(id)?selectedOp:records[rows[0]];
+      const g=node({...positions.get(id),id,title:job.title,code:'CC · '+id,tone:'cc',cc:true,selected:selectedRole===id,
+        onClick:()=>onRole?.(id,layer.id,anchor.id)});
+      g.dataset.owns=rows.map(i=>records[i].id).join(' ');
+      if(!selectedRole&&selectedOwners.has(id))g.classList.add('ax-associated');
+      const ownedTitles=rows.map(i=>records[i].title).join(', ');
+      g.setAttribute('aria-label',g.getAttribute('aria-label')+' · Operations: '+ownedTitles);
+      for(const [event,on] of [['mouseenter',true],['mouseleave',false],['focus',true],['blur',false]])
+        g.addEventListener(event,()=>emphasizeOwner(id,on));
+    }
+    let h=floor+9;
+    if(selectedOp)h=crossLinks(selectedOp,layer,h);
+    finish(h);
+    if(outside.length){
+      const details=html('details','ax-index ax-boundary-index');
+      details.append(html('summary','','Subsystem handoffs ('+outside.length+')'));
+      for(const [a,b,label] of outside){
+        const row=html('div','ax-index-row');
+        button(row,opIndex.get(a).title,()=>onOp?.(layer.id,a),'ax-jump');
+        row.append(html('span','',label));
+        button(row,opIndex.get(b).title,()=>onOp?.(layer.id,b),'ax-jump');
+        details.append(row);
+      }
+      shell.append(details);
+    }
+  }
+  function crossLinks(o,parent,localHeight){
     const here=parent.id+'/'+o.id,ports={incoming:new Map(),outgoing:new Map()};
     for(const [from,to,label,kind] of options.cross||[]){
       if(from!==here&&to!==here)continue;
@@ -364,35 +465,6 @@ function drawAtlas(container, options) {
       const entries=map.get(endpoint).labels;if(!entries.includes(label))entries.push(label);
     }
     const nPorts=Math.max(ports.incoming.size,ports.outgoing.size),crossHeight=nPorts?97+nPorts*86:0;
-    region(8,7,width-16,localHeight-14,stripLevel(parent.title).toUpperCase()+' · OPERATION');
-    const neighbors=[];
-    function sides(edges, leftSide){
-      edges.forEach(([a,b,label],i)=>{
-        const id=leftSide?a:b, r=ops.get(id),dy=72+(sideRows-edges.length)*44.5+i*89, w=207, x=leftSide?24:width-w-24;
-        const sy=dy+34, ey=cy+35+(i-(edges.length-1)/2)*6;
-        const mid=leftSide?289:711;
-        wire(a,b,label,leftSide?`M${x+w},${sy} H${mid} V${ey} H${center.x-2}`:`M${center.x+center.w},${ey} H${mid} V${sy} H${x-2}`,mid,sy,leftSide?'state':'call',112);
-        neighbors.push({id,title:r.title,x,y:dy,w,h:67,code:leftSide?'INPUT FROM':'PASSES TO',tone:'neighbor',onClick:()=>onOp?.(parent.id,id)});
-      });
-    }
-    sides(inc,true);sides(out,false);
-    const ccNodes=[];
-    ccs.forEach((id,i)=>{
-      const row=Math.floor(i/3),col=i%3,count=Math.min(3,ccs.length-row*3),w=288,gap=17;
-      const x=(width-count*w-(count-1)*gap)/2+col*(w+gap),y=ccY+row*113,tx=x+w/2;
-      const gy=ccY-24;
-      const path=row===0?`M500,${cy+74} V${gy} H${tx} V${y-2}`:`M500,${cy+74} V${gy} H16 V${y-10} H${tx} V${y-2}`;
-      wire(o.id,id,'agent uses',path,500,gy,'build',112,i===0);
-      const job=options.roles.get(id);
-      ccNodes.push({id,title:job.title,x,y,w,h:99,code:'CC · '+id,tone:'cc',selected:id===selectedRole,cc:true,onClick:()=>onRole?.(id)});
-    });
-    neighbors.forEach(node);
-    node({...center,id:o.id,title:o.title,code:'SELECTED OPERATION',tone:'focus',selected:true,onClick:()=>onOp?.(parent.id,o.id)});
-    ccNodes.forEach(node);
-    if(!ccs.length)svgEl(labels,'text',{x:500,y:ccY,'text-anchor':'middle',class:'ax-node-sub'},'External dependency');
-    for(const [a,b,l] of parent.edges.filter(([a,b])=>a===o.id&&b===o.id)){
-      wire(a,b,l,`M505,${cy} v-21 h-63 v19`,478,cy-19,'feedback',155);
-    }
     if(nPorts){
       const top=localHeight+9,my=top+53+(nPorts-1)*43;
       region(8,top,width-16,crossHeight-13,'ACROSS LAYERS');
@@ -410,10 +482,9 @@ function drawAtlas(container, options) {
       node({id:here,title:o.title,code:'THIS OPERATION',tone:'focus',selected:true,x:355,y:my,w:290,h:70,onClick:()=>onOp?.(parent.id,o.id)});
       connected.forEach(node);
     }
-    finish(localHeight+crossHeight+7);
+    return localHeight+crossHeight+7;
   }
-  if(selectedOp) focusedOp();
-  else if(selectedLayer) layerComposition();
+  if(selectedLayer) layerComposition();
   else if(palette==='engine') engineOverview();
   else operationMap(layers,rawEdges,'layer');
   const legend=html('div','ax-legend');
