@@ -22,11 +22,11 @@ const baselineJobs = [
     work:'Read metadata and validate offsets, shapes, per-tensor types and expert addressing without loading the full model. Resolve every required tensor and expose an addressable slice for one expert.',
     output:'A hashed tensor inventory with packed byte spans, shape and type checks, and a verified sample slice. Placement needs actual sizes. Kernels need real encoded blocks.'
   },{
-    id:'serving', title:'Build request and token handling', agent:'Request agent', lane:'engine',
+    id:'serving', title:'Build the image interface', agent:'Request agent', lane:'engine',
     cc:['serving.request_gateway','tokenizer.prepare_request','scheduler.request_lifecycle','batch.execution_layout'],
     needs:[['plan','Frozen token IDs, cancellation protocol, sequence identifiers and batch interface.']],
-    work:'Build a minimal text endpoint and a single-device admission loop. Exercise prompt encoding, positions, a cancelled request and streamed text using stub model outputs. Keep sequence identity through batch packing.',
-    output:'An executable request replay with expected token IDs, offsets, stop events and cancellation cleanup. The generation agent can replace the stub with the real forward call.'
+    work:'Publish the completions endpoint, listen port, mount contract and optional profiling switches in a versioned image interface manifest. Build the single-device admission loop. Exercise prompt encoding, positions, a cancelled request and streamed text using stub model outputs. Keep sequence identity through batch packing.',
+    output:'An image interface manifest and executable request replay with expected token IDs, offsets, stop events and cancellation cleanup. The generation agent can replace the stub with the real forward call.'
   },{
     id:'reference', title:'Build a reference decoder block', agent:'Model math agent', lane:'engine',
     cc:['model.embedding_service','model.decoder_architecture','attention.dense_execution','model.logit_head'],
@@ -66,8 +66,8 @@ const baselineJobs = [
     output:'A reviewable source revision, reproducible build command and prompt replay with emitted IDs, per-step logits, peak bytes and clean shutdown. Record the first mismatch if a gate fails.'
   },{
     id:'image', title:'Build the runnable image', agent:'Image builder', lane:'factory',
-    cc:['factory.builder'], needs:[['assemble','Reviewed source revision, dependency inputs and a known-good startup and decode command.']],
-    work:'Resolve the executable and runtime dependencies into an image. Mount the separately identified checkpoint at startup. Boot from the image on a clean target and replay the smoke prompt.',
+    cc:['factory.builder'], needs:[['assemble','Reviewed source revision, dependency inputs and a known-good startup and decode command.'],['serving','Image interface manifest with endpoint, mount paths, readiness and diagnostic controls.']],
+    work:'Resolve the executable and runtime dependencies into an image. Mount the separately identified checkpoint at startup. Use the published port and volume bindings on a clean target. Replay a completion from outside the image and retrieve an output trace when profiling is enabled.',
     output:'An image digest, dependency inventory, checkpoint digest and boot transcript. The lab can reproduce the exact executable and model combination.'
   },{
     id:'qualify', title:'Qualify the target run', agent:'Experiment agent', lane:'lab',

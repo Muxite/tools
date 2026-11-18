@@ -161,14 +161,14 @@
   },
   {
     "id": "interface",
-    "title": "L1 · Text interface",
-    "summary": "Accept messages, raw text or supported token IDs. Submit a sequence descriptor to the scheduler. Convert committed output IDs into text and return each complete text fragment to the caller.",
+    "title": "L1 · Engine image interface",
+    "summary": "The image exposes three surfaces to its callers and operators: text generation over HTTP, filesystem paths bound at launch, and optional diagnostics. One CC owns the external interface across all three.",
     "ops": [
       {
         "id": "accept",
         "group": "Input",
-        "title": "Accept a text request",
-        "detail": "An HTTP handler or embedded call validates generation options, context limits and cancellation ownership. Assign a request ID for events and resource attribution.",
+        "title": "Serve the completions endpoint",
+        "detail": "Bind the configured address and port. For a completions-compatible contract, POST /v1/completions accepts a prompt and returns JSON or an ordered event stream. Validate generation options and propagate cancellation to the scheduler.",
         "check": "Submit invalid parameters, an oversized prompt and a disconnected client. Check deterministic error and cleanup behavior.",
         "metric": "Request arrival rate, rejected requests, parse time.",
         "cc": [
@@ -254,6 +254,29 @@
           "output.stream",
           "output.structured_response"
         ]
+      },
+      {
+        "id": "mounts",
+        "group": "Image boundary",
+        "title": "Resolve mounted paths",
+        "detail": "Declare a read-only model root, any writable cache and scratch paths, and an optional diagnostics output directory. The launcher binds host volumes. Resolve paths inside the image and report a missing or unreadable checkpoint before advertising readiness.",
+        "check": "Launch with an external read-only checkpoint and a fresh output volume. Repeat with a missing required mount. Observe a specific startup error and an unready service.",
+        "metric": "Required paths resolved; readiness and startup outcome.",
+        "cc": [
+          "serving.request_gateway"
+        ]
+      },
+      {
+        "id": "diagnostics",
+        "group": "Image boundary",
+        "title": "Expose diagnostic hooks",
+        "detail": "Make the supported metrics surface, profiling switches and trace destination discoverable. The observability CC inserts NVTX ranges and defines event names and clocks. An external collector can capture those ranges and write a trace to the agreed destination.",
+        "check": "Send the same request with profiling disabled and enabled. Check output parity, correlate request and layer events, and verify that the host can retrieve the trace.",
+        "metric": "Trace retrieval, event coverage and capture overhead.",
+        "cc": [
+          "serving.request_gateway",
+          "observability.runtime_events"
+        ]
       }
     ],
     "edges": [
@@ -286,6 +309,21 @@
         "emit",
         "submit",
         "disconnect or cancellation signal"
+      ],
+      [
+        "mounts",
+        "accept",
+        "validated launch paths and readiness"
+      ],
+      [
+        "accept",
+        "diagnostics",
+        "request identity and timing"
+      ],
+      [
+        "emit",
+        "diagnostics",
+        "terminal status and response timing"
       ]
     ]
   },

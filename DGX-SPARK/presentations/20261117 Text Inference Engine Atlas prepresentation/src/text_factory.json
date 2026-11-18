@@ -512,7 +512,7 @@
     "weights.adapter_binding": "An adapter changes the requested model state. Its identity, application order and per-request residency can fail independently of base-weight loading.",
     "model.decoder_architecture": "The checkpoint family determines the block order, layer-specific branches and residual updates that the graph must execute.",
     "tokenizer.prepare_request": "Both directions use the same vocabulary and special-token policy. The codec owns exact prompt IDs and incremental decoded text, independently of request transport.",
-    "serving.request_gateway": "Own the text request and response protocol. Plain prompts use the core path. A tool-aware API can select additional call parsing, identity tracking and serialization capabilities.",
+    "serving.request_gateway": "One owner maintains the external contract that clients, launchers and lab tools use to run and inspect the engine image.",
     "scheduler.request_lifecycle": "Only the scheduler can guarantee that a token, slot or memory budget is assigned and released exactly once under concurrency.",
     "batch.execution_layout": "Even a correct scheduler can scramble outputs if ragged positions or batch rows are aligned to the wrong sequences.",
     "decode.advance_sequence": "The generation driver owns when state advances and which token positions the next forward pass consumes.",
@@ -649,8 +649,9 @@
   },
   "responsibilities": {
     "serving.request_gateway": {
-      "outputs": "Validated text-generation requests, cancellation and streaming events. For tool-aware protocols, preserve call IDs, argument fragments and final status.",
-      "check": "Replay the same request through the supported local or HTTP entry point. For tool calls, split arguments across stream chunks and verify reconstruction, identity and completion."
+      "outputs": "Versioned image interface manifest covering entrypoint, port, completions protocol, mount paths and optional telemetry/profiler settings. Include cancellation, streaming and tool-call fields for enabled modes.",
+      "check": "Start the built image with only its declared mounts. Probe readiness and completions from outside, disconnect a stream, then enable diagnostics and retrieve a correlated trace. Verify disabled-mode parity.",
+      "inputs": "Reviewed API, launch and diagnostic requirements from the engine contract."
     },
     "verification.performance_measurement": {
       "outputs": "A reproducible timing record with workload, warm state, queue boundaries and uncertainty. When comparing revisions, produce a paired effect estimate and screen or confirmation decision.",

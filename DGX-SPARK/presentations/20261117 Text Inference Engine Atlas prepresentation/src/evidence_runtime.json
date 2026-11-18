@@ -415,6 +415,12 @@
       "title": "Replica routing combines prefix reuse and current load",
       "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/serve/replicas.py#L513-L527",
       "detail": "route considers living replicas, scores unmatched prompt tokens plus load_tokens times in-flight count, breaks ties by load/history and increments the selected replica counters. The policy is concrete; no throughput improvement is established by this source inspection."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Server image publishes its endpoint and binds the model volume",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/tools/server/README.md#L466",
+      "detail": "The documented launch maps a host port and model directory and supplies the in-container model path and listen address. This establishes the launch interface; profiling hooks have separate runtime evidence."
     }
   ],
   "serving.tool_conversations": [
