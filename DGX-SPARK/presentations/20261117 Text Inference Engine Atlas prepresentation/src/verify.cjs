@@ -303,9 +303,18 @@ async function main() {
       }
       await jump('#engine');
     }
+    await jump('#construction/designs');
+    assert.equal(await page.locator('nav [aria-current="page"]').innerText(),'Compare engines');
+    assert.equal(await page.locator('.comparison-group').count(),4);
+    assert(await page.locator('.proof-chip.single').count()>0 && await page.locator('.proof-chip.paper').count()>0);
+    for(const card of await page.locator('.comparison-group article').all()){
+      const ccLinks=await card.locator('a[href^="#cc/"]').evaluateAll(links=>links.map(a=>a.hash.slice(4)));
+      assert(ccLinks.length && ccLinks.every(cc=>roles.has(cc)));
+      assert(await card.locator('details a[href^="https://"]').count()>0);
+    }
     const jobId=await verifyConstruction(page,data.roles,jump);
     await page.setViewportSize({ width:390, height:844 });
-    for (const h of ['#engine','#engine/model?op=' + route.id,'#factory','#library','#sources','#quantization','#sources/weights.decode_blocks?engine=Strata','#construction','#construction/'+jobId]) {
+    for (const h of ['#engine','#engine/model?op=' + route.id,'#factory','#library','#sources','#quantization','#sources/weights.decode_blocks?engine=Strata','#construction/designs','#construction','#construction/'+jobId]) {
       await jump(h);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Horizontal page overflow at ' + h);
     }

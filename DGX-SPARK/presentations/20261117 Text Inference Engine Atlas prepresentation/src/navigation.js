@@ -19,7 +19,7 @@ function render(){
    if(layer)mode=factoryId(layer.id)?'factory':'engine';
  }
  const page=['library','sources','quantization','construction'].includes(view)?view:mode;
- document.querySelectorAll('nav a').forEach(a=>{if(a.dataset.tab===page)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+ document.querySelectorAll('nav a').forEach(a=>{if(a.dataset.tab===(page==='construction'&&id==='designs'?'designs':page))a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
  if(page==='construction'){construction(id);return}if(page==='library'){library(p);return}if(page==='sources'){evidence(id,p);return}if(page==='quantization'){quantization();return}
  if(outside){root.innerHTML='<h1>Historical media role</h1><p class="lead">This work belonged to the earlier multimodal inventory. The current engine contract covers text generation.</p>'+pill('Text engine','#engine');return}
  const fullLayers=mode==='factory'?atlas.factory:atlas.engine,edges=mode==='factory'?atlas.factoryEdges:atlas.edges;
