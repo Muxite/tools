@@ -480,7 +480,10 @@
     "factory.speculation_lab": "verification.numerical_conformance",
     "factory.scheduling_lab": "verification.performance_measurement",
     "factory.code_generation": "factory.source_integration",
-    "engine.cpu_worker_policy": "backend.execute_operators"
+    "engine.cpu_worker_policy": "backend.execute_operators",
+    "experts.routed_forward": "model.expert_ffn",
+    "experts.shared_forward": "model.expert_ffn",
+    "engine.expert_residency": "engine.expert_streaming"
   },
   "remove": [
     "media.encode_inputs",
@@ -522,7 +525,7 @@
     "experts.shared_forward": "A checkpoint may require an always-on expert contribution with separate weights or gating outside the routed shortlist.",
     "merge.expert_contributions": "The merge owns inverse assignment and weighted accumulation into original token order. Correct individual expert outputs can still be combined incorrectly.",
     "parallel.expert_exchange": "Expert parallelism changes token ownership across ranks and requires inverse exchange plus conservation of row identity.",
-    "engine.expert_streaming": "Execution on nonresident expert weights requires authoritative readiness, transfer completion and protection of live slots under pressure.",
+    "engine.expert_streaming": "A bounded cache must own admission, eviction, demand fills and the lifetime of the exact weights used by each expert launch.",
     "routing.forecast_expert_demand": "A predictor can produce early hints using information available before demand. Its accuracy, lead time and wasted bytes have independent tests.",
     "observability.runtime_events": "External profiles need trustworthy runtime phase and route boundaries bound to actual requests, tokens, layers and launches.",
     "verification.numerical_conformance": "Independent references expose wrong outputs even when candidate and baseline share infrastructure or a performance measurement improves.",
@@ -542,14 +545,15 @@
     "factory.resource_lab": "Capacity and placement candidates require a joint live-byte model and measured tradeoff across latency, throughput and memory ceilings.",
     "factory.streaming_lab": "Trace replay and timed transfer evidence establish whether prefetch or caching improves exposed demand-time readiness on target.",
     "factory.precision_lab": "Choosing a representation changes a quality-versus-size tradeoff. Calibration and downstream error require evidence beyond bit-exact decoder tests.",
-    "engine.expert_residency": "Placement controls which expert weights are kept resident across demands. Residency policy can be tuned independently of transfer correctness."
+    "engine.expert_residency": "Placement controls which expert weights are kept resident across demands. Residency policy can be tuned independently of transfer correctness.",
+    "model.expert_ffn": "Routed and shared experts use the same FFN projection machinery. One CC provides separately invocable routed and shared execution capabilities with different row and gating contracts."
   },
   "conditional": {
     "weights.prepare_artifact": "Source checkpoint layout, format or precision differs from what the chosen backend can consume.",
     "weights.decode_blocks": "The contract admits packed or quantized weights. For floating weights, direct tensor reads suffice.",
     "weights.adapter_binding": "The serving contract permits adapters or request-specific modification of base weights.",
     "graph.lower_capture_replay": "The backend builds an execution graph, performs fusion or replays previously captured steps.",
-    "placement.partition_model": "Weights, operators or workspaces must be partitioned across devices or memory tiers.",
+    "placement.partition_model": "On this single device, bind the resident base tensors, storage-backed ranges and staging destination. Cross-device partitioning is an optional capability outside this baseline.",
     "memory.sequence_kv": "The architecture caches keys and values across positions. Pure recurrent models use their own state instead.",
     "memory.reusable_sessions": "The deployment can reuse prefixes or sessions across invocation boundaries.",
     "memory.kv_tiering": "Live KV exceeds the primary allocation or disaggregated execution requires migration.",
@@ -566,13 +570,39 @@
     "experts.shared_forward": "The checkpoint declares an always-on shared expert branch.",
     "merge.expert_contributions": "Model blocks combine selected expert outputs, optionally with an always-on branch.",
     "parallel.expert_exchange": "Token owners and selected expert owners can reside on different ranks.",
-    "engine.expert_streaming": "Selected experts can be absent from compute-visible memory at the time of routing.",
+    "engine.expert_streaming": "Required for this target: the stored model exceeds usable physical memory. Load authoritative expert ranges from backing storage into a bounded working set.",
     "engine.expert_residency": "An expert tier has limited capacity or the target reserves fast storage for a subset of experts.",
     "routing.forecast_expert_demand": "There is transfer or service latency to hide, advance features and a bounded speculation budget.",
     "factory.experiment_design": "An optimization, transfer decision or observed failure requires a controlled experiment.",
     "factory.methodology_ab": "A change is being compared to a baseline for a scoped performance or quality claim.",
     "factory.resource_lab": "Selection among capacity, placement or offload choices needs target measurements.",
     "factory.streaming_lab": "The contract enables expert streaming, residency optimization or advance demand prediction.",
-    "factory.precision_lab": "The build chooses, changes or calibrates a weight, activation or state representation."
+    "factory.precision_lab": "The build chooses, changes or calibrates a weight, activation or state representation.",
+    "model.expert_ffn": "Routed FFN execution is required. Enable shared FFN execution only when the checkpoint declares shared tensors and their gate."
+  },
+  "definitions": {
+    "model.expert_ffn": {
+      "id": "model.expert_ffn",
+      "reason": "Routed and shared experts use the same FFN projection machinery. One CC provides separately invocable routed and shared execution capabilities with different row and gating contracts.",
+      "inputs": "Hidden rows, token-to-expert assignments, expert geometry, ready weight handles, and optional shared tensors and gate.",
+      "outputs": "Routed FFN rows with their inverse token map, and an independent shared contribution when required.",
+      "capabilities": [
+        "Pack and unpack routed rows",
+        "Evaluate gate/up, activation and down projections",
+        "Execute a shared expert with checkpoint-defined gating",
+        "Select grouped or individual kernels for the active token counts"
+      ],
+      "decisions": "Bind the activation, precision, row order and shared-gate convention to the checkpoint. The router supplies the authoritative assignments.",
+      "integration": "Connect ready weight handles and dispatch indices to native FFN operators. Pass branch outputs to the merge CC with explicit token order.",
+      "greenfield": "Build one scalar FFN oracle, then bind routed batches and optional shared rows to a common projection backend.",
+      "check": "Compare routed and shared outputs independently against a reference. Include empty expert batches, unequal row counts and a non-unit shared gate.",
+      "ex": [],
+      "reuse": [],
+      "old": [],
+      "nodes": [
+        "experts",
+        "shared"
+      ]
+    }
   }
 }

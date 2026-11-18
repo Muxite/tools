@@ -15,6 +15,7 @@ def assemble():
     def current(key):
         return merged.get(key, key)
     old = {r['id']:r for r in evidence['roles']}
+    old.update(taxonomy.get('definitions', {}))
     aliases = {k:current(v) for k,v in evidence['aliases'].items()}
     aliases.update({k:current(k) for k in old})
     roles = {k:r for k,r in old.items() if k not in merged and k not in removed}
@@ -24,7 +25,7 @@ def assemble():
         r['variantJobs'] = []
     for former,survivor in merged.items():
         roles[survivor]['variantJobs'].append({k:old[former][k] for k in ['id','reason','check','capabilities']})
-        for field in ['ex','reuse']:
+        for field in ['ex','reuse','capabilities']:
             roles[survivor][field]=list(dict.fromkeys(roles[survivor][field]+old[former][field]))
     factory = taxonomy['layers']
     sites = {k:[] for k in roles}
@@ -58,6 +59,7 @@ def assemble():
     for tr in architecture['traces']:
         for item in tr['steps']:
             lay,k,note=item[:3]
+            k=current(k)
             if lay not in paths:lay=sites[k][0][0]
             where=next(((l,o) for l,o in sites[k] if l==lay),sites[k][0])
             if len(item)>3:

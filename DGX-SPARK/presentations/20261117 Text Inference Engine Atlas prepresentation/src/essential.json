@@ -1,5 +1,5 @@
 {
-  "description": "Baseline: a single-device, resident-weight FP transformer MoE with rotary positions, dense causal attention, routed experts and cached text generation. Factory essentials deliver and qualify that image against correctness and performance gates.",
+  "description": "Baseline: one fixed text MoE checkpoint on one compute device. The checkpoint in its deployed format exceeds usable machine memory, including host RAM. Backing storage holds the model; bounded buffers hold the active weights. Budget host and device peaks separately on discrete systems, and count shared physical memory once on unified systems.",
   "operations": {
     "startup": [
       "config",
@@ -44,7 +44,8 @@
       "expert",
       "combine",
       "layerout",
-      "head"
+      "head",
+      "ready"
     ],
     "backend": [
       "dispatch",
@@ -59,12 +60,15 @@
       "allocate",
       "append",
       "scratch",
-      "release"
+      "release",
+      "residency",
+      "fill"
     ],
     "host": [
       "hostcpu",
       "device",
-      "dram"
+      "dram",
+      "ssd"
     ],
     "f_spec": [
       "intake",
@@ -87,7 +91,9 @@
     "f_lab": [
       "stage",
       "quality",
-      "benchmark"
+      "benchmark",
+      "capacity",
+      "stream"
     ],
     "f_evidence": [
       "record",
@@ -108,7 +114,7 @@
     "model.normalization",
     "attention.dense_execution",
     "model.expert_routing",
-    "experts.routed_forward",
+    "model.expert_ffn",
     "merge.expert_contributions",
     "model.logit_head",
     "output.response_stream",
@@ -126,6 +132,9 @@
     "verification.performance_measurement",
     "factory.evidence",
     "factory.cc_qualification",
-    "placement.partition_model"
+    "placement.partition_model",
+    "engine.expert_streaming",
+    "factory.resource_lab",
+    "factory.streaming_lab"
   ]
 }

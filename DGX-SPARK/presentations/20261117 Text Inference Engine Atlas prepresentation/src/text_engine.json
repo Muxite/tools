@@ -56,7 +56,7 @@
         "id": "bind",
         "group": "Model assets",
         "title": "Bind model and tokenizer",
-        "detail": "Bind input embeddings, decoder layers, output weights, vocabulary and special IDs. If an adapter is requested, validate rank, target projections, scale and model revision.",
+        "detail": "Bind input embeddings, decoder layers, output weights, vocabulary and special IDs. If an adapter is requested, validate rank, target projections, scale and model revision. Bind storage offsets and lengths without materializing the entire checkpoint in RAM. Load bounded slices as needed.",
         "check": "Exercise a known prompt and compare token IDs and logits to the reference with the selected adapter active.",
         "metric": "Time to bind model and tokenizer; adapter load bytes.",
         "cc": [
@@ -833,7 +833,6 @@
           "engine.expert_streaming",
           "engine.expert_residency"
         ],
-        "condition": "Selected weights are streamed or tiered",
         "bindings": [
           "engine.expert_streaming"
         ]
@@ -1349,14 +1348,13 @@
         "id": "residency",
         "group": "Parameters",
         "title": "Budget expert residency",
-        "detail": "Allocate the fast-tier expert budget after accounting for fixed weights, KV, workspaces and runtime headroom. Use measured demand or fixed placement where applicable; preserve all authoritative expert choices.",
-        "check": "Apply an infeasible budget and a cold expert burst. Ensure deterministic fallback or explicit configuration failure.",
+        "detail": "Reserve KV, workspace, staging, runtime and OS headroom first. Allocate the remainder to resident weights. Bound concurrent fills and count mapped file pages in the physical budget. Protect live expert slots until their last kernel completes.",
+        "check": "Replay a demand set larger than the cache, verify evictions, check host and device peaks, and reject startup when even the minimum execution tile and state cannot fit.",
         "metric": "Useful resident fraction, demand miss ratio, eviction churn and high-water bytes.",
         "cc": [
           "engine.expert_residency",
           "engine.expert_streaming"
         ],
-        "condition": "Tiered expert placement",
         "bindings": [
           "placement.map_expert_replicas"
         ]
@@ -1371,7 +1369,6 @@
         "cc": [
           "engine.expert_streaming"
         ],
-        "condition": "Weights can be streamed",
         "bindings": [
           "engine.expert_streaming"
         ]

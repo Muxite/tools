@@ -251,6 +251,49 @@
      "gate"
     ]
    ]
+  },
+  {
+   "id": "miss",
+   "title": "Storage miss",
+   "intro": "Trace a cold expert from disk to a verified FFN output.",
+   "steps": [
+    [
+     "startup",
+     "weights.load_checkpoint",
+     "Bind expert tensors to checked storage byte ranges.",
+     "bind"
+    ],
+    [
+     "state",
+     "engine.expert_streaming",
+     "Budget live weights after KV, workspace, staging and headroom. Refuse an infeasible tile.",
+     "residency"
+    ],
+    [
+     "model",
+     "model.expert_routing",
+     "Route the token to an expert that is absent from the cache.",
+     "route"
+    ],
+    [
+     "state",
+     "engine.expert_streaming",
+     "Read the demanded bytes, join duplicate fills and publish a handle after the final copy.",
+     "fill"
+    ],
+    [
+     "model",
+     "model.expert_ffn",
+     "Wait for the handle, compute the selected expert and release its slot after last use.",
+     "expert"
+    ],
+    [
+     "f_lab",
+     "factory.streaming_lab",
+     "Force misses with a working set larger than the cache. Compare against a small reference fixture and measure actual storage bytes, peak memory and exposed wait.",
+     "stream"
+    ]
+   ]
   }
  ]
 }

@@ -143,7 +143,14 @@ async function main() {
     await page.locator('[data-ax-id="model.expert_routing"].ax-core').waitFor();
     await page.locator('.corekey').waitFor();
     await jump('#cc/engine.expert_streaming');
-    assert.equal(await page.locator('[data-ax-id="engine.expert_streaming"].ax-core').count(),0);
+    await graphNode('engine.expert_streaming').waitFor();
+    assert.equal(await page.locator('[data-ax-id="engine.expert_streaming"].ax-core').count(),1);
+    for (const legacy of ['experts.routed_forward','experts.shared_forward']) {
+      await jump('#cc/'+legacy);
+      await graphNode('model.expert_ffn').waitFor();
+    }
+    await jump('#cc/engine.expert_residency');
+    await graphNode('engine.expert_streaming').waitFor();
     assert.deepEqual(errors, [], 'Browser exceptions');
     assert.deepEqual(requests, [], 'Site attempted to load network resources');
     console.log('PASS: ' + layers.length + ' graph regions, ' + layers.reduce((n,l) => n+l.ops.length,0) + ' operations, ' + roles.size + ' reachable CCs, ' + data.sources.length + ' source examples and ' + data.traces.length + ' walkthroughs. Keyboard, offline and mobile checks passed.');
