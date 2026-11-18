@@ -246,6 +246,7 @@ async function main() {
       assert.deepEqual(await page.locator('main .cap-row a').evaluateAll(as=>as.map(a=>a.href)),expected.map(e=>e.url));
     }
     await jump('#library');
+    assert.deepEqual(await page.locator('#results a.listing').evaluateAll(nodes=>nodes.map(n=>n.hash.slice(4)).sort()),data.roles.map(r=>r.id).sort());
     await page.locator('#search').fill('dequantize_q6_K');
     await page.locator('#scope').selectOption('Engine');
     const listHash=await page.evaluate(()=>location.hash);
@@ -289,10 +290,15 @@ async function main() {
     await page.getByRole('heading',{name:'Optional NVTX instrumentation'}).waitFor();
     await jump('#engine');
     const walks = page.locator('[data-walk]');
+    assert.deepEqual(await walks.evaluateAll(nodes=>nodes.map(n=>n.dataset.walk)),['token','moe','miss']);
     for (const t of data.traces) {
       const trigger = walks.filter({ hasText:t.title }).first();
       if (await trigger.count()) await trigger.click();
-      else await page.locator('[data-walk="' + t.id + '"]').first().click();
+      else {
+        const [layer,op]=t.steps[0];
+        const mode=data.factory.some(l=>l.id===layer)?'factory':'engine';
+        await jump('#'+mode+'/'+layer+'?op='+op+'&trace='+t.id+'&step=0');
+      }
       await page.locator('.steps').first().waitFor();
       assert.equal(await page.locator('.steps a').count(),t.steps.length);
       for (const [n,step] of t.steps.entries()) {
