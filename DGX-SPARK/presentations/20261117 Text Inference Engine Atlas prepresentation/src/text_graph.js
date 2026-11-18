@@ -134,12 +134,26 @@ function drawAtlas(container, options) {
     svgEl(badge,'circle',{cx:x,cy:y,r:4.6});
     svgEl(badge,'title',{},overlayName+' · '+n+' source examples linked through CCs');
   }
+  function essentialMark(g,yes,x,y,summary=false){
+    if(!yes)return;
+    const message=summary?'Contains essential operations':'Essential for the baseline';
+    g.classList.add(summary?'ax-core-parent':'ax-core');
+    g.setAttribute('aria-label',(g.getAttribute('aria-label')||'')+' · '+message);
+    const mark=svgEl(g,'path',{d:'M'+x+' '+(y-5)+'l5 5 -5 5 -5 -5z',class:summary?'ax-core-ring':'ax-core-diamond'});
+    svgEl(mark,'title',{},message);
+  }
   function node({ id, title, x, y, w, h, code, sub, tone, onClick, selected, cc = false }) {
     const g = svgEl(blocks, 'g', { class: ['ax-node', 'ax-node-' + (tone || 'operation'), selected ? 'ax-selected' : '', traced.has(id) ? 'ax-traced' : ''].join(' '), 'data-ax-id': id });
     bind(g, title + (code ? ' · ' + code : '') + (sub ? ' · ' + sub : ''), onClick);
     svgEl(g, 'rect', { x, y, width:w, height:h, rx:9, class:'ax-box' });
     const qualified=id.includes('/')&&!id.startsWith('@group/');
     const bindingKey = selectedLayer && !qualified && !cc && !levelNames[id] && !coreLayer(id) ? selectedLayer.id+'/'+id : id;
+    const group=id.startsWith('@group/')?id.slice(7):null;
+    const layerRef=layers.find(l=>l.id===id);
+    const remoteLayer=qualified?layers.find(l=>l.id===id.split('/')[0]):null;
+    const leaf=(remoteLayer||selectedLayer)?.ops.find(o=>o.id===(remoteLayer?id.split('/')[1]:id));
+    const aggregate=group?selectedLayer?.ops.filter(o=>o.group===group):layerRef?.ops;
+    essentialMark(g,cc?options.roles.get(id)?.essential:aggregate?aggregate.some(o=>o.essential):leaf?.essential,x+w-25,y+12,!!aggregate);
     markBinding(g,bindingKey,x+w-12,y+12);
     const px = x + 14, titleWidth = w - 35;
     const lineLen = Math.floor(titleWidth / (cc ? 7.8 : 8.1));
@@ -222,6 +236,7 @@ function drawAtlas(container, options) {
     const g=svgEl(blocks,'g',{class:'ax-node ax-node-state','data-ax-id':'state'});
     bind(g,mem.title,()=>onLayer?.('state'));
     svgEl(g,'rect',{...{x:sbox.x,y:sbox.y,width:sbox.w,height:sbox.h},rx:10,class:'ax-box'});
+    essentialMark(g,mem.ops.some(o=>o.essential),sideX+sideW-26,startY+18,true);
     markBinding(g,'state',sideX+sideW-13,startY+18);
     svgEl(g,'text',{x:sideX+16,y:startY+25,class:'ax-node-code'},'M · CROSS-LAYER');
     lines(stripLevel(mem.title),26).forEach((s,i)=>svgEl(g,'text',{x:sideX+16,y:startY+51+i*18,class:'ax-node-title'},s));
@@ -232,6 +247,7 @@ function drawAtlas(container, options) {
       const sg=svgEl(blocks,'g',{class:'ax-state-item','data-ax-id':o.id});
       bind(sg,o.title,()=>onOp?.('state',o.id));
       svgEl(sg,'rect',{x:sideX+12,y:sy-17,width:sideW-24,height:36,rx:5});
+      essentialMark(sg,o.essential,sideX+sideW-24,sy);
       lines(o.title,30,2).forEach((t,i)=>svgEl(sg,'text',{x:sideX+22,y:sy+i*14,class:'ax-state-title'},t));
       sy+=43;
     }

@@ -8,6 +8,7 @@ const array=v=>Array.isArray(v)?v:[v];
 const list=v=>array(v).map(s=>'<p>'+esc(s)+'</p>').join('');
 const ext=(t,u)=>u?'<a href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(t)+'</a>':esc(t);
 const pill=(t,h)=>'<a class="pill" href="'+esc(h)+'">'+esc(t)+'</a>';
+const essentialTag=value=>value?'<span class="coretag">◆ Essential</span> ':'';
 const sec=(h,s)=>s?'<section><h3>'+esc(h)+'</h3>'+s+'</section>':'';
 const details=(t,s)=>s?'<details><summary>'+esc(t)+'</summary>'+s+'</details>':'';
 const engines=['Strata','llama.cpp','ds4','SGLang'];
@@ -30,7 +31,7 @@ function routingCase(){
 }
 function ccPanel(r,overlay){
  const ex=atlas.assets.filter(a=>r.ex.includes(a.name)), rows=atlas.sources.filter(s=>s.assigned===r.id&&s.engine===overlay);
- return '<div class="tagline">'+(r.kind==='factory'?'Software factory':'Engine construction')+' CC</div><h2><code>'+esc(r.id)+'</code></h2>'+
+ return '<div class="tagline">'+(r.kind==='factory'?'Software factory':'Engine construction')+' CC</div><h2><code>'+esc(r.id)+'</code></h2>'+essentialTag(r.essential)+
  sec('Engineering job',list(r.why))+sec('When to use it',list(r.when))+sec('Produces',list(r.outputs))+
  (r.id==='model.expert_routing'?routingCase():'')+sec('Verification',list(r.check))+
  details('Contract choices and capabilities',list(r.decisions)+list(r.capabilities))+
@@ -45,7 +46,7 @@ function opPanel(layer,op,overlay){
  const relevant=atlas.sources.filter(s=>s.engine===overlay&&op.cc.includes(s.assigned));
  const exact=relevant.filter(s=>(op.bindings||[]).includes(s.previous)||(op.bindings||[]).includes(s.id));
  const linked=layer.edges.filter(([a,b])=>a===op.id||b===op.id);
- return '<div class="tagline">'+esc(layer.title)+'</div><h2>'+esc(op.title)+'</h2>'+list(op.detail)+sec('Optimize',list(op.metric))+sec('Check',list(op.check))+
+ return '<div class="tagline">'+esc(layer.title)+'</div><h2>'+esc(op.title)+'</h2>'+essentialTag(op.essential)+list(op.detail)+sec('Optimize',list(op.metric))+sec('Check',list(op.check))+
  (op.condition?sec('Applies when',list(op.condition)):'')+sec('CCs',op.cc.map(k=>pill(k,at(layer.id,op.id,{cc:k,overlay}))).join(' '))+
  sec('Data flow',linked.map(([a,b,l])=>{const other=a===op.id?b:a;return '<p>'+esc(a===op.id?'Sends ':'Receives ')+esc(l)+(a===op.id?' to ':' from ')+pill(layer.ops.find(n=>n.id===other).title,at(layer.id,other,{overlay}))+'</p>'}).join(''))+
  sec(overlay+' implementation',exact.length?exact.map(sourceRow).join(''):'<p class="muted">No operation-specific source binding recorded for this revision.</p>')+
@@ -58,7 +59,7 @@ function library(query){
  function update(){
  const terms=input.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
  const jobs=atlas.roles.filter(r=>{const hay=[r.id,r.why,r.capabilities,...Object.keys(atlas.aliases).filter(k=>atlas.aliases[k]===r.id),...atlas.sources.filter(s=>s.assigned===r.id).map(s=>s.symbol)].join(' ').toLowerCase();return terms.every(x=>hay.includes(x))&&(scope.value==='All CCs'||(scope.value==='Software factory')===(r.kind==='factory'))});
- root.querySelector('#results').innerHTML='<p class="caption">'+jobs.length+' CCs</p><div class="cards">'+jobs.map(r=>'<a class="listing" href="#cc/'+esc(r.id)+'"><strong>'+esc(r.id)+'</strong><p>'+esc(r.why)+'</p></a>').join('')+'</div>';
+ root.querySelector('#results').innerHTML='<p class="caption">'+jobs.length+' CCs</p><div class="cards">'+jobs.map(r=>'<a class="listing" href="#cc/'+esc(r.id)+'"><strong>'+esc(r.id)+'</strong> '+essentialTag(r.essential)+'<p>'+esc(r.why)+'</p></a>').join('')+'</div>';
  history.replaceState(null,'',address('library','',{q:input.value,scope:scope.value==='All CCs'?'':scope.value}));
  }
  input.oninput=update;scope.onchange=update;update();

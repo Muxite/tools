@@ -138,7 +138,12 @@ async function main() {
     await graphNode('backend/row').focus();
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => location.hash.includes('engine/backend') && location.hash.includes('op=row'));
-    assert(await graphNode('backend.execute_operators').count(), 'Kernel worksite has no backend CC');
+    await graphNode('backend.execute_operators').waitFor();
+    await jump('#cc/model.expert_routing');
+    await page.locator('[data-ax-id="model.expert_routing"].ax-core').waitFor();
+    await page.locator('.corekey').waitFor();
+    await jump('#cc/engine.expert_streaming');
+    assert.equal(await page.locator('[data-ax-id="engine.expert_streaming"].ax-core').count(),0);
     assert.deepEqual(errors, [], 'Browser exceptions');
     assert.deepEqual(requests, [], 'Site attempted to load network resources');
     console.log('PASS: ' + layers.length + ' graph regions, ' + layers.reduce((n,l) => n+l.ops.length,0) + ' operations, ' + roles.size + ' reachable CCs, ' + data.sources.length + ' source examples and ' + data.traces.length + ' walkthroughs. Keyboard, offline and mobile checks passed.');

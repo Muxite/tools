@@ -1,0 +1,131 @@
+{
+  "description": "Baseline: a single-device, resident-weight FP transformer MoE with rotary positions, dense causal attention, routed experts and cached text generation. Factory essentials deliver and qualify that image against correctness and performance gates.",
+  "operations": {
+    "startup": [
+      "config",
+      "manifest",
+      "bind",
+      "place",
+      "reserve"
+    ],
+    "interface": [
+      "accept",
+      "encode",
+      "submit",
+      "detok",
+      "emit"
+    ],
+    "schedule": [
+      "queue",
+      "admit",
+      "slot",
+      "budget",
+      "batch",
+      "advance"
+    ],
+    "generate": [
+      "prefill",
+      "step",
+      "sample",
+      "commit"
+    ],
+    "model": [
+      "embed",
+      "norm",
+      "qkv",
+      "position",
+      "kv",
+      "attend",
+      "attout",
+      "resid",
+      "gate",
+      "route",
+      "dispatch",
+      "expert",
+      "combine",
+      "layerout",
+      "head"
+    ],
+    "backend": [
+      "dispatch",
+      "gemm",
+      "attn",
+      "row",
+      "streams",
+      "signal"
+    ],
+    "state": [
+      "weight",
+      "allocate",
+      "append",
+      "scratch",
+      "release"
+    ],
+    "host": [
+      "hostcpu",
+      "device",
+      "dram"
+    ],
+    "f_spec": [
+      "intake",
+      "modelterms",
+      "budget",
+      "freeze"
+    ],
+    "f_plan": [
+      "survey",
+      "gaps",
+      "workorder",
+      "assign"
+    ],
+    "f_build": [
+      "apply",
+      "oracle",
+      "build",
+      "handoff"
+    ],
+    "f_lab": [
+      "stage",
+      "quality",
+      "benchmark"
+    ],
+    "f_evidence": [
+      "record",
+      "gate",
+      "release"
+    ]
+  },
+  "roles": [
+    "weights.load_checkpoint",
+    "model.decoder_architecture",
+    "tokenizer.prepare_request",
+    "serving.request_gateway",
+    "scheduler.request_lifecycle",
+    "batch.execution_layout",
+    "decode.advance_sequence",
+    "sampling.select_tokens",
+    "model.embedding_service",
+    "model.normalization",
+    "attention.dense_execution",
+    "model.expert_routing",
+    "experts.routed_forward",
+    "merge.expert_contributions",
+    "model.logit_head",
+    "output.response_stream",
+    "backend.execute_operators",
+    "memory.runtime_arenas",
+    "memory.sequence_kv",
+    "compiler.intent_brief",
+    "compiler.engine_contract",
+    "factory.workflow_planning",
+    "factory.source_inspection",
+    "factory.source_integration",
+    "factory.builder",
+    "factory.lab_execution",
+    "verification.numerical_conformance",
+    "verification.performance_measurement",
+    "factory.evidence",
+    "factory.cc_qualification",
+    "placement.partition_model"
+  ]
+}

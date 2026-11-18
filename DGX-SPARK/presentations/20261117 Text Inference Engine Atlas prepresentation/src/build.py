@@ -64,7 +64,16 @@ def assemble():
                 assert item[3] in paths[lay]
                 where=(lay,item[3])
             item[:]=[*where,k,note]
-    return dict(cross=cross,engine=engine,factory=factory,edges=architecture['edges'],factoryEdges=taxonomy['edges'],roles=list(roles.values()),aliases=aliases,excluded=sorted(removed),sources=sources,assets=evidence['assets'],repositories=evidence['repositories'],traces=architecture['traces'],transfers=evidence['transfers'],mergers=merged)
+    baseline=read('essential.json')
+    assert set(baseline['roles']) <= roles.keys()
+    for lid,ops in baseline['operations'].items():
+        assert set(ops) <= paths[lid]
+    for l in engine+factory:
+        for op in l['ops']:
+            op['essential']=op['id'] in baseline['operations'][l['id']]
+    for k,r in roles.items():
+        r['essential']=k in baseline['roles']
+    return dict(baseline=baseline['description'],cross=cross,engine=engine,factory=factory,edges=architecture['edges'],factoryEdges=taxonomy['edges'],roles=list(roles.values()),aliases=aliases,excluded=sorted(removed),sources=sources,assets=evidence['assets'],repositories=evidence['repositories'],traces=architecture['traces'],transfers=evidence['transfers'],mergers=merged)
 
 if __name__=='__main__':
     data=assemble()
