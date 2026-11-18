@@ -135,7 +135,7 @@ def assemble():
 if __name__=='__main__':
     data=assemble()
     page=(HERE/'site.html').read_text('utf-8')
-    for token,names in [('/*GRAPH_JS*/',['text_graph.js']),('/*SITE_JS*/',['site.js','experiments.js','construction_options.js','spark_trials.js','variations.js','construction.js','navigation.js']),('/*SITE_CSS*/',['site.css','text_graph.css'])]:
+    for token,names in [('/*GRAPH_JS*/',['text_graph.js']),('/*SITE_JS*/',['site.js','experiments.js','construction_options.js','spark_trials.js','variations.js','construction.js','integration.js','navigation.js']),('/*SITE_CSS*/',['site.css','text_graph.css'])]:
         page=page.replace(token,'\n'.join((HERE/n).read_text('utf-8') for n in names))
     page=page.replace('__ATLAS__',json.dumps(data,ensure_ascii=False,separators=(',',':')).replace('<','\\u003c'))
     out=HERE.parent/'20261117 Text Inference Engine Atlas prepresentation.html'

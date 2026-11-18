@@ -327,9 +327,16 @@ async function main() {
       assert.equal(await page.locator('.spark-trial').count(),1);
       assert(await page.locator('.spark-trial').innerText().then(text=>text.includes(t.decision)));
     }
+    await jump('#integration');
+    for(const step of await page.evaluate(()=>factoryConnections)){
+      await page.locator('.integration-flow a[href="#integration/'+step.id+'"]').click();
+      await page.locator('#integration-detail h2').filter({hasText:step.title}).waitFor();
+      assert(step.cc.every(k=>roles.has(k)));
+      assert.equal(await page.locator('#integration-detail a[href*="github.com/Stellven/"]').count(),step.refs.length);
+    }
     const jobId=await verifyConstruction(page,data.roles,jump);
     await page.setViewportSize({ width:390, height:844 });
-    for (const h of ['#engine','#engine/model?op=' + route.id,'#factory','#library','#sources','#quantization','#sources/weights.decode_blocks?engine=Strata','#construction/trials','#construction/designs','#construction','#construction/'+jobId]) {
+    for (const h of ['#engine','#engine/model?op=' + route.id,'#factory','#library','#sources','#quantization','#sources/weights.decode_blocks?engine=Strata','#integration','#construction/trials','#construction/designs','#construction','#construction/'+jobId]) {
       await jump(h);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Horizontal page overflow at ' + h);
     }
