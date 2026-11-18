@@ -167,6 +167,17 @@ function drawAtlas(container, options) {
       yy += 17;
     });
     if (sub) lines(sub, Math.floor(titleWidth/6.7), Math.max(1, Math.floor((y+h-yy)/15)+1)).forEach(t => { svgEl(g,'text',{x:px,y:yy,class:'ax-node-sub'},t); yy+=15; });
+    if(cc){
+      const kinds=[...new Set(options.roles.get(id).contents.map(c=>c.kind))];
+      g.setAttribute('aria-label',g.getAttribute('aria-label')+' · Capabilities: '+kinds.join(', '));
+      let left=x+14;
+      for(const kind of kinds){
+        const tagWidth=kind.length*6.6+12;
+        svgEl(g,'rect',{x:left,y:y+h-21,width:tagWidth,height:15,rx:3,class:'cap-fill-'+kind});
+        svgEl(g,'text',{x:left+6,y:y+h-10,class:'ax-cap-text'},kind);
+        left+=tagWidth+4;
+      }
+    }
     const emphasis = enabled => {
       for(const edge of drawn) {
         const faded = enabled && edge.a !== id && edge.b !== id;
@@ -341,7 +352,7 @@ function drawAtlas(container, options) {
     const sideRows=Math.max(inc.length,out.length,1),sideBottom=72+sideRows*89,cy=72+(sideRows-1)*44.5;
     const center={x:355,y:cy,w:290,h:74};
     const ccs=[...new Set(o.cc.map(getCC).filter(Boolean))],ccY=sideBottom+65;
-    const localHeight=ccY+Math.ceil(ccs.length/3)*87+24;
+    const localHeight=ccY+Math.ceil(ccs.length/3)*113+24;
     const here=parent.id+'/'+o.id,ports={incoming:new Map(),outgoing:new Map()};
     for(const [from,to,label,kind] of options.cross||[]){
       if(from!==here&&to!==here)continue;
@@ -368,12 +379,12 @@ function drawAtlas(container, options) {
     const ccNodes=[];
     ccs.forEach((id,i)=>{
       const row=Math.floor(i/3),col=i%3,count=Math.min(3,ccs.length-row*3),w=288,gap=17;
-      const x=(width-count*w-(count-1)*gap)/2+col*(w+gap),y=ccY+row*87,tx=x+w/2;
+      const x=(width-count*w-(count-1)*gap)/2+col*(w+gap),y=ccY+row*113,tx=x+w/2;
       const gy=ccY-24;
       const path=row===0?`M500,${cy+74} V${gy} H${tx} V${y-2}`:`M500,${cy+74} V${gy} H16 V${y-10} H${tx} V${y-2}`;
-      wire(o.id,id,'built by',path,500,gy,'build',112,i===0);
-      const chunks=id.split('.');
-      ccNodes.push({id,title:id,x,y,w,h:64,code:'CC · '+(chunks[0]||'').toUpperCase(),tone:'cc',selected:id===selectedRole,cc:true,onClick:()=>onRole?.(id)});
+      wire(o.id,id,'agent uses',path,500,gy,'build',112,i===0);
+      const job=options.roles.get(id);
+      ccNodes.push({id,title:job.title,x,y,w,h:99,code:'CC · '+id,tone:'cc',selected:id===selectedRole,cc:true,onClick:()=>onRole?.(id)});
     });
     neighbors.forEach(node);
     node({...center,id:o.id,title:o.title,code:'SELECTED OPERATION',tone:'focus',selected:true,onClick:()=>onOp?.(parent.id,o.id)});
@@ -408,7 +419,7 @@ function drawAtlas(container, options) {
   const legend=html('div','ax-legend');
   if (showBindings) legend.append(html('span','ax-overlay-key',overlayName+' · filled dot = linked source evidence'));
   const kinds=new Set(drawn.map(e=>[...e.g.classList].find(v=>v.startsWith('ax-wire-'))?.slice(8)));
-  const typeLabels={call:palette==='factory'?'Handoff':'Call / data',state:'State / input',feedback:'Return / repeat',build:'Built by',platform:'Device / host',trace:'Selected path'};
+  const typeLabels={call:palette==='factory'?'Handoff':'Call / data',state:'State / input',feedback:'Return / repeat',build:'Assigned CC',platform:'Device / host',trace:'Selected path'};
   for(const k of Object.keys(typeLabels))if(kinds.has(k)){
     const item=html('span','ax-key ax-key-'+k);item.append(html('i',''),document.createTextNode(typeLabels[k]));legend.append(item);
   }

@@ -2,12 +2,12 @@
   {
     "id": "startup",
     "title": "L0 · Startup",
-    "summary": "The host starts a runtime, which binds a checkpoint and tokenizer to a model definition. Its readiness handle admits the first request only after mandatory resources are usable.",
+    "summary": "At process startup, validate the checkpoint and tokenizer, bind tensor storage, reserve state and run a warm-up request. The request handler receives a ready engine handle.",
     "ops": [
       {
         "id": "config",
         "group": "Configuration",
-        "title": "Resolve run configuration",
+        "title": "Validate model and device settings",
         "detail": "Resolve model revision, tokenizer identity, context limit, compute precision, target devices and memory budgets against supported options. A deployed binary receives architecture choices from checkpoint metadata and validated overrides.",
         "check": "Reject mismatched tokenizer/model identities and unsupported head geometry before serving.",
         "metric": "Configuration failures and elapsed time to validated configuration.",
@@ -89,7 +89,7 @@
       {
         "id": "reserve",
         "group": "Device bring-up",
-        "title": "Reserve execution resources",
+        "title": "Reserve state and backend workspace",
         "detail": "Initialize device contexts, communicators when required, KV storage, scheduler slots, scratch arenas and stream/event pools. Leave headroom for peak concurrent requests.",
         "check": "Start with minimum and maximum supported budgets. Verify failure occurs before partially published readiness.",
         "metric": "Reserved versus committed bytes; per-device high-water mark.",
@@ -162,7 +162,7 @@
   {
     "id": "interface",
     "title": "L1 · Text interface",
-    "summary": "A caller supplies text, messages or supported token IDs. The interface validates the request, establishes a sequence identity and streams only committed output back to that caller.",
+    "summary": "Accept messages, raw text or supported token IDs. Submit a sequence descriptor to the scheduler. Convert committed output IDs into text and return each complete text fragment to the caller.",
     "ops": [
       {
         "id": "accept",
@@ -198,7 +198,7 @@
       {
         "id": "encode",
         "group": "Input",
-        "title": "Encode text to token IDs",
+        "title": "Tokenize the prompt",
         "detail": "Apply the tokenizer’s normalization and segmentation rules, vocabulary mapping, byte fallback and BOS/EOS policy. Preserve exact token IDs through the request boundary.",
         "check": "Check boundary-sensitive whitespace, split Unicode, reserved text and special token policies against a frozen tokenizer.",
         "metric": "Tokenizer throughput in prompt tokens/s and elapsed time per request.",
@@ -242,7 +242,7 @@
       {
         "id": "emit",
         "group": "Output",
-        "title": "Stream text and finish",
+        "title": "Send text deltas and finish reason",
         "detail": "Serialize text deltas, finish reason and optional tool-call fields. Bound buffered output and feed disconnect or backpressure into request ownership.",
         "check": "Verify exactly one finish notification and no emissions after cancellation under a slow reader.",
         "metric": "Client-observed first text and inter-chunk latency; queued output bytes.",
@@ -292,12 +292,12 @@
   {
     "id": "schedule",
     "title": "L2 · Scheduling",
-    "summary": "The scheduler makes per-iteration decisions across sequences. It chooses which tokens run and reserves the state needed to make that decision executable.",
+    "summary": "At each iteration, choose the prompt spans and decode rows that will run. Publish a batch plan containing tokens, positions, sequence offsets and physical KV write locations.",
     "ops": [
       {
         "id": "queue",
         "group": "Admission",
-        "title": "Queue and classify",
+        "title": "Queue requests by service policy",
         "detail": "Track enqueue time, deadlines, requested limits and cancellation. Allocate a durable request identity even when a sequence has no active device slot.",
         "check": "Mix long and short requests with a cancelled head of queue; confirm progress and fair service under the declared policy.",
         "metric": "Waiting requests, queue wait percentiles and arrival rate.",
@@ -342,7 +342,7 @@
       {
         "id": "budget",
         "group": "Iteration",
-        "title": "Choose prefill and decode work",
+        "title": "Allocate the iteration’s token budget",
         "detail": "Spend an iteration’s token budget on prompt chunks and active decode tokens. Respect context positions, latency goals and staging capacity when overlapping steps.",
         "check": "Compare logits under chunked and unchunked prompts; verify an outstanding decode request is served under heavy prefill.",
         "metric": "Prompt tokens/step, decode tokens/step, prefill interference and starvation time.",
@@ -372,7 +372,7 @@
       {
         "id": "advance",
         "group": "Iteration",
-        "title": "Consume iteration completion",
+        "title": "Commit batch results and release slots",
         "detail": "Read completion and sampled token events, advance committed positions, requeue continuing sequences and release finished or cancelled state when device work is safe.",
         "check": "Interleave completion, cancellation and stop events across two sequences and verify ownership after slot recycling.",
         "metric": "Finished requests/s, step turnaround, state release delay.",
@@ -426,12 +426,12 @@
   {
     "id": "generate",
     "title": "L3 · Generation loop",
-    "summary": "Prefill commits prompt state. Decode consumes a committed token and its execution state to produce new logits. Sampling and stopping decide what becomes visible and what returns to the next iteration.",
+    "summary": "Prefill produces state and first-token logits from the prompt. Each decode step consumes a committed token, appends its state and returns logits for the next token. Finished sequences return to the scheduler for release.",
     "ops": [
       {
         "id": "prefill",
         "group": "Prompt",
-        "title": "Prefill prompt spans",
+        "title": "Populate sequence state from prompt tokens",
         "detail": "Submit uncached prompt tokens at their absolute positions with a causal mask and any valid cached prefix. Retain state and the final logits required for the first generated token.",
         "check": "Compare chunked and whole-prompt logits and KV contents for a prefix whose last page is partially full.",
         "metric": "Prefill tokens/s, prefill duration and time to first token under the specified load.",
@@ -447,7 +447,7 @@
       {
         "id": "handoff",
         "group": "Prompt",
-        "title": "Transfer prefill state",
+        "title": "Hand off prompt state to decode",
         "detail": "If prefill and decode run on different workers, transfer or share KV blocks, prefix length, layout, sequence identity and completion fences before decode starts.",
         "check": "Inject a missing page and a delayed copy. Require correct retry or failure and reference-equivalent destination logits.",
         "metric": "Handoff bytes, transfer duration and exposed wait before decode.",
@@ -463,7 +463,7 @@
       {
         "id": "step",
         "group": "Iteration",
-        "title": "Decode next position",
+        "title": "Run one decode step",
         "detail": "Read the last committed token, logical position and prefix state. Run the model and logit head, append that token’s state, and return logits for the following token.",
         "check": "Compare cached decode against recomputing the full prefix at page and window boundaries.",
         "metric": "Inter-token latency and decode tokens/s with active sequences and context lengths recorded.",
@@ -506,7 +506,7 @@
       {
         "id": "commit",
         "group": "Iteration",
-        "title": "Commit and test termination",
+        "title": "Commit tokens and test stop conditions",
         "detail": "Advance the accepted token stream and update generation limits, EOS state and stop-sequence buffers. Emit safe committed output and schedule another step if the request remains active.",
         "check": "Stop on EOS, output-length limit and a stop sequence crossing a chunk. Prevent emission of unverified draft tokens.",
         "metric": "Emitted versus computed tokens, host bookkeeping and terminal notification delay.",
@@ -538,7 +538,7 @@
       {
         "id": "verify",
         "group": "Speculation",
-        "title": "Verify and roll back",
+        "title": "Verify drafts and roll back rejected state",
         "detail": "Evaluate target logits over draft positions. Accept a valid prefix according to the selected verifier, emit the target correction when required, then roll KV, positions and any recurrent state back to the commit point.",
         "check": "Check zero, partial and full acceptance. For a stochastic verifier test target-distribution equivalence, not exact greedy equality.",
         "metric": "Accepted tokens per verification, rejected work, rollback time and end-to-end speedup.",
@@ -608,12 +608,12 @@
   {
     "id": "model",
     "title": "L4 · Model execution",
-    "summary": "One forward pass maps token IDs and sequence state to logits. Inside each decoder block, attention and feed-forward operators transform hidden rows. Checkpoint metadata determines layer order, attention variant, routed and shared branches, activation and normalization.",
+    "summary": "For each input row, gather its embedding, apply the checkpoint’s decoder blocks and project final hidden rows to vocabulary logits. Each block reads attention or recurrent state and applies a dense or routed feed-forward network.",
     "ops": [
       {
         "id": "embed",
         "group": "Decoder",
-        "title": "Token embedding",
+        "title": "Gather token embeddings",
         "detail": "Gather rows from the vocabulary embedding table by input token ID. Apply model-specific embedding scale or supplemental per-layer embeddings only when defined.",
         "check": "Check repeated and boundary IDs, model scale and tied/untied vocabulary matrices against a reference.",
         "metric": "Bytes gathered, embedding time and hidden-row count.",
@@ -655,7 +655,7 @@
       {
         "id": "position",
         "group": "Attention",
-        "title": "Apply positional rule",
+        "title": "Encode token positions",
         "detail": "Apply the specified positional encoding. For RoPE, rotate the configured Q/K channel pairs at the correct sequence positions with the checkpoint frequencies and scaling policy.",
         "check": "Compare beyond the initial context range and across a chunk boundary. Verify dimension order and pairing convention.",
         "metric": "Position transform duration and overhead of a separate launch.",
@@ -669,7 +669,7 @@
       {
         "id": "kv",
         "group": "Attention",
-        "title": "Write and address KV",
+        "title": "Append K and V to sequence state",
         "detail": "Map the arriving K/V vectors to the sequence’s physical pages or contiguous slots. Make the appended entries visible to the consuming attention call at the correct causal positions.",
         "check": "Check partial pages, concurrent slots and sliding-window wrap using an independently indexed reference.",
         "metric": "KV bytes appended and read per step, address translation overhead.",
@@ -702,7 +702,7 @@
       {
         "id": "attend",
         "group": "Attention",
-        "title": "Score and reduce attention",
+        "title": "Compute attention outputs",
         "detail": "For scaled dot-product attention, compute QKᵀ times scale, apply legal-position mask and biases, normalize scores, then weight V. A tiled fused kernel can accumulate online softmax statistics without materializing scores.",
         "check": "Compare to an explicit small reference for ragged lengths, grouped heads, causal masks and split reductions.",
         "metric": "Prefill compute throughput versus decode KV-read bandwidth; mask and workspace traffic.",
@@ -722,7 +722,7 @@
         "id": "attout",
         "group": "Attention",
         "title": "Project attention output",
-        "detail": "Merge heads back into the hidden layout and apply the learned output projection. Reduce partial outputs across tensor-parallel ranks when the partition requires it.",
+        "detail": "Concatenate each token’s attention heads into a hidden row and multiply by the attention output weights. If tensor parallelism splits the projection into partial sums, reduce those sums before the residual addition.",
         "check": "Compare head reassembly and rank partial sums to a single-device reference.",
         "metric": "Projection time and exposed collective latency.",
         "cc": [
@@ -748,7 +748,7 @@
       {
         "id": "resid",
         "group": "Decoder",
-        "title": "Join residual and prepare FFN",
+        "title": "Add residual and normalize FFN input",
         "detail": "Combine the attention or recurrence result with its residual and apply the model’s normalization and residual topology before the feed-forward path.",
         "check": "Compare hidden tensors immediately before and after this join across multiple layers.",
         "metric": "Residual read/write bytes and launches saved by legal fusion.",
@@ -764,7 +764,7 @@
       {
         "id": "dense",
         "group": "Feed-forward",
-        "title": "Dense feed-forward",
+        "title": "Compute dense FFN outputs",
         "detail": "For a gated FFN, form gate and up projections, apply the declared activation to the gate, multiply elementwise, then down-project to hidden width. Ungated FFNs follow the model’s activation graph.",
         "check": "Compare intermediate activations, biases and down-projection values to a small reference.",
         "metric": "Prefill GEMM throughput versus decode weight bandwidth; scratch traffic.",
@@ -795,7 +795,7 @@
         "id": "route",
         "group": "MoE",
         "title": "Select routed experts",
-        "detail": "Apply group restrictions, score or hash policy, routed width k and tie rules. Return authoritative expert IDs with aligned weights, normalize and scale only as the checkpoint specifies. Shared experts have their own contribution policy.",
+        "detail": "Choose k routed expert IDs per token under the model’s ranking, group and tie rules. Gather the corresponding mixture weights in the same order, then apply the specified normalization and scale. Track a compulsory shared branch separately even when a kernel encodes it in an extra slot.",
         "check": "Exercise five routed, six routed and five plus a shared branch; compare IDs, weights and final hidden outputs at ties.",
         "metric": "Selection latency by expert count and k; optimized versus fallback dispatch.",
         "cc": [
@@ -825,7 +825,7 @@
       {
         "id": "ready",
         "group": "MoE",
-        "title": "Resolve expert readiness",
+        "title": "Wait for selected expert weights",
         "detail": "Resolve each authoritative expert to a resident or fetched weight handle. Join matching in-flight loads, protect the active slot generation and wait on completion before consuming the bytes.",
         "check": "Force a miss after a wrong hint, reorder IO completions and recycle a slot. Every consumed handle must match the demanded layer and expert.",
         "metric": "Demand miss rate, transferred bytes, wait on the critical path and duplicate loads.",
@@ -856,7 +856,7 @@
       {
         "id": "expert",
         "group": "MoE",
-        "title": "Execute routed FFNs",
+        "title": "Run the selected experts",
         "detail": "Evaluate each chosen expert on its assigned rows using its gate/up/down weights and activation. Use grouped kernels or CPU/device workers according to placement and effective rows per expert.",
         "check": "Compare each active group against a separate reference FFN, including one-row and empty groups.",
         "metric": "Rows per expert, weight bandwidth in decode and grouped matmul utilization in prefill.",
@@ -872,7 +872,7 @@
       {
         "id": "shared",
         "group": "MoE",
-        "title": "Execute shared FFN",
+        "title": "Run the shared expert",
         "detail": "If defined, run the always-on shared FFN on the original token rows and apply its model-defined output gate. Bind any fused physical slot representation to the logical shared branch.",
         "check": "Independently evaluate the shared output and gate for a token whose routed expert IDs exclude that branch.",
         "metric": "Shared weight footprint, execution time and useful overlap with routed experts.",
@@ -887,7 +887,7 @@
       {
         "id": "combine",
         "group": "MoE",
-        "title": "Restore order and mix",
+        "title": "Restore token order and sum expert outputs",
         "detail": "Return remote outputs when necessary and scatter each expert result to its original token. Compute the weighted sum of routed contributions, add the model-defined shared term, and apply scale exactly once.",
         "check": "Compare to a direct per-token sum after shuffled dispatch, uneven rank loads and nonuniform routing weights.",
         "metric": "Reverse exchange duration, scatter/reduction bandwidth and accumulation precision.",
@@ -903,7 +903,7 @@
       {
         "id": "layerout",
         "group": "Decoder",
-        "title": "Advance decoder stack",
+        "title": "Pass hidden rows to the next layer",
         "detail": "Join FFN output and residual according to the model architecture; feed the resulting hidden rows to the next layer. After the final block apply the declared output normalization.",
         "check": "Capture layer-boundary hidden states and locate the first divergent layer against a reference.",
         "metric": "Per-layer critical-path time and bytes retained between successive layers.",
@@ -919,7 +919,7 @@
       {
         "id": "head",
         "group": "Decoder",
-        "title": "Project vocabulary logits",
+        "title": "Project hidden rows to vocabulary logits",
         "detail": "Select the hidden rows requested by generation or verification, apply final vocabulary projection and optional model-specific scaling or clipping. Tied embeddings still require the correct orientation.",
         "check": "Compare full vocabulary logits for requested rows before sampling; exercise ties, output subsets and tensor-parallel gathering.",
         "metric": "Logit rows computed, projection cost and vocabulary communication volume.",
@@ -1083,7 +1083,7 @@
   {
     "id": "backend",
     "title": "L5 · Execution backend",
-    "summary": "The backend implements logical tensor operations on a concrete device. It chooses admissible layouts, precision, kernels, fusion and launch order, then publishes completion to the caller.",
+    "summary": "Lower tensor operations to CPU or accelerator work. Select a kernel for the actual shape, dtype and layout, bind operand buffers, and return an event that tells the caller when results can be read.",
     "ops": [
       {
         "id": "lower",
@@ -1104,7 +1104,7 @@
       {
         "id": "dispatch",
         "group": "Planning",
-        "title": "Select kernel or fallback",
+        "title": "Choose a kernel for the operand layout",
         "detail": "Check hardware features, alignment, head dimension, quantization type, batch shape and specialization bounds. Choose library, native or generated code and retain a valid fallback.",
         "check": "Test just below, at and beyond specialization limits with unfavorable strides and partial tiles.",
         "metric": "Selected implementation, dispatch overhead and fallback frequency by shape.",
@@ -1171,7 +1171,7 @@
       {
         "id": "row",
         "group": "Kernel families",
-        "title": "Reduce, gather and scatter",
+        "title": "Run reductions and indexed copies",
         "detail": "Implement row reductions and movement for norms, router top-k, sampling, expert counts, prefix sums, packing and output mixing. Preserve tie policy, inverse indices, aliasing constraints and reduction precision.",
         "check": "Use ties at kth rank, all-zero rows, uneven group sizes and counts spanning a warp or block boundary.",
         "metric": "Launch count, memory traffic, reduction throughput and synchronization cost.",
@@ -1189,7 +1189,7 @@
       {
         "id": "streams",
         "group": "Submission",
-        "title": "Order copies and kernels",
+        "title": "Schedule copies and kernel launches",
         "detail": "Enqueue copies, collectives and compute on suitable streams. Record/wait events at true producer-consumer dependencies; pin buffers until final read completes.",
         "check": "Delay copies and cross-stream producers. Compare asynchronous execution with a serialized reference and test cancellation during flight.",
         "metric": "Exposed copy or collective wait versus overlapped duration; launch gaps.",
@@ -1237,7 +1237,7 @@
       {
         "id": "signal",
         "group": "Submission",
-        "title": "Publish completion events",
+        "title": "Signal device or CPU completion",
         "detail": "Return completion and device error information with request, batch and operation IDs. Runtime markers connect submitted operations to device intervals and preserve asynchronous attribution.",
         "check": "Correlate a known delayed kernel with its owning batch and verify incomplete work cannot release resources.",
         "metric": "Submission-to-start gap, completion-to-next-submit gap and timeline coverage.",
@@ -1326,12 +1326,12 @@
   {
     "id": "state",
     "title": "M · Memory and state",
-    "summary": "State spans startup, scheduling, generation, model execution and backend launches. Every allocation has an owner, a visibility rule and a lifetime that can extend beyond a single forward pass.",
+    "summary": "Manage storage shared by startup, scheduling, model execution and kernels. Weight handles persist with the model, KV follows a sequence, and scratch becomes reusable after its last reader finishes.",
     "ops": [
       {
         "id": "weight",
         "group": "Parameters",
-        "title": "Own model weights",
+        "title": "Bind weight storage to tensor handles",
         "detail": "Retain bound read-only weight storage or mapped ranges for the model lifetime. Associate each pointer with tensor shape, dtype, quantization metadata, placement and ownership on load or eviction.",
         "check": "Hash or decode sampled weight slices across reloads, tiers and device views.",
         "metric": "Mapped versus resident bytes, page faults and bytes read from each tier.",
@@ -1376,7 +1376,7 @@
       {
         "id": "allocate",
         "group": "Sequence state",
-        "title": "Allocate sequence state",
+        "title": "Reserve KV pages or contiguous slots",
         "detail": "Reserve per-sequence cache pages or contiguous slots before execution. Distinguish logical position, physical page/offset and allocation generation. For standard dense KV, a baseline payload estimate is 2 × layers × tokens × KV heads × head dimension × bytes/element when K and V shapes match.",
         "check": "Test page-boundary allocation, short final pages and out-of-capacity rollback; account separately for slack, metadata and alternative cache layouts.",
         "metric": "Active KV payload, allocated bytes, fragmentation and remaining token capacity.",
@@ -1390,7 +1390,7 @@
       {
         "id": "append",
         "group": "Sequence state",
-        "title": "Append and read KV",
+        "title": "Write and read sequence KV",
         "detail": "The model appends K/V for the current sequence positions; attention reads the allowed prefix using descriptors from the allocator. Windowed, quantized or compressed layouts require corresponding index and decode semantics.",
         "check": "Compare a cached continuation to full recomputation after a page transition, context wrap or cache-format conversion.",
         "metric": "Read and write bytes per decode token, lookup cost and cache precision error.",
@@ -1438,7 +1438,7 @@
       {
         "id": "recurrent",
         "group": "Sequence state",
-        "title": "Own recurrent and draft state",
+        "title": "Save recurrent and speculative state",
         "detail": "Bind recurrent hidden state, counters and speculative checkpoints to each request and layer. Snapshot enough to undo rejected tokens or safely recompute that segment.",
         "check": "Branch, reject and resume at different acceptance lengths. Compare resulting state to serial target execution.",
         "metric": "State and snapshot bytes/sequence; restoration or recomputation cost.",
@@ -1471,7 +1471,7 @@
       {
         "id": "release",
         "group": "Transient",
-        "title": "Reclaim completed state",
+        "title": "Release storage after its last reader",
         "detail": "Use completion fences and ownership counts to release physical resources after cancellation, request completion, speculative rollback or model shutdown. Keep intentionally retained prefix entries accounted.",
         "check": "Repeatedly cancel and reuse slots while kernels run. Check bounded memory growth and correct isolation.",
         "metric": "Outstanding retained bytes, release latency and free capacity after repeated runs.",
@@ -1547,7 +1547,7 @@
   {
     "id": "host",
     "title": "L6 · Host and devices",
-    "summary": "The deployment supplies compute, memory, storage, interconnect and system software. The engine discovers these resources and binds its operators and placement policy to their measured capabilities.",
+    "summary": "The machine supplies CPU cores, accelerator compute, memory, links, storage and drivers. Startup reads their usable capacities and features. Running kernels, transfers and worker threads consume those resources.",
     "ops": [
       {
         "id": "discover",
@@ -1568,7 +1568,7 @@
       {
         "id": "hostcpu",
         "group": "Compute",
-        "title": "CPU cores and OS",
+        "title": "Schedule and run host threads",
         "detail": "Host threads tokenize, schedule and launch device work; CPU kernels may also execute model operators. Available cores, affinity, OS scheduling and competing load constrain their latency.",
         "check": "Run matched workloads with fixed worker count and record scheduling delay separately from active computation.",
         "metric": "CPU cycles/token, context switches, run-queue wait and runnable cores.",
@@ -1577,7 +1577,7 @@
       {
         "id": "device",
         "group": "Compute",
-        "title": "Accelerator execution",
+        "title": "Execute accelerator kernels",
         "detail": "Device compute units execute the admitted kernel instructions. Precision support, vector or tensor units, shared memory, cache and register limits constrain efficient shapes.",
         "check": "Record device identity and clocks for each run. Compare a measured kernel with a matched precision and shape ceiling.",
         "metric": "Achieved FLOP/s, achieved bandwidth, active warps and stall reasons.",
@@ -1586,7 +1586,7 @@
       {
         "id": "dram",
         "group": "Memory system",
-        "title": "Memory and interconnect",
+        "title": "Move bytes through memory and links",
         "detail": "Physical bandwidth depends on topology: unified versus discrete memory, NUMA locality, accelerator links and peer routing. Explicit copies and shared-address accesses can have distinct costs.",
         "check": "Measure the actual access path and payload size for local, remote and peer cases under the target topology.",
         "metric": "Sustained GB/s, latency by transfer size and traffic per interconnect.",
@@ -1595,7 +1595,7 @@
       {
         "id": "ssd",
         "group": "Memory system",
-        "title": "Storage and page cache",
+        "title": "Read weights from storage",
         "detail": "Checkpoint reads and streamed experts may traverse filesystem cache, mapped pages, direct IO or a remote store. Distinguish storage service time from page faults and cache hits.",
         "check": "Repeat a known byte-range workload with documented cold/warm cache state, read alignment and concurrency.",
         "metric": "Read latency percentiles, queue depth, bandwidth and page-fault count.",

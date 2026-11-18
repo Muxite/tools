@@ -18,6 +18,11 @@ async function main() {
     await page.goto(url);
     await page.locator('.ax-engine svg').waitFor();
     const data = await page.locator('#dataset').evaluate(el => JSON.parse(el.textContent));
+    for (const role of data.roles) {
+      assert(role.title && role.title !== role.id,role.id+' needs a job title');
+      assert(role.contents.length >= 2,role.id+' needs a capability mix');
+      for (const cap of role.contents) assert(['component','tool','skill','method'].includes(cap.kind) && cap.name && cap.detail);
+    }
     const roles = new Set(data.roles.map(r => r.id));
     const layers = [...data.engine, ...data.factory];
     const layerIds = new Set(layers.map(x => x.id));
@@ -151,6 +156,16 @@ async function main() {
     }
     await jump('#cc/engine.expert_residency');
     await graphNode('engine.expert_streaming').waitFor();
+    for (const [former,current] of [['serving.tool_conversations','serving.request_gateway'],['factory.methodology_ab','verification.performance_measurement'],['transfer.prefill_handoff','parallel.model_execution']]){
+      await jump('#cc/'+former);
+      await graphNode(current).waitFor();
+      assert(await page.locator('.cap-row .cap-kind').count()>0);
+    }
+    await jump('#library');
+    await page.locator('#captype').selectOption('method');
+    for(const card of await page.locator('#results .listing').all())assert(await card.locator('.cap-method').count()>0);
+    await jump('#factory/f_plan?op=workorder');
+    await page.getByRole('heading',{name:'Example work orders'}).waitFor();
     assert.deepEqual(errors, [], 'Browser exceptions');
     assert.deepEqual(requests, [], 'Site attempted to load network resources');
     console.log('PASS: ' + layers.length + ' graph regions, ' + layers.reduce((n,l) => n+l.ops.length,0) + ' operations, ' + roles.size + ' reachable CCs, ' + data.sources.length + ' source examples and ' + data.traces.length + ' walkthroughs. Keyboard, offline and mobile checks passed.');

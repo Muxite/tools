@@ -3,7 +3,7 @@
     {
       "id": "f_spec",
       "title": "Intent and contract",
-      "summary": "Turn the requested text engine and deployment constraints into explicit, testable engineering obligations.",
+      "summary": "Translate the user’s request into a versioned contract. Name the required model behavior, permitted implementation choices, target limits and tests that decide acceptance.",
       "ops": [
         {
           "id": "intake",
@@ -17,7 +17,7 @@
         },
         {
           "id": "modelterms",
-          "title": "Resolve model terms",
+          "title": "Bind contract terms to model behavior",
           "detail": "Bind words such as “five experts plus one shared” to routed width, independent shared tensors, score transformation, normalization and the checkpoint’s architecture. Check tokenizer identity and vocabulary boundaries.",
           "check": "Reject an unsupported checkpoint change before planning. Record which settings can vary at runtime.",
           "metric": "Unbound model fields and contradictory settings.",
@@ -73,7 +73,7 @@
     {
       "id": "f_plan",
       "title": "Inventory and work orders",
-      "summary": "Use existing source where it passes the contract. Derive the same required interfaces for an empty repository.",
+      "summary": "Compare the contract with the source inventory. For each missing or unqualified interface, identify the artifacts an agent must deliver, the CCs it can use and the dependencies the workflow must schedule.",
       "ops": [
         {
           "id": "survey",
@@ -87,7 +87,7 @@
         },
         {
           "id": "gaps",
-          "title": "Classify gaps",
+          "title": "Find missing or unqualified interfaces",
           "detail": "Classify each interface as qualified for this contract, present with missing evidence, incompatible, or missing. A selector with a compiled k needs a cross-check against the model geometry and fallback.",
           "check": "A passing existing interface can be reused without a code change. An unavailable shape yields an adaptation or a new implementation order.",
           "metric": "Unresolved obligations by component and target.",
@@ -98,8 +98,8 @@
         },
         {
           "id": "workorder",
-          "title": "Assign CCs to agents",
-          "detail": "Build a dependency graph over required artifacts. Assign one or more CCs to a JiuwenSwarm agent for each work order. Separate artifact consumption from scheduling order so two independent consumers can reuse one producer.",
+          "title": "Map work orders to CCs",
+          "detail": "For each required artifact, name its producer, consumers and acceptance test. One JiuwenSwarm agent may use several CCs on a work order. Several agents or subworkflows may invoke the same CC with their own inputs. For example, prefill and decode workers can both use the KV-state CC with different token shapes.",
           "check": "A clean start identifies every missing producer. Shared CC invocations carry per-job inputs, output identities and retry boundaries.",
           "metric": "Unprovided artifacts and blocked work orders.",
           "cc": [
@@ -118,8 +118,8 @@
         },
         {
           "id": "assign",
-          "title": "Release work",
-          "detail": "Bind the source or empty-tree baseline, contract inputs, tools, candidate budget and required tests. Set dependencies so a reference can qualify an optimized variant and blocked work can resume.",
+          "title": "Dispatch ready work orders",
+          "detail": "The workflow releases an order when its contract inputs and prerequisite artifacts are ready. Give the assigned agent the source revision, permitted CCs, write target and acceptance cases. Publish each verified output once so downstream orders can consume the same revision.",
           "check": "Every agent receives a bounded write target and a verifiable result. Deduplicate common inputs across subworkflows.",
           "metric": "Ready, blocked and completed orders per contract.",
           "cc": [
@@ -158,11 +158,11 @@
     {
       "id": "f_build",
       "title": "Source and image",
-      "summary": "Apply engine-building CCs to the source tree. The factory records which source, build and environment produced the image.",
+      "summary": "Implement or adapt each assigned interface, check it against a reference, build the release image and hand the candidate and test inputs to the external lab.",
       "ops": [
         {
           "id": "apply",
-          "title": "Implement or adapt",
+          "title": "Implement the assigned interface",
           "detail": "Bind the selected engine CCs at the target interfaces. Implement a missing reference path, adapt a compatible donor or lower an eligible operation into code. Keep generated output and source edits reviewable.",
           "check": "Check layout, shape, dtype, state ownership, execution order and fallback. Reject a source transfer that changes model semantics.",
           "metric": "Changed obligations with a source revision and a test.",
@@ -192,7 +192,7 @@
         },
         {
           "id": "handoff",
-          "title": "Prepare the lab handoff",
+          "title": "Submit image and workload to the lab",
           "detail": "Link the image digest, workload, configuration, expected outputs and allowed target to the build receipt. Pass an immutable candidate and its submission manifest to the lab manager.",
           "check": "Verify digests and resolve each dependency before allocating a trial. Record any evidence limited to a host-only test.",
           "metric": "Manifest completeness and unresolved image obligations.",
@@ -228,11 +228,11 @@
     {
       "id": "f_lab",
       "title": "Controlled experiments",
-      "summary": "The lab manager drives a bounded run outside the candidate image. Select the measurements needed to distinguish the competing explanations.",
+      "summary": "Run the versioned candidate on its declared target. Return numerical checks, workload measurements and focused diagnostics with the inputs and conditions needed to interpret them.",
       "ops": [
         {
           "id": "stage",
-          "title": "Admit and stage",
+          "title": "Stage the candidate on the target",
           "detail": "Check image identity, target health, SDK/driver capability, resource lease and workload inputs. Record cold/warm cache policy and immutable attempt identity before launch.",
           "check": "Simulate a timeout or lost acknowledgement. Reconcile the lease and export partial evidence before cleanup or retry.",
           "metric": "Valid attempts, fault reasons and missing coverage.",
@@ -262,7 +262,7 @@
         },
         {
           "id": "profile",
-          "title": "Attribute the bottleneck",
+          "title": "Locate the critical-path delay",
           "detail": "Align request phases, CPU submit ranges, GPU events, transfer completions and kernel launches. Slow decode can arise from scheduler gaps, KV reads, expert-weight misses, collectives or kernel limits.",
           "check": "Use correlated timelines and measure instrumentation overhead. Overlapping intervals cannot be summed into wall time.",
           "metric": "GPU active time, launch gaps, bytes moved, exposed stalls and observer cost.",
@@ -282,7 +282,7 @@
         },
         {
           "id": "stream",
-          "title": "Replay expert demand",
+          "title": "Replay expert-weight demand",
           "detail": "Use time-ordered routing traces to compare residency, eviction and prefetch alternatives. Separate selected, already resident, late, useful and wasted bytes. Include cold misses and forced delayed completion.",
           "check": "Prevent future-token leakage. Validate exact bytes and outputs on demand misses, then confirm any replay benefit on target.",
           "metric": "Stall time avoided, useful bytes, wasted bytes and held-out coverage.",
@@ -372,7 +372,7 @@
     {
       "id": "f_evidence",
       "title": "Decision and repair",
-      "summary": "Retain provenance and decide whether the exact candidate satisfies the contract. Route unresolved work to the owner that can change it.",
+      "summary": "Connect each contract obligation to its evidence. Accept a qualified candidate, issue a repair order for a failed gate, or record which measurement is still missing.",
       "ops": [
         {
           "id": "record",
@@ -386,7 +386,7 @@
         },
         {
           "id": "gate",
-          "title": "Apply the gates",
+          "title": "Evaluate the contract gates",
           "detail": "Evaluate correctness, resource and performance requirements for this image, target and configuration. Preserve the basis for conditional acceptance, rejection or eligibility for confirmation.",
           "check": "A pilot screen at +9.28% under a frozen +10% requirement remains below the gate. Verify independent confirmation before advertising a gain.",
           "metric": "Pass, fail or unmeasured obligations and confirmation state.",
@@ -407,7 +407,7 @@
         },
         {
           "id": "release",
-          "title": "Retain the release",
+          "title": "Retain the qualified image and evidence",
           "detail": "Publish an internal receipt naming the exact image, contract, target, test limits and qualifying observations. Store the scope of reusable findings for future jobs.",
           "check": "Recover the image, configuration and receipts from retained identities. Disclose qualifying hardware and workload boundaries.",
           "metric": "Qualified image identities and reproducible evidence links.",
@@ -483,7 +483,10 @@
     "engine.cpu_worker_policy": "backend.execute_operators",
     "experts.routed_forward": "model.expert_ffn",
     "experts.shared_forward": "model.expert_ffn",
-    "engine.expert_residency": "engine.expert_streaming"
+    "engine.expert_residency": "engine.expert_streaming",
+    "serving.tool_conversations": "serving.request_gateway",
+    "factory.methodology_ab": "verification.performance_measurement",
+    "transfer.prefill_handoff": "parallel.model_execution"
   },
   "remove": [
     "media.encode_inputs",
@@ -496,7 +499,7 @@
     "weights.adapter_binding": "An adapter changes the requested model state. Its identity, application order and per-request residency can fail independently of base-weight loading.",
     "model.decoder_architecture": "The checkpoint family determines the block order, layer-specific branches and residual updates that the graph must execute.",
     "tokenizer.prepare_request": "Input identity begins with tokens. Incorrect template, special-token policy or vocabulary mapping changes every downstream calculation.",
-    "serving.request_gateway": "An external caller needs a stable request identity, validated inputs, cancellation and a result path across an embedded or network boundary.",
+    "serving.request_gateway": "Own the text request and response protocol. Plain prompts use the core path. A tool-aware API can select additional call parsing, identity tracking and serialization capabilities.",
     "scheduler.request_lifecycle": "Only the scheduler can guarantee that a token, slot or memory budget is assigned and released exactly once under concurrency.",
     "batch.execution_layout": "Even a correct scheduler can scramble outputs if ragged positions or batch rows are aligned to the wrong sequences.",
     "decode.advance_sequence": "The generation driver owns when state advances and which token positions the next forward pass consumes.",
@@ -518,7 +521,7 @@
     "output.response_stream": "A correct token sequence still needs ordered emission, incremental detokenization, stop handling and one terminal response.",
     "serving.tool_conversations": "A model-specific text tool dialect creates parser and multi-turn state that must survive streaming boundaries.",
     "decode.speculative_execution": "Draft acceptance changes how many target steps can commit at once. The target distribution and rejected-suffix rollback require dedicated checks.",
-    "parallel.model_execution": "Sharded model execution requires consistent rank topology, ownership and collective ordering to reconstruct the unsharded computation.",
+    "parallel.model_execution": "Own cross-rank execution and state handoffs when a deployment spans workers. Tensor sharding, collective reduction, distributed prefill and prefill-to-decode transfer are independently selectable variants.",
     "transfer.prefill_handoff": "Disaggregated serving crosses an ownership boundary with live KV and request position. Decode may begin only after matching state is ready.",
     "model.expert_routing": "The router owns the authoritative expert IDs and aligned mixture weights required by every downstream MoE implementation.",
     "experts.routed_forward": "Variable token-to-expert assignments must become correctly packed expert projections, including empty and uneven expert batches.",
@@ -529,7 +532,7 @@
     "routing.forecast_expert_demand": "A predictor can produce early hints using information available before demand. Its accuracy, lead time and wasted bytes have independent tests.",
     "observability.runtime_events": "External profiles need trustworthy runtime phase and route boundaries bound to actual requests, tokens, layers and launches.",
     "verification.numerical_conformance": "Independent references expose wrong outputs even when candidate and baseline share infrastructure or a performance measurement improves.",
-    "verification.performance_measurement": "An identified workload, timing boundaries and population rules are necessary for reproducible throughput and latency results under load.",
+    "verification.performance_measurement": "Measure a pinned workload with explicit latency, throughput and memory boundaries. For comparisons, reuse the same harness and select paired A/B, A/A stability or independent confirmation as the work order requires.",
     "compiler.intent_brief": "User goals can leave several viable model, budget or service choices. A reviewed brief exposes the unresolved decision before implementation.",
     "compiler.engine_contract": "A build needs stable model semantics, operational interfaces, allowed substitutions and executable acceptance obligations.",
     "factory.workflow_planning": "Shared CCs need ordered, retryable invocations with specific upstream artifacts, especially when requirements or source availability change.",
@@ -563,7 +566,7 @@
     "attention.sparse_execution": "The checkpoint defines sparse/indexed attention or a contract-qualified sparse alternative.",
     "serving.tool_conversations": "Text tool-call parsing, multi-turn tool serialization or structured tool output is required.",
     "decode.speculative_execution": "The contract permits draft-and-verify acceleration and supplies an appropriate draft path.",
-    "parallel.model_execution": "Model execution spans more than one rank or device.",
+    "parallel.model_execution": "Only when execution or prefill state spans workers. The single-device baseline uses local execution and keeps sequence state on the same worker.",
     "transfer.prefill_handoff": "Prefill and decode are served by separate workers or resource pools.",
     "model.expert_routing": "The checkpoint includes routed expert layers.",
     "experts.routed_forward": "A model-defined router sends token rows to expert FFNs.",
@@ -603,6 +606,20 @@
         "experts",
         "shared"
       ]
+    }
+  },
+  "responsibilities": {
+    "serving.request_gateway": {
+      "outputs": "Validated text-generation requests, cancellation and streaming events. For tool-aware protocols, preserve call IDs, argument fragments and final status.",
+      "check": "Replay the same request through the supported local or HTTP entry point. For tool calls, split arguments across stream chunks and verify reconstruction, identity and completion."
+    },
+    "verification.performance_measurement": {
+      "outputs": "A reproducible timing record with workload, warm state, queue boundaries and uncertainty. When comparing revisions, produce a paired effect estimate and screen or confirmation decision.",
+      "check": "Verify token counts and clock boundaries on a fixed workload. For A/B evaluation, counterbalance run order, check A/A variation and confirm the candidate on independent runs."
+    },
+    "parallel.model_execution": {
+      "outputs": "Rank-local batches, ordered collective results and completion events. Split prefill deployments also require a receiver-owned, validated sequence-state handle.",
+      "check": "Compare sharded logits with a local reference. When transferring prefill state, delay receipt, check sequence identity and positions, and compare the first receiver-side decode logits to the reference."
     }
   }
 }

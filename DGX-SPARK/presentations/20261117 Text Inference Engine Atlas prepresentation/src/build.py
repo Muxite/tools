@@ -22,11 +22,22 @@ def assemble():
     for k,r in roles.items():
         r['why'] = taxonomy['rationale'][k]
         r['when'] = taxonomy['conditional'].get(k,'Required when this operation is present in the target engine or workflow.')
+        r.update(taxonomy.get('responsibilities', {}).get(k, {}))
         r['variantJobs'] = []
     for former,survivor in merged.items():
         roles[survivor]['variantJobs'].append({k:old[former][k] for k in ['id','reason','check','capabilities']})
         for field in ['ex','reuse','capabilities']:
             roles[survivor][field]=list(dict.fromkeys(roles[survivor][field]+old[former][field]))
+    catalog=read('capability_catalog.json')
+    for key,role in roles.items():
+        role['title']=catalog[key]['title']
+        role['contents']=list(catalog[key]['capabilities'])
+    for key,entry in catalog.items():
+        if key in merged:
+            roles[current(key)]['contents'].extend(entry['capabilities'])
+    for role in roles.values():
+        for cap in role['contents']:
+            assert cap['kind'] in {'component','tool','skill','method'} and cap['name'] and cap['detail']
     factory = taxonomy['layers']
     sites = {k:[] for k in roles}
     for layer in engine+factory:

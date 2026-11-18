@@ -29,12 +29,16 @@ function transfer(r,e){
 function routingCase(){
  return '<section><h3>Routing contract</h3><label>Per-token rule <select id="routing-case"><option>5 routed</option><option>6 routed</option><option>5 routed + 1 shared</option></select></label><p id="routing-out"></p></section>';
 }
+const kindTerms={component:'Reusable code an agent can integrate into the engine or factory.',tool:'An executable instrument an agent runs to inspect, transform or measure.',skill:'Integration know-how an agent applies to the target source.',method:'A repeatable procedure with a decision rule or acceptance check.'};
+function kindLabel(k){return '<span class="cap-kind cap-'+k+'">'+esc(k)+'</span>'}
+function kindStrip(r){return [...new Set(r.contents.map(c=>c.kind))].map(kindLabel).join(' ')}
+function capabilityKey(){return details('Capability types',Object.entries(kindTerms).map(([k,v])=>'<p>'+kindLabel(k)+' '+esc(v)+'</p>').join(''))}
 function ccPanel(r,overlay){
  const ex=atlas.assets.filter(a=>r.ex.includes(a.name)), rows=atlas.sources.filter(s=>s.assigned===r.id&&s.engine===overlay);
- return '<div class="tagline">'+(r.kind==='factory'?'Software factory':'Engine construction')+' CC</div><h2><code>'+esc(r.id)+'</code></h2>'+essentialTag(r.essential)+
- sec('Engineering job',list(r.why))+sec('When to use it',list(r.when))+sec('Produces',list(r.outputs))+
+ return '<div class="tagline">'+(r.kind==='factory'?'Software factory':'Engine construction')+' CC</div><h2>'+esc(r.title)+'</h2><code>'+esc(r.id)+'</code> '+essentialTag(r.essential)+
+ sec('Responsibility',list(r.why))+sec('When to use it',list(r.when))+sec('Capabilities for agents','<p class="caption">Proposed contents. The work order selects the capabilities needed for this job.</p>'+r.contents.map(c=>'<article class="cap-row">'+kindLabel(c.kind)+' <b>'+esc(c.name)+'</b><p>'+esc(c.detail)+'</p></article>').join('')+capabilityKey())+sec('Work output',list(r.outputs))+
  (r.id==='model.expert_routing'?routingCase():'')+sec('Verification',list(r.check))+
- details('Contract choices and capabilities',list(r.decisions)+list(r.capabilities))+
+ details('Contract choices and implementation variants',list(r.decisions)+list(r.capabilities))+
  details('Build or integrate',sec('Inputs',list(r.inputs))+sec('From scratch',list(r.greenfield))+sec('Existing source',list(r.integration)))+
  details('Included jobs',r.variantJobs.map(x=>sec(x.id,list(x.reason)+list(x.check))).join(''))+
  transfer(r,overlay)+details(overlay+' · '+rows.length+' source bindings',rows.map(sourceRow).join(''))+
@@ -42,27 +46,35 @@ function ccPanel(r,overlay){
  details('Related evidence',atlas.assets.filter(a=>r.reuse.includes(a.name)&&!r.ex.includes(a.name)).map(assetRow).join(''))+
  details('Other worksites',r.sites.map(([l,o])=>pill(layerIndex.get(l).ops.find(x=>x.id===o).title,at(l,o,{cc:r.id,overlay}))).join(' '));
 }
+function assignmentExample(){
+ const rows=[
+  ['Storage agent','Implement bounded reads and slot eviction.',['engine.expert_streaming','memory.runtime_arenas']],
+  ['Execution agent','Wait for the selected slot and release it after the expert kernel completes.',['engine.expert_streaming','model.expert_ffn']],
+  ['Lab agent','Force a cold miss and verify output and peak memory.',['factory.streaming_lab','verification.numerical_conformance']]
+ ];
+ return sec('Example work orders', '<p>Each agent receives the CCs needed for its assigned output. Two agents share the streaming CC so both implement the same slot-lifetime contract.</p>'+rows.map(([name,task,ids])=>'<article class="cap-row"><b>'+esc(name)+'</b><p>'+esc(task)+'</p>'+ids.map(id=>pill(roleIndex.get(id).title,'#cc/'+id)).join(' ')+'</article>').join(''));
+}
 function opPanel(layer,op,overlay){
  const relevant=atlas.sources.filter(s=>s.engine===overlay&&op.cc.includes(s.assigned));
  const exact=relevant.filter(s=>(op.bindings||[]).includes(s.previous)||(op.bindings||[]).includes(s.id));
  const linked=layer.edges.filter(([a,b])=>a===op.id||b===op.id);
- return '<div class="tagline">'+esc(layer.title)+'</div><h2>'+esc(op.title)+'</h2>'+essentialTag(op.essential)+list(op.detail)+sec('Optimize',list(op.metric))+sec('Check',list(op.check))+
- (op.condition?sec('Applies when',list(op.condition)):'')+sec('CCs',op.cc.map(k=>pill(k,at(layer.id,op.id,{cc:k,overlay}))).join(' '))+
+ return '<div class="tagline">'+esc(layer.title)+'</div><h2>'+esc(op.title)+'</h2>'+essentialTag(op.essential)+list(op.detail)+(layer.id==='f_plan'&&['assign','workorder'].includes(op.id)?assignmentExample():'')+sec('Optimize',list(op.metric))+sec('Check',list(op.check))+
+ (op.condition?sec('Applies when',list(op.condition)):'')+sec('CCs for this operation',op.cc.map(k=>pill(roleIndex.get(k).title,at(layer.id,op.id,{cc:k,overlay}))).join(' '))+
  sec('Data flow',linked.map(([a,b,l])=>{const other=a===op.id?b:a;return '<p>'+esc(a===op.id?'Sends ':'Receives ')+esc(l)+(a===op.id?' to ':' from ')+pill(layer.ops.find(n=>n.id===other).title,at(layer.id,other,{overlay}))+'</p>'}).join(''))+
  sec(overlay+' implementation',exact.length?exact.map(sourceRow).join(''):'<p class="muted">No operation-specific source binding recorded for this revision.</p>')+
  details('Related CC bindings · '+(relevant.length-exact.length),relevant.filter(s=>!exact.includes(s)).map(sourceRow).join(''));
 }
 function library(query){
  const q=query.get('q')||'';
- root.innerHTML='<h1>CC library</h1><p class="lead">Find a job by operation, capability, former identity or source symbol.</p><div class="tools"><input id="search" type="search" aria-label="Search CCs"><select id="scope" aria-label="CC scope"><option>All CCs</option><option>Engine</option><option>Software factory</option></select></div><div id="results"></div>';
- const input=root.querySelector('#search'),scope=root.querySelector('#scope');input.value=q;scope.value=query.get('scope')||'All CCs';
+ root.innerHTML='<h1>CC library</h1><p class="lead">A CC bundles capabilities for a job. An agent can receive several CCs, and several agents can use the same CC. Search by responsibility, capability or source symbol.</p><div class="tools"><input id="search" type="search" aria-label="Search CCs"><select id="scope" aria-label="CC scope"><option>All CCs</option><option>Engine</option><option>Software factory</option></select><select id="captype" aria-label="Capability type"><option value="">All capability types</option>'+Object.keys(kindTerms).map(k=>'<option>'+k+'</option>').join('')+'</select></div>'+capabilityKey()+'<div id="results"></div>';
+ const input=root.querySelector('#search'),scope=root.querySelector('#scope');input.value=q;scope.value=query.get('scope')||'All CCs';const type=root.querySelector('#captype');type.value=query.get('type')||'';
  function update(){
  const terms=input.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
- const jobs=atlas.roles.filter(r=>{const hay=[r.id,r.why,r.capabilities,...Object.keys(atlas.aliases).filter(k=>atlas.aliases[k]===r.id),...atlas.sources.filter(s=>s.assigned===r.id).map(s=>s.symbol)].join(' ').toLowerCase();return terms.every(x=>hay.includes(x))&&(scope.value==='All CCs'||(scope.value==='Software factory')===(r.kind==='factory'))});
- root.querySelector('#results').innerHTML='<p class="caption">'+jobs.length+' CCs</p><div class="cards">'+jobs.map(r=>'<a class="listing" href="#cc/'+esc(r.id)+'"><strong>'+esc(r.id)+'</strong> '+essentialTag(r.essential)+'<p>'+esc(r.why)+'</p></a>').join('')+'</div>';
- history.replaceState(null,'',address('library','',{q:input.value,scope:scope.value==='All CCs'?'':scope.value}));
+ const jobs=atlas.roles.filter(r=>{const hay=[r.id,r.title,r.why,r.capabilities,...r.contents.map(c=>[c.name,c.detail,c.kind].join(" ")),...Object.keys(atlas.aliases).filter(k=>atlas.aliases[k]===r.id),...atlas.sources.filter(s=>s.assigned===r.id).map(s=>s.symbol)].join(' ').toLowerCase();return (!type.value||r.contents.some(c=>c.kind===type.value))&&terms.every(x=>hay.includes(x))&&(scope.value==='All CCs'||(scope.value==='Software factory')===(r.kind==='factory'))});
+ root.querySelector('#results').innerHTML='<p class="caption">'+jobs.length+' CCs</p><div class="cards">'+jobs.map(r=>'<a class="listing" href="#cc/'+esc(r.id)+'"><strong>'+esc(r.title)+'</strong> '+essentialTag(r.essential)+'<br><code>'+esc(r.id)+'</code><p>'+esc(r.why)+'</p><div>'+kindStrip(r)+'</div></a>').join('')+'</div>';
+ history.replaceState(null,'',address('library','',{q:input.value,type:type.value,scope:scope.value==='All CCs'?'':scope.value}));
  }
- input.oninput=update;scope.onchange=update;update();
+ input.oninput=update;scope.onchange=update;type.onchange=update;update();
 }
 function evidence(){
  const docs='https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/';
