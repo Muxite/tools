@@ -104,6 +104,12 @@
      "sample"
     ],
     [
+     "generate",
+     "decode.advance_sequence",
+     "Use the sampled token and the existing sequence state for the next decode step. Compare its logits with full-context recomputation.",
+     "step"
+    ],
+    [
      "interface",
      "output.response_stream",
      "Decode the committed token, buffer incomplete text and stream the response.",
@@ -114,6 +120,12 @@
      "scheduler.request_lifecycle",
      "On stop or cancellation, retire the sequence and release its claims after outstanding work completes.",
      "advance"
+    ],
+    [
+     "state",
+     "memory.sequence_kv",
+     "Release the final sequence-owned pages only after the device has completed its last read. Test that a second request cannot observe stale state.",
+     "release"
     ]
    ]
   },
@@ -194,6 +206,49 @@
      "factory.runtime_profiling",
      "Repeat with fixed input lengths, concurrency and cache state. Attribute nested or overlapping intervals on a timeline before ranking causes.",
      "profile"
+    ]
+   ]
+  },
+  {
+   "id": "build",
+   "title": "Build a router",
+   "intro": "Apply one reusable CC to a new tree or an existing engine.",
+   "steps": [
+    [
+     "f_spec",
+     "compiler.engine_contract",
+     "Freeze the model routing rule, allowed device paths and correctness oracle.",
+     "freeze"
+    ],
+    [
+     "f_plan",
+     "factory.source_inspection",
+     "Inspect existing hooks for routing scores, expert IDs, weights and token layout. In an empty tree these become explicit interface obligations.",
+     "gaps"
+    ],
+    [
+     "model",
+     "model.expert_routing",
+     "Implement a reference selector. Keep score corrections, shared width and the downstream dispatch interface explicit.",
+     "route"
+    ],
+    [
+     "backend",
+     "model.expert_routing",
+     "Add a fast selector only for qualified shapes. Test ties and fallback on an unsupported width.",
+     "row"
+    ],
+    [
+     "f_lab",
+     "verification.numerical_conformance",
+     "Compare selected IDs, weights and the merged residual against independently computed expected values.",
+     "quality"
+    ],
+    [
+     "f_evidence",
+     "factory.cc_qualification",
+     "Record which code, model, shapes and device passed. Reopen work for an unqualified target.",
+     "gate"
     ]
    ]
   }

@@ -138,7 +138,8 @@ function drawAtlas(container, options) {
     const g = svgEl(blocks, 'g', { class: ['ax-node', 'ax-node-' + (tone || 'operation'), selected ? 'ax-selected' : '', traced.has(id) ? 'ax-traced' : ''].join(' '), 'data-ax-id': id });
     bind(g, title + (code ? ' · ' + code : '') + (sub ? ' · ' + sub : ''), onClick);
     svgEl(g, 'rect', { x, y, width:w, height:h, rx:9, class:'ax-box' });
-    const bindingKey = selectedLayer && !cc && !levelNames[id] && !coreLayer(id) ? selectedLayer.id+'/'+id : id;
+    const qualified=id.includes('/')&&!id.startsWith('@group/');
+    const bindingKey = selectedLayer && !qualified && !cc && !levelNames[id] && !coreLayer(id) ? selectedLayer.id+'/'+id : id;
     markBinding(g,bindingKey,x+w-12,y+12);
     const px = x + 14, titleWidth = w - 35;
     const lineLen = Math.floor(titleWidth / (cc ? 7.8 : 8.1));
@@ -324,8 +325,19 @@ function drawAtlas(container, options) {
     const sideRows=Math.max(inc.length,out.length,1),sideBottom=72+sideRows*89,cy=72+(sideRows-1)*44.5;
     const center={x:355,y:cy,w:290,h:74};
     const ccs=[...new Set(o.cc.map(getCC).filter(Boolean))],ccY=sideBottom+65;
-    const height=ccY+Math.ceil(ccs.length/3)*87+24;
-    region(8,7,width-16,height-14,stripLevel(parent.title).toUpperCase()+' · OPERATION');
+    const localHeight=ccY+Math.ceil(ccs.length/3)*87+24;
+    const here=parent.id+'/'+o.id,ports={incoming:new Map(),outgoing:new Map()};
+    for(const [from,to,label,kind] of options.cross||[]){
+      if(from!==here&&to!==here)continue;
+      const incoming=to===here,endpoint=incoming?from:to;
+      const [lid,oid]=endpoint.split('/'),layer=coreLayer(lid),remote=layer?.ops.find(x=>x.id===oid);
+      if(!remote||lid===parent.id)continue;
+      const map=incoming?ports.incoming:ports.outgoing;
+      if(!map.has(endpoint))map.set(endpoint,{from,to,kind,layer,remote,labels:[]});
+      const entries=map.get(endpoint).labels;if(!entries.includes(label))entries.push(label);
+    }
+    const nPorts=Math.max(ports.incoming.size,ports.outgoing.size),crossHeight=nPorts?97+nPorts*86:0;
+    region(8,7,width-16,localHeight-14,stripLevel(parent.title).toUpperCase()+' · OPERATION');
     const neighbors=[];
     function sides(edges, leftSide){
       edges.forEach(([a,b,label],i)=>{
@@ -354,7 +366,24 @@ function drawAtlas(container, options) {
     for(const [a,b,l] of parent.edges.filter(([a,b])=>a===o.id&&b===o.id)){
       wire(a,b,l,`M505,${cy} v-21 h-63 v19`,478,cy-19,'feedback',155);
     }
-    finish(height);
+    if(nPorts){
+      const top=localHeight+9,my=top+53+(nPorts-1)*43;
+      region(8,top,width-16,crossHeight-13,'ACROSS LAYERS');
+      const connected=[];
+      for(const [direction,entries] of Object.entries(ports)){
+        const incoming=direction==='incoming';
+        [...entries.values()].forEach(({from,to,kind,layer,remote,labels},i)=>{
+          const x=incoming?24:769,y=top+52+(nPorts-entries.size)*43+i*86,ry=y+35,sy=my+35+(i-(entries.size-1)/2)*6;
+          const mid=incoming?290:710;
+          const d=incoming?`M231,${ry} H${mid} V${sy} H353`:`M645,${sy} H${mid} V${ry} H767`;
+          wire(from,to,labels.join(' · '),d,mid,ry,kindFor(parent.id,layer.id,kind),112);
+          connected.push({id:layer.id+'/'+remote.id,title:remote.title,code:(levelNames[layer.id]||'')+' '+stripLevel(layer.title).toUpperCase(),tone:'neighbor',x,y,w:207,h:70,onClick:()=>onOp?.(layer.id,remote.id)});
+        });
+      }
+      node({id:here,title:o.title,code:'THIS OPERATION',tone:'focus',selected:true,x:355,y:my,w:290,h:70,onClick:()=>onOp?.(parent.id,o.id)});
+      connected.forEach(node);
+    }
+    finish(localHeight+crossHeight+7);
   }
   if(selectedOp) focusedOp();
   else if(selectedLayer) layerComposition();
@@ -370,6 +399,7 @@ function drawAtlas(container, options) {
   shell.append(legend);
   const index=html('details','ax-index');const summary=html('summary','', 'Connections ('+drawn.length+')');index.append(summary);
   const titles=new Map(layers.flatMap(l=>[[l.id,stripLevel(l.title)],...l.ops.map(o=>[o.id,o.title])]));
+  for(const l of layers)for(const o of l.ops)titles.set(l.id+'/'+o.id,stripLevel(l.title)+' / '+o.title);
   for(const g of groupNames)titles.set(groupKey(g),g);
   for(const {a,b,label} of drawn){
     const row=html('div','ax-index-row');

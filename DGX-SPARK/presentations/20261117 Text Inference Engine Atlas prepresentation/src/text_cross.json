@@ -1,0 +1,164 @@
+[
+  [
+    "startup/bind",
+    "model/embed",
+    "embedding table and vocabulary identity",
+    "reads"
+  ],
+  [
+    "startup/place",
+    "state/weight",
+    "bound tensor placement by tier",
+    "writes"
+  ],
+  [
+    "host/discover",
+    "startup/reserve",
+    "usable device and memory limits",
+    "returns"
+  ],
+  [
+    "startup/warm",
+    "interface/accept",
+    "ready model and execution context",
+    "returns"
+  ],
+  [
+    "interface/submit",
+    "schedule/queue",
+    "sequence descriptor or cancellation",
+    "calls"
+  ],
+  [
+    "schedule/admit",
+    "state/allocate",
+    "KV capacity reservation",
+    "calls"
+  ],
+  [
+    "schedule/slot",
+    "state/reuse",
+    "compatible prefix and state handles",
+    "reads"
+  ],
+  [
+    "schedule/batch",
+    "generate/prefill",
+    "ragged prompt spans, offsets and positions",
+    "calls"
+  ],
+  [
+    "schedule/batch",
+    "generate/step",
+    "decode rows, slot mapping and positions",
+    "calls"
+  ],
+  [
+    "generate/prefill",
+    "model/embed",
+    "prompt token IDs for forward pass",
+    "calls"
+  ],
+  [
+    "generate/step",
+    "model/embed",
+    "last committed token IDs for forward pass",
+    "calls"
+  ],
+  [
+    "model/head",
+    "generate/filter",
+    "next-token vocabulary logits",
+    "returns"
+  ],
+  [
+    "generate/commit",
+    "interface/detok",
+    "committed output IDs and terminal status",
+    "returns"
+  ],
+  [
+    "generate/commit",
+    "schedule/advance",
+    "accepted tokens and continuation decision",
+    "returns"
+  ],
+  [
+    "schedule/advance",
+    "state/release",
+    "retired or cancelled sequence generation",
+    "calls"
+  ],
+  [
+    "generate/verify",
+    "state/recurrent",
+    "committed length and rollback point",
+    "writes"
+  ],
+  [
+    "model/kv",
+    "state/append",
+    "K/V vectors, logical positions and physical slots",
+    "writes"
+  ],
+  [
+    "model/attend",
+    "state/append",
+    "K/V for visible positions",
+    "reads"
+  ],
+  [
+    "model/ready",
+    "state/fill",
+    "authoritative expert ID and placement",
+    "calls"
+  ],
+  [
+    "model/qkv",
+    "backend/gemm",
+    "dense projection operands and shape",
+    "calls"
+  ],
+  [
+    "model/route",
+    "backend/row",
+    "scores or table indices and selector contract",
+    "calls"
+  ],
+  [
+    "model/attend",
+    "backend/attn",
+    "Q, KV view, mask and scale",
+    "calls"
+  ],
+  [
+    "model/expert",
+    "backend/gemm",
+    "grouped expert rows and weight handles",
+    "calls"
+  ],
+  [
+    "model/combine",
+    "backend/row",
+    "inverse indices, expert outputs and mixture weights",
+    "calls"
+  ],
+  [
+    "backend/lower",
+    "state/scratch",
+    "temporary buffer requirements and liveness",
+    "calls"
+  ],
+  [
+    "backend/streams",
+    "host/device",
+    "launches, copies and synchronization events",
+    "calls"
+  ],
+  [
+    "backend/signal",
+    "state/release",
+    "last-use completion fence",
+    "returns"
+  ]
+]

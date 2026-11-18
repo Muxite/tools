@@ -48,6 +48,11 @@ def assemble():
     for asset in evidence['assets']:
         asset['assigned']=current(asset['assigned'])
     paths={l['id']:{o['id'] for o in l['ops']} for l in engine+factory}
+    cross = read('text_cross.json')
+    for a,b,label,kind in cross:
+        for endpoint in [a,b]:
+            lid,oid=endpoint.split('/')
+            assert oid in paths[lid] and label and kind
     for a,b,*_ in architecture['edges']+taxonomy['edges']:
         assert a in paths and b in paths
     for tr in architecture['traces']:
@@ -59,7 +64,7 @@ def assemble():
                 assert item[3] in paths[lay]
                 where=(lay,item[3])
             item[:]=[*where,k,note]
-    return dict(engine=engine,factory=factory,edges=architecture['edges'],factoryEdges=taxonomy['edges'],roles=list(roles.values()),aliases=aliases,excluded=sorted(removed),sources=sources,assets=evidence['assets'],repositories=evidence['repositories'],traces=architecture['traces'],transfers=evidence['transfers'],mergers=merged)
+    return dict(cross=cross,engine=engine,factory=factory,edges=architecture['edges'],factoryEdges=taxonomy['edges'],roles=list(roles.values()),aliases=aliases,excluded=sorted(removed),sources=sources,assets=evidence['assets'],repositories=evidence['repositories'],traces=architecture['traces'],transfers=evidence['transfers'],mergers=merged)
 
 if __name__=='__main__':
     data=assemble()
