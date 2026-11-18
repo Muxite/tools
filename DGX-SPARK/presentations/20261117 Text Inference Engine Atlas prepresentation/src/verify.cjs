@@ -328,9 +328,12 @@ async function main() {
       assert(await page.locator('.spark-trial').innerText().then(text=>text.includes(t.decision)));
     }
     await jump('#integration');
+    const coverageLinks=await page.locator('#coverage details a').evaluateAll(as=>as.map(a=>a.hash.slice(4)).sort());
+    assert.deepEqual(coverageLinks,[...roles].sort(),'Every CC needs exactly one presentation group');
     for(const step of await page.evaluate(()=>factoryConnections)){
       await page.locator('.integration-flow a[href="#integration/'+step.id+'"]').click();
       await page.locator('#integration-detail h2').filter({hasText:step.title}).waitFor();
+      await page.locator('#integration-detail .worked-example').waitFor();
       assert(step.cc.every(k=>roles.has(k)));
       assert.equal(await page.locator('#integration-detail a[href*="github.com/Stellven/"]').count(),step.refs.length);
     }
