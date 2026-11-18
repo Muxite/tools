@@ -354,10 +354,12 @@ function engineVariations() {
     ['guard','Implementation constraint','Check the pinned backend’s admission rules before assigning integration work.']
   ];
   function showCard(card){
+    const trial=sparkTrials.find(t=>t.title===card.title);
     const badge=card.audit==='research' ? '<span class="proof-chip paper">Research candidate</span>' :
       card.audit ? '<span class="proof-chip single">One-engine evidence · '+esc(card.audit)+'</span>' : '';
     return '<article class="listing"><h3>'+esc(card.title)+'</h3>'+badge+'<div>'+[...new Set(card.examples.map(x=>x.engine))].filter(e=>e!=='Research').map(e=>'<span class="ref-engine" data-engine="'+esc(e)+'">'+esc(e)+'</span>').join('')+'</div><p>'+esc(card.target)+'</p>'+
       '<p><b>Planner assigns</b></p><div class="pills">'+card.roles.map(id=>pill(id,'#cc/'+canonical(id))).join(' ')+'</div>'+
+      (trial?'<p><b>Trial owner</b> '+pill(trial.owner,'#cc/'+trial.owner)+' '+pill('Inspect decision experiment','#construction/trial-'+trial.id)+'</p>':'')+
       '<details><summary>Activation, evidence and acceptance</summary><p>'+esc(card.activate)+'</p>'+
       card.examples.map(example=>'<div class="cap-row"><b>'+esc(example.engine)+'</b><p>'+esc(example.text)+'</p>'+example.refs.map(r=>ext(r.title,r.url)).join(' · ')+'</div>').join('')+
       '<p><strong>Acceptance</strong> · '+esc(card.check)+'</p></details></article>';
@@ -367,5 +369,6 @@ function engineVariations() {
   return '<section id="variations-section"><h2>Which features fit together?</h2><p class="lead">'+common.length+' of '+active.length+' target engine CCs have source examples in all four engines. One codebase can support many variants. The checkpoint fixes the required computation, and the planner qualifies each enabled combination within the single-Spark budget.</p>'+
     '<div class="comparison-key">'+groups.map(([key,title])=>'<span class="cmp-tag cmp-'+key+'">'+esc(title)+'</span>').join('')+'</div>'+
     '<p class="caption">Purple marks a mechanism verified in one audited engine. Pink marks a published research method whose integration in these four engines is unverified. Both labels describe evidence coverage.</p>'+
+    '<section class="sheet"><h2>Out-of-core MoE experiments</h2><p>Each candidate has an owning CC, a baseline, a test on one Spark and a build decision.</p><div class="pills">'+sparkTrials.map(t=>'<a class="proof-chip '+(t.badge==='research'?'paper':'single')+'" href="#construction/trial-'+t.id+'">'+esc(t.title)+'</a>').join(' ')+'</div><p>'+pill('Read all eight experiments','#construction/trials')+'</p></section>'+
     groups.map(([key,title,detail])=>'<section class="comparison-group cmp-'+key+'"><h2>'+esc(title)+'</h2><p>'+esc(detail)+'</p><div class="cards">'+cards.filter(card=>card.group===key).map(showCard).join('')+'</div></section>').join('')+'</section>';
 }

@@ -312,9 +312,18 @@ async function main() {
       assert(ccLinks.length && ccLinks.every(cc=>roles.has(cc)));
       assert(await card.locator('details a[href^="https://"]').count()>0);
     }
+    await jump('#construction/trials');
+    assert.equal(await page.locator('.spark-trial').count(),8);
+    for(const t of await page.evaluate(()=>sparkTrials)){
+      assert(roles.has(t.owner)&&t.partners.every(x=>roles.has(x)));
+      await jump('#construction/trial-'+t.id);
+      assert.equal(await page.locator('main h1').innerText(),t.title);
+      assert.equal(await page.locator('.spark-trial').count(),1);
+      assert(await page.locator('.spark-trial').innerText().then(text=>text.includes(t.decision)));
+    }
     const jobId=await verifyConstruction(page,data.roles,jump);
     await page.setViewportSize({ width:390, height:844 });
-    for (const h of ['#engine','#engine/model?op=' + route.id,'#factory','#library','#sources','#quantization','#sources/weights.decode_blocks?engine=Strata','#construction/designs','#construction','#construction/'+jobId]) {
+    for (const h of ['#engine','#engine/model?op=' + route.id,'#factory','#library','#sources','#quantization','#sources/weights.decode_blocks?engine=Strata','#construction/trials','#construction/designs','#construction','#construction/'+jobId]) {
       await jump(h);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Horizontal page overflow at ' + h);
     }

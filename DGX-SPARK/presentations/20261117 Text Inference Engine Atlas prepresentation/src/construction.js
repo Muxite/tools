@@ -120,6 +120,10 @@ function drawReadyJobs(){
  };
 }
 function construction(id){
+ if(id==='trials'||id.startsWith('trial-')&&sparkTrials.some(t=>id==='trial-'+t.id)){
+   root.innerHTML=sparkTrialView(id.slice(6));
+   return;
+ }
  if(id==='designs'){
    root.innerHTML='<div class="crumb">'+pill('From scratch','#construction')+'</div><h1>Engine design choices</h1><div id="engine-variations">'+engineVariations()+'</div>';
    return;
