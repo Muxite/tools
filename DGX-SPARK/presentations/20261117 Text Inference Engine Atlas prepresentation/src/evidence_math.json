@@ -1,0 +1,298 @@
+{
+  "weights.load_checkpoint": [
+    {
+      "engine": "llama.cpp",
+      "title": "gguf_init_from_file_ptr",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/ggml/src/gguf.cpp#L966",
+      "detail": "Accepts a GGUF file handle and reader parameters, and builds the metadata/tensor context used by the model loader."
+    },
+    {
+      "engine": "Strata",
+      "title": "WeightTable::load",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/weights.cpp#L176",
+      "detail": "Binds named reads from a packed model to weight tensors reachable by native execution."
+    },
+    {
+      "engine": "Strata",
+      "title": "check_layer",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/layout.cpp#L141",
+      "detail": "Validates expected per-layer weight slots before a layer can run; shape and presence checks belong before execution."
+    },
+    {
+      "engine": "Strata",
+      "title": "NativeDense::load",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/native_dense.cpp#L329",
+      "detail": "Builds dense device weight ownership from the shard list and WeightTable, providing an integration point for a tensor catalog and its allocated runtime representation."
+    }
+  ],
+  "weights.prepare_artifact": [
+    {
+      "engine": "llama.cpp",
+      "title": "tensor_allows_quantization",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-quant.cpp#L302",
+      "detail": "Checks GGUF tensor eligibility before quantization, keeping unsupported tensor conversions out of an output artifact."
+    },
+    {
+      "engine": "Strata",
+      "title": "from_gguf",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/tools/embd_bf16_pack.py#L55",
+      "detail": "Reads the checkpoint token embedding and builds a BF16 embedding pack. This conversion prepares a specific weight artifact; its output is separate from the runtime gather operation."
+    },
+    {
+      "engine": "Strata",
+      "title": "check_experts",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/tools/nvfp4_verify.py#L79",
+      "detail": "Compares ModelOpt expert blocks with the GGUF NVFP4 repack using their scales. This supplies a format-specific validation method for layout conversion."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Write a quantized GGUF candidate",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/tools/quantize/quantize.cpp#L650",
+      "detail": "The quantize CLI calls llama_model_quantize with a source path, destination path and quantization parameters, and checks the return status. It illustrates an actual conversion work order for a supported GGUF input. It does not qualify a Muse conversion on Spark."
+    }
+  ],
+  "weights.decode_blocks": [
+    {
+      "engine": "llama.cpp",
+      "title": "dequantize_row_q4_0",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/ggml/src/ggml-quants.c#L462",
+      "detail": "Converts Q4_0 block scales and packed nibbles into reference floats. A Q4_0 oracle cannot validate a different packing scheme."
+    },
+    {
+      "engine": "Strata",
+      "title": "dequantize_q6_K",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/include/strata/artifact/dequant.hpp#L149",
+      "detail": "Decodes Q6_K’s low and high bit planes with block and group scales. It supplies a distinct oracle for Q6_K packed weights."
+    }
+  ],
+  "weights.adapter_binding": [
+    {
+      "engine": "llama.cpp",
+      "title": "llama_adapter_lora_init_impl",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-adapter.cpp#L151",
+      "detail": "Initializes the adapter from a file against a concrete llama_model. The adapter must match that base model and its target projections."
+    }
+  ],
+  "model.decoder_architecture": [
+    {
+      "engine": "llama.cpp",
+      "title": "llama_model_llama::build_arch_graph",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/models/llama.cpp#L94",
+      "detail": "Selects the Llama architecture graph builder from model-specific metadata; graph construction is not a generic checkpoint parser."
+    },
+    {
+      "engine": "Strata",
+      "title": "Prefill::run_layer_major",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/prefill/prefill.cpp#L7817",
+      "detail": "Advances a prompt span layer by layer from explicit token IDs and a starting position. This is an example of a concrete decoder traversal, with model-specific state and weights."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Llama decoder layer assembly",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/models/llama.cpp#L132",
+      "detail": "Builds the pre-attention normalization before the architecture’s attention, FFN branches and residual joins. It provides an example of preserving a model’s block order in an operator graph."
+    }
+  ],
+  "model.normalization": [
+    {
+      "engine": "llama.cpp",
+      "title": "rms_norm_f32",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/ggml/src/ggml-cuda/norm.cu#L112",
+      "detail": "The CUDA row reduction implements an RMS normalization path; target weight placement and arithmetic must be checked at its caller."
+    },
+    {
+      "engine": "Strata",
+      "title": "native_gr_rms_norm_weighted",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/native_gr_norm.cu#L86",
+      "detail": "Launches weighted RMS normalization on device rows with the supplied learned gamma. Check normalization semantics against the target model before reusing this operation."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Final build_norm in the Llama graph",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/models/llama.cpp#L219",
+      "detail": "Applies final model normalization after the block stack and before the output head, exposing the exact integration boundary."
+    }
+  ],
+  "attention.dense_execution": [
+    {
+      "engine": "llama.cpp",
+      "title": "ggml_cuda_flash_attn_ext",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/ggml/src/ggml-cuda/fattn.cu#L830",
+      "detail": "Dispatches an attention operator based on tensor and backend support. Selecting a compatible kernel is separate from the logical attention mask."
+    },
+    {
+      "engine": "Strata",
+      "title": "native_flash_attn_short_step",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/native_flash_attn.cu#L192",
+      "detail": "Runs short-context step attention from Q, cached K/V, sequence position and capacity. Its shape and sequence-state contract constrain reuse."
+    },
+    {
+      "engine": "Strata",
+      "title": "native_rope_apply",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/native_rope.cu#L189",
+      "detail": "Applies rotary position encoding with explicit rotated dimension, scaling policy and positions, which must follow the checkpoint’s layer rules."
+    }
+  ],
+  "attention.sparse_execution": [
+    {
+      "engine": "Strata",
+      "title": "native_qsa_score",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/native_qsa_score.cu#L194",
+      "detail": "Produces model-specific sparse block scores before candidate shortlisting. A block-scoring path and an attention reduction have independent correctness tests."
+    },
+    {
+      "engine": "Strata",
+      "title": "qsa_decode_attn_step",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/qsa_decode_attn.cu#L1217",
+      "detail": "Consumes selected candidate IDs and attention pools at the current decode step. The selected subset and its mask determine the reduction’s visible context."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "DeepSeek 3.2 lightning indexer",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/models/deepseek32.cpp#L222",
+      "detail": "Builds the indexer query projection from qr before reshaping heads and applying indexer position encoding. Its model-specific indexer feeds the sparse-attention path."
+    }
+  ],
+  "model.embedding_service": [
+    {
+      "engine": "Strata",
+      "title": "NativeEmbed::gather_dev",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/native_head.cpp#L299",
+      "detail": "Uses device token IDs to gather rows via the loaded embedding type and row size, writing hidden vectors to the supplied device output."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "llm_graph_context::build_inp_embd",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-graph.cpp#L2670",
+      "detail": "Builds model inputs from the token embedding tensor or supplied embeddings; the caller provides token scale and model context."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Llama input embedding binding",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/models/llama.cpp#L108",
+      "detail": "Connects model.tok_embd to the block graph input, an explicit boundary between token ID processing and hidden rows."
+    }
+  ],
+  "model.logit_head": [
+    {
+      "engine": "Strata",
+      "title": "NativeHead::run",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/native_head.cpp#L149",
+      "detail": "Takes mixed hidden rows and writes logits through the native head, with validation of loaded weights, buffers and stream."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Output vocabulary projection",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/models/llama.cpp#L228",
+      "detail": "Uses the model output tensor in build_lora_mm on final hidden rows. This is the vocabulary projection, preceding token sampling."
+    }
+  ],
+  "graph.lower_capture_replay": [
+    {
+      "engine": "Strata",
+      "title": "CapturedGraph::launch",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/graph.cpp#L75",
+      "detail": "Checks that a CUDA executable graph exists before launching on the supplied stream; source-level graph construction alone cannot demonstrate successful replay."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "ggml_gallocr_alloc_graph_impl",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/ggml/src/ggml-alloc.c#L715",
+      "detail": "Allocates graph buffers according to node and leaf buffer IDs, exposing storage assignment as a graph execution prerequisite."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "FFN graph construction",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/models/llama.cpp#L177",
+      "detail": "Lowers the FFN into graph operations using the selected model’s weights. This example covers graph construction and makes no claim about captured CUDA replay."
+    }
+  ],
+  "backend.execute_operators": [
+    {
+      "engine": "llama.cpp",
+      "title": "ggml_cuda_compute_forward",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/ggml/src/ggml-cuda/ggml-cuda.cu#L2726",
+      "detail": "Switches on ggml operation codes to select concrete CUDA implementations for model graph nodes."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "ggml_cuda_mul_mat_q",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/ggml/src/ggml-cuda/mmq.cu#L164",
+      "detail": "Dispatches CUDA quantized matrix multiplication from the ggml operator; supported weight type and tensor shapes control eligibility."
+    },
+    {
+      "engine": "Strata",
+      "title": "Context::run",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/prefill/moe_mmq.cu#L356",
+      "detail": "Submits a grouped MoE matrix product using its active row count and group descriptors; empty work exits without launching a compute operation."
+    }
+  ],
+  "memory.sequence_kv": [
+    {
+      "engine": "Strata",
+      "title": "kv_append_q4_steps",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/kv_q4.cu#L195",
+      "detail": "Appends quantized K/V into physical pages using the supplied page table and step positions. The attention reader must understand the same format."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "llama_kv_cache",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-kv-cache.cpp#L65",
+      "detail": "A persistent cache object binds per-sequence state to the model and its memory configuration."
+    }
+  ],
+  "sequence.recurrent_execution": [
+    {
+      "engine": "Strata",
+      "title": "gdn_chunk_recurrence",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/prefill/gdn_chunk.cu#L533",
+      "detail": "Runs a gated delta recurrence on a passed-in state and a prompt chunk, demonstrating a conditional alternative to attention-only state."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Qwen3Next recurrent attention call",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/models/qwen3next.cpp#L530",
+      "detail": "Passes state, normalized queries/keys, values and gates to the recurrent attention graph, a model-specific alternative to standard KV attention."
+    }
+  ],
+  "dense.feed_forward": [
+    {
+      "engine": "Strata",
+      "title": "swilu_legacy",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/include/strata/kernels/swiglu.cuh#L27",
+      "detail": "Defines the SiLU(gate) × up expression with explicit precision before multiplication. Adjacent variants illustrate how a fusion can change numerical behavior unless the epilogue preserves the chosen arithmetic."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Llama dense build_ffn call",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/models/llama.cpp#L177",
+      "detail": "Passes architecture-specific FFN projection tensors to the graph builder after pre-FFN normalization; the adjacent MoE branch is selected separately."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "llm_graph_context::build_ffn",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-graph.cpp#L1979",
+      "detail": "Constructs a configurable FFN from projection weights, activation policy and optional biases. Encodes the reusable operation and the model-specific decisions an agent must check."
+    }
+  ],
+  "model.expert_ffn": [
+    {
+      "engine": "Strata",
+      "title": "moe_hit_grouped_s2",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/s2_expert_grouped.cu#L661",
+      "detail": "Executes grouped expert work for resident weights, demonstrating the handoff from residency resolution to expert computation."
+    },
+    {
+      "engine": "Strata",
+      "title": "Context::run",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/prefill/moe_mmq.cu#L356",
+      "detail": "Lowers a grouped expert matrix product to backend work using active rows; useful for batched prefill rather than assuming one expert per token launch."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "build_moe_ffn",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-graph.cpp#L2204",
+      "detail": "The MoE graph wiring separates routing, expert gathers, expert projections and mixture operations inside a model forward path."
+    }
+  ]
+}

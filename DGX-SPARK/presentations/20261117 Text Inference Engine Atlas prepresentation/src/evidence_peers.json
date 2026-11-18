@@ -1,0 +1,232 @@
+{
+  "engine.expert_streaming": [
+    {
+      "engine": "ds4",
+      "title": "Next-layer expert fill",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_cuda.cu#L29465",
+      "detail": "Iterates all experts in the next layer, skips cache hits and plans missing gate/up/down ranges for overlapping reads and copies. This is next-layer prefetch rather than per-token expert prediction."
+    },
+    {
+      "engine": "ds4",
+      "title": "ds4_gpu_stream_expert_cache_prefetch_finish",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_cuda.cu#L29352",
+      "detail": "Finishes or cancels the outstanding asynchronous fill before slot and transfer state can be reused."
+    },
+    {
+      "engine": "SGLang",
+      "title": "EagerExecutor._run",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/layers/moe/paged_experts/executor.py#L59",
+      "detail": "Counts actual top-k IDs, derives distinct required experts and plans waves against bounded resident slots and host rows. The resulting partial waves are combined before returning hidden rows. This paged-experts subsystem requires a model-specific integration check."
+    }
+  ],
+  "placement.partition_model": [
+    {
+      "engine": "SGLang",
+      "title": "LRUPolicy.place",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/layers/moe/paged_experts/residency.py#L32",
+      "detail": "Maps a requested wave to fast-tier slots, preserves resident hits and returns the misses to load. This is a runtime expert-placement policy with a fixed slot count."
+    },
+    {
+      "engine": "ds4",
+      "title": "ds4_compute_layer_placement",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_layer_pack.c#L14",
+      "detail": "Accepts layer entry sizes and placement constraints and computes a layer assignment. Use a capacity-feasible assignment before submitting layer work."
+    },
+    {
+      "engine": "ds4",
+      "title": "ds4_ssd_auto_cache_plan",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_ssd.c#L108",
+      "detail": "Accounts for the model limit, recommended memory, non-routed bytes and bytes per expert when sizing the expert cache. Fixed model data and routed weight slots compete for the same budget."
+    }
+  ],
+  "weights.load_checkpoint": [
+    {
+      "engine": "SGLang",
+      "title": "get_model_loader",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/model_loader/loader.py#L4217",
+      "detail": "Selects a loader from the configured model and load format; checkpoint compatibility is an explicit startup decision."
+    },
+    {
+      "engine": "SGLang",
+      "title": "safetensors_weights_iterator",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/model_loader/weight_utils.py#L1316",
+      "detail": "Iterates named weight tensors from safetensors shards so a model-specific binder can assign the incoming tensors."
+    },
+    {
+      "engine": "ds4",
+      "title": "ds4_engine_open_internal",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L73543",
+      "detail": "Opens a concrete engine with its model artifacts and options. This is a native startup integration boundary rather than proof the implementation accepts Muse models."
+    }
+  ],
+  "weights.prepare_artifact": [
+    {
+      "engine": "ds4",
+      "title": "ds4_repack_build_q2k_aligned",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/cuda/mmq/ds4_repack.cu#L1045",
+      "detail": "Builds the aligned Q2_K layout for ds4 matrix multiplication. Retaining scale and lane order is required when targeting a different kernel."
+    },
+    {
+      "engine": "SGLang",
+      "title": "write_experts",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/layers/moe/paged_experts/expert_cache.py#L173",
+      "detail": "Packs per-tensor expert rows into the expert-cache object layout and writes them for later direct IO. This covers storage layout preparation; the routine does not itself change quantization precision."
+    }
+  ],
+  "weights.decode_blocks": [
+    {
+      "engine": "ds4",
+      "title": "dequant_q8_0_to_f16_kernel",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_cuda.cu#L7041",
+      "detail": "Decodes Q8_0 packed weights to a half-precision output buffer. The accepted block format and output dtype are explicit compatibility boundaries."
+    },
+    {
+      "engine": "SGLang",
+      "title": "dequantize_block_q6_K",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/kernels/aot/csrc/quantization/gguf/dequantize.cuh#L265",
+      "detail": "CUDA kernel extracts the Q6_K bit fields and applies quantization scales before storing a decoded tile; compare with a Q6_K reference oracle."
+    }
+  ],
+  "memory.runtime_arenas": [
+    {
+      "engine": "ds4",
+      "title": "cuda_tmp_alloc_on",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_cuda.cu#L753",
+      "detail": "Associates temporary allocations with a logical memory tier, checks capacity/identity on special paths and selects the corresponding device allocator."
+    },
+    {
+      "engine": "SGLang",
+      "title": "FinalizePushWorkspace",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/layers/communication/muse_spark_finalize_workspace.py#L24",
+      "detail": "Binds rank, device, hidden width and a symmetric workspace lease to the fused Muse finalize path. Push slots require dependency-ordered launches; this concrete example concerns a tensor-parallel backend."
+    }
+  ],
+  "observability.runtime_events": [
+    {
+      "engine": "SGLang",
+      "title": "SchedulerReqTimeStats",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/observability/req_time_stats.py#L690",
+      "detail": "Tracks request phases with scheduler-owned timing state so work can be attributed to the request timeline."
+    },
+    {
+      "engine": "ds4",
+      "title": "metal_graph_profile_router_selection",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L23992",
+      "detail": "Captures actual selected expert IDs in the Metal graph path for routing analysis. A selection trace measures demand; it does not establish prediction quality."
+    },
+    {
+      "engine": "SGLang",
+      "title": "Gate optional host ranges for scheduler stages",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/observability/scheduler_stage_metrics.py#L128",
+      "detail": "The stage wrapper supplies a scheduler-specific range name and the NVTX enable flag. It shows optional source annotations around work; GPU completion needs a device-side timeline."
+    },
+    {
+      "engine": "SGLang",
+      "title": "Enter an NVTX annotation scope only when enabled",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/utils/nvtx_utils.py#L77",
+      "detail": "The context manager can enter an NVTX annotation and independently support profiler recording. This is an implementation example for the marker CC."
+    }
+  ],
+  "backend.execute_operators": [
+    {
+      "engine": "SGLang",
+      "title": "register_attention_backend",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/layers/attention/attention_registry.py#L50",
+      "detail": "Registers named attention implementations. Model geometry and hardware qualification still govern which registered implementation can execute."
+    },
+    {
+      "engine": "ds4",
+      "title": "ds4_mmq_dense_impl",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/cuda/mmq/ds4_mmq.cu#L1006",
+      "detail": "Dispatches dense quantized matrix work through a CUDA implementation, giving the worker a concrete shape/layout-dependent numerical path."
+    }
+  ],
+  "scheduler.request_lifecycle": [
+    {
+      "engine": "ds4",
+      "title": "dequeue",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_server.c#L14957",
+      "detail": "Waits for queued work or shutdown under the request mutex, removes the next job, and hands ownership to the serving worker. This evidence covers queue lifecycle only."
+    },
+    {
+      "engine": "SGLang",
+      "title": "process_batch_result",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/managers/scheduler.py#L5816",
+      "detail": "Consumes completed model work and dispatches result handling by batch kind, linking iteration results back to scheduler-owned request state."
+    }
+  ],
+  "batch.execution_layout": [
+    {
+      "engine": "SGLang",
+      "title": "get_new_batch_prefill",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/managers/scheduler.py#L4458",
+      "detail": "Forms the next prefill plan in the context of the currently running batch, making prompt admission and iteration capacity a shared decision."
+    }
+  ],
+  "decode.advance_sequence": [
+    {
+      "engine": "ds4",
+      "title": "ds4_session_sync",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L78640",
+      "detail": "Synchronizes a session to a supplied prompt token sequence before continuation."
+    },
+    {
+      "engine": "ds4",
+      "title": "ds4_session_eval",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L81340",
+      "detail": "Runs evaluation of one supplied token against a session; caller-owned sampling and output remain separate completion steps."
+    }
+  ],
+  "graph.lower_capture_replay": [
+    {
+      "engine": "ds4",
+      "title": "ds4_gpu_decode_graph_begin",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_cuda.cu#L1138",
+      "detail": "Starts graph handling with an explicit decode graph key. Replay eligibility depends on the shape and resources represented by that key."
+    },
+    {
+      "engine": "SGLang",
+      "title": "DecodeCudaGraphRunner",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/model_executor/runner/decode_cuda_graph_runner.py#L270",
+      "detail": "Manages captured decode execution as a distinct fast path in the model runner."
+    }
+  ],
+  "model.expert_ffn": [
+    {
+      "engine": "SGLang",
+      "title": "EagerExecutor._run_waves",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/layers/moe/paged_experts/executor.py#L88",
+      "detail": "Runs expert computation in bounded waves and merges their partial results. The wave scheduler preserves assignments even when distinct experts exceed resident slots."
+    }
+  ],
+  "merge.expert_contributions": [
+    {
+      "engine": "SGLang",
+      "title": "Return combined paged-expert outputs",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/layers/moe/paged_experts/executor.py#L80",
+      "detail": "Calls the runner contract to finish the merged wave results with the input hidden rows and routed scaling factor before returning standard combine input."
+    }
+  ],
+  "model.logit_head": [
+    {
+      "engine": "ds4",
+      "title": "Project the normalized row into vocabulary logits",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L16312",
+      "detail": "The Q8_0 output matrix consumes the normalized hidden row and writes logits. This establishes the vocabulary projection job in this model family."
+    },
+    {
+      "engine": "SGLang",
+      "title": "Pass Muse hidden states and its LM head to logits processing",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/models/muse_spark.py#L1349",
+      "detail": "The Muse forward path supplies input IDs, hidden states, the model’s LM head and the current forward batch to the logits processor."
+    }
+  ],
+  "model.embedding_service": [
+    {
+      "engine": "SGLang",
+      "title": "Look up Muse token embeddings",
+      "url": "https://github.com/sgl-project/sglang/blob/1aa45c661758b2ff99dc8c57ec849175ab4625ed/python/sglang/srt/models/muse_spark.py#L1222",
+      "detail": "When precomputed input embeddings are absent, the Muse implementation gathers embedding rows using the input token IDs."
+    }
+  ]
+}

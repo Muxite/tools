@@ -1,0 +1,150 @@
+{
+  "attention.dense_execution": {
+    "site": "model/attend",
+    "boundary": "Own the attention result for a specified mask, head layout and sequence position. A failing attention row can be reproduced with fixed Q, K and V independently of the cache allocator."
+  },
+  "backend.execute_operators": {
+    "site": "backend/dispatch",
+    "boundary": "Own shape and dtype admission, fallback and launch. The same correct model operator can dispatch to an incompatible device kernel."
+  },
+  "batch.execution_layout": {
+    "site": "schedule/batch",
+    "boundary": "Turn admitted requests into offsets, positions and state handles. A batch can be scheduled fairly yet still mix two sequences’ rows."
+  },
+  "decode.advance_sequence": {
+    "site": "generate/step",
+    "boundary": "Own the transition from committed token and sequence state to next-step logits. Cached execution can be compared with full-context recomputation."
+  },
+  "dense.feed_forward": {
+    "site": "model/dense",
+    "boundary": "Where the layer configuration selects a dense FFN, verify its projections, activation and residual shape without expert selection or token packing."
+  },
+  "engine.expert_streaming": {
+    "site": "state/fill",
+    "boundary": "Own a demanded weight range from admission through read completion and last use. One controller must protect slots and enforce the byte ceiling."
+  },
+  "graph.lower_capture_replay": {
+    "site": "backend/capture",
+    "boundary": "A captured graph is a reusable executable with validity constraints. Qualify pointer, shape and state changes against uncaptured execution before enabling replay."
+  },
+  "memory.reusable_sessions": {
+    "site": "state/reuse",
+    "boundary": "Share cached prefixes only across compatible identities. A correct per-sequence KV allocator can still reuse stale prefix content across requests."
+  },
+  "memory.runtime_arenas": {
+    "site": "state/scratch",
+    "boundary": "Own physical workspace lifetimes and alignment across operators. Verify peak live bytes and overlap separately from model arithmetic."
+  },
+  "memory.sequence_kv": {
+    "site": "state/append",
+    "boundary": "Own the mapping from logical position to live KV bytes, including migration and reclamation. Moving a page must update the same map that readers use."
+  },
+  "merge.expert_contributions": {
+    "site": "model/dispatch",
+    "boundary": "Own both ends of token permutation. Packing and weighted reconstruction must agree on token identity, order and aligned mixture weights."
+  },
+  "model.decoder_architecture": {
+    "site": "model/norm",
+    "boundary": "Own block order, residual state and site-specific normalization. A passing kernel can still be inserted at the wrong residual boundary."
+  },
+  "model.embedding_service": {
+    "site": "model/embed",
+    "boundary": "Map vocabulary IDs to the exact checkpoint rows and embedding representation consumed by the first layer. Verify with known IDs before testing the stack."
+  },
+  "model.expert_routing": {
+    "site": "model/route",
+    "boundary": "Produce authoritative expert IDs and corresponding unbiased mixture weights. This decision can be checked before loading or executing an expert."
+  },
+  "model.logit_head": {
+    "site": "model/head",
+    "boundary": "Turn the final hidden row into vocabulary logits under the checkpoint’s projection and output transform. This is a small independently testable boundary between model math and sampling."
+  },
+  "observability.runtime_events": {
+    "site": "backend/signal",
+    "boundary": "Own optional source annotations, correlation IDs and their measured overhead. Kernel owners expose hooks; the lab interprets the resulting trace."
+  },
+  "placement.partition_model": {
+    "site": "startup/place",
+    "boundary": "Produce a feasible placement plan for the target and the deployed pack. The runtime cache then enforces that plan under real demand."
+  },
+  "routing.forecast_expert_demand": {
+    "site": "model/predict",
+    "boundary": "A predictor emits optional time-bounded hints. Held-out demand can score its lead time and wasted bytes independently of routing correctness."
+  },
+  "sampling.select_tokens": {
+    "site": "generate/sample",
+    "boundary": "Convert logits into a selected token under an explicit sampling policy, seed and constraints. Replay with frozen logits."
+  },
+  "scheduler.request_lifecycle": {
+    "site": "schedule/admit",
+    "boundary": "Own admission, fairness and slot retirement under capacity constraints. The batch layout worker consumes the accepted assignments."
+  },
+  "serving.request_gateway": {
+    "site": "interface/accept",
+    "boundary": "Own text request, cancellation and completion semantics across the API boundary. Tokenization and model computation can be verified separately."
+  },
+  "tokenizer.prepare_request": {
+    "site": "interface/encode",
+    "boundary": "Own text-to-ID and committed-ID-to-text conventions, including incremental buffering. Both ends depend on the same vocabulary and special-token rules."
+  },
+  "weights.decode_blocks": {
+    "site": "backend/quant",
+    "boundary": "Own the runtime interpretation of bytes, block metadata and scales. A format-specific fixture can fail even when the manifest and exporter pass."
+  },
+  "weights.load_checkpoint": {
+    "site": "startup/manifest",
+    "boundary": "Admit a complete tensor inventory and bind names and offsets to the model. Reject incompatible packs before any kernel consumes them."
+  },
+  "weights.prepare_artifact": {
+    "site": "startup/layout",
+    "boundary": "Produce a reproducible deployable pack and record how it was made. A new conversion can be evaluated independently with the same runtime decoder."
+  },
+  "model.expert_ffn": {
+    "site": "model/expert",
+    "boundary": "Consume ready expert weights and assigned rows and return per-expert activations. A fixed expert fixture isolates projection errors from routing or cache policy."
+  },
+  "compiler.engine_contract": {
+    "site": "f_spec/freeze",
+    "boundary": "Freeze the weight policy, quality tolerance, memory ceiling and workload before comparing candidates."
+  },
+  "factory.workflow_planning": {
+    "site": "f_plan/workorder",
+    "boundary": "Bind each deliverable to a work order, dependencies and an acceptance decision. Several agents may share the same CC."
+  },
+  "factory.source_integration": {
+    "site": "f_build/apply",
+    "boundary": "Produce a reviewable diff from the work order, including any optional annotation changes, before the independent build."
+  },
+  "factory.builder": {
+    "site": "f_build/build",
+    "boundary": "Turn the revision and diff into an identified executable image. Its manifest makes it possible to reproduce the candidate that was measured."
+  },
+  "factory.controlled_experiment": {
+    "site": "f_lab/pair",
+    "boundary": "Own controls, measurement and verdict together. Quantization quality, latency and storage measurements must refer to the same candidate and trial."
+  },
+  "parallel.expert_exchange": {
+    "site": "model/dispatch",
+    "boundary": "Extension for distributed expert dispatch and the return mapping of remote outputs."
+  },
+  "parallel.model_execution": {
+    "site": "generate/handoff",
+    "boundary": "Extension for rank-local work, collectives and transfer of prefill state between workers."
+  },
+  "sequence.recurrent_execution": {
+    "site": "model/recur",
+    "boundary": "Extension for models whose next step consumes a recurrent state rather than only the attention cache."
+  },
+  "decode.speculative_execution": {
+    "site": "generate/draft",
+    "boundary": "Extension for a proposer, target verification and rollback of rejected state."
+  },
+  "attention.sparse_execution": {
+    "site": "model/shortlist",
+    "boundary": "Extension for selecting candidate blocks before attention over a subset of KV."
+  },
+  "weights.adapter_binding": {
+    "site": "startup/bind",
+    "boundary": "Extension for composing adapter parameters with a base revision and isolating their effects."
+  }
+}

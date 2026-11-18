@@ -294,6 +294,61 @@
      "stream"
     ]
    ]
+  },
+  {
+   "id": "quant",
+   "title": "Compare quantizations",
+   "intro": "Follow one precision-policy change from frozen quality gates to the lab verdict.",
+   "steps": [
+    [
+     "f_spec",
+     "compiler.engine_contract",
+     "Freeze the reference, candidate tensor precision policy, held-out quality gates, device budgets and target workload.",
+     "budget"
+    ],
+    [
+     "startup",
+     "weights.prepare_artifact",
+     "Record a per-tensor format manifest. Use the supplier’s pinned checkpoint or export a candidate with isolated calibration data.",
+     "layout"
+    ],
+    [
+     "startup",
+     "weights.load_checkpoint",
+     "Verify the pack identity, tensor metadata and byte ranges before mapping bounded windows.",
+     "manifest"
+    ],
+    [
+     "backend",
+     "weights.decode_blocks",
+     "Decode edge-value blocks independently and qualify the scale convention before exercising fused multiplication.",
+     "quant"
+    ],
+    [
+     "backend",
+     "backend.execute_operators",
+     "Observe the kernel actually selected for the format and shape, including any fallback or workspace expansion.",
+     "gemm"
+    ],
+    [
+     "state",
+     "engine.expert_streaming",
+     "Measure real expert bytes, capacity and storage misses under the same demand trace.",
+     "fill"
+    ],
+    [
+     "f_lab",
+     "factory.controlled_experiment",
+     "Score matched held-out prompts and report the quality delta and uncertainty alongside measured memory, latency, throughput and bytes from storage.",
+     "pair"
+    ],
+    [
+     "f_evidence",
+     "factory.controlled_experiment",
+     "Return the pinned artifacts and pass, fail or inconclusive verdict to the planner. Quality regressions remain visible in the RSI record.",
+     "record"
+    ]
+   ]
   }
  ]
 }

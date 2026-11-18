@@ -1,736 +1,737 @@
 {
- "layers": [
-  {
-   "id": "f_spec",
-   "title": "Intent and contract",
-   "summary": "Translate the user’s request into a versioned contract. Name the required model behavior, permitted implementation choices, target limits and tests that decide acceptance.",
-   "ops": [
+  "layers": [
     {
-     "id": "intake",
-     "title": "Capture intent",
-     "detail": "Identify the requested model and revision, target topology, serving mode, context and concurrency range, memory limit, allowed dependencies and success criteria. Keep user preferences separate from facts observed on the machine.",
-     "check": "Flag missing facts that change feasibility. Preserve the exact request and evidence for resolved facts.",
-     "metric": "Unresolved contract-changing questions.",
-     "cc": [
-      "compiler.intent_brief"
-     ]
+      "id": "f_spec",
+      "title": "Intent and contract",
+      "summary": "Translate the user’s request into a versioned contract. Name the required model behavior, permitted implementation choices, target limits and tests that decide acceptance.",
+      "ops": [
+        {
+          "id": "intake",
+          "title": "Capture intent",
+          "detail": "Identify the requested model and revision, target topology, serving mode, context and concurrency range, memory limit, allowed dependencies and success criteria. Keep user preferences separate from facts observed on the machine.",
+          "check": "Flag missing facts that change feasibility. Preserve the exact request and evidence for resolved facts.",
+          "metric": "Unresolved contract-changing questions.",
+          "cc": [
+            "compiler.intent_brief"
+          ]
+        },
+        {
+          "id": "modelterms",
+          "title": "Bind contract terms to model behavior",
+          "detail": "Bind words such as “five experts plus one shared” to routed width, independent shared tensors, score transformation, normalization and the checkpoint’s architecture. Check tokenizer identity and vocabulary boundaries.",
+          "check": "Reject an unsupported checkpoint change before planning. Record which settings can vary at runtime.",
+          "metric": "Unbound model fields and contradictory settings.",
+          "cc": [
+            "compiler.engine_contract",
+            "factory.source_inspection"
+          ]
+        },
+        {
+          "id": "budget",
+          "title": "Set target budgets",
+          "detail": "Attach units, measurement boundaries and workload shapes to VRAM or shared-memory ceilings, TTFT, inter-token latency, throughput and quality. Distinguish a microkernel target from a user-visible SLO.",
+          "check": "A reviewer can run the acceptance rule from its workload, metric and threshold.",
+          "metric": "Acceptance measures with a defined workload and denominator.",
+          "cc": [
+            "compiler.engine_contract"
+          ]
+        },
+        {
+          "id": "freeze",
+          "title": "Freeze the contract",
+          "detail": "Release the contract revision with the ontology, required interfaces, allowed substitutions, independent oracle and pass/fail gates. Bind supplier commitments for weights, tokenizer, SDK and runtime dependencies.",
+          "check": "Changing routing semantics or relaxing quality opens a contract revision. An equivalent backend choice stays inside the authorized design space.",
+          "metric": "Contracts with identified asset suppliers and acceptance gates.",
+          "cc": [
+            "compiler.engine_contract"
+          ]
+        }
+      ],
+      "edges": [
+        [
+          "intake",
+          "modelterms",
+          "model and target references"
+        ],
+        [
+          "intake",
+          "budget",
+          "user goals and constraints"
+        ],
+        [
+          "modelterms",
+          "freeze",
+          "model obligations"
+        ],
+        [
+          "budget",
+          "freeze",
+          "resource and quality gates"
+        ]
+      ]
     },
     {
-     "id": "modelterms",
-     "title": "Bind contract terms to model behavior",
-     "detail": "Bind words such as “five experts plus one shared” to routed width, independent shared tensors, score transformation, normalization and the checkpoint’s architecture. Check tokenizer identity and vocabulary boundaries.",
-     "check": "Reject an unsupported checkpoint change before planning. Record which settings can vary at runtime.",
-     "metric": "Unbound model fields and contradictory settings.",
-     "cc": [
-      "compiler.engine_contract",
-      "factory.source_inspection"
-     ]
+      "id": "f_plan",
+      "title": "Inventory and work orders",
+      "summary": "Compare the contract with the source inventory. For each missing or unqualified interface, identify the artifacts an agent must deliver, the CCs it can use and the dependencies the workflow must schedule.",
+      "ops": [
+        {
+          "id": "survey",
+          "title": "Inspect source and image",
+          "detail": "Pin the tree, model, tokenizer and build configuration. Identify where each obligated interface is owned. In an empty tree, record the starting inventory and external providers explicitly.",
+          "check": "Corroborate declared support with a callable path, supported shape and effective configuration. Flag source-only evidence.",
+          "metric": "Required interfaces with known providers.",
+          "cc": [
+            "factory.source_inspection"
+          ]
+        },
+        {
+          "id": "gaps",
+          "title": "Find missing or unqualified interfaces",
+          "detail": "Classify each interface as qualified for this contract, present with missing evidence, incompatible, or missing. A selector with a compiled k needs a cross-check against the model geometry and fallback.",
+          "check": "A passing existing interface can be reused without a code change. An unavailable shape yields an adaptation or a new implementation order.",
+          "metric": "Unresolved obligations by component and target.",
+          "cc": [
+            "factory.source_inspection",
+            "factory.cc_qualification"
+          ]
+        },
+        {
+          "id": "workorder",
+          "title": "Map work orders to CCs",
+          "detail": "For each required artifact, name its producer, consumers and acceptance test. One JiuwenSwarm agent may use several CCs on a work order. Several agents or subworkflows may invoke the same CC with their own inputs. For example, prefill and decode workers can both use the KV-state CC with different token shapes.",
+          "check": "A clean start identifies every missing producer. Shared CC invocations carry per-job inputs, output identities and retry boundaries.",
+          "metric": "Unprovided artifacts and blocked work orders.",
+          "cc": [
+            "factory.workflow_planning"
+          ]
+        },
+        {
+          "id": "experiment",
+          "title": "Design the experiment",
+          "detail": "When an implementation or performance choice remains open, specify the predicted mechanism, a counterexample, controls, representative shapes and an independent acceptance criterion.",
+          "check": "Freeze changes and stopping rules before observing candidate results. Include transfer risks when adapting another engine.",
+          "metric": "Experiments with a falsifiable observation and declared stop rule.",
+          "cc": [
+            "factory.experiment_design"
+          ]
+        },
+        {
+          "id": "assign",
+          "title": "Dispatch ready work orders",
+          "detail": "The workflow releases an order when its contract inputs and prerequisite artifacts are ready. Give the assigned agent the source revision, permitted CCs, write target and acceptance cases. Publish each verified output once so downstream orders can consume the same revision.",
+          "check": "Every agent receives a bounded write target and a verifiable result. Deduplicate common inputs across subworkflows.",
+          "metric": "Ready, blocked and completed orders per contract.",
+          "cc": [
+            "factory.workflow_planning"
+          ]
+        }
+      ],
+      "edges": [
+        [
+          "survey",
+          "gaps",
+          "pinned inventory"
+        ],
+        [
+          "gaps",
+          "workorder",
+          "required producers"
+        ],
+        [
+          "workorder",
+          "assign",
+          "artifact dependencies"
+        ],
+        [
+          "gaps",
+          "experiment",
+          "unresolved design choice"
+        ],
+        [
+          "experiment",
+          "assign",
+          "frozen trial plan"
+        ]
+      ]
     },
     {
-     "id": "budget",
-     "title": "Set target budgets",
-     "detail": "Attach units, measurement boundaries and workload shapes to VRAM or shared-memory ceilings, TTFT, inter-token latency, throughput and quality. Distinguish a microkernel target from a user-visible SLO.",
-     "check": "A reviewer can run the acceptance rule from its workload, metric and threshold.",
-     "metric": "Acceptance measures with a defined workload and denominator.",
-     "cc": [
-      "compiler.engine_contract"
-     ]
+      "id": "f_build",
+      "title": "Source and image",
+      "summary": "Implement or adapt each assigned interface, check it against a reference, build the release image and hand the candidate and test inputs to the external lab.",
+      "ops": [
+        {
+          "id": "apply",
+          "title": "Implement the assigned interface",
+          "detail": "Bind the selected engine CCs at the target interfaces. Implement a missing reference path, adapt a compatible donor or lower an eligible operation into code. Keep generated output and source edits reviewable.",
+          "check": "Check layout, shape, dtype, state ownership, execution order and fallback. Reject a source transfer that changes model semantics.",
+          "metric": "Changed obligations with a source revision and a test.",
+          "cc": [
+            "factory.source_integration"
+          ]
+        },
+        {
+          "id": "oracle",
+          "title": "Check the implementation",
+          "detail": "Compare candidate operators to an independent reference with known tolerances. For MoE, inspect aligned IDs and weights, routed and shared contributions, then restored token order and final logits.",
+          "check": "Expose sign, scale, permutation, stale state and unsupported shape faults before building a release. Record first divergence.",
+          "metric": "Max error and first divergent tensor or token.",
+          "cc": [
+            "verification.numerical_conformance"
+          ]
+        },
+        {
+          "id": "build",
+          "title": "Build the release image",
+          "detail": "Compile pinned source with the selected toolchain and SDK. Attach the image digest, model mounting contract, native flags, dependencies, entry point and expected backend.",
+          "check": "Clean start the image on its target interface. Fail admission for missing libraries, a mismatched runtime ABI or the wrong active backend.",
+          "metric": "Build duration, artifact size and startup smoke verdict.",
+          "cc": [
+            "factory.builder"
+          ]
+        },
+        {
+          "id": "handoff",
+          "title": "Submit image and workload to the lab",
+          "detail": "Link the image digest, workload, configuration, expected outputs and allowed target to the build receipt. Pass an immutable candidate and its submission manifest to the lab manager.",
+          "check": "Verify digests and resolve each dependency before allocating a trial. Record any evidence limited to a host-only test.",
+          "metric": "Manifest completeness and unresolved image obligations.",
+          "cc": [
+            "factory.builder",
+            "factory.cc_qualification"
+          ]
+        }
+      ],
+      "edges": [
+        [
+          "apply",
+          "oracle",
+          "source revision and fixtures"
+        ],
+        [
+          "apply",
+          "build",
+          "exact source closure"
+        ],
+        [
+          "oracle",
+          "handoff",
+          "correctness receipts"
+        ],
+        [
+          "build",
+          "handoff",
+          "image digest and dependencies"
+        ]
+      ]
     },
     {
-     "id": "freeze",
-     "title": "Freeze the contract",
-     "detail": "Release the contract revision with the ontology, required interfaces, allowed substitutions, independent oracle and pass/fail gates. Bind supplier commitments for weights, tokenizer, SDK and runtime dependencies.",
-     "check": "Changing routing semantics or relaxing quality opens a contract revision. An equivalent backend choice stays inside the authorized design space.",
-     "metric": "Contracts with identified asset suppliers and acceptance gates.",
-     "cc": [
-      "compiler.engine_contract"
-     ]
+      "id": "f_lab",
+      "title": "Controlled experiments",
+      "summary": "Run the versioned candidate on its declared target. Return numerical checks, workload measurements and focused diagnostics with the inputs and conditions needed to interpret them.",
+      "ops": [
+        {
+          "id": "stage",
+          "title": "Stage the candidate on the target",
+          "detail": "Check image identity, target health, SDK/driver capability, resource lease and workload inputs. Record cold/warm cache policy and immutable attempt identity before launch.",
+          "check": "Simulate a timeout or lost acknowledgement. Reconcile the lease and export partial evidence before cleanup or retry.",
+          "metric": "Valid attempts, fault reasons and missing coverage.",
+          "cc": [
+            "factory.lab_execution"
+          ]
+        },
+        {
+          "id": "quality",
+          "title": "Check numerical quality",
+          "detail": "Run operator fixtures, tiny forward references, cached versus recomputed decode, rollback and reuse tests, then contract-level output or task-quality checks. Compare distributions when sampling is stochastic.",
+          "check": "Deliberately perturb one route, KV position, scale or output token. Confirm the designated oracle detects the fault.",
+          "metric": "Error distributions, mismatched token positions and quality scores.",
+          "cc": [
+            "verification.numerical_conformance"
+          ]
+        },
+        {
+          "id": "benchmark",
+          "title": "Measure service performance",
+          "detail": "Run identified prompt lengths, output lengths, offered load and concurrency. Measure request arrival to first output, admitted queue delay, per-token intervals and total emitted tokens divided by measured wall time.",
+          "check": "Separate startup, warm-up and timed intervals. Count failed and cancelled requests and report latency percentiles with sample counts.",
+          "metric": "TTFT, inter-token p50/p95/p99, output tokens/s and completion rate.",
+          "cc": [
+            "verification.performance_measurement"
+          ]
+        },
+        {
+          "id": "profile",
+          "title": "Locate the critical-path delay",
+          "detail": "Align request phases, CPU submit ranges, GPU events, transfer completions and kernel launches. Slow decode can arise from scheduler gaps, KV reads, expert-weight misses, collectives or kernel limits.",
+          "check": "Use correlated timelines and measure instrumentation overhead. Overlapping intervals cannot be summed into wall time.",
+          "metric": "GPU active time, launch gaps, bytes moved, exposed stalls and observer cost.",
+          "cc": [
+            "factory.runtime_profiling"
+          ]
+        },
+        {
+          "id": "capacity",
+          "title": "Test resource feasibility",
+          "detail": "Sweep a controlled capacity or placement choice, measuring simultaneously live weights, KV, expert residency, staging and workspace. Calibrate peak memory, bandwidth and transfer ceilings on the actual target.",
+          "check": "Preserve model outputs while varying one budget. Account for shared physical memory once on unified-memory hardware.",
+          "metric": "Peak live bytes, headroom, transfer volume and useful throughput.",
+          "cc": [
+            "factory.resource_lab"
+          ]
+        },
+        {
+          "id": "stream",
+          "title": "Replay expert-weight demand",
+          "detail": "Use time-ordered routing traces to compare residency, eviction and prefetch alternatives. Separate selected, already resident, late, useful and wasted bytes. Include cold misses and forced delayed completion.",
+          "check": "Prevent future-token leakage. Validate exact bytes and outputs on demand misses, then confirm any replay benefit on target.",
+          "metric": "Stall time avoided, useful bytes, wasted bytes and held-out coverage.",
+          "cc": [
+            "factory.streaming_lab"
+          ]
+        },
+        {
+          "id": "precision",
+          "title": "Assess precision",
+          "detail": "Evaluate a declared encoding and calibrator against reference tensors for the same layout, scales, rounding and accumulator type. Compare the byte budget against downstream model quality.",
+          "check": "Use held-out inputs and an independent format-specific oracle. A passed INT4 fixture does not qualify a Q6_K decoder.",
+          "metric": "Reconstruction error, bytes per weight and downstream quality delta.",
+          "cc": [
+            "factory.precision_lab"
+          ]
+        },
+        {
+          "id": "pair",
+          "title": "Compare candidates",
+          "detail": "For a candidate change, pair baseline and candidate under matched workloads, build identities and cache states. Counterbalance run order and record excluded attempts with reasons.",
+          "check": "Apply the frozen gates, check correctness first and reserve independent confirmation for promising screens.",
+          "metric": "Paired speed or latency ratio, uncertainty and gate result.",
+          "cc": [
+            "factory.methodology_ab"
+          ]
+        }
+      ],
+      "edges": [
+        [
+          "stage",
+          "quality",
+          "pinned inputs and oracle"
+        ],
+        [
+          "stage",
+          "benchmark",
+          "workload and timing boundaries"
+        ],
+        [
+          "benchmark",
+          "profile",
+          "symptom and correlated request IDs"
+        ],
+        [
+          "profile",
+          "capacity",
+          "resource hypothesis"
+        ],
+        [
+          "profile",
+          "stream",
+          "expert transfer hypothesis"
+        ],
+        [
+          "quality",
+          "precision",
+          "quantization hypothesis"
+        ],
+        [
+          "quality",
+          "pair",
+          "quality verdict"
+        ],
+        [
+          "benchmark",
+          "pair",
+          "timed observations"
+        ],
+        [
+          "capacity",
+          "pair",
+          "feasible target configuration"
+        ],
+        [
+          "stream",
+          "pair",
+          "candidate policy and target trial"
+        ],
+        [
+          "precision",
+          "pair",
+          "qualified representation"
+        ]
+      ]
+    },
+    {
+      "id": "f_evidence",
+      "title": "Decision and repair",
+      "summary": "Connect each contract obligation to its evidence. Accept a qualified candidate, issue a repair order for a failed gate, or record which measurement is still missing.",
+      "ops": [
+        {
+          "id": "record",
+          "title": "Record evidence",
+          "detail": "Link input and output hashes, engine and model revisions, target, flags, workload, attempts and raw observations. Keep native manifests, materials-only methods, source references and executed trials distinct.",
+          "check": "Resolve a decision back to the exact raw observation. Mark missing, partial, unconfirmed or rejected attempts without converting them into passes.",
+          "metric": "Evidence coverage by contract obligation.",
+          "cc": [
+            "factory.evidence"
+          ]
+        },
+        {
+          "id": "gate",
+          "title": "Evaluate the contract gates",
+          "detail": "Evaluate correctness, resource and performance requirements for this image, target and configuration. Preserve the basis for conditional acceptance, rejection or eligibility for confirmation.",
+          "check": "A pilot screen at +9.28% under a frozen +10% requirement remains below the gate. Verify independent confirmation before advertising a gain.",
+          "metric": "Pass, fail or unmeasured obligations and confirmation state.",
+          "cc": [
+            "factory.cc_qualification"
+          ]
+        },
+        {
+          "id": "repair",
+          "title": "Route follow-up work",
+          "detail": "Translate a failed obligation into a scoped implementation, evidence or measurement work order. Source changes produce a new image. Permitted settings produce a new configuration and attempt.",
+          "check": "Retain the prior attempt and reproduction case. Escalate an incompatible requirement to intent review. Enforce branch and retry budgets.",
+          "metric": "Unresolved obligations, retry counts and repair ownership.",
+          "cc": [
+            "factory.workflow_planning",
+            "factory.experiment_design"
+          ]
+        },
+        {
+          "id": "release",
+          "title": "Retain the qualified image and evidence",
+          "detail": "Publish an internal receipt naming the exact image, contract, target, test limits and qualifying observations. Store the scope of reusable findings for future jobs.",
+          "check": "Recover the image, configuration and receipts from retained identities. Disclose qualifying hardware and workload boundaries.",
+          "metric": "Qualified image identities and reproducible evidence links.",
+          "cc": [
+            "factory.evidence",
+            "factory.cc_qualification"
+          ]
+        }
+      ],
+      "edges": [
+        [
+          "record",
+          "gate",
+          "provenance-linked observations"
+        ],
+        [
+          "gate",
+          "repair",
+          "failed or missing obligation"
+        ],
+        [
+          "gate",
+          "release",
+          "qualified contract and candidate"
+        ],
+        [
+          "record",
+          "release",
+          "evidence manifest"
+        ]
+      ]
     }
-   ],
-   "edges": [
+  ],
+  "edges": [
     [
-     "intake",
-     "modelterms",
-     "model and target references"
+      "f_spec",
+      "f_plan",
+      "approved contract and ontology"
     ],
     [
-     "intake",
-     "budget",
-     "user goals and constraints"
+      "f_plan",
+      "f_build",
+      "bound CC work orders"
     ],
     [
-     "modelterms",
-     "freeze",
-     "model obligations"
+      "f_build",
+      "f_lab",
+      "immutable image and submission manifest"
     ],
     [
-     "budget",
-     "freeze",
-     "resource and quality gates"
+      "f_lab",
+      "f_evidence",
+      "quality, timing and attempt receipts"
+    ],
+    [
+      "f_evidence",
+      "f_plan",
+      "scoped repair or new evidence order"
+    ],
+    [
+      "f_evidence",
+      "f_spec",
+      "requirement change for human review"
     ]
-   ]
+  ],
+  "merge": {
+    "build.package_runtime": "factory.builder",
+    "factory.numerical_validation": "verification.numerical_conformance",
+    "factory.sequence_memory_lab": "verification.numerical_conformance",
+    "factory.speculation_lab": "verification.numerical_conformance",
+    "factory.scheduling_lab": "verification.performance_measurement",
+    "factory.code_generation": "factory.source_integration",
+    "engine.cpu_worker_policy": "backend.execute_operators",
+    "experts.routed_forward": "model.expert_ffn",
+    "experts.shared_forward": "model.expert_ffn",
+    "engine.expert_residency": "engine.expert_streaming",
+    "serving.tool_conversations": "serving.request_gateway",
+    "factory.methodology_ab": "verification.performance_measurement",
+    "transfer.prefill_handoff": "parallel.model_execution",
+    "compiler.intent_brief": "compiler.engine_contract",
+    "factory.source_inspection": "factory.workflow_planning",
+    "model.normalization": "model.decoder_architecture",
+    "output.response_stream": "serving.request_gateway",
+    "factory.cc_qualification": "factory.controlled_experiment",
+    "factory.evidence": "factory.controlled_experiment",
+    "factory.experiment_design": "factory.controlled_experiment",
+    "factory.lab_execution": "factory.controlled_experiment",
+    "factory.precision_lab": "factory.controlled_experiment",
+    "factory.resource_lab": "factory.controlled_experiment",
+    "factory.runtime_profiling": "factory.controlled_experiment",
+    "factory.streaming_lab": "factory.controlled_experiment",
+    "verification.numerical_conformance": "factory.controlled_experiment",
+    "verification.performance_measurement": "factory.controlled_experiment",
+    "memory.kv_tiering": "memory.sequence_kv"
   },
-  {
-   "id": "f_plan",
-   "title": "Inventory and work orders",
-   "summary": "Compare the contract with the source inventory. For each missing or unqualified interface, identify the artifacts an agent must deliver, the CCs it can use and the dependencies the workflow must schedule.",
-   "ops": [
-    {
-     "id": "survey",
-     "title": "Inspect source and image",
-     "detail": "Pin the tree, model, tokenizer and build configuration. Identify where each obligated interface is owned. In an empty tree, record the starting inventory and external providers explicitly.",
-     "check": "Corroborate declared support with a callable path, supported shape and effective configuration. Flag source-only evidence.",
-     "metric": "Required interfaces with known providers.",
-     "cc": [
-      "factory.source_inspection"
-     ]
-    },
-    {
-     "id": "gaps",
-     "title": "Find missing or unqualified interfaces",
-     "detail": "Classify each interface as qualified for this contract, present with missing evidence, incompatible, or missing. A selector with a compiled k needs a cross-check against the model geometry and fallback.",
-     "check": "A passing existing interface can be reused without a code change. An unavailable shape yields an adaptation or a new implementation order.",
-     "metric": "Unresolved obligations by component and target.",
-     "cc": [
-      "factory.source_inspection",
-      "factory.cc_qualification"
-     ]
-    },
-    {
-     "id": "workorder",
-     "title": "Map work orders to CCs",
-     "detail": "For each required artifact, name its producer, consumers and acceptance test. One JiuwenSwarm agent may use several CCs on a work order. Several agents or subworkflows may invoke the same CC with their own inputs. For example, prefill and decode workers can both use the KV-state CC with different token shapes.",
-     "check": "A clean start identifies every missing producer. Shared CC invocations carry per-job inputs, output identities and retry boundaries.",
-     "metric": "Unprovided artifacts and blocked work orders.",
-     "cc": [
-      "factory.workflow_planning"
-     ]
-    },
-    {
-     "id": "experiment",
-     "title": "Design the experiment",
-     "detail": "When an implementation or performance choice remains open, specify the predicted mechanism, a counterexample, controls, representative shapes and an independent acceptance criterion.",
-     "check": "Freeze changes and stopping rules before observing candidate results. Include transfer risks when adapting another engine.",
-     "metric": "Experiments with a falsifiable observation and declared stop rule.",
-     "cc": [
-      "factory.experiment_design"
-     ]
-    },
-    {
-     "id": "assign",
-     "title": "Dispatch ready work orders",
-     "detail": "The workflow releases an order when its contract inputs and prerequisite artifacts are ready. Give the assigned agent the source revision, permitted CCs, write target and acceptance cases. Publish each verified output once so downstream orders can consume the same revision.",
-     "check": "Every agent receives a bounded write target and a verifiable result. Deduplicate common inputs across subworkflows.",
-     "metric": "Ready, blocked and completed orders per contract.",
-     "cc": [
-      "factory.workflow_planning"
-     ]
-    }
-   ],
-   "edges": [
-    [
-     "survey",
-     "gaps",
-     "pinned inventory"
-    ],
-    [
-     "gaps",
-     "workorder",
-     "required producers"
-    ],
-    [
-     "workorder",
-     "assign",
-     "artifact dependencies"
-    ],
-    [
-     "gaps",
-     "experiment",
-     "unresolved design choice"
-    ],
-    [
-     "experiment",
-     "assign",
-     "frozen trial plan"
-    ]
-   ]
+  "remove": [
+    "media.encode_inputs",
+    "media.diffusion_denoiser"
+  ],
+  "rationale": {
+    "weights.load_checkpoint": "A model cannot execute until named tensors resolve to complete, valid storage with the required shapes and types.",
+    "weights.prepare_artifact": "Converting or packing checkpoint tensors changes both data and metadata. The produced artifact needs format admission and a fidelity check.",
+    "weights.decode_blocks": "A packed tensor can pass a shape check and still reconstruct incorrect values. The codec owns the bit layout, scales and numerical oracle.",
+    "weights.adapter_binding": "An adapter changes the requested model state. Its identity, application order and per-request residency can fail independently of base-weight loading.",
+    "model.decoder_architecture": "The checkpoint family determines the block order, layer-specific branches and residual updates that the graph must execute.",
+    "tokenizer.prepare_request": "Both directions use the same vocabulary and special-token policy. The codec owns exact prompt IDs and incremental decoded text, independently of request transport.",
+    "serving.request_gateway": "Own the text request and response protocol. Plain prompts use the core path. A tool-aware API can select additional call parsing, identity tracking and serialization capabilities.",
+    "scheduler.request_lifecycle": "Only the scheduler can guarantee that a token, slot or memory budget is assigned and released exactly once under concurrency.",
+    "batch.execution_layout": "Even a correct scheduler can scramble outputs if ragged positions or batch rows are aligned to the wrong sequences.",
+    "decode.advance_sequence": "The generation driver owns when state advances and which token positions the next forward pass consumes.",
+    "graph.lower_capture_replay": "A captured or fused execution plan must remain valid for its concrete shapes, addresses and mutable state across repeated launches.",
+    "memory.runtime_arenas": "Every live workspace and persistent buffer needs an address, capacity and lifetime extending through its last consumer.",
+    "placement.partition_model": "Tensor placement decides where operations can run and which data must move. A feasible partition can change without changing the checkpoint.",
+    "backend.execute_operators": "Each admitted shape and type needs a real execution path, sound launch guards and an eligible fallback on the target hardware.",
+    "memory.sequence_kv": "Own the mapping from logical position to live KV bytes, including migration and reclamation. Moving a page must update the same map that readers use.",
+    "memory.reusable_sessions": "Reuse crosses request lifetimes and requires its own identity and invalidation rule to prevent stale or foreign state from being read.",
+    "memory.kv_tiering": "Migrating live state introduces copy completion, physical remapping and reclamation hazards absent from single-tier KV.",
+    "sequence.recurrent_execution": "A recurrent architecture needs its own transition, initial state and restore semantics to reproduce a full forward pass.",
+    "sampling.select_tokens": "The token lottery or argmax has an observable contract over logits, constraints, history and random state.",
+    "dense.feed_forward": "Dense projections, gating and activation order must implement the checkpoint arithmetic on the selected representation.",
+    "model.normalization": "Normalization owns reduction axes, epsilon, parameter broadcasting and residual timing. A wrong convention can perturb every layer.",
+    "attention.dense_execution": "Position-aware attention needs independently verifiable causal scores, stable normalization, grouped-head access and value accumulation.",
+    "attention.sparse_execution": "Sparse attention introduces index generation and candidate coverage with a correctness boundary beyond executing the dense attention arithmetic.",
+    "model.embedding_service": "Token IDs and positions must map to the appropriate embedding rows, scale and order before any decoder block can run.",
+    "model.logit_head": "The final hidden representation must project to the correct vocabulary ordering and logits before sampling.",
+    "output.response_stream": "A correct token sequence still needs ordered emission, incremental detokenization, stop handling and one terminal response.",
+    "serving.tool_conversations": "A model-specific text tool dialect creates parser and multi-turn state that must survive streaming boundaries.",
+    "decode.speculative_execution": "Draft acceptance changes how many target steps can commit at once. The target distribution and rejected-suffix rollback require dedicated checks.",
+    "parallel.model_execution": "Own cross-rank execution and state handoffs when a deployment spans workers. Tensor sharding, collective reduction, distributed prefill and prefill-to-decode transfer are independently selectable variants.",
+    "transfer.prefill_handoff": "Disaggregated serving crosses an ownership boundary with live KV and request position. Decode may begin only after matching state is ready.",
+    "model.expert_routing": "The router owns the authoritative expert IDs and aligned mixture weights required by every downstream MoE implementation.",
+    "experts.routed_forward": "Variable token-to-expert assignments must become correctly packed expert projections, including empty and uneven expert batches.",
+    "experts.shared_forward": "A checkpoint may require an always-on expert contribution with separate weights or gating outside the routed shortlist.",
+    "merge.expert_contributions": "Forward packing and inverse gathering share a permutation contract. They can be tested as one round trip independently of the expert arithmetic.",
+    "parallel.expert_exchange": "Expert parallelism changes token ownership across ranks and requires inverse exchange plus conservation of row identity.",
+    "engine.expert_streaming": "A bounded cache must own admission, eviction, demand fills and the lifetime of the exact weights used by each expert launch.",
+    "routing.forecast_expert_demand": "A predictor can produce early hints using information available before demand. Its accuracy, lead time and wasted bytes have independent tests.",
+    "observability.runtime_events": "External profiles need trustworthy runtime phase and route boundaries bound to actual requests, tokens, layers and launches.",
+    "verification.numerical_conformance": "Independent references expose wrong outputs even when candidate and baseline share infrastructure or a performance measurement improves.",
+    "verification.performance_measurement": "Measure a pinned workload with explicit latency, throughput and memory boundaries. For comparisons, reuse the same harness and select paired A/B, A/A stability or independent confirmation as the work order requires.",
+    "compiler.intent_brief": "User goals can leave several viable model, budget or service choices. A reviewed brief exposes the unresolved decision before implementation.",
+    "compiler.engine_contract": "Resolving the user intent and binding model facts to verifiable constraints produces one contract, from reviewed goals through workload-specific acceptance gates.",
+    "factory.workflow_planning": "A plan depends on what the source already supplies. Inspect the baseline, identify unsupported obligations and bind work orders with explicit upstream artifacts and reusable CCs.",
+    "factory.experiment_design": "An optimization or transfer question needs competing explanations, a control and a falsifiable prediction before resources are spent.",
+    "factory.methodology_ab": "Two independently measured images need paired controls and confirmation rules before attributing a difference to a code change.",
+    "factory.source_inspection": "An existing tree or candidate image can advertise features that its active build cannot execute. Inspection identifies the actual integration surface.",
+    "factory.source_integration": "Reusable components and code generators need adaptation to the target ABI, ownership and source revision to produce a reviewable change.",
+    "factory.builder": "A source-level pass does not establish that the linked executable and deployed dependencies reproduce the same path on a clean system.",
+    "factory.lab_execution": "The experiment runner owns the target lease, attempt lifecycle, failure recovery, artifact export and cleanup outside the engine.",
+    "factory.cc_qualification": "Availability, source evidence and passing trials answer different questions. Admission binds a verdict to declared scope and explicit obligations.",
+    "factory.evidence": "A result can guide later construction only when its image, configuration, workload, target and raw observations are recoverable.",
+    "factory.runtime_profiling": "Queue, host, transfer and kernel stalls share symptoms. Correlated traces and counters discriminate their causes.",
+    "factory.resource_lab": "Capacity and placement candidates require a joint live-byte model and measured tradeoff across latency, throughput and memory ceilings.",
+    "factory.streaming_lab": "Trace replay and timed transfer evidence establish whether prefetch or caching improves exposed demand-time readiness on target.",
+    "factory.precision_lab": "Choosing a representation changes a quality-versus-size tradeoff. Calibration and downstream error require evidence beyond bit-exact decoder tests.",
+    "engine.expert_residency": "Placement controls which expert weights are kept resident across demands. Residency policy can be tuned independently of transfer correctness.",
+    "model.expert_ffn": "Implement expert arithmetic from already grouped hidden rows and ready weights, preserving each row until inverse dispatch.",
+    "factory.controlled_experiment": "An engine improvement needs a reproducible test and an independent verdict. Trial design, lab execution, correctness, profiling, comparisons and provenance are complementary capabilities of one worker job."
   },
-  {
-   "id": "f_build",
-   "title": "Source and image",
-   "summary": "Implement or adapt each assigned interface, check it against a reference, build the release image and hand the candidate and test inputs to the external lab.",
-   "ops": [
-    {
-     "id": "apply",
-     "title": "Implement the assigned interface",
-     "detail": "Bind the selected engine CCs at the target interfaces. Implement a missing reference path, adapt a compatible donor or lower an eligible operation into code. Keep generated output and source edits reviewable.",
-     "check": "Check layout, shape, dtype, state ownership, execution order and fallback. Reject a source transfer that changes model semantics.",
-     "metric": "Changed obligations with a source revision and a test.",
-     "cc": [
-      "factory.source_integration"
-     ]
-    },
-    {
-     "id": "oracle",
-     "title": "Check the implementation",
-     "detail": "Compare candidate operators to an independent reference with known tolerances. For MoE, inspect aligned IDs and weights, routed and shared contributions, then restored token order and final logits.",
-     "check": "Expose sign, scale, permutation, stale state and unsupported shape faults before building a release. Record first divergence.",
-     "metric": "Max error and first divergent tensor or token.",
-     "cc": [
-      "verification.numerical_conformance"
-     ]
-    },
-    {
-     "id": "build",
-     "title": "Build the release image",
-     "detail": "Compile pinned source with the selected toolchain and SDK. Attach the image digest, model mounting contract, native flags, dependencies, entry point and expected backend.",
-     "check": "Clean start the image on its target interface. Fail admission for missing libraries, a mismatched runtime ABI or the wrong active backend.",
-     "metric": "Build duration, artifact size and startup smoke verdict.",
-     "cc": [
-      "factory.builder"
-     ]
-    },
-    {
-     "id": "handoff",
-     "title": "Submit image and workload to the lab",
-     "detail": "Link the image digest, workload, configuration, expected outputs and allowed target to the build receipt. Pass an immutable candidate and its submission manifest to the lab manager.",
-     "check": "Verify digests and resolve each dependency before allocating a trial. Record any evidence limited to a host-only test.",
-     "metric": "Manifest completeness and unresolved image obligations.",
-     "cc": [
-      "factory.builder",
-      "factory.cc_qualification"
-     ]
-    }
-   ],
-   "edges": [
-    [
-     "apply",
-     "oracle",
-     "source revision and fixtures"
-    ],
-    [
-     "apply",
-     "build",
-     "exact source closure"
-    ],
-    [
-     "oracle",
-     "handoff",
-     "correctness receipts"
-    ],
-    [
-     "build",
-     "handoff",
-     "image digest and dependencies"
-    ]
-   ]
+  "conditional": {
+    "weights.prepare_artifact": "Source checkpoint layout, format or precision differs from what the chosen backend can consume.",
+    "weights.decode_blocks": "The contract admits packed or quantized weights. For floating weights, direct tensor reads suffice.",
+    "weights.adapter_binding": "The serving contract permits adapters or request-specific modification of base weights.",
+    "graph.lower_capture_replay": "The backend builds an execution graph, performs fusion or replays previously captured steps.",
+    "placement.partition_model": "On this single device, bind the resident base tensors, storage-backed ranges and staging destination. Cross-device partitioning is an optional capability outside this baseline.",
+    "memory.sequence_kv": "The architecture caches keys and values across positions. Pure recurrent models use their own state instead.",
+    "memory.reusable_sessions": "The deployment can reuse prefixes or sessions across invocation boundaries.",
+    "memory.kv_tiering": "Live KV exceeds the primary allocation or disaggregated execution requires migration.",
+    "sequence.recurrent_execution": "The checkpoint includes recurrent or hybrid state transitions.",
+    "dense.feed_forward": "The checkpoint contains a dense FFN path. Routed and shared expert workers can reuse its arithmetic capabilities.",
+    "attention.dense_execution": "The checkpoint contains dense causal self-attention or uses it as a correctness oracle.",
+    "attention.sparse_execution": "The checkpoint defines sparse/indexed attention or a contract-qualified sparse alternative.",
+    "serving.tool_conversations": "Text tool-call parsing, multi-turn tool serialization or structured tool output is required.",
+    "decode.speculative_execution": "The contract permits draft-and-verify acceleration and supplies an appropriate draft path.",
+    "parallel.model_execution": "Only when execution or prefill state spans workers. The single-device baseline uses local execution and keeps sequence state on the same worker.",
+    "transfer.prefill_handoff": "Prefill and decode are served by separate workers or resource pools.",
+    "model.expert_routing": "The checkpoint includes routed expert layers.",
+    "experts.routed_forward": "A model-defined router sends token rows to expert FFNs.",
+    "experts.shared_forward": "The checkpoint declares an always-on shared expert branch.",
+    "merge.expert_contributions": "Model blocks combine selected expert outputs, optionally with an always-on branch.",
+    "parallel.expert_exchange": "Token owners and selected expert owners can reside on different ranks.",
+    "engine.expert_streaming": "Required for this target: the stored model exceeds usable physical memory. Load authoritative expert ranges from backing storage into a bounded working set.",
+    "engine.expert_residency": "An expert tier has limited capacity or the target reserves fast storage for a subset of experts.",
+    "routing.forecast_expert_demand": "There is transfer or service latency to hide, advance features and a bounded speculation budget.",
+    "factory.experiment_design": "An optimization, transfer decision or observed failure requires a controlled experiment.",
+    "factory.methodology_ab": "A change is being compared to a baseline for a scoped performance or quality claim.",
+    "factory.resource_lab": "Selection among capacity, placement or offload choices needs target measurements.",
+    "factory.streaming_lab": "The contract enables expert streaming, residency optimization or advance demand prediction.",
+    "factory.precision_lab": "The build chooses, changes or calibrates a weight, activation or state representation.",
+    "model.expert_ffn": "Routed FFN execution is required. Enable shared FFN execution only when the checkpoint declares shared tensors and their gate."
   },
-  {
-   "id": "f_lab",
-   "title": "Controlled experiments",
-   "summary": "Run the versioned candidate on its declared target. Return numerical checks, workload measurements and focused diagnostics with the inputs and conditions needed to interpret them.",
-   "ops": [
-    {
-     "id": "stage",
-     "title": "Stage the candidate on the target",
-     "detail": "Check image identity, target health, SDK/driver capability, resource lease and workload inputs. Record cold/warm cache policy and immutable attempt identity before launch.",
-     "check": "Simulate a timeout or lost acknowledgement. Reconcile the lease and export partial evidence before cleanup or retry.",
-     "metric": "Valid attempts, fault reasons and missing coverage.",
-     "cc": [
-      "factory.lab_execution"
-     ]
+  "definitions": {
+    "model.expert_ffn": {
+      "id": "model.expert_ffn",
+      "reason": "Implement expert arithmetic from already grouped hidden rows and ready weights, preserving each row until inverse dispatch.",
+      "inputs": "Expert-grouped hidden rows, row offsets, ready gate/up/down weights, architecture and precision contract.",
+      "outputs": "Expert-local FFN output rows in the input grouped order.",
+      "capabilities": [
+        "Expert projections and gating",
+        "Shape-qualified grouped execution",
+        "Independent numerical oracle"
+      ],
+      "decisions": "Choose eligible grouped or individual kernels with the required activation, accumulator precision and layout.",
+      "integration": "Consume dispatch offsets and protected weight handles; hand per-row expert outputs to the inverse gather.",
+      "greenfield": "Build a scalar gate/up → activation and multiply → down oracle, then replace eligible projections with qualified target kernels.",
+      "check": "Use distinct expert matrices and lane values. Compare each grouped output row to the correct expert oracle for uneven counts, empty experts and tail tiles.",
+      "ex": [],
+      "reuse": [],
+      "old": [],
+      "nodes": [
+        "experts",
+        "shared"
+      ]
     },
-    {
-     "id": "quality",
-     "title": "Check numerical quality",
-     "detail": "Run operator fixtures, tiny forward references, cached versus recomputed decode, rollback and reuse tests, then contract-level output or task-quality checks. Compare distributions when sampling is stochastic.",
-     "check": "Deliberately perturb one route, KV position, scale or output token. Confirm the designated oracle detects the fault.",
-     "metric": "Error distributions, mismatched token positions and quality scores.",
-     "cc": [
-      "verification.numerical_conformance"
-     ]
-    },
-    {
-     "id": "benchmark",
-     "title": "Measure service performance",
-     "detail": "Run identified prompt lengths, output lengths, offered load and concurrency. Measure request arrival to first output, admitted queue delay, per-token intervals and total emitted tokens divided by measured wall time.",
-     "check": "Separate startup, warm-up and timed intervals. Count failed and cancelled requests and report latency percentiles with sample counts.",
-     "metric": "TTFT, inter-token p50/p95/p99, output tokens/s and completion rate.",
-     "cc": [
-      "verification.performance_measurement"
-     ]
-    },
-    {
-     "id": "profile",
-     "title": "Locate the critical-path delay",
-     "detail": "Align request phases, CPU submit ranges, GPU events, transfer completions and kernel launches. Slow decode can arise from scheduler gaps, KV reads, expert-weight misses, collectives or kernel limits.",
-     "check": "Use correlated timelines and measure instrumentation overhead. Overlapping intervals cannot be summed into wall time.",
-     "metric": "GPU active time, launch gaps, bytes moved, exposed stalls and observer cost.",
-     "cc": [
-      "factory.runtime_profiling"
-     ]
-    },
-    {
-     "id": "capacity",
-     "title": "Test resource feasibility",
-     "detail": "Sweep a controlled capacity or placement choice, measuring simultaneously live weights, KV, expert residency, staging and workspace. Calibrate peak memory, bandwidth and transfer ceilings on the actual target.",
-     "check": "Preserve model outputs while varying one budget. Account for shared physical memory once on unified-memory hardware.",
-     "metric": "Peak live bytes, headroom, transfer volume and useful throughput.",
-     "cc": [
-      "factory.resource_lab"
-     ]
-    },
-    {
-     "id": "stream",
-     "title": "Replay expert-weight demand",
-     "detail": "Use time-ordered routing traces to compare residency, eviction and prefetch alternatives. Separate selected, already resident, late, useful and wasted bytes. Include cold misses and forced delayed completion.",
-     "check": "Prevent future-token leakage. Validate exact bytes and outputs on demand misses, then confirm any replay benefit on target.",
-     "metric": "Stall time avoided, useful bytes, wasted bytes and held-out coverage.",
-     "cc": [
-      "factory.streaming_lab"
-     ]
-    },
-    {
-     "id": "precision",
-     "title": "Assess precision",
-     "detail": "Evaluate a declared encoding and calibrator against reference tensors for the same layout, scales, rounding and accumulator type. Compare the byte budget against downstream model quality.",
-     "check": "Use held-out inputs and an independent format-specific oracle. A passed INT4 fixture does not qualify a Q6_K decoder.",
-     "metric": "Reconstruction error, bytes per weight and downstream quality delta.",
-     "cc": [
-      "factory.precision_lab"
-     ]
-    },
-    {
-     "id": "pair",
-     "title": "Compare candidates",
-     "detail": "For a candidate change, pair baseline and candidate under matched workloads, build identities and cache states. Counterbalance run order and record excluded attempts with reasons.",
-     "check": "Apply the frozen gates, check correctness first and reserve independent confirmation for promising screens.",
-     "metric": "Paired speed or latency ratio, uncertainty and gate result.",
-     "cc": [
-      "factory.methodology_ab"
-     ]
+    "factory.controlled_experiment": {
+      "id": "factory.controlled_experiment",
+      "kind": "factory",
+      "reason": "Run a controlled target experiment that turns a candidate image and a falsifiable question into an auditable, bounded verdict.",
+      "inputs": "Candidate and baseline identities, workload and model pins, contract gates, controls, resource budget, target and numerical oracle.",
+      "outputs": "Attempt manifest, quality and performance observations, resource accounting, scoped pass/fail or inconclusive verdict and linked reproduction records.",
+      "capabilities": [
+        "Trial admission and cleanup",
+        "Reference comparisons",
+        "Controlled target profiling",
+        "Paired performance measurements",
+        "Scoped evidence receipts"
+      ],
+      "decisions": "Choose the cheapest test that can discriminate the hypothesis. Record device, warm-up, cache state, sample counts, quality tolerance and confirmation rule before comparing.",
+      "integration": "Stage the exact existing engine image and independent client. Correlate observations from exposed runtime hooks and retain raw artifacts for a failed or incomplete attempt.",
+      "greenfield": "Start with independently computed tiny forward and decoding fixtures and a clean-start test. Add forced storage misses, matched workloads, target measurements and paired trials as the engine becomes runnable.",
+      "check": "Detect a seeded numerical or ownership fault; reproduce a recorded trial from its manifest; mark missing measurements and failed gates explicitly.",
+      "ex": [],
+      "reuse": [],
+      "old": [],
+      "nodes": [
+        "verification",
+        "profile",
+        "evidence"
+      ]
     }
-   ],
-   "edges": [
-    [
-     "stage",
-     "quality",
-     "pinned inputs and oracle"
-    ],
-    [
-     "stage",
-     "benchmark",
-     "workload and timing boundaries"
-    ],
-    [
-     "benchmark",
-     "profile",
-     "symptom and correlated request IDs"
-    ],
-    [
-     "profile",
-     "capacity",
-     "resource hypothesis"
-    ],
-    [
-     "profile",
-     "stream",
-     "expert transfer hypothesis"
-    ],
-    [
-     "quality",
-     "precision",
-     "quantization hypothesis"
-    ],
-    [
-     "quality",
-     "pair",
-     "quality verdict"
-    ],
-    [
-     "benchmark",
-     "pair",
-     "timed observations"
-    ],
-    [
-     "capacity",
-     "pair",
-     "feasible target configuration"
-    ],
-    [
-     "stream",
-     "pair",
-     "candidate policy and target trial"
-    ],
-    [
-     "precision",
-     "pair",
-     "qualified representation"
-    ]
-   ]
   },
-  {
-   "id": "f_evidence",
-   "title": "Decision and repair",
-   "summary": "Connect each contract obligation to its evidence. Accept a qualified candidate, issue a repair order for a failed gate, or record which measurement is still missing.",
-   "ops": [
-    {
-     "id": "record",
-     "title": "Record evidence",
-     "detail": "Link input and output hashes, engine and model revisions, target, flags, workload, attempts and raw observations. Keep native manifests, materials-only methods, source references and executed trials distinct.",
-     "check": "Resolve a decision back to the exact raw observation. Mark missing, partial, unconfirmed or rejected attempts without converting them into passes.",
-     "metric": "Evidence coverage by contract obligation.",
-     "cc": [
-      "factory.evidence"
-     ]
+  "responsibilities": {
+    "serving.request_gateway": {
+      "outputs": "Validated text-generation requests, cancellation and streaming events. For tool-aware protocols, preserve call IDs, argument fragments and final status.",
+      "check": "Replay the same request through the supported local or HTTP entry point. For tool calls, split arguments across stream chunks and verify reconstruction, identity and completion."
     },
-    {
-     "id": "gate",
-     "title": "Evaluate the contract gates",
-     "detail": "Evaluate correctness, resource and performance requirements for this image, target and configuration. Preserve the basis for conditional acceptance, rejection or eligibility for confirmation.",
-     "check": "A pilot screen at +9.28% under a frozen +10% requirement remains below the gate. Verify independent confirmation before advertising a gain.",
-     "metric": "Pass, fail or unmeasured obligations and confirmation state.",
-     "cc": [
-      "factory.cc_qualification"
-     ]
+    "verification.performance_measurement": {
+      "outputs": "A reproducible timing record with workload, warm state, queue boundaries and uncertainty. When comparing revisions, produce a paired effect estimate and screen or confirmation decision.",
+      "check": "Verify token counts and clock boundaries on a fixed workload. For A/B evaluation, counterbalance run order, check A/A variation and confirm the candidate on independent runs."
     },
-    {
-     "id": "repair",
-     "title": "Route follow-up work",
-     "detail": "Translate a failed obligation into a scoped implementation, evidence or measurement work order. Source changes produce a new image. Permitted settings produce a new configuration and attempt.",
-     "check": "Retain the prior attempt and reproduction case. Escalate an incompatible requirement to intent review. Enforce branch and retry budgets.",
-     "metric": "Unresolved obligations, retry counts and repair ownership.",
-     "cc": [
-      "factory.workflow_planning",
-      "factory.experiment_design"
-     ]
+    "parallel.model_execution": {
+      "outputs": "Rank-local batches, ordered collective results and completion events. Split prefill deployments also require a receiver-owned, validated sequence-state handle.",
+      "check": "Compare sharded logits with a local reference. When transferring prefill state, delay receipt, check sequence identity and positions, and compare the first receiver-side decode logits to the reference."
     },
-    {
-     "id": "release",
-     "title": "Retain the qualified image and evidence",
-     "detail": "Publish an internal receipt naming the exact image, contract, target, test limits and qualifying observations. Store the scope of reusable findings for future jobs.",
-     "check": "Recover the image, configuration and receipts from retained identities. Disclose qualifying hardware and workload boundaries.",
-     "metric": "Qualified image identities and reproducible evidence links.",
-     "cc": [
-      "factory.evidence",
-      "factory.cc_qualification"
-     ]
+    "merge.expert_contributions": {
+      "reason": "Forward packing and inverse gathering share a permutation contract. They can be tested as one round trip independently of the expert arithmetic.",
+      "inputs": "Authoritative expert IDs and weights, token rows, valid assignment counts, expert FFN outputs.",
+      "outputs": "Expert-grouped rows, offsets and the inverse map; restored per-token weighted outputs.",
+      "integration": "Bind assignment rows and strides to the target grouped GEMM interface. Preserve the inverse token/choice map through compute. Document where the route weights are applied.",
+      "greenfield": "Build a scalar group-and-gather oracle, then add count/scan/scatter and optimized inverse reductions.",
+      "check": "Exercise k=1 and k>1, empty experts, nonuniform weights, repeated token owners and uneven histograms. Compare the grouped result to direct per-token evaluation.",
+      "capabilities": [
+        "Histogram, scan and pack eligible rows",
+        "Preserve expert offsets and inverse token/choice map",
+        "Restore token order and weight each contribution once"
+      ]
+    },
+    "tokenizer.prepare_request": {
+      "reason": "Both directions use the same vocabulary and special-token policy. The codec owns exact prompt IDs and incremental decoded text, independently of request transport.",
+      "outputs": "Prompt IDs and offsets for scheduling; decoded UTF-8 chunks for the output writer.",
+      "check": "Compare exact IDs with the checkpoint tokenizer, then decode deliberately split multibyte pieces, unknown or special IDs and an empty terminal fragment.",
+      "integration": "Pin the tokenizer assets and chat template revision. Bind input IDs to the sequence; emit text fragments to the transport writer.",
+      "greenfield": "Implement the declared tokenizer and reverse vocabulary decoder against small golden input/output fixtures; put transport framing outside the codec."
+    },
+    "factory.workflow_planning": {
+      "reason": "A plan depends on what the source already supplies. Inspect the baseline, identify unsupported obligations and bind work orders with explicit upstream artifacts and reusable CCs.",
+      "inputs": "Approved contract, target topology, existing source and evidence, or an empty repository.",
+      "outputs": "Pinned baseline inventory, verified gaps and ordered work orders with artifact bindings and retry decisions.",
+      "greenfield": "Declare every required provider, then schedule a reference end-to-end path with input, output and verification ownership.",
+      "integration": "Inspect effective flags and live interfaces, qualify reusable parts and schedule only missing work and evidence.",
+      "check": "Every required artifact has a provider. Distinguish a present source symbol from an admitted runtime path."
+    },
+    "compiler.engine_contract": {
+      "reason": "Resolving the user intent and binding model facts to verifiable constraints produces one contract, from reviewed goals through workload-specific acceptance gates.",
+      "inputs": "User intent, system ontology, model and target facts, constrained resources and requested quality/performance.",
+      "outputs": "Resolved intent, ontology-linked obligations, acceptance gates and any unresolved questions with contract impact.",
+      "check": "Given an underspecified request, resolve or mark missing facts. Reject incompatible requirements before assigning engineering work."
     }
-   ],
-   "edges": [
-    [
-     "record",
-     "gate",
-     "provenance-linked observations"
+  },
+  "aliasOverrides": {
+    "experts.pack_tokens": "merge.expert_contributions",
+    "output.detokenize": "tokenizer.prepare_request"
+  },
+  "operationOwners": {
+    "interface/detok": [
+      "tokenizer.prepare_request"
     ],
-    [
-     "gate",
-     "repair",
-     "failed or missing obligation"
+    "interface/emit": [
+      "serving.request_gateway"
     ],
-    [
-     "gate",
-     "release",
-     "qualified contract and candidate"
-    ],
-    [
-     "record",
-     "release",
-     "evidence manifest"
+    "model/dispatch": [
+      "merge.expert_contributions",
+      "parallel.expert_exchange"
     ]
-   ]
-  }
- ],
- "edges": [
-  [
-   "f_spec",
-   "f_plan",
-   "approved contract and ontology"
+  },
+  "sourceOwnerByPrevious": {
+    "experts.pack_tokens": "merge.expert_contributions",
+    "output.detokenize": "tokenizer.prepare_request"
+  },
+  "nonTargetRoles": [
+    "weights.adapter_binding",
+    "parallel.model_execution",
+    "parallel.expert_exchange",
+    "decode.speculative_execution",
+    "sequence.recurrent_execution",
+    "attention.sparse_execution"
   ],
-  [
-   "f_plan",
-   "f_build",
-   "bound CC work orders"
-  ],
-  [
-   "f_build",
-   "f_lab",
-   "immutable image and submission manifest"
-  ],
-  [
-   "f_lab",
-   "f_evidence",
-   "quality, timing and attempt receipts"
-  ],
-  [
-   "f_evidence",
-   "f_plan",
-   "scoped repair or new evidence order"
-  ],
-  [
-   "f_evidence",
-   "f_spec",
-   "requirement change for human review"
+  "nonTargetOperations": [
+    "generate/handoff",
+    "generate/draft",
+    "generate/verify",
+    "model/recur",
+    "state/recurrent",
+    "model/shortlist",
+    "model/shared"
   ]
- ],
- "merge": {
-  "build.package_runtime": "factory.builder",
-  "factory.numerical_validation": "verification.numerical_conformance",
-  "factory.sequence_memory_lab": "verification.numerical_conformance",
-  "factory.speculation_lab": "verification.numerical_conformance",
-  "factory.scheduling_lab": "verification.performance_measurement",
-  "factory.code_generation": "factory.source_integration",
-  "engine.cpu_worker_policy": "backend.execute_operators",
-  "experts.routed_forward": "model.expert_ffn",
-  "experts.shared_forward": "model.expert_ffn",
-  "engine.expert_residency": "engine.expert_streaming",
-  "serving.tool_conversations": "serving.request_gateway",
-  "factory.methodology_ab": "verification.performance_measurement",
-  "transfer.prefill_handoff": "parallel.model_execution",
-  "compiler.intent_brief": "compiler.engine_contract",
-  "factory.source_inspection": "factory.workflow_planning",
-  "model.normalization": "model.decoder_architecture",
-  "output.response_stream": "serving.request_gateway",
-  "factory.cc_qualification": "factory.controlled_experiment",
-  "factory.evidence": "factory.controlled_experiment",
-  "factory.experiment_design": "factory.controlled_experiment",
-  "factory.lab_execution": "factory.controlled_experiment",
-  "factory.precision_lab": "factory.controlled_experiment",
-  "factory.resource_lab": "factory.controlled_experiment",
-  "factory.runtime_profiling": "factory.controlled_experiment",
-  "factory.streaming_lab": "factory.controlled_experiment",
-  "verification.numerical_conformance": "factory.controlled_experiment",
-  "verification.performance_measurement": "factory.controlled_experiment"
- },
- "remove": [
-  "media.encode_inputs",
-  "media.diffusion_denoiser"
- ],
- "rationale": {
-  "weights.load_checkpoint": "A model cannot execute until named tensors resolve to complete, valid storage with the required shapes and types.",
-  "weights.prepare_artifact": "Converting or packing checkpoint tensors changes both data and metadata. The produced artifact needs format admission and a fidelity check.",
-  "weights.decode_blocks": "A packed tensor can pass a shape check and still reconstruct incorrect values. The codec owns the bit layout, scales and numerical oracle.",
-  "weights.adapter_binding": "An adapter changes the requested model state. Its identity, application order and per-request residency can fail independently of base-weight loading.",
-  "model.decoder_architecture": "The checkpoint family determines the block order, layer-specific branches and residual updates that the graph must execute.",
-  "tokenizer.prepare_request": "Both directions use the same vocabulary and special-token policy. The codec owns exact prompt IDs and incremental decoded text, independently of request transport.",
-  "serving.request_gateway": "Own the text request and response protocol. Plain prompts use the core path. A tool-aware API can select additional call parsing, identity tracking and serialization capabilities.",
-  "scheduler.request_lifecycle": "Only the scheduler can guarantee that a token, slot or memory budget is assigned and released exactly once under concurrency.",
-  "batch.execution_layout": "Even a correct scheduler can scramble outputs if ragged positions or batch rows are aligned to the wrong sequences.",
-  "decode.advance_sequence": "The generation driver owns when state advances and which token positions the next forward pass consumes.",
-  "graph.lower_capture_replay": "A captured or fused execution plan must remain valid for its concrete shapes, addresses and mutable state across repeated launches.",
-  "memory.runtime_arenas": "Every live workspace and persistent buffer needs an address, capacity and lifetime extending through its last consumer.",
-  "placement.partition_model": "Tensor placement decides where operations can run and which data must move. A feasible partition can change without changing the checkpoint.",
-  "backend.execute_operators": "Each admitted shape and type needs a real execution path, sound launch guards and an eligible fallback on the target hardware.",
-  "memory.sequence_kv": "Attention state needs a unique owner and logical-to-physical position mapping through append, masking and release.",
-  "memory.reusable_sessions": "Reuse crosses request lifetimes and requires its own identity and invalidation rule to prevent stale or foreign state from being read.",
-  "memory.kv_tiering": "Migrating live state introduces copy completion, physical remapping and reclamation hazards absent from single-tier KV.",
-  "sequence.recurrent_execution": "A recurrent architecture needs its own transition, initial state and restore semantics to reproduce a full forward pass.",
-  "sampling.select_tokens": "The token lottery or argmax has an observable contract over logits, constraints, history and random state.",
-  "dense.feed_forward": "Dense projections, gating and activation order must implement the checkpoint arithmetic on the selected representation.",
-  "model.normalization": "Normalization owns reduction axes, epsilon, parameter broadcasting and residual timing. A wrong convention can perturb every layer.",
-  "attention.dense_execution": "Position-aware attention needs independently verifiable causal scores, stable normalization, grouped-head access and value accumulation.",
-  "attention.sparse_execution": "Sparse attention introduces index generation and candidate coverage with a correctness boundary beyond executing the dense attention arithmetic.",
-  "model.embedding_service": "Token IDs and positions must map to the appropriate embedding rows, scale and order before any decoder block can run.",
-  "model.logit_head": "The final hidden representation must project to the correct vocabulary ordering and logits before sampling.",
-  "output.response_stream": "A correct token sequence still needs ordered emission, incremental detokenization, stop handling and one terminal response.",
-  "serving.tool_conversations": "A model-specific text tool dialect creates parser and multi-turn state that must survive streaming boundaries.",
-  "decode.speculative_execution": "Draft acceptance changes how many target steps can commit at once. The target distribution and rejected-suffix rollback require dedicated checks.",
-  "parallel.model_execution": "Own cross-rank execution and state handoffs when a deployment spans workers. Tensor sharding, collective reduction, distributed prefill and prefill-to-decode transfer are independently selectable variants.",
-  "transfer.prefill_handoff": "Disaggregated serving crosses an ownership boundary with live KV and request position. Decode may begin only after matching state is ready.",
-  "model.expert_routing": "The router owns the authoritative expert IDs and aligned mixture weights required by every downstream MoE implementation.",
-  "experts.routed_forward": "Variable token-to-expert assignments must become correctly packed expert projections, including empty and uneven expert batches.",
-  "experts.shared_forward": "A checkpoint may require an always-on expert contribution with separate weights or gating outside the routed shortlist.",
-  "merge.expert_contributions": "Forward packing and inverse gathering share a permutation contract. They can be tested as one round trip independently of the expert arithmetic.",
-  "parallel.expert_exchange": "Expert parallelism changes token ownership across ranks and requires inverse exchange plus conservation of row identity.",
-  "engine.expert_streaming": "A bounded cache must own admission, eviction, demand fills and the lifetime of the exact weights used by each expert launch.",
-  "routing.forecast_expert_demand": "A predictor can produce early hints using information available before demand. Its accuracy, lead time and wasted bytes have independent tests.",
-  "observability.runtime_events": "External profiles need trustworthy runtime phase and route boundaries bound to actual requests, tokens, layers and launches.",
-  "verification.numerical_conformance": "Independent references expose wrong outputs even when candidate and baseline share infrastructure or a performance measurement improves.",
-  "verification.performance_measurement": "Measure a pinned workload with explicit latency, throughput and memory boundaries. For comparisons, reuse the same harness and select paired A/B, A/A stability or independent confirmation as the work order requires.",
-  "compiler.intent_brief": "User goals can leave several viable model, budget or service choices. A reviewed brief exposes the unresolved decision before implementation.",
-  "compiler.engine_contract": "Resolving the user intent and binding model facts to verifiable constraints produces one contract, from reviewed goals through workload-specific acceptance gates.",
-  "factory.workflow_planning": "A plan depends on what the source already supplies. Inspect the baseline, identify unsupported obligations and bind work orders with explicit upstream artifacts and reusable CCs.",
-  "factory.experiment_design": "An optimization or transfer question needs competing explanations, a control and a falsifiable prediction before resources are spent.",
-  "factory.methodology_ab": "Two independently measured images need paired controls and confirmation rules before attributing a difference to a code change.",
-  "factory.source_inspection": "An existing tree or candidate image can advertise features that its active build cannot execute. Inspection identifies the actual integration surface.",
-  "factory.source_integration": "Reusable components and code generators need adaptation to the target ABI, ownership and source revision to produce a reviewable change.",
-  "factory.builder": "A source-level pass does not establish that the linked executable and deployed dependencies reproduce the same path on a clean system.",
-  "factory.lab_execution": "The experiment runner owns the target lease, attempt lifecycle, failure recovery, artifact export and cleanup outside the engine.",
-  "factory.cc_qualification": "Availability, source evidence and passing trials answer different questions. Admission binds a verdict to declared scope and explicit obligations.",
-  "factory.evidence": "A result can guide later construction only when its image, configuration, workload, target and raw observations are recoverable.",
-  "factory.runtime_profiling": "Queue, host, transfer and kernel stalls share symptoms. Correlated traces and counters discriminate their causes.",
-  "factory.resource_lab": "Capacity and placement candidates require a joint live-byte model and measured tradeoff across latency, throughput and memory ceilings.",
-  "factory.streaming_lab": "Trace replay and timed transfer evidence establish whether prefetch or caching improves exposed demand-time readiness on target.",
-  "factory.precision_lab": "Choosing a representation changes a quality-versus-size tradeoff. Calibration and downstream error require evidence beyond bit-exact decoder tests.",
-  "engine.expert_residency": "Placement controls which expert weights are kept resident across demands. Residency policy can be tuned independently of transfer correctness.",
-  "model.expert_ffn": "Implement expert arithmetic from already grouped hidden rows and ready weights, preserving each row until inverse dispatch.",
-  "factory.controlled_experiment": "An engine improvement needs a reproducible test and an independent verdict. Trial design, lab execution, correctness, profiling, comparisons and provenance are complementary capabilities of one worker job."
- },
- "conditional": {
-  "weights.prepare_artifact": "Source checkpoint layout, format or precision differs from what the chosen backend can consume.",
-  "weights.decode_blocks": "The contract admits packed or quantized weights. For floating weights, direct tensor reads suffice.",
-  "weights.adapter_binding": "The serving contract permits adapters or request-specific modification of base weights.",
-  "graph.lower_capture_replay": "The backend builds an execution graph, performs fusion or replays previously captured steps.",
-  "placement.partition_model": "On this single device, bind the resident base tensors, storage-backed ranges and staging destination. Cross-device partitioning is an optional capability outside this baseline.",
-  "memory.sequence_kv": "The architecture caches keys and values across positions. Pure recurrent models use their own state instead.",
-  "memory.reusable_sessions": "The deployment can reuse prefixes or sessions across invocation boundaries.",
-  "memory.kv_tiering": "Live KV exceeds the primary allocation or disaggregated execution requires migration.",
-  "sequence.recurrent_execution": "The checkpoint includes recurrent or hybrid state transitions.",
-  "dense.feed_forward": "The checkpoint contains a dense FFN path. Routed and shared expert workers can reuse its arithmetic capabilities.",
-  "attention.dense_execution": "The checkpoint contains dense causal self-attention or uses it as a correctness oracle.",
-  "attention.sparse_execution": "The checkpoint defines sparse/indexed attention or a contract-qualified sparse alternative.",
-  "serving.tool_conversations": "Text tool-call parsing, multi-turn tool serialization or structured tool output is required.",
-  "decode.speculative_execution": "The contract permits draft-and-verify acceleration and supplies an appropriate draft path.",
-  "parallel.model_execution": "Only when execution or prefill state spans workers. The single-device baseline uses local execution and keeps sequence state on the same worker.",
-  "transfer.prefill_handoff": "Prefill and decode are served by separate workers or resource pools.",
-  "model.expert_routing": "The checkpoint includes routed expert layers.",
-  "experts.routed_forward": "A model-defined router sends token rows to expert FFNs.",
-  "experts.shared_forward": "The checkpoint declares an always-on shared expert branch.",
-  "merge.expert_contributions": "Model blocks combine selected expert outputs, optionally with an always-on branch.",
-  "parallel.expert_exchange": "Token owners and selected expert owners can reside on different ranks.",
-  "engine.expert_streaming": "Required for this target: the stored model exceeds usable physical memory. Load authoritative expert ranges from backing storage into a bounded working set.",
-  "engine.expert_residency": "An expert tier has limited capacity or the target reserves fast storage for a subset of experts.",
-  "routing.forecast_expert_demand": "There is transfer or service latency to hide, advance features and a bounded speculation budget.",
-  "factory.experiment_design": "An optimization, transfer decision or observed failure requires a controlled experiment.",
-  "factory.methodology_ab": "A change is being compared to a baseline for a scoped performance or quality claim.",
-  "factory.resource_lab": "Selection among capacity, placement or offload choices needs target measurements.",
-  "factory.streaming_lab": "The contract enables expert streaming, residency optimization or advance demand prediction.",
-  "factory.precision_lab": "The build chooses, changes or calibrates a weight, activation or state representation.",
-  "model.expert_ffn": "Routed FFN execution is required. Enable shared FFN execution only when the checkpoint declares shared tensors and their gate."
- },
- "definitions": {
-  "model.expert_ffn": {
-   "id": "model.expert_ffn",
-   "reason": "Implement expert arithmetic from already grouped hidden rows and ready weights, preserving each row until inverse dispatch.",
-   "inputs": "Expert-grouped hidden rows, row offsets, ready gate/up/down weights, architecture and precision contract.",
-   "outputs": "Expert-local FFN output rows in the input grouped order.",
-   "capabilities": [
-    "Expert projections and gating",
-    "Shape-qualified grouped execution",
-    "Independent numerical oracle"
-   ],
-   "decisions": "Choose eligible grouped or individual kernels with the required activation, accumulator precision and layout.",
-   "integration": "Consume dispatch offsets and protected weight handles; hand per-row expert outputs to the inverse gather.",
-   "greenfield": "Build a scalar gate/up → activation and multiply → down oracle, then replace eligible projections with qualified target kernels.",
-   "check": "Use distinct expert matrices and lane values. Compare each grouped output row to the correct expert oracle for uneven counts, empty experts and tail tiles.",
-   "ex": [],
-   "reuse": [],
-   "old": [],
-   "nodes": [
-    "experts",
-    "shared"
-   ]
-  },
-  "factory.controlled_experiment": {
-   "id": "factory.controlled_experiment",
-   "kind": "factory",
-   "reason": "Run a controlled target experiment that turns a candidate image and a falsifiable question into an auditable, bounded verdict.",
-   "inputs": "Candidate and baseline identities, workload and model pins, contract gates, controls, resource budget, target and numerical oracle.",
-   "outputs": "Attempt manifest, quality and performance observations, resource accounting, scoped pass/fail or inconclusive verdict and linked reproduction records.",
-   "capabilities": [
-    "Trial admission and cleanup",
-    "Reference comparisons",
-    "Controlled target profiling",
-    "Paired performance measurements",
-    "Scoped evidence receipts"
-   ],
-   "decisions": "Choose the cheapest test that can discriminate the hypothesis. Record device, warm-up, cache state, sample counts, quality tolerance and confirmation rule before comparing.",
-   "integration": "Stage the exact existing engine image and independent client. Correlate observations from exposed runtime hooks and retain raw artifacts for a failed or incomplete attempt.",
-   "greenfield": "Start with independently computed tiny forward and decoding fixtures and a clean-start test. Add forced storage misses, matched workloads, target measurements and paired trials as the engine becomes runnable.",
-   "check": "Detect a seeded numerical or ownership fault; reproduce a recorded trial from its manifest; mark missing measurements and failed gates explicitly.",
-   "ex": [],
-   "reuse": [],
-   "old": [],
-   "nodes": [
-    "verification",
-    "profile",
-    "evidence"
-   ]
-  }
- },
- "responsibilities": {
-  "serving.request_gateway": {
-   "outputs": "Validated text-generation requests, cancellation and streaming events. For tool-aware protocols, preserve call IDs, argument fragments and final status.",
-   "check": "Replay the same request through the supported local or HTTP entry point. For tool calls, split arguments across stream chunks and verify reconstruction, identity and completion."
-  },
-  "verification.performance_measurement": {
-   "outputs": "A reproducible timing record with workload, warm state, queue boundaries and uncertainty. When comparing revisions, produce a paired effect estimate and screen or confirmation decision.",
-   "check": "Verify token counts and clock boundaries on a fixed workload. For A/B evaluation, counterbalance run order, check A/A variation and confirm the candidate on independent runs."
-  },
-  "parallel.model_execution": {
-   "outputs": "Rank-local batches, ordered collective results and completion events. Split prefill deployments also require a receiver-owned, validated sequence-state handle.",
-   "check": "Compare sharded logits with a local reference. When transferring prefill state, delay receipt, check sequence identity and positions, and compare the first receiver-side decode logits to the reference."
-  },
-  "merge.expert_contributions": {
-   "reason": "Forward packing and inverse gathering share a permutation contract. They can be tested as one round trip independently of the expert arithmetic.",
-   "inputs": "Authoritative expert IDs and weights, token rows, valid assignment counts, expert FFN outputs.",
-   "outputs": "Expert-grouped rows, offsets and the inverse map; restored per-token weighted outputs.",
-   "integration": "Bind assignment rows and strides to the target grouped GEMM interface. Preserve the inverse token/choice map through compute. Document where the route weights are applied.",
-   "greenfield": "Build a scalar group-and-gather oracle, then add count/scan/scatter and optimized inverse reductions.",
-   "check": "Exercise k=1 and k>1, empty experts, nonuniform weights, repeated token owners and uneven histograms. Compare the grouped result to direct per-token evaluation.",
-   "capabilities": [
-    "Histogram, scan and pack eligible rows",
-    "Preserve expert offsets and inverse token/choice map",
-    "Restore token order and weight each contribution once"
-   ]
-  },
-  "tokenizer.prepare_request": {
-   "reason": "Both directions use the same vocabulary and special-token policy. The codec owns exact prompt IDs and incremental decoded text, independently of request transport.",
-   "outputs": "Prompt IDs and offsets for scheduling; decoded UTF-8 chunks for the output writer.",
-   "check": "Compare exact IDs with the checkpoint tokenizer, then decode deliberately split multibyte pieces, unknown or special IDs and an empty terminal fragment.",
-   "integration": "Pin the tokenizer assets and chat template revision. Bind input IDs to the sequence; emit text fragments to the transport writer.",
-   "greenfield": "Implement the declared tokenizer and reverse vocabulary decoder against small golden input/output fixtures; put transport framing outside the codec."
-  },
-  "factory.workflow_planning": {
-   "reason": "A plan depends on what the source already supplies. Inspect the baseline, identify unsupported obligations and bind work orders with explicit upstream artifacts and reusable CCs.",
-   "inputs": "Approved contract, target topology, existing source and evidence, or an empty repository.",
-   "outputs": "Pinned baseline inventory, verified gaps and ordered work orders with artifact bindings and retry decisions.",
-   "greenfield": "Declare every required provider, then schedule a reference end-to-end path with input, output and verification ownership.",
-   "integration": "Inspect effective flags and live interfaces, qualify reusable parts and schedule only missing work and evidence.",
-   "check": "Every required artifact has a provider. Distinguish a present source symbol from an admitted runtime path."
-  },
-  "compiler.engine_contract": {
-   "reason": "Resolving the user intent and binding model facts to verifiable constraints produces one contract, from reviewed goals through workload-specific acceptance gates.",
-   "inputs": "User intent, system ontology, model and target facts, constrained resources and requested quality/performance.",
-   "outputs": "Resolved intent, ontology-linked obligations, acceptance gates and any unresolved questions with contract impact.",
-   "check": "Given an underspecified request, resolve or mark missing facts. Reject incompatible requirements before assigning engineering work."
-  }
- },
- "aliasOverrides": {
-  "experts.pack_tokens": "merge.expert_contributions",
-  "output.detokenize": "tokenizer.prepare_request"
- },
- "operationOwners": {
-  "interface/detok": [
-   "tokenizer.prepare_request"
-  ],
-  "interface/emit": [
-   "serving.request_gateway"
-  ],
-  "model/dispatch": [
-   "merge.expert_contributions",
-   "parallel.expert_exchange"
-  ]
- },
- "sourceOwnerByPrevious": {
-  "experts.pack_tokens": "merge.expert_contributions",
-  "output.detokenize": "tokenizer.prepare_request"
- },
- "nonTargetRoles": [
-  "weights.adapter_binding",
-  "parallel.model_execution",
-  "parallel.expert_exchange",
-  "decode.speculative_execution",
-  "sequence.recurrent_execution",
-  "attention.sparse_execution"
- ],
- "nonTargetOperations": [
-  "generate/handoff",
-  "generate/draft",
-  "generate/verify",
-  "model/recur",
-  "state/recurrent",
-  "model/shortlist",
-  "model/shared"
- ]
 }

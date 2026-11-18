@@ -49,11 +49,13 @@ function kindStrip(r){return [...new Set(r.contents.map(c=>c.kind))].map(kindLab
 function capabilityKey(){return details('Capability types',Object.entries(kindTerms).map(([k,v])=>'<p>'+kindLabel(k)+' '+esc(v)+'</p>').join(''))}
 function ccPanel(r,overlay){
  const ex=atlas.assets.filter(a=>r.ex.includes(a.name)), rows=atlas.sources.filter(s=>s.assigned===r.id);
- const target=museRows(r.id),examples=target.length?references(target):rows.slice(0,1).map(sourceRow).join('');
+ const target=museRows(r.id),museCode=target.filter(s=>!s.url.includes('/Muxite/tools/'));
+ const picks=engines.map(e=>r.examples.find(s=>s.engine===e)).filter(Boolean);
+ const examples=references([...museCode.slice(0,1),...picks.slice(0,2)].filter((s,i,rs)=>rs.findIndex(v=>v.url===s.url)===i));
  return '<div class="tagline">'+(r.kind==='factory'?'Software factory':r.target===false?'Reference extension':'Muse engine construction')+' CC</div><h2>'+esc(r.title)+'</h2><code>'+esc(r.id)+'</code> '+essentialTag(r.essential)+
- sec('What you own',list(r.why))+ (r.id==='model.expert_routing'?routingCase():r.id==='model.decoder_architecture'?normalizationGuide():'')+
- sec('Interface to preserve','<b>Consumes</b>'+list(r.inputs)+'<b>Produces</b>'+list(r.outputs))+sec('Check the result',list(r.check))+
- sec('Implementation evidence',examples)+details('Agent capabilities · '+r.contents.length,'<p>Choose the capabilities required by the work order. These are proposed contents.</p>'+r.contents.map(c=>'<article class="cap-row">'+kindLabel(c.kind)+' <b>'+esc(c.name)+'</b><p>'+esc(c.detail)+'</p></article>').join('')+capabilityKey())+
+ sec('What it owns',list(r.review.boundary))+ (r.id==='model.expert_routing'?routingCase():r.id==='model.decoder_architecture'?normalizationGuide():'')+
+ sec('Interface to preserve','<b>Consumes</b>'+list(r.inputs)+'<b>Produces</b>'+list(r.outputs))+sec('Check the result',list(r.check))+sec('Proposed agent handoff',handoffPanel(r.handoff))+(r.tierHandoff?details('When moving KV pages between tiers',handoffPanel(r.tierHandoff)):'')+(r.id==='observability.runtime_events'?nvtxGuide():'')+(['weights.prepare_artifact','weights.decode_blocks','factory.controlled_experiment'].includes(r.id)?pill('Quantization experiments','#quantization'):'')+
+ (examples?sec('Implementation evidence',examples+'<div class="pills">'+engines.filter(e=>r.examples.some(s=>s.engine===e)).map(e=>pill(e+' examples',address('sources',r.id,{engine:e}))).join(' ')+'</div>'):'')+details('Design notes',references(target.filter(s=>s.url.includes('/Muxite/tools/'))))+details('Agent capabilities · '+r.contents.length,'<p>Choose the capabilities required by the work order. These are proposed contents.</p>'+r.contents.map(c=>'<article class="cap-row">'+kindLabel(c.kind)+' <b>'+esc(c.name)+'</b><p>'+esc(c.detail)+'</p></article>').join('')+capabilityKey())+
  details('Build or integrate',sec('From scratch',list(r.greenfield))+sec('Existing source',list(r.integration)))+
  details('Pinned engine examples · '+rows.length,rows.map(sourceRow).join(''))+
  details('Existing factory and lab assets · '+ex.length,ex.map(assetRow).join(''))+
@@ -85,15 +87,16 @@ function library(query){
  const terms=input.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
  const jobs=atlas.roles.filter(r=>{const hay=[r.id,r.title,r.why,r.capabilities,...r.contents.map(c=>[c.name,c.detail,c.kind].join(" ")),...Object.keys(atlas.aliases).filter(k=>atlas.aliases[k]===r.id),...atlas.sources.filter(s=>s.assigned===r.id).map(s=>s.symbol)].join(' ').toLowerCase();return (!type.value||r.contents.some(c=>c.kind===type.value))&&terms.every(x=>hay.includes(x))&&(scope.value==='Reference extensions'?r.target===false:r.target!==false&&(scope.value==='All CCs'||(scope.value==='Software factory')===(r.kind==='factory')))});
  root.querySelector('#results').innerHTML='<p class="caption">'+jobs.length+' CCs</p><div class="cards">'+jobs.map(r=>'<a class="listing" href="#cc/'+esc(r.id)+'"><strong>'+esc(r.title)+'</strong> '+essentialTag(r.essential)+'<br><code>'+esc(r.id)+'</code><p>'+esc(r.why)+'</p><div>'+kindStrip(r)+'</div></a>').join('')+'</div>';
- history.replaceState(null,'',address('library','',{q:input.value,type:type.value,scope:scope.value==='All CCs'?'':scope.value}));
+ history.replaceState(history.state,'',address('library','',{q:input.value,type:type.value,scope:scope.value==='All CCs'?'':scope.value}));
  }
  input.oninput=update;scope.onchange=update;type.onchange=update;update();
 }
-function evidence(){
+function evidence(id,params){
+ if(id&&sourceSlice(id,params.get('engine')))return;
  const docs='https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/';
  const notes=docs+'DGX-SPARK/planning/muse-workshop/';
- root.innerHTML='<h1>Evidence</h1><p class="lead">Source bindings establish implementation choices. Asset records distinguish declarations, local fixtures and measured runs.</p><div class="cards">'+atlas.repositories.map(r=>'<article class="listing"><h2>'+esc(r.engine)+'</h2><p>'+ext(r.pin.slice(0,12),r.base+'/tree/'+r.pin)+' · '+atlas.sources.filter(x=>x.engine===r.engine).length+' inspected bindings</p>'+'</article>').join('')+'</div>'+
- sec('Muse Spark Open and DGX Spark',references(atlas.muse.refs))+'<div class="sheet"><h2>Integration history</h2><p>The native parent supplied 42 top-level and eight nested CC manifests. The workflow merge retained all 50. The subsequent snapshot added throughput_campaign and revised standard_benchmark with cancellation support. The historical two Strata screens reported +8.30% and +9.28% against a 10% threshold on their frozen workload.</p>'+
+ root.innerHTML='<h1>Implementation evidence</h1>'+ownershipMatrix()+'<p class="lead">Source bindings establish implementation choices. Asset records distinguish declarations, local fixtures and measured runs.</p><div class="cards">'+atlas.repositories.map(r=>'<article class="listing"><h2>'+esc(r.engine)+'</h2><p>'+ext(r.pin.slice(0,12),r.base+'/tree/'+r.pin)+' · '+atlas.sources.filter(x=>x.engine===r.engine).length+' inspected bindings</p>'+'</article>').join('')+'</div>'+
+ receiptGuide()+sec('Muse Spark Open and DGX Spark',references(atlas.muse.refs))+'<div class="sheet"><h2>Integration history</h2><p>The native parent supplied 42 top-level and eight nested CC manifests. The workflow merge retained all 50. The subsequent snapshot added throughput_campaign and revised standard_benchmark with cancellation support. The historical two Strata screens reported +8.30% and +9.28% against a 10% threshold on their frozen workload.</p>'+
  ext('Native workflow integration',docs+'DGX-SPARK/NATIVE-WORKFLOW-INTEGRATION.md')+
  '<h3>Design references</h3><p>The 17-page <i>Inference Engine: Layered Architecture and Profiling Plan</i> supplies the startup, request, scheduler, generation, model, kernel and host vocabulary. Its memory column spans execution layers. The graph treats the host as a deployment dependency and attributes queue, state and launch waits individually.</p>'+ext('Inference layers and profiling',notes+'Inference%20layers%20and%20profiling.md')+' · '+ext('Post-presentation design revision',notes+'Post-presentation%20design%20revision.md')+
  details('Existing assets · '+atlas.assets.length,atlas.assets.map(assetRow).join(''))+

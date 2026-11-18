@@ -105,13 +105,37 @@ def assemble():
             assert any(s['assigned']==k and s.get('url','').startswith('https://github.com/') and '/blob/' in s['url'] for s in sources), 'No pinned source for '+k
         if r['essential']:
             assert r['target'],k
+    review=read('ownership_review.json')
+    handoffs=read('handoffs.json')
+    muse=read('muse_evidence.json')
+    for key,r in roles.items():
+        r['review']=review[key]
+        assert review[key]['site'].split('/') in r['sites'], key
+        r['handoff']=handoffs[key]
+        r['examples']=[]
+    roles['memory.sequence_kv']['tierHandoff']=handoffs['memory.kv_tiering']
+    def example(key, row):
+        bucket=roles[current(key)]['examples']
+        if not any(x['url']==row['url'] for x in bucket):
+            bucket.append(row)
+    for name in ['evidence_runtime.json','evidence_math.json','evidence_peers.json']:
+        for key,rows in read(name).items():
+            for row in rows:
+                example(key,row)
+    for key,rows in muse['byRole'].items():
+        for row in rows:
+            for repo in evidence['repositories']:
+                if row['url'].startswith(repo['base']+'/blob/'+repo['pin']+'/'):
+                    example(key,dict(row,engine=repo['engine']))
+    for row in sources:
+        example(row['assigned'], dict(engine=row['engine'],title=row['symbol'],url=row['url'],detail=row['detail']))
     assert len([r for r in roles.values() if r.get('kind')=='factory'])==5
     return dict(muse=read('muse_evidence.json'),baseline=baseline['description'],cross=cross,engine=engine,factory=factory,edges=architecture['edges'],factoryEdges=taxonomy['edges'],roles=list(roles.values()),aliases=aliases,excluded=sorted(removed),sources=sources,assets=evidence['assets'],repositories=evidence['repositories'],traces=architecture['traces'],transfers=evidence['transfers'],mergers=merged)
 
 if __name__=='__main__':
     data=assemble()
     page=(HERE/'site.html').read_text('utf-8')
-    for token,names in [('/*GRAPH_JS*/',['text_graph.js']),('/*SITE_JS*/',['site.js','navigation.js']),('/*SITE_CSS*/',['site.css','text_graph.css'])]:
+    for token,names in [('/*GRAPH_JS*/',['text_graph.js']),('/*SITE_JS*/',['site.js','experiments.js','navigation.js']),('/*SITE_CSS*/',['site.css','text_graph.css'])]:
         page=page.replace(token,'\n'.join((HERE/n).read_text('utf-8') for n in names))
     page=page.replace('__ATLAS__',json.dumps(data,ensure_ascii=False,separators=(',',':')).replace('<','\\u003c'))
     out=HERE.parent/'20261117 Text Inference Engine Atlas prepresentation.html'

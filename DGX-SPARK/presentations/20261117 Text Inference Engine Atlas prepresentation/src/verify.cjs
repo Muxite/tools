@@ -122,6 +122,78 @@ async function main() {
     assert((await page.locator('main').innerText()).includes('weights.decode_blocks'), 'Library misses a source-symbol match');
     await jump('#sources');
     assert(await page.locator('main a[href*="github.com/"]').count() > 0, 'Evidence view contains no upstream source links');
+    const repoNames = ['Strata','llama.cpp','ds4','SGLang'];
+    const targetRoles = data.roles.filter(r => r.kind !== 'factory' && r.target !== false);
+    const matrix = page.locator('table.matrix');
+    assert.deepEqual((await matrix.locator('thead th').allTextContents()).slice(1),repoNames);
+    assert.equal(await matrix.locator('tbody tr').count(),targetRoles.length);
+    for (const [i,r] of targetRoles.entries()) {
+      const row = matrix.locator('tbody tr').nth(i);
+      assert.equal(await row.locator('th a').getAttribute('href'),'#cc/'+r.id);
+      assert(r.examples.length,'No inspected example for ' + r.id);
+      for (const [j,name] of repoNames.entries()) {
+        const refs=r.examples.filter(e=>e.engine===name);
+        const cell=row.locator('td').nth(j);
+        assert.equal(await cell.innerText(),refs.length ? String(refs.length) : '—',r.id+' / '+name);
+        if (refs.length) {
+          const repo=data.repositories.find(x=>x.engine===name);
+          assert(refs.every(e=>e.url.startsWith(repo.base+'/blob/'+repo.pin+'/')&&e.title&&e.detail),r.id+' needs pinned '+name+' evidence');
+        }
+      }
+    }
+    for (const name of repoNames) {
+      const sample = targetRoles.find(r => r.examples.some(e=>e.engine===name));
+      assert(sample,'No matrix sources for '+name);
+      await jump('#sources');
+      const href = '#sources/'+sample.id+'?engine='+encodeURIComponent(name);
+      const pick = page.locator('table.matrix a[href="'+href+'"]');
+      await pick.click();
+      await page.getByRole('heading',{name:sample.title,exact:true}).waitFor();
+      const expected=sample.examples.filter(e=>e.engine===name);
+      assert.deepEqual(await page.locator('main .cap-row a').evaluateAll(as=>as.map(a=>a.href)),expected.map(e=>e.url));
+    }
+    await jump('#library');
+    await page.locator('#search').fill('dequantize_q6_K');
+    await page.locator('#scope').selectOption('Engine');
+    const listHash=await page.evaluate(()=>location.hash);
+    await page.locator('#results a[href="#cc/weights.decode_blocks"]').click();
+    await page.locator('.receipt').first().waitFor();
+    const ccHash=await page.evaluate(()=>location.hash);
+    const slice=page.locator('main a[href^="#sources/weights.decode_blocks?engine="]').first();
+    const sliceHash=await slice.getAttribute('href');
+    await slice.click();
+    await page.locator('main .cap-row a').first().waitFor();
+    await page.locator('#page-back').click();
+    await page.waitForFunction(h=>location.hash===h,ccHash);
+    await page.locator('#page-back').click();
+    await page.waitForFunction(h=>location.hash===h,listHash);
+    assert.equal(await page.locator('#search').inputValue(),'dequantize_q6_K');
+    assert.equal(await page.locator('#scope').inputValue(),'Engine');
+    await page.goForward();
+    await page.waitForFunction(h=>location.hash===h,ccHash);
+    await page.goForward();
+    await page.waitForFunction(h=>location.hash===h,sliceHash);
+    await page.getByRole('link',{name:'Inspect CC and handoff'}).click();
+    await page.getByRole('link',{name:'Quantization experiments'}).click();
+    await page.getByRole('heading',{name:'Quantization experiments',exact:true}).waitFor();
+    assert.equal(await page.locator('.quant-steps article').count(),5);
+    assert((await page.locator('main').innerText()).includes('held-out'));
+    await page.getByRole('link',{name:'Run the trial'}).click();
+    await page.locator('.receipt').first().waitFor();
+    assert((await page.locator('.receipt').first().innerText()).includes('RSI decision'));
+    for (const r of data.roles) {
+      assert(r.handoff.signals.length && r.handoff.artifact && r.handoff.consumer && r.handoff.proof && r.handoff.rsi,r.id+' handoff is incomplete');
+      await jump('#cc/'+r.id);
+      const receipt=page.locator('.receipt').first();
+      await receipt.waitFor();
+      assert((await receipt.innerText()).includes(r.handoff.artifact),r.id+' shows an incorrect handoff');
+    }
+    await jump('#cc/memory.kv_tiering');
+    await graphNode('memory.sequence_kv').waitFor();
+    await page.getByText('When moving KV pages between tiers',{exact:true}).click();
+    assert((await page.locator('main').innerText()).includes(data.roles.find(r=>r.id==='memory.sequence_kv').tierHandoff.proof));
+    await jump('#cc/observability.runtime_events');
+    await page.getByRole('heading',{name:'Optional NVTX instrumentation'}).waitFor();
     await jump('#engine');
     const walks = page.locator('[data-walk]');
     for (const t of data.traces) {
@@ -139,7 +211,7 @@ async function main() {
       await jump('#engine');
     }
     await page.setViewportSize({ width:390, height:844 });
-    for (const h of ['#engine','#engine/model?op=' + route.id,'#factory','#library','#sources']) {
+    for (const h of ['#engine','#engine/model?op=' + route.id,'#factory','#library','#sources','#quantization','#sources/weights.decode_blocks?engine=Strata']) {
       await jump(h);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Horizontal page overflow at ' + h);
     }
@@ -172,7 +244,8 @@ async function main() {
     await page.getByRole('heading',{name:'Example work orders'}).waitFor();
     assert.deepEqual(errors, [], 'Browser exceptions');
     assert.deepEqual(requests, [], 'Site attempted to load network resources');
-    console.log('PASS: ' + layers.length + ' graph regions, ' + layers.reduce((n,l) => n+l.ops.length,0) + ' operations, ' + roles.size + ' reachable CCs, ' + data.sources.length + ' source examples and ' + data.traces.length + ' walkthroughs. Keyboard, offline and mobile checks passed.');
+    const evidenceCount = targetRoles.reduce((n,r)=>n+r.examples.length,0);
+    console.log('PASS: ' + layers.length + ' graph regions, ' + layers.reduce((n,l) => n+l.ops.length,0) + ' operations, ' + roles.size + ' CC handoffs, ' + evidenceCount + ' target CC/source pairs across four engines, ' + data.traces.length + ' walkthroughs. Evidence filters, Back/Forward, quantization, keyboard, offline and mobile checks passed.');
   } finally {
     await browser.close();
   }

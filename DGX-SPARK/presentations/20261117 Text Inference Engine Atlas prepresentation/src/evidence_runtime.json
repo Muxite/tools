@@ -1,0 +1,454 @@
+{
+  "batch.execution_layout": [
+    {
+      "engine": "llama.cpp",
+      "title": "Microbatch splitting consumes indexed tokens up to the requested limit",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-batch.cpp#L625-L656",
+      "detail": "split_simple finds the first unused token, records indices, marks them used until n_ubatch or the end and constructs the corresponding ubatch. Other split variants have different sequence-shape rules."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Batch admission checks per-sequence position consistency",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-batch.cpp#L400-L425",
+      "detail": "The M-RoPE position branch compares each sequence starting position to the stored memory frontier and rejects invalid ordering. Embedding-input rows have a separately handled overlap convention."
+    },
+    {
+      "engine": "Strata",
+      "title": "Batched speculative lanes retain lane IDs and per-lane row counts",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/split/src/batch.cpp#L91-L140",
+      "detail": "fit bounds total rows by cutting drafts from the longest lane; window requires a valid token and limit per lane, packs lane IDs/counts plus base/draft rows and passes them to verify_rows. This is a split-engine batch binding."
+    }
+  ],
+  "decode.advance_sequence": [
+    {
+      "engine": "llama.cpp",
+      "title": "Decode validates available context mode and input row geometry",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-context.cpp#L2140-L2167",
+      "detail": "decode delegates to encode if the context has no memory, rejects empty input or wrong embedding width and checks support before accepting embedding/state rows. These admission checks do not alone establish incremental-logit equivalence."
+    },
+    {
+      "engine": "Strata",
+      "title": "Split forward execution traverses the model layers and card-local buffers",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/split/src/engine.cu#L982-L1010",
+      "detail": "enqueue iterates layers and participating card contexts, applies pending residual/hyper-connection updates and handles the designated per-layer embedding branch. This is a particular split-engine forward path, not evidence that every Strata model uses it."
+    }
+  ],
+  "decode.speculative_execution": [
+    {
+      "engine": "llama.cpp",
+      "title": "Speculation dispatch commits accepted counts to the active proposer",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/common/speculative.cpp#L3522-L3548",
+      "detail": "common_speculative_accept identifies the last proposer for the sequence and handles accepted-token bookkeeping. A null proposer requires zero accepted tokens. Source presence is not a proof that rejection rollback matches ordinary decoding."
+    },
+    {
+      "engine": "Strata",
+      "title": "Suffix drafting declines insufficient history or absent suffix matches",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/spec/suffix_drafter.cpp#L64-L89",
+      "detail": "SuffixDrafter::propose resets match length, checks history and maximum draft size, looks up the suffix key and searches candidate matches. This is one proposer; it does not define target acceptance."
+    },
+    {
+      "engine": "Strata",
+      "title": "Adaptive draft policy accumulates expected acceptance benefit",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/spec/draft_policy.cpp#L975-L996",
+      "detail": "keep_draft bounds the effort cap and updates a chain from predicted acceptance and configured cost estimates. This supports a cost-aware policy mechanism, not a measured speedup or universal optimal policy."
+    }
+  ],
+  "engine.expert_streaming": [
+    {
+      "engine": "llama.cpp",
+      "title": "MoE cache plans fills from authoritative selected IDs",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-moe-cache.cpp#L767-L821",
+      "detail": "The scheduler-copy callback locates the selected-expert lookup, requires routing to have run in an earlier graph split, reads the actual IDs back and synchronizes before cache planning. It aborts when selected demand exceeds cache feasibility. This is exact-demand caching, not future-route prediction."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Missing expert uploads precede publication of the new slot map",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-moe-cache.cpp#L835-L859",
+      "detail": "The cache coalesces consecutive expert/slot fills, submits weight uploads, accounts hits/misses/CPU work/bytes and only then submits the slot-map update. Ordering is attached to the backend copy path; no SSD throughput or cross-engine transfer is established."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Victim selection protects experts selected by the current plan",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-moe-cache.cpp#L132-L175",
+      "detail": "is_selected uses layer-aware generation marks; candidate walks the recency list while excluding selected keys, and victim ranks eligible candidates using age and class. This is an implemented residency policy with pinned-in-plan protection."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Large batches may bypass admission to preserve the decode working set",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-moe-cache.cpp#L690-L724",
+      "detail": "get_slot_map returns no cache lookup for unsupported layers, empty/oversized batches or demand larger than slot capacity. The optional CPU-miss map is separately disabled if a backend offloads the probed operation. These are workload eligibility rules, not universal cache acceleration."
+    },
+    {
+      "engine": "Strata",
+      "title": "Direct storage submission enforces offset, size and pointer alignment",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/platform/direct_file.cpp#L206-L216",
+      "detail": "DirectFile::submit rejects unopened or zero/unaligned requests before appending tagged work under its queue mutex. This establishes aligned asynchronous submission, not successful completion or a particular storage bandwidth."
+    },
+    {
+      "engine": "Strata",
+      "title": "VRAM expert fill queues copies and reports enqueue errors",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_cache.cpp#L873-L888",
+      "detail": "fill_slot_queued checks sealed-write rules, slot destination and host pointer, then enqueues a host-to-device copy and increments the fill counter. A true return is enqueue success; this function alone does not prove the consumer has waited for completion."
+    },
+    {
+      "engine": "Strata",
+      "title": "Foresight swaps bound per-card copies and protect recently referenced slots",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L6714-L6763",
+      "detail": "request_locked ignores already pending/held keys, enforces copy budget and pinned-source availability, queries completion events before reclaiming loading slots and avoids recently referenced slots. New work is marked not-ready/loading before being queued. Demand consumption readiness still needs its own integration check."
+    },
+    {
+      "engine": "Strata",
+      "title": "Split FFN fills planned slots before launching expert arithmetic",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/split/src/engine.cu#L948-L978",
+      "detail": "The split FFN routes tokens, optionally plans slots in the router, calls moe_cache for planned experts before gate/up and down kernels, waits for the independent shared branch when necessary and then reduces contributions. This establishes one integrated path beyond a standalone cache API."
+    },
+    {
+      "engine": "Strata",
+      "title": "Peer expert launch has an explicit output/direct-mode boundary",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/peer_experts.cpp#L254-L272",
+      "detail": "PeerExperts::launch decides whether direct mode is usable from configuration and an output pointer and records host launch time. This demonstrates a peer-service entrypoint, not correct peer results or fallback performance."
+    },
+    {
+      "engine": "Strata",
+      "title": "Remote expert admission checks token, model-width and layer limits",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/remote_experts.cpp#L265-L278",
+      "detail": "RemoteExperts::begin bounds total assignments, token window and compiled selection width and checks layer/device availability before remote work. This is a specialized service contract rather than arbitrary remote expert execution."
+    },
+    {
+      "engine": "Strata",
+      "title": "Metal streaming marks slots pending before issuing multipart reads",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/metal/src/engine/stream.cpp#L338-L352",
+      "detail": "ExpertStream::submit stores layer/expert identity, marks the slot in flight, distinguishes urgent versus prefetch use and counts remaining read parts/outstanding work. This is source evidence for a Metal-specific streaming lifecycle, not CUDA or DGX validation."
+    }
+  ],
+  "memory.kv_tiering": [
+    {
+      "engine": "Strata",
+      "title": "Host-to-stage KV copy uses format-derived contiguous runs",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/kv_stream.cu#L254-L261",
+      "detail": "kv_stage_from_host derives source/destination runs for the chosen format and submits cudaMemcpyAsync for each run on the provided stream. This directly demonstrates host-to-device staging; it does not establish hierarchical disk KV management or target throughput."
+    }
+  ],
+  "memory.reusable_sessions": [
+    {
+      "engine": "llama.cpp",
+      "title": "Server prompt save captures target and optional draft sequence state",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/tools/server/server-context.cpp#L344-L376",
+      "detail": "prompt_save sizes and serializes target and optional draft state into the prompt cache; failed capture removes the new cache entry. prompt_load delegates restoration to the cache using requested tokens and the current slot ID. This establishes an in-process reuse path."
+    },
+    {
+      "engine": "Strata",
+      "title": "Prefix restoration refuses lengths beyond the captured KV",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/conversation_snapshot.cpp#L481-L489",
+      "detail": "conversation_kv_restore_prefix joins parked host work if needed, rejects a negative or too-long prefix and validates snapshot geometry before restoration. This supports bounded restore admission, not a complete identity or replay proof."
+    },
+    {
+      "engine": "Strata",
+      "title": "Persistent session loader rejects foreign model/configuration identities",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/conversation_file.cpp#L1200-L1214",
+      "detail": "The session header parser checks magic, header checksum, version and fields, then explicitly rejects mismatched model/configuration fingerprints and inconsistent payload lengths. These are identity and structural checks in source."
+    }
+  ],
+  "memory.runtime_arenas": [
+    {
+      "engine": "llama.cpp",
+      "title": "Mapped weights preserve lazy ranges during initial host prefetch",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-mmap.cpp#L712-L749",
+      "detail": "The POSIX mapping uses a shared read-only mmap, avoids MAP_POPULATE when lazy ranges exist, advises eager complement ranges WILLNEED and lazy ranges RANDOM. These are OS hints, not a guarantee of physical memory residency."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Graph allocator accounts views and dependency references",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/ggml/src/ggml-alloc.c#L735-L765",
+      "detail": "The allocator records view references and source-child counts, allocates explicit graph inputs and then visits graph nodes for allocation. This is source evidence for dependency-aware workspace management, not a measured peak-memory bound."
+    },
+    {
+      "engine": "Strata",
+      "title": "Pinned registration publishes completion slice by slice",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/pinned.cu#L1024-L1038",
+      "detail": "register_slices traverses arena boundaries, stops on the first registration failure and counts successfully registered slices. The path supports partial registration; a fully pinned model must not be inferred from the API name."
+    },
+    {
+      "engine": "Strata",
+      "title": "Virtual-memory commit rolls back failed mappings",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/vmm.cpp#L137-L150",
+      "detail": "commit_run succeeds only after access rights are established; on failure it unmaps and frees each chunk in the interval. unmap checks mapping presence and uses the resolved driver API. Support remains device/driver-dependent."
+    }
+  ],
+  "memory.sequence_kv": [
+    {
+      "engine": "llama.cpp",
+      "title": "Sequence removal updates free-slot search heads",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-kv-cache.cpp#L440-L466",
+      "detail": "seq_rm normalizes position bounds, removes sequence-owned cells and advances the allocation search head to a newly available slot. The shared-other-cache early return and valid sequence-ID guard are explicit."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Same-stream sequence copy shares cell metadata instead of copying tensors",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-kv-cache.cpp#L497-L523",
+      "detail": "seq_cp validates sequence IDs and recognizes when source and destination share a KV stream; that path updates metadata without copying payload bytes. Cross-stream behavior must be considered separately."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Windowed/full KV wrapper propagates sequence removal to both stores",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-kv-cache-iswa.cpp#L108-L126",
+      "detail": "The ISWA wrapper clears both base and sliding-window caches and combines sequence-removal results from both. This establishes coordination of those stores, not a verified long-context quality result."
+    },
+    {
+      "engine": "Strata",
+      "title": "KV lane growth is all-or-none before page-table publication",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/split/src/engine.cu#L657-L691",
+      "detail": "ensure_pages_of checks context capacity, optionally expands the arena or invokes pool-short recovery, refuses insufficient free pages before mutation and copies newly assigned page IDs to each device lane table. The comments identify stale-table writes as the avoided hazard."
+    },
+    {
+      "engine": "Strata",
+      "title": "Q4 KV append checks head geometry and launches indexed updates",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/kv_q4.cu#L195-L205",
+      "detail": "kv_append_q4_steps returns for no steps, enforces its supported 256 geometry and launches the append kernel with page table, step stride and one/two-plane selection. This is a format-specific path, not generic KV precision support."
+    }
+  ],
+  "merge.expert_contributions": [
+    {
+      "engine": "llama.cpp",
+      "title": "MoE merge weights outputs and reduces the per-layer expert count",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-graph.cpp#L2621-L2656",
+      "detail": "After optional expert-output normalization, the graph applies route weights unless they were applied before the FFN, then creates expert views bounded by hparams.n_expert_used(il) and sums them. Correct weighting location is architecture-dependent."
+    },
+    {
+      "engine": "Strata",
+      "title": "Qwen merge restores packed rows and adds sigmoid-gated shared output",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/qwen35/q36_engine.cu#L161-L185",
+      "detail": "k_moe_out uses prow to invert packed expert order, weights each routed row, adds sigmoid(sgate) times the shared row and updates the residual. Optional next normalization is fused after that update. This is a specific Qwen-family branch contract."
+    }
+  ],
+  "model.expert_routing": [
+    {
+      "engine": "llama.cpp",
+      "title": "Graph separates score transformation from correction-biased selection",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-graph.cpp#L2297-L2335",
+      "detail": "build_moe_ffn supports softmax, sigmoid, supplied-weight and sqrt-softplus score transforms. It preserves the original probs tensor while adding expert correction bias to selection_probs. This avoids treating selection bias as mixture probability."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Grouped routing uses top-two-sum group scores and gathers original weights",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-graph.cpp#L2345-L2394",
+      "detail": "The graph scores each group by the sum of its top two selection values, retains n_group_used groups with other scores set to negative infinity, selects n_expert_used IDs and gathers their weights from probs. The supplied-weight mode has a separate selected-weight softmax."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "CUDA routing admission rejects unsupported geometry and softmax variants",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/ggml/src/ggml-cuda/topk-moe.cu#L487-L530",
+      "detail": "The fused path admits specific expert counts, requires contiguous logits/weights and refuses nonunit softmax scale, max bias, masks or sinks. This is concrete fallback eligibility; runtime K remains an input rather than a separate construction job."
+    },
+    {
+      "engine": "Strata",
+      "title": "Native 512-way router uses deterministic ranked selection",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/native_router.cu#L49-L99",
+      "detail": "The pinned Flash-Next route reads 512 logits and emits ten picks, computes stabilized softmax values, resolves equal scores by lower expert ID and suppresses selected entries before the next pick. The numeric accumulation order is explicitly lane-dependent."
+    },
+    {
+      "engine": "Strata",
+      "title": "Native router dispatch advertises two compiled model geometries",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/native_router.cu#L236-L248",
+      "detail": "native_router_topk_supported admits 512 experts with k=10 or 256 experts with k=8; dispatch preserves the original 512/10 kernels and guards other inputs. It is incorrect to describe the whole pinned Strata runtime as only 512/10."
+    },
+    {
+      "engine": "Strata",
+      "title": "Opt-in residency prior intentionally changes authoritative selection",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/route_prior.cu#L29-L68",
+      "detail": "route_prior_k adds lambda to resident expert logits only for selecting winners, keeps original exponentiated scores for weights and renormalizes over the ten selected IDs. Unlike prefetch prediction, positive residency bias can change model output and needs separate quality acceptance."
+    }
+  ],
+  "observability.runtime_events": [
+    {
+      "engine": "llama.cpp",
+      "title": "Synchronized host phase counters distinguish one-token and multi-token work",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-context.cpp#L955-L976",
+      "detail": "synchronize waits for the backend scheduler, then accumulates elapsed host time into generation for one queued token or prompt evaluation for multiple tokens. The source notes unsynchronized single-token calls can be classified as prompt work. These are aggregate counters, not NVTX ranges."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Performance interface exposes prompt, generation and reused counts",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-context.cpp#L4118-L4129",
+      "detail": "perf_get_data returns load/start/prompt/generation durations and token/reuse counts with minimum denominators for evaluation counts. This exposes runtime aggregates; it does not provide kernel-level timeline attribution."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "MoE cache emits a binary trace of selected expert IDs",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-moe-cache.cpp#L644-L679",
+      "detail": "The MCT1 writer records cache group/model geometry and one record per slot lookup containing layer, experts-per-token, ID count and the actual ID list. It does not store aligned mixture weights or per-event timestamps, so it is a partial route-trace facility."
+    },
+    {
+      "engine": "Strata",
+      "title": "GPU stage profiler uses CUDA events and changes capture mode",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/dflash2.cpp#L69-L109",
+      "detail": "STRATA_DF2_PROFILE enables per-stage cudaEventRecord/cudaEventElapsedTime collection and synchronization. Its documented measurement mode runs without the ordinary graph; it is an existing alternative to annotations but may perturb the path being measured. No NVTX API is present in this block."
+    },
+    {
+      "engine": "Strata",
+      "title": "Split expert trace rejects overflow and returns a requested suffix",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/split/src/engine.cu#L713-L724",
+      "detail": "route_trace reads a device length, fails if capacity was exceeded and copies recorded unsigned picks from the requested offset. Route recording is fed from actual b.topi in ffn_half. The trace does not expose aligned weights through this getter."
+    },
+    {
+      "engine": "Strata",
+      "title": "Serving exports request counts and latency histograms",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/serve/prometheus.py#L73-L104",
+      "detail": "Prometheus rendering emits running/waiting counts, prompt/generation/cache/speculation counters and TTFT/inter-token/end-to-end histograms. Its kv_cache_usage_perc field is derived from used context tokens divided by context size, not measured allocated KV bytes; preemption is explicitly reported as zero."
+    }
+  ],
+  "output.response_stream": [
+    {
+      "engine": "llama.cpp",
+      "title": "Resume endpoint validates stream identity and byte offsets",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/tools/server/server-stream.cpp#L454-L496",
+      "detail": "The GET stream handler retrieves an existing session, rejects malformed or dropped offsets and replays ring-buffer SSE bytes from the cursor before waiting for live data. A consumer pipe does not finalize the session merely by being destroyed."
+    },
+    {
+      "engine": "Strata",
+      "title": "Incremental detokenizer holds incomplete UTF-8 token bytes",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/serve/server.py#L4687-L4712",
+      "detail": "Detokenizer uses an incremental UTF-8 decoder when token_bytes is available and can report pending partial bytes. Tokenizers without that interface fall back to accumulated-ID decoding. This is concrete output-byte handling, not a claim of cross-engine token equivalence."
+    },
+    {
+      "engine": "Strata",
+      "title": "Structured output rejects duplicate keys and incomplete finishes",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/serve/structured.py#L237-L265",
+      "detail": "validated_json rejects duplicate object keys and nonfinite constants, requires finish_reason stop and canonicalizes parsed JSON. Escape repair is an explicit opt-in fallback after strict parsing fails; schema validation continues beyond this cited parse block."
+    }
+  ],
+  "placement.partition_model": [
+    {
+      "engine": "llama.cpp",
+      "title": "Layer assignment binds CPU fallback and normalized GPU splits",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-model.cpp#L1793-L1822",
+      "detail": "The loader normalizes device split weights, places layers outside the selected GPU interval on CPU and assigns remaining layers via cumulative splits. The input layer remains CPU-resident; output placement uses its own layer index."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Scheduler prefetch guards dependencies and records completion events",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/ggml/src/ggml-backend.cpp#L2155-L2209",
+      "detail": "Next-split input prefetch only selects suitable host-copy compute outputs not written in the current split, requires asynchronous get/event support and records an event after copies. This is graph-partition data movement, not expert-demand forecasting."
+    },
+    {
+      "engine": "Strata",
+      "title": "Split engine can enlarge the shared arena to meet KV page pressure",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/split/src/engine.cu#L659-L666",
+      "detail": "Before assigning new KV pages, the lane allocator compares needed/free pages and raises arena_w toward arena_cap in bounded steps. This demonstrates a concrete resource-sharing adjustment; it does not prove a general layer-placement optimizer."
+    }
+  ],
+  "routing.forecast_expert_demand": [
+    {
+      "engine": "Strata",
+      "title": "Lookahead scores future router weights against available hidden rows",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L3290-L3351",
+      "detail": "RouterLookahead computes approximate future-layer router scores using supported CPU paths, sorts candidates, excludes resident experts and emits bounded ranked hints with lower confidence at greater depth. The source explicitly treats this as prefetch estimation independent of authoritative model output."
+    },
+    {
+      "engine": "Strata",
+      "title": "Prediction scoring separates demand misses from resident experts",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L3182-L3225",
+      "detail": "stats_score checks the prediction generation, constructs actual nonresident demand and compares vote-ranked predictions with that miss set and its configured PCIe share. It is an online scorer; no held-out accuracy or absence of feature leakage has been demonstrated here."
+    },
+    {
+      "engine": "Strata",
+      "title": "Prediction submission is a bounded optional cache request",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L6708-L6728",
+      "detail": "predict validates layer/expert indices and enters request_locked with predicted_copy=true. The common request path suppresses duplicates and applies per-card budgets and pinned-source admission. This links hints to streaming but is not itself a learned predictor."
+    }
+  ],
+  "sampling.select_tokens": [
+    {
+      "engine": "llama.cpp",
+      "title": "Sampler chain applies eligible host operations in declared order",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-sampler.cpp#L682-L701",
+      "detail": "chain_apply iterates samplers, skips those already executed on the backend and invokes available apply callbacks in sequence while optionally measuring sampling time. The chosen chain determines actual sampling semantics."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Grammar masks rejected vocabulary candidates including invalid termination",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-grammar.cpp#L1590-L1609",
+      "detail": "Grammar application sets forbidden end-of-generation, empty pieces and rejected parsed candidates to negative-infinity logits; token pieces are decoded with partial UTF-8 state. This is a concrete vocabulary constraint path."
+    },
+    {
+      "engine": "Strata",
+      "title": "GPU sampling admission rejects penalties without token history",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/sampler.cu#L1260-L1278",
+      "detail": "sample_tokens copies sampling parameters, admits Gumbel mode through parameters/environment and returns for empty geometry; a positive history-penalty window without history is a fatal input error. Seed/distribution equivalence requires separate tests."
+    }
+  ],
+  "scheduler.request_lifecycle": [
+    {
+      "engine": "llama.cpp",
+      "title": "Queue insertion removes pending work targeted by cancellation",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/tools/server/server-queue.cpp#L28-L47",
+      "detail": "post holds the queue mutex, cleans up pending tasks for cancellation, inserts front/back as requested, updates idle timing when appropriate and notifies the consumer. This supports queue ownership behavior, not a fairness guarantee."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "Slot selection respects explicitly requested busy slots",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/tools/server/server-slot-sched.cpp#L317-L355",
+      "detail": "select resolves an explicit slot ID and returns an occupied slot untouched for the caller to defer; subsequent similarity search skips processing slots. Admission and prefix policy are implemented in server-specific slot terms."
+    },
+    {
+      "engine": "Strata",
+      "title": "Available slot selection considers cached prompt prefixes",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/serve/server.py#L2576-L2617",
+      "detail": "pick_slot only considers nonbusy slots. Pipelined slot groups prioritize filling holes; ordinary slots compute common prompt prefixes against held tokens. These are distinct policy branches and should not be described as one unconditional longest-prefix rule."
+    }
+  ],
+  "serving.request_gateway": [
+    {
+      "engine": "llama.cpp",
+      "title": "Readiness middleware rejects requests while the model loads",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/tools/server/server-http.cpp#L394-L410",
+      "detail": "The HTTP middleware checks is_ready and returns a loading-model 503 before non-frontend requests proceed. This establishes an ingress readiness guard, not successful model startup on a target."
+    },
+    {
+      "engine": "Strata",
+      "title": "Generation ingress validates capability and sends token IDs to the engine",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/serve/server.py#L2670-L2701",
+      "detail": "generate checks engine liveness, validates sampling/capability requests and writes the GEN protocol with integer token IDs. It has a separate batched path and text-only prefill request form; these are native process protocol bindings."
+    },
+    {
+      "engine": "Strata",
+      "title": "Replica routing combines prefix reuse and current load",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/serve/replicas.py#L513-L527",
+      "detail": "route considers living replicas, scores unmatched prompt tokens plus load_tokens times in-flight count, breaks ties by load/history and increments the selected replica counters. The policy is concrete; no throughput improvement is established by this source inspection."
+    }
+  ],
+  "serving.tool_conversations": [
+    {
+      "engine": "Strata",
+      "title": "Template inspection selects the tool-call dialect",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/serve/toolformat.py#L20-L33",
+      "detail": "tool_format classifies a template as DSML, XML, JSON, none or other using explicit syntax checks. This is evidence for dialect selection only; it does not prove streaming parse or multi-turn state correctness."
+    }
+  ],
+  "tokenizer.prepare_request": [
+    {
+      "engine": "llama.cpp",
+      "title": "Tokenization exposes explicit special-token controls and required capacity",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-vocab.cpp#L4660-L4682",
+      "detail": "The public tokenize overload forwards add_special and parse_special, rejects an int32 overflow, returns negative required capacity when the output buffer is too small and writes IDs in order."
+    },
+    {
+      "engine": "llama.cpp",
+      "title": "ChatML renderer writes role delimiters and assistant generation prefix",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/9048bad8d6e3a0f9f1726e238e451181c7e02613/src/llama-chat.cpp#L244-L273",
+      "detail": "The template dispatcher renders messages according to a selected chat format; the ChatML branch writes role/content delimiters and conditionally adds the assistant prefix. Behavior is template-specific rather than a universal chat serialization."
+    },
+    {
+      "engine": "Strata",
+      "title": "Model tokenizer distinguishes control literals from ordinary text spans",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/tools/strata_tokenizer.py#L341-L354",
+      "detail": "encode chooses its special-token matcher using parse_special, while plain spans remain ordinary text. encode_marked also returns text offsets and accumulated IDs at special-token resume points."
+    },
+    {
+      "engine": "Strata",
+      "title": "Service rendering preserves quoted control-token text as ordinary input",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/serve/server.py#L5895-L5909",
+      "detail": "encode_prompt marks literal control/reasoning text inside messages, renders the template, restores plain spans and encodes with special parsing enabled for template-written controls. It can reuse kept prompt encodings; it is not an IPC tokenizer manager."
+    }
+  ]
+}

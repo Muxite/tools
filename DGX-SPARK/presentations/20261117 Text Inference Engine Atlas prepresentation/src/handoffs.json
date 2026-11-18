@@ -1,0 +1,382 @@
+{
+  "attention.dense_execution": {
+    "signals": [
+      "Attended key positions per query row after the causal and sliding-window masks (positions).",
+      "Device elapsed time per active attention call (µs), grouped by head geometry, sequence length and prefill/decode."
+    ],
+    "artifact": "Attention parity fixture with explicit positions, valid keys, head-to-KV-head map, dtype, tolerance and expected output rows.",
+    "consumer": "Decoder integration agent and backend dispatch agent.",
+    "proof": "Compare a full forward and incremental decode against an independent masked softmax reference at the window boundary and across grouped heads.",
+    "rsi": "A short-context pass and long-context failure direct the next trial to mask, logical position and KV mapping. Tune kernels only after those checks pass."
+  },
+  "attention.sparse_execution": {
+    "signals": [
+      "Legal candidate keys per query after index filtering (positions/query).",
+      "Candidate selection and sparse gather duration on the same device timeline (µs/call)."
+    ],
+    "artifact": "Extension fixture with candidate indices, validity mask, retained keys and reference output under the declared sparse model rule.",
+    "consumer": "Agent qualifying an indexed-attention extension.",
+    "proof": "Exercise duplicate, out-of-range and future indices. Compare to dense attention restricted to exactly the same allowed keys.",
+    "rsi": "Incorrect selected indices reopen shortlist generation; correct indices with slow gather reopen layout. Keep outside the Muse target unless its architecture changes."
+  },
+  "backend.execute_operators": {
+    "signals": [
+      "Actual backend and kernel ID per eligible shape; count of fallback calls (calls/shape).",
+      "CPU submit-to-device-start gap and device execution time (µs/launch) with correlated clocks."
+    ],
+    "artifact": "Dispatch manifest with shape/stride/dtype guards, target architecture, fallback and tested kernel identities.",
+    "consumer": "Model operator agents, graph planner and performance lab.",
+    "proof": "Run shapes on both sides of every specialization guard, including tail shapes, and verify numerical parity and observed dispatch.",
+    "rsi": "A slow eligible shape still using fallback calls for a guard/layout check before changing kernel math; record the new image and compare again."
+  },
+  "batch.execution_layout": {
+    "signals": [
+      "Valid rows versus padded capacity at batch submission (rows/batch).",
+      "Context lengths and position offsets when the scheduler emits each row (tokens/sequence)."
+    ],
+    "artifact": "Serialized batch plan with sequence IDs, token offsets, lengths, state handles and result-row scatter indices.",
+    "consumer": "Generation driver and per-sequence state owner.",
+    "proof": "Compare a mixed, reordered ragged batch with independent single-sequence runs and verify each output returns to the originating request.",
+    "rsi": "Wrong rows force an index-map repair; correct rows with excessive padding justify a shape-bucketing trial at matched load."
+  },
+  "compiler.engine_contract": {
+    "signals": [
+      "Count of unresolved model, environment or metric obligations before contract release (obligations/revision).",
+      "Declared memory ceiling (bytes), intended context length (tokens) and user-facing time boundaries for each frozen workload."
+    ],
+    "artifact": "Versioned intent and contract with checkpoint/tokenizer revisions, target, permitted choices, suppliers and acceptance gates.",
+    "consumer": "Workflow planning agent, independent lab and contract owner.",
+    "proof": "Resolve conflicting constraints or issue a specific unsatisfied obligation. Validate that the frozen inputs and metric definitions suffice to reproduce a pass/fail decision.",
+    "rsi": "Failures caused by an ambiguous unit or incompatible requirement reopen human intent review; performance data alone cannot authorize changing a gate."
+  },
+  "decode.advance_sequence": {
+    "signals": [
+      "Newly committed positions at each prefill chunk or decode step (tokens/sequence).",
+      "Step wall time from ready batch to committed result (ms/step), separately for prefill and decode."
+    ],
+    "artifact": "Sequence transition transcript containing prior length, input positions, state handles, emitted token and next committed length.",
+    "consumer": "Sampler, state owner and scheduler.",
+    "proof": "Compare cached decode against full-prefix recomputation at chunk boundaries, cancellation and the first token after prefill.",
+    "rsi": "A first mismatch after chunking points to state advancement or position mapping. Match outputs before testing new step sizes."
+  },
+  "decode.speculative_execution": {
+    "signals": [
+      "Draft length and accepted prefix length per verification pass (tokens/pass).",
+      "Target evaluation time and rejected state discarded (ms/pass and positions/pass)."
+    ],
+    "artifact": "Extension acceptance transcript with draft proposals, verifier results, accepted prefix and state rollback positions.",
+    "consumer": "Agent evaluating a draft-and-verify extension.",
+    "proof": "Force zero, partial and full acceptance. Compare target distributions and next-step state after a rejected suffix against a target-only reference.",
+    "rsi": "A higher acceptance rate without saved wall time leads to a shorter draft-length trial. Wrong rollback blocks a performance claim."
+  },
+  "dense.feed_forward": {
+    "signals": [
+      "Rows, projection widths and accumulator dtype at each gate/up/down invocation (rows and channels).",
+      "Duration of each projection and activation at matched prefill/decode geometry (µs/call)."
+    ],
+    "artifact": "Golden gated-FFN fixture with intermediate gate/up activations, down projection and declared activation/precision convention.",
+    "consumer": "Decoder and expert-FFN implementation agents.",
+    "proof": "Compare all intermediates and final rows to independent arithmetic using signed inputs, zero rows and non-multiple tile widths.",
+    "rsi": "A first error before activation isolates projection packing; correct projections with high temporary traffic motivate a qualified fused path."
+  },
+  "engine.expert_streaming": {
+    "signals": [
+      "Demand-to-ready time for an actually selected nonresident expert (µs/miss); split backing read, queue and device-visible completion where available.",
+      "Storage bytes read, resident-pool peak and late or unused prefetch bytes per declared decode interval (bytes)."
+    ],
+    "artifact": "Expert residency trace with model/layer/expert key, storage range, slot generation, demand, ready and last-use timestamps, plus effective byte budgets.",
+    "consumer": "Expert FFN worker, placement agent and controlled experiment agent.",
+    "proof": "Force cold misses, duplicate requests and slot reuse under a reduced budget. Verify exact reference bytes and logits, and ensure no slot is evicted before last use.",
+    "rsi": "High reads with low exposed waits point away from storage tuning. Late demand stalls or duplicate fills justify a bounded cache or join-policy trial."
+  },
+  "factory.builder": {
+    "signals": [
+      "Elapsed clean build and clean first boot to readiness (s/build and s/boot).",
+      "Image, compiled objects and staged model materials by identity and on-disk size (bytes)."
+    ],
+    "artifact": "Build receipt with source revision, toolchain, flags, binary/image digest, external model mounts, launch command and build logs.",
+    "consumer": "Lab execution and release decision owners.",
+    "proof": "Rebuild from the pinned closure, explain any nondeterministic digest and clean-start the handed-off image with its declared dependencies.",
+    "rsi": "A different runtime library or stale binary reopens the build closure before attributing a measured change to the proposed source edit."
+  },
+  "factory.source_integration": {
+    "signals": [
+      "Coverage of modified obligations by focused tests (covered/required cases); candidate source identity per test.",
+      "Unsupported layouts, fallback cases or failing checkpoints identified at integration (cases/revision)."
+    ],
+    "artifact": "Reviewable source patch, hook and ABI mapping, expected selected path, regression tests and rollback revision.",
+    "consumer": "Build agent and lab investigator.",
+    "proof": "Run through the normal call path, perform a negative/fallback case and verify expected code engagement. Repeat the pre-existing reference case.",
+    "rsi": "If an edit fails to engage, repair the hook or configuration first. If engagement changes numerics, return the first divergent fixture to the owner."
+  },
+  "factory.workflow_planning": {
+    "signals": [
+      "Unbound inputs and unmet evidence gates after source inspection (obligations/work order).",
+      "Completed, retried and blocked CC invocations per contract revision (invocations)."
+    ],
+    "artifact": "Artifact dependency plan, pinned current-state inventory and scoped work orders with source owner, inputs, outputs and retry budget.",
+    "consumer": "JiuwenSwarm implementing agents, builder and contract owner.",
+    "proof": "Trace every required delivery artifact back to an admitted provider, including the empty-tree case. Exercise repair without rerunning unrelated qualified jobs.",
+    "rsi": "A measured failure reopens the smallest dependent job chain. A missing external supplier or changed requirement returns to the contract owner."
+  },
+  "graph.lower_capture_replay": {
+    "signals": [
+      "Graph cache misses, captures and replays per shape/state key (counts).",
+      "Host submission and device elapsed time for matched eager and replay runs (µs/step)."
+    ],
+    "artifact": "Execution-plan manifest with shape guards, graph key, buffer-address lifetime and reference/replay equivalence cases.",
+    "consumer": "Backend operator owners and generation driver.",
+    "proof": "Vary batch shapes and addresses after capture. Require eager fallback or a valid recapture and compare outputs with uncaptured execution.",
+    "rsi": "Correct replay with little end-to-end change directs investigation toward other waits; rising recaptures suggest a narrower eligible shape set."
+  },
+  "memory.kv_tiering": {
+    "signals": [
+      "Transferred KV payload and exposed demand wait by tier (bytes/page and µs/page fault).",
+      "Dirty, in-flight and reusable pages when a migration completes (pages)."
+    ],
+    "artifact": "Logical-page migration log with original/target handle, version, completion fence, reader count and reclamation state.",
+    "consumer": "KV allocator, scheduler and tiered-cache worker.",
+    "proof": "Delay completion during a read, abort a migration and reuse an old slot. Require correct page identity and equivalent logits after recovery.",
+    "rsi": "High migration traffic with little capacity benefit warrants adjusting watermarks or disabling tiering for that workload."
+  },
+  "memory.reusable_sessions": {
+    "signals": [
+      "Reusable prefix length at admission and actually skipped prompt work (tokens/request).",
+      "Pinned shared pages and eviction/reclamation lag after session retirement (pages and ms)."
+    ],
+    "artifact": "Prefix/session reuse record binding token prefix, tokenizer/model identity, positional state and shared page ownership.",
+    "consumer": "Scheduler and sequence-state owner.",
+    "proof": "Try changed prompts, model or adapter revisions, siblings and evicted sessions. Reuse only compatible prefixes and match uncached continuation.",
+    "rsi": "Many index hits with few skipped tokens point to unusable prefix boundaries; false matches require identity repair before policy changes."
+  },
+  "memory.runtime_arenas": {
+    "signals": [
+      "Simultaneously live allocations by owner and lifetime (bytes at timestamp); include high-water mark.",
+      "Requested versus committed backing and reusable workspace at safe release points (bytes/arena)."
+    ],
+    "artifact": "Arena layout and lifetime report keyed by physical backing, tensor owner and completion fence.",
+    "consumer": "Placement, backend and build qualification agents.",
+    "proof": "Allocate a pressure fixture with overlapping asynchronous consumers. Verify no premature reuse or double counting of shared physical pages.",
+    "rsi": "Use the live allocation at peak to choose between workspace reuse, smaller tiles or reduced concurrent state before lowering model quality."
+  },
+  "memory.sequence_kv": {
+    "signals": [
+      "Occupied, reserved and reclaimed KV blocks through append and retirement (pages/sequence).",
+      "Logical position, physical block and byte offset per boundary fixture (tokens, pages and bytes)."
+    ],
+    "artifact": "Page map with KV dtype/layout, per-sequence positions, valid length, sharing/ownership and release evidence.",
+    "consumer": "Attention kernel, generation driver and scheduler.",
+    "proof": "Cross a page boundary and sliding-window rollover, cancel a request, then reuse its pages for another sequence and compare cached vs full logits.",
+    "rsi": "Capacity failures with many reserved but unused pages motivate block-size or reservation changes; stale positions require correctness repair."
+  },
+  "merge.expert_contributions": {
+    "signals": [
+      "Assignments before packing and after inverse gathering (rows/token and rows/expert).",
+      "Bytes moved by pack/gather and device time per routing histogram (bytes/batch and µs/batch)."
+    ],
+    "artifact": "Forward expert offsets, packed row IDs, inverse token/choice map and aligned weights with a reference reduction fixture.",
+    "consumer": "Expert FFN worker, residual layer and routing verifier.",
+    "proof": "Use tagged rows with k>1, multiple tokens choosing the same expert, empty experts and nonuniform weights. Compare the packed/reduced result to direct per-token summation.",
+    "rsi": "Lost assignments isolate grouping; preserved IDs with wrong values isolate inverse mapping, weight alignment or duplicate scaling. Requalify before pack fusion."
+  },
+  "model.decoder_architecture": {
+    "signals": [
+      "Layer identity and hidden-state geometry at each norm, sublayer and residual boundary (layer index, rows and channels).",
+      "First divergent hidden value and per-layer max absolute error compared with the checkpoint reference (value units)."
+    ],
+    "artifact": "Decoder wiring manifest with ordered blocks, normalization convention, residual joins, optional architecture branches and per-boundary reference activations.",
+    "consumer": "Attention, expert and output-head agents.",
+    "proof": "Verify post/pre-norm order, epsilon, residual scaling and repeated-layer indexing on a short forward trace with independently computed checkpoints.",
+    "rsi": "The first divergent boundary localizes the next investigation. Preserve the passing prefix while changing just that block."
+  },
+  "model.embedding_service": {
+    "signals": [
+      "Requested vocabulary IDs, out-of-range rejections and gathered row geometry (IDs, failures and channels/token).",
+      "Embedding gather elapsed time and bytes read by token shape (µs/batch and bytes)."
+    ],
+    "artifact": "Embedding binding manifest with vocabulary ordering, tensor shape/stride, index axis, scaling and golden rows.",
+    "consumer": "Decoder input and tokenizer agents.",
+    "proof": "Gather edge IDs, repeated IDs and reordered rows. Verify exact expected vectors or declared tolerances and reject invalid IDs.",
+    "rsi": "If different token IDs map correctly but the chosen ID is wrong, inspect the tokenizer; mismatches in the same row identify a tensor bind or scale problem."
+  },
+  "model.expert_routing": {
+    "signals": [
+      "Selected expert IDs, aligned weights and normalization sum at router exit (IDs/token, unitless weights).",
+      "Expert selection histogram and selector device duration grouped by layer, batch shape, E and k (assignments/expert and µs/call)."
+    ],
+    "artifact": "Pinned routing fixture with input scores, selection rule, expected IDs and weights, eligible fast-path geometry and tie policy.",
+    "consumer": "Packing and expert streaming agents; independent MoE verifier.",
+    "proof": "Use a hand-evaluated fixture covering ties, shapes at the dispatch boundary and the actual checkpoint scoring/normalization rule. Compare IDs, weights and downstream output.",
+    "rsi": "A histogram imbalance alone cannot justify modifying the model route. Use it to choose grouping or residency policies; numerical mismatch reopens the selector."
+  },
+  "model.logit_head": {
+    "signals": [
+      "Final hidden and output dimensions and vocabulary rank of golden tokens (channels, vocabulary entries and ranks).",
+      "Max logit difference and head projection time at selected rows (logit units and µs/row)."
+    ],
+    "artifact": "Projection fixture with input hidden states, head tensor identity, tied-weight policy, vocabulary order and expected logit rows.",
+    "consumer": "Sampler and numerical verifier.",
+    "proof": "Compare full and last-row-only evaluation, padded vocabulary rows and any tied-weight binding against an independent projection.",
+    "rsi": "A correct hidden vector with shifted token rankings identifies head layout or vocabulary order; optimize row selection after parity."
+  },
+  "observability.runtime_events": {
+    "signals": [
+      "Correlated request/sequence/layer/stream identifiers and timestamp domain at instrumented boundaries (counts and ns or µs).",
+      "Unpaired or dropped events and matched uninstrumented/instrumented interval durations (events and ms/run)."
+    ],
+    "artifact": "Optional instrumentation map and trace sample specifying event definitions, clock domain, coverage, overhead and build flags; optional NVTX ranges connect to external profilers.",
+    "consumer": "Controlled experiment agent and component owners tracing specific stalls.",
+    "proof": "Verify start/end matching, thread/stream correlation and finite overhead at the actual target. Record unavailable events and compare with tracing disabled.",
+    "rsi": "Select additional event points only when the current trace cannot separate competing explanations. Recheck the candidate on an uninstrumented timing run."
+  },
+  "parallel.expert_exchange": {
+    "signals": [
+      "Sent and received expert rows and bytes per peer at dispatch and combine (rows/rank and bytes/rank).",
+      "Collective completion wait at each expert owner (µs/dispatch or combine)."
+    ],
+    "artifact": "Extension exchange transcript with split sizes, logical and physical expert ownership, token tags and reverse permutation.",
+    "consumer": "Distributed expert dispatcher and inverse-gather agent.",
+    "proof": "Force empty and uneven peer splits, permute rank-local rows and compare restored tokens with single-device evaluation.",
+    "rsi": "Imbalanced bytes across ranks motivate expert placement or padding changes. A mismatched inverse map returns to exchange correctness."
+  },
+  "parallel.model_execution": {
+    "signals": [
+      "Shard payload and collective ordering per rank (bytes/collective and sequence IDs).",
+      "Exposed communication latency and cross-rank skew from ready to completion (µs/collective)."
+    ],
+    "artifact": "Extension topology and shard manifest with collective schedule, peer transports, layout and any live-state handoff protocol.",
+    "consumer": "Placement, distributed execution and target verification agents.",
+    "proof": "Compare output with an unsharded reference; exercise unequal local sizes and verify transferred state readiness before the next decode step.",
+    "rsi": "Correct reductions with exposed waits motivate changing shard axes or overlapping communication. Keep multi-rank work outside the single-device release."
+  },
+  "placement.partition_model": {
+    "signals": [
+      "Capacity budget and measured peak by unique physical pool (bytes), including reserved headroom and storage-backed ranges.",
+      "Transferred bytes and page faults while executing each placed partition (bytes/phase and faults/phase)."
+    ],
+    "artifact": "Placement and residency budget for weights, KV, staging, workspace and runtime; include addressability, storage paths, target model and rejection limits.",
+    "consumer": "Loader, expert streamer, arena owner and scheduler.",
+    "proof": "Request an infeasible live tile and reject or select a legal alternative. On unified memory count shared pages once and confirm measured high-water behavior.",
+    "rsi": "Observed headroom or fault behavior changes the next tile/residency allocation. Keep a failure trace and compare identical workload boundaries."
+  },
+  "routing.forecast_expert_demand": {
+    "signals": [
+      "Precision and recall against later actual demand on a time-separated holdout (fractions), measured before residency filtering.",
+      "Hint-to-demand lead time, useful and wasted transfer traffic (µs/hint and bytes/run)."
+    ],
+    "artifact": "Versioned predictor, time-available input definition, ordered forecast/demand trace and hint-budget evaluation.",
+    "consumer": "Streaming policy agent and controlled experiment evaluator.",
+    "proof": "Use no future-token features. Force wrong and late predictions and require exact authoritative routing and equal outputs. Compare against no-prefetch on target.",
+    "rsi": "High accuracy without saved demand wait suggests hints target already-resident experts or arrive late; change the hint policy or disable it."
+  },
+  "sampling.select_tokens": {
+    "signals": [
+      "Logits, allowed-set size, token probability and RNG counter at sampling boundary (logit units, tokens, probability, draws/request).",
+      "Sampling phase elapsed time and rejected constraint candidates by strategy (µs/token and count/token)."
+    ],
+    "artifact": "Sampling-policy fixture with filter order, seed, per-request RNG state, logits and expected deterministic IDs or distribution bounds.",
+    "consumer": "Generation driver and numerical evaluator.",
+    "proof": "Verify greedy ties and reproducible seeded draws under batch reorder. Check probabilities on tiny stochastic distributions and constrained outputs.",
+    "rsi": "Divergent tokens with matching logits direct the next check to filter order, allowed set and RNG ownership before changing model operators."
+  },
+  "scheduler.request_lifecycle": {
+    "signals": [
+      "Time from accepted request to first scheduled work and subsequent ready-to-run delay (ms/request and ms/step).",
+      "Admitted token count, active slots, KV credits and queue depth at each scheduling decision (tokens, slots, pages and requests)."
+    ],
+    "artifact": "Decision trace covering queue admission, token budget, batch assignment, cancellation, completion and resource return.",
+    "consumer": "Batch builder, state allocator and performance experiment agent.",
+    "proof": "Replay mixed prompt lengths, overload and cancellation. Check bounded reservations, absence of starvation under declared policy and single release per request.",
+    "rsi": "Long waits with free credits suggest admission or CPU dispatch; saturated credits instead point to placement or concurrency limits. Test one change under the same offered load."
+  },
+  "sequence.recurrent_execution": {
+    "signals": [
+      "Committed recurrent-state length and snapshots at reset, restore and branch (positions/sequence); hidden-state size (bytes/sequence).",
+      "Per-transition numerical error against reference recurrence (state value units)."
+    ],
+    "artifact": "Extension state transition fixture with model keys, sequence identity, initial state and expected carried tensors.",
+    "consumer": "Hybrid decoder and scheduler-state agents.",
+    "proof": "Compare sequential replay with chunked execution; switch and resume two sequences and verify reset does not leak previous state.",
+    "rsi": "Errors only after reuse identify state ownership, while first-step errors point to recurrence arithmetic. Keep extension out of Muse baseline."
+  },
+  "serving.request_gateway": {
+    "signals": [
+      "Transport acceptance, engine submit, first emitted byte and terminal event on a common host clock (ms/request).",
+      "Completed, rejected, cancelled and broken streams by finish condition (requests/observation interval)."
+    ],
+    "artifact": "Protocol fixture with typed request identity, ordered response events, cancellation and finish status, plus effective serving interface.",
+    "consumer": "Scheduler, output codec and benchmark client.",
+    "proof": "Split output across chunks, cancel mid-generation and reconnect as supported. Check ordered emission and exactly one terminal disposition including failures.",
+    "rsi": "High client TTFT with short engine TTFT isolates protocol buffering or upstream queueing. Re-run the same client workload after the proposed change."
+  },
+  "tokenizer.prepare_request": {
+    "signals": [
+      "Encoded ID count at model ingress and committed/decoded ID count at output (tokens/request).",
+      "Encoding and incremental decode time, bytes buffered at incomplete UTF-8 boundaries (µs/request, µs/token and bytes/stream)."
+    ],
+    "artifact": "Pinned vocabulary, tokenizer and template identities with bidirectional golden request/response fixtures.",
+    "consumer": "Gateway, scheduler, embedding worker and output writer.",
+    "proof": "Match exact prompt IDs, special IDs and token count; verify incremental decode of multibyte and stop-boundary cases against the same complete token stream.",
+    "rsi": "Wrong model answers with good internal numerics trigger a prompt-ID comparison; correct committed tokens with damaged text trigger an output codec test."
+  },
+  "weights.adapter_binding": {
+    "signals": [
+      "Active adapter identity, rank and resident delta footprint at each request bind (ID, rank and bytes).",
+      "Load or switch latency and output difference for base/adapter pairs (ms/switch and tensor units)."
+    ],
+    "artifact": "Extension adapter manifest with target parameter mapping, scaling, lifetime and request-scoped selection fixture.",
+    "consumer": "Weight loader and adapter-aware execution agent.",
+    "proof": "Alternate base and adapter requests in one batch, reject incompatible shapes and verify independent reference deltas without leakage.",
+    "rsi": "Repeated load stalls motivate a bounded adapter cache; wrong-request deltas require an ownership fix before tuning."
+  },
+  "weights.decode_blocks": {
+    "signals": [
+      "Declared bytes per packed block, decoded element count and absolute error against the same-format reference (bytes/block, elements/block and value units).",
+      "Decode/repack duration at the tested layout and dtype (µs/block group)."
+    ],
+    "artifact": "Format-specific golden raw bytes, scale/zero metadata, reconstructed values and kernel-layout contract.",
+    "consumer": "Loader, matmul implementer and quantization evaluator.",
+    "proof": "Compare signed extrema, scale boundaries, tail blocks and malformed inputs against an independent decoder for that exact format. Compare downstream matmul as well.",
+    "rsi": "Bit-level error reopens layout decoding; acceptable local reconstruction but poor model quality belongs to calibration/representation selection under a frozen task."
+  },
+  "weights.load_checkpoint": {
+    "signals": [
+      "Mapped or read byte ranges, tensors bound and missing or mismatched entries at readiness (bytes/shard, tensors and errors).",
+      "Startup interval from load initiation to complete validated bindings (s/load) under a declared cache state."
+    ],
+    "artifact": "Validated weight inventory with tensor names, shapes, dtypes, offsets, file sizes, checksums and persistent storage identity.",
+    "consumer": "Decoder binder, placement agent and streamer.",
+    "proof": "Test split or truncated files, missing shards, duplicate names and a correctly loaded small checkpoint. Ensure all referenced ranges lie within their file.",
+    "rsi": "Identify whether startup time belongs to metadata checks, data reads or first-use conversion before parallelizing load or changing storage."
+  },
+  "weights.prepare_artifact": {
+    "signals": [
+      "Packed bytes and overhead by tensor including scales, alignment and index metadata (bytes/tensor).",
+      "Reconstruction error distribution and held-out logit or task-quality delta versus the pinned higher-precision reference (value units, logit units or percentage points)."
+    ],
+    "artifact": "Versioned converted model with source/format identities, quantization and calibration recipe, tensor-wise precision choices, quality report and independent decode fixture.",
+    "consumer": "Loader, block decoder and controlled quality evaluator.",
+    "proof": "Use held-out calibration-independent text, verify tensor identities and byte accounting, then evaluate model numerics and task quality at matched decoding settings.",
+    "rsi": "A smaller artifact with unacceptable quality triggers per-tensor sensitivity analysis or a higher-precision exception, followed by the same held-out tests."
+  },
+  "model.expert_ffn": {
+    "signals": [
+      "Active rows and selected compute variant by layer/expert (rows/expert and kernel ID); attach dtype and matrix geometry.",
+      "Time from expert weights ready to completion, and reference error at gate/up/down boundaries (µs/expert group and tensor units)."
+    ],
+    "artifact": "Expert arithmetic fixture with grouped rows, protected weight handles, dimensions, activation, expected projections and grouped output order.",
+    "consumer": "Routed row gather/reducer, kernel writer and lab verifier.",
+    "proof": "Compare empty, singleton and uneven expert groups against independent per-expert arithmetic including signed gates. Track the weight handle through final device consumption.",
+    "rsi": "If the first mismatch is inside projection, inspect weight/scale layout; correct math with poor throughput directs a grouped-vs-individual kernel trial by row count."
+  },
+  "factory.controlled_experiment": {
+    "signals": [
+      "Quality gate, wall time, client TTFT/ITL, throughput, bytes moved and peak live memory for the frozen prompt/concurrency/cache configuration (quality units, ms, output tokens/s and bytes).",
+      "Record valid, failed and excluded attempts by image/target and paired baseline-to-candidate effect with sample count and uncertainty (runs, ratio or percentage points)."
+    ],
+    "artifact": "Trial manifest and evidence bundle with question, baseline/candidate revisions and digests, independent oracle, resource budget, raw logs, controls, exclusions, verdict and reproduction command.",
+    "consumer": "Planner deciding repair, release reviewer and agents preparing the next bounded experiment.",
+    "proof": "Verify that a deliberately wrong result fails, reproduce a baseline and preserve partial failures. For quantized candidates compare memory and speed with a separately frozen numerical/task-quality gate on held-out text.",
+    "rsi": "Accept, reject, request confirmation or identify the smallest unresolved hypothesis. A speed gain cannot override a failed numerical or quality gate. Feed the identified owner and reproduction artifacts back into planning."
+  }
+}
