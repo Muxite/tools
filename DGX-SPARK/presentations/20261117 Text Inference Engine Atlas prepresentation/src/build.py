@@ -129,7 +129,7 @@ def assemble():
                     example(key,dict(row,engine=repo['engine']))
     for row in sources:
         example(row['assigned'], dict(engine=row['engine'],title=row['symbol'],url=row['url'],detail=row['detail']))
-    assert len([r for r in roles.values() if r.get('kind')=='factory'])==5
+    assert len([r for r in roles.values() if r.get('kind')=='factory'])==6
     return dict(muse=read('muse_evidence.json'),baseline=baseline['description'],cross=cross,engine=engine,factory=factory,edges=architecture['edges'],factoryEdges=taxonomy['edges'],roles=list(roles.values()),aliases=aliases,excluded=sorted(removed),sources=sources,assets=evidence['assets'],repositories=evidence['repositories'],traces=architecture['traces'],transfers=evidence['transfers'],mergers=merged)
 
 if __name__=='__main__':

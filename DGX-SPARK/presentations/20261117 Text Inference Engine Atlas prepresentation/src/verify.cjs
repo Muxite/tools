@@ -33,6 +33,8 @@ async function verifyConstruction(page, roleRecords, jump) {
   const simulator=page.locator('#ready-jobs');
   const ready=()=>simulator.locator('[data-accept]').evaluateAll(buttons=>buttons.map(b=>b.dataset.accept).sort());
   const accept=id=>simulator.locator('[data-accept="'+id+'"]').click();
+  assert.deepEqual(await ready(),['intent']);
+  await accept('intent');
   assert.deepEqual(await ready(),['contract']);
   await accept('contract');
   assert.deepEqual(await ready(),['plan']);
@@ -177,7 +179,14 @@ async function main() {
     assert((await page.locator('#routing-out').innerText()).includes('0.4286'));
     await router.selectOption('0');
     assert((await page.locator('#routing-out').innerText()).includes('E0 and E1'));
-    assert.equal(data.roles.filter(r=>r.kind==='factory').length,5);
+    assert.equal(data.roles.filter(r=>r.kind==='factory').length,6);
+    const spec=data.factory.find(layer=>layer.id==='f_spec');
+    assert.deepEqual(spec.ops.find(op=>op.id==='intake').cc,['compiler.intent_brief']);
+    assert.deepEqual(spec.ops.find(op=>op.id==='freeze').cc,['compiler.engine_contract']);
+    for(const [id,title] of [['compiler.intent_brief','Intent Compiler'],['compiler.engine_contract','Contract Compiler']]){
+      const cc=data.roles.find(r=>r.id===id);
+      assert(cc.essential && cc.title===title);
+    }
     for(const r of data.roles.filter(r=>r.kind!=='factory'&&r.target!==false)){
       assert(data.sources.some(s=>s.assigned===r.id&&s.url)||data.muse.byRole[r.id]?.length,r.id);
     }

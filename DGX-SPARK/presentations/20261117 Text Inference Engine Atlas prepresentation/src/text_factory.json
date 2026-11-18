@@ -3,7 +3,7 @@
     {
       "id": "f_spec",
       "title": "Intent and contract",
-      "summary": "Translate the user’s request into a versioned contract. Name the required model behavior, permitted implementation choices, target limits and tests that decide acceptance.",
+      "summary": "The Intent Compiler captures the user request in a reviewed brief. The Contract Compiler consumes that brief and the system ontology to define model behavior, resource limits and acceptance tests.",
       "ops": [
         {
           "id": "intake",
@@ -22,8 +22,7 @@
           "check": "Reject an unsupported checkpoint change before planning. Record which settings can vary at runtime.",
           "metric": "Unbound model fields and contradictory settings.",
           "cc": [
-            "compiler.engine_contract",
-            "factory.source_inspection"
+            "compiler.engine_contract"
           ]
         },
         {
@@ -51,12 +50,12 @@
         [
           "intake",
           "modelterms",
-          "model and target references"
+          "reviewed intent brief · model and target"
         ],
         [
           "intake",
           "budget",
-          "user goals and constraints"
+          "reviewed intent brief · goals and constraints"
         ],
         [
           "modelterms",
@@ -487,7 +486,6 @@
     "serving.tool_conversations": "serving.request_gateway",
     "factory.methodology_ab": "verification.performance_measurement",
     "transfer.prefill_handoff": "parallel.model_execution",
-    "compiler.intent_brief": "compiler.engine_contract",
     "factory.source_inspection": "factory.workflow_planning",
     "model.normalization": "model.decoder_architecture",
     "output.response_stream": "serving.request_gateway",
@@ -549,7 +547,7 @@
     "verification.numerical_conformance": "Independent references expose wrong outputs even when candidate and baseline share infrastructure or a performance measurement improves.",
     "verification.performance_measurement": "Measure a pinned workload with explicit latency, throughput and memory boundaries. For comparisons, reuse the same harness and select paired A/B, A/A stability or independent confirmation as the work order requires.",
     "compiler.intent_brief": "User goals can leave several viable model, budget or service choices. A reviewed brief exposes the unresolved decision before implementation.",
-    "compiler.engine_contract": "Resolving the user intent and binding model facts to verifiable constraints produces one contract, from reviewed goals through workload-specific acceptance gates.",
+    "compiler.engine_contract": "Compile the reviewed intent brief and system ontology into a versioned contract with testable engine obligations.",
     "factory.workflow_planning": "A plan depends on what the source already supplies. Inspect the baseline, identify unsupported obligations and bind work orders with explicit upstream artifacts and reusable CCs.",
     "factory.experiment_design": "An optimization or transfer question needs competing explanations, a control and a falsifiable prediction before resources are spent.",
     "factory.methodology_ab": "Two independently measured images need paired controls and confirmation rules before attributing a difference to a code change.",
@@ -691,10 +689,10 @@
       "check": "Every required artifact has a provider. Distinguish a present source symbol from an admitted runtime path."
     },
     "compiler.engine_contract": {
-      "reason": "Resolving the user intent and binding model facts to verifiable constraints produces one contract, from reviewed goals through workload-specific acceptance gates.",
-      "inputs": "User intent, system ontology, model and target facts, constrained resources and requested quality/performance.",
-      "outputs": "Resolved intent, ontology-linked obligations, acceptance gates and any unresolved questions with contract impact.",
-      "check": "Given an underspecified request, resolve or mark missing facts. Reject incompatible requirements before assigning engineering work."
+      "reason": "Compile the reviewed intent brief and system ontology into a versioned contract with testable engine obligations.",
+      "inputs": "Reviewed intent brief, system ontology, checkpoint facts and target profile.",
+      "outputs": "Versioned engine contract with interfaces, budgets, permitted choices and acceptance gates.",
+      "check": "Trace every obligation to reviewed intent or an identified model or target constraint. Return unresolved conflicts to the Intent Compiler before releasing the contract."
     }
   },
   "aliasOverrides": {

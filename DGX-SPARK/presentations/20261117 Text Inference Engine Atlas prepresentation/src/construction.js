@@ -2,8 +2,13 @@
 
 const baselineJobs = [
   {
-    id:'contract', title:'Freeze the engine contract', agent:'Contract agent', lane:'factory',
-    cc:['compiler.engine_contract'], needs:[],
+    id:'intent', title:'Capture intent', agent:'Intent intake agent', lane:'factory',
+    cc:['compiler.intent_brief'], needs:[],
+    work:'Use the Intent Compiler to capture the requested model, workload, target and success criteria. Ask for clarification when a choice changes scope. Record user preferences and observed facts with their sources.',
+    output:'A reviewed intent brief that identifies the request, constraints and open decisions. The Contract Compiler can bind approved goals to model obligations and measurable gates.'
+  },{
+    id:'contract', title:'Compile the engine contract', agent:'Contract compilation agent', lane:'factory',
+    cc:['compiler.engine_contract'], needs:[['intent','A reviewed intent brief identifying approved goals, constraints and open decisions.']],
     work:'Read the system ontology and the requested workload. Bind text-only generation, one device, the model and tokenizer revisions, position semantics, expert count and routed width, any shared branch, supported pack, memory ceiling and quality gates. In this example the starting pack already exists.',
     output:'A versioned contract with tensor and token conventions, a memory envelope, fixed test prompts and explicit acceptance thresholds. Unresolved checkpoint fields stay open until the pack is inspected.'
   },{
@@ -86,7 +91,7 @@ const conditionalGates=[
 const jobIndex=new Map(constructionJobs.map(j=>[j.id,j]));
 const lanes={factory:'Factory',engine:'Engine',lab:'Lab',option:'Contract option'};
 const groups=[
- ['Contract','contract'],['Work orders','plan'],['Parallel foundations','weights','serving','reference','routing','state'],
+ ['Intent and contract','intent','contract'],['Work orders','plan'],['Parallel foundations','weights','serving','reference','routing','state'],
  ['Placement and kernels','placement','kernels'],['Storage integration','storage'],['Generation','assemble'],
  ['Image and qualification','image','qualify']
 ];
@@ -127,7 +132,7 @@ function construction(id){
    root.innerHTML='<div class="crumb">'+pill('From scratch','#construction')+'</div><article id="work-order" class="sheet lane-'+job.lane+'"><small>'+esc(lanes[job.lane])+' · '+esc(job.agent)+'</small><h1>'+esc(job.title)+'</h1><div class="pills">'+job.cc.map(cc=>pill(cc,'#cc/'+cc)).join(' ')+'</div>'+sec('Start when',job.needs.length?'<ul>'+job.needs.map(([up,receipt])=>'<li>'+jobLink(up)+' '+esc(receipt)+'</li>').join('')+'</ul>':'<p>The user supplies the model, machine and workload intent.</p>')+sec('Agent work',list(job.work))+sec('Acceptance evidence',list(job.output))+gates+sec('Who uses it',next.length?'<ul>'+next.map(j=>'<li>'+jobLink(j.id)+' '+esc(j.needs.find(([up])=>up===id)[1])+'</li>').join('')+'</ul>':list(job.lane==='option'?'The planner sends the variant through image build and controlled qualification before promotion.':'The planner and RSI receive the scoped verdict and supporting measurements.'))+'</article>';
    return;
  }
- root.innerHTML='<h1>Build an engine from scratch</h1><p class="lead">One illustrative assignment for a text MoE whose weights exceed one device’s memory. The system ontology describes the desired engine. The contract freezes its choices, and the planner assigns CCs to agents as their inputs become available.</p><p><b>Example ontology choices</b> · One device removes the inter-rank exchange job. Weights larger than available memory activate exact-demand streaming. The checkpoint supplies routed width and shared-expert policy to the same routing CC.</p><div class="build-key">'+Object.entries(lanes).map(([key,label])=>'<span class="lane-'+key+'">'+esc(label)+'</span>').join('')+'</div><p class="build-note">Select a work order for its start evidence and the artifact its consumer needs. Jobs with ready inputs can overlap. For example, kernel qualification can continue while the storage agent builds cold fills.</p>'+
+ root.innerHTML='<h1>Build an engine from scratch</h1><p class="lead">One illustrative assignment for a text MoE whose weights exceed one device’s memory. The Intent Compiler captures the request. The Contract Compiler binds the reviewed brief to the system ontology and freezes the build choices, and the planner assigns CCs to agents as their inputs become available.</p><p><b>Example ontology choices</b> · One device removes the inter-rank exchange job. Weights larger than available memory activate exact-demand streaming. The checkpoint supplies routed width and shared-expert policy to the same routing CC.</p><div class="build-key">'+Object.entries(lanes).map(([key,label])=>'<span class="lane-'+key+'">'+esc(label)+'</span>').join('')+'</div><p class="build-note">Select a work order for its start evidence and the artifact its consumer needs. Jobs with ready inputs can overlap. For example, kernel qualification can continue while the storage agent builds cold fills.</p>'+
  '<div class="tools"><a class="pill" href="#construction/designs">Compare engine designs →</a><button class="pill" type="button" data-build-jump="conditional-jobs">Contract-dependent work ↓</button></div>'+
  '<section class="sheet build-sim"><h2>Try the handoffs</h2><p>Accept example receipts to see which agents can start in parallel. This rehearses the baseline path. Open any work order below to inspect the evidence first.</p><div id="ready-jobs"></div></section>'+
  groups.map(([title,...ids])=>'<section class="build-group"><h2>'+esc(title)+'</h2><div class="build-grid">'+ids.map(id=>jobCard(jobIndex.get(id))).join('')+'</div></section>').join('')+
