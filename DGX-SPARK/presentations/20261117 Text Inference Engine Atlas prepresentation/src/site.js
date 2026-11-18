@@ -91,15 +91,43 @@ function library(query){
  }
  input.oninput=update;scope.onchange=update;type.onchange=update;update();
 }
+function implementationPaths(){
+ const paths=[
+   {engine:'ds4',title:'Routed rows and weighted output',intro:'Follow the CPU batched routed path. The dispatcher owns the forward permutation and the inverse mapping used to restore each token.',steps:[
+     ['Score and select','For scored routing, rank with the optional correction bias, gather the original transformed scores at the winning IDs, then normalize and scale. Some layers select IDs by token lookup.','model.expert_routing','ds4.c#L13062'],
+     ['Group by expert','Count assignments per expert, prefix-sum the counts and scatter pair indices into contiguous ranges. A pair index retains both the token and its choice slot.','merge.expert_contributions','ds4.c#L13427'],
+     ['Execute expert rows','The Q8 path prepares one quantized input row per token for reuse by its selected experts. Expert workers use the pair table to find those rows.','model.expert_ffn','ds4.c#L13443'],
+     ['Restore token order','Down-projection accumulation follows the stored assignments into token output rows. Test grouped execution against a token-by-token reference with two tokens sharing an expert.','merge.expert_contributions','ds4.c#L13507']]},
+   {engine:'Strata',title:'An expert read reaches the cache',intro:'Trace one file-backed cache fill. Three events matter to a worker implementing storage-backed MoE: the storage read completes, the demanded bytes become available, and the staging buffer becomes reusable.',steps:[
+     ['Read a staged expert','A prefetch worker claims a staging slot by layer and expert, reads its bytes and publishes completion under the stage lock. A failed read removes the slot mapping.','engine.expert_streaming','src/core/expert_source.cpp#L1369'],
+     ['Join or fill on demand','The consumer waits for an in-flight read of the same key, then rechecks the key before accepting the pointer. An unclaimed miss takes the synchronous fill path.','engine.expert_streaming','src/core/expert_source.cpp#L2148'],
+     ['Submit the cache fill','The dispatcher requests bytes after it has a candidate cache slot. A failed fill records the failing layer and expert. A successful fill registers the source buffer against the copy stream.','engine.expert_streaming','src/core/expert_source.cpp#L5492'],
+     ['Protect the source buffer','For pinned staging memory, record a CUDA event behind the copy. If the event cannot be created or recorded, synchronize the stream. Force overlapping fills in a test and check that every expert still reads its own weights.','engine.expert_streaming','src/core/expert_source.cpp#L2102']]}
+ ];
+ return '<section id="paths-section" tabindex="-1" class="sheet"><h2>Implementation paths</h2>'+paths.map(path=>{
+   const repo=atlas.repositories.find(r=>r.engine===path.engine);
+   const steps=path.steps.map(([title,body,cc,location])=>'<li><strong>'+esc(title)+'</strong><p>'+esc(body)+'</p>'+pill(cc,'#cc/'+cc)+' '+ext('Source ↗',repo.base+'/blob/'+repo.pin+'/'+location)+'</li>').join('');
+   return details(path.engine+' · '+path.title,'<p>'+esc(path.intro)+'</p><ol>'+steps+'</ol>');
+ }).join('')+'</section>';
+}
 function evidence(id,params){
  if(id&&sourceSlice(id,params.get('engine')))return;
  const docs='https://github.com/Muxite/tools/blob/548ed63a137382c2c9e1b7b64e537f50da4245db/';
  const notes=docs+'DGX-SPARK/planning/muse-workshop/';
- root.innerHTML='<h1>Implementation evidence</h1>'+ownershipMatrix()+'<p class="lead">Source bindings establish implementation choices. Asset records distinguish declarations, local fixtures and measured runs.</p><div class="cards">'+atlas.repositories.map(r=>'<article class="listing"><h2>'+esc(r.engine)+'</h2><p>'+ext(r.pin.slice(0,12),r.base+'/tree/'+r.pin)+' · '+atlas.sources.filter(x=>x.engine===r.engine).length+' inspected bindings</p>'+'</article>').join('')+'</div>'+
- receiptGuide()+sec('Muse Spark Open and DGX Spark',references(atlas.muse.refs))+'<div class="sheet"><h2>Integration history</h2><p>The native parent supplied 42 top-level and eight nested CC manifests. The workflow merge retained all 50. The subsequent snapshot added throughput_campaign and revised standard_benchmark with cancellation support. The historical two Strata screens reported +8.30% and +9.28% against a 10% threshold on their frozen workload.</p>'+
+ const destinations=[['paths-section','Implementation paths'],['matrix-section','Engine evidence by CC'],['history-section','Integration history']];
+ const shortcuts='<div class="tools" aria-label="Evidence sections">'+destinations.map(([id,label])=>'<button type="button" class="pill" data-section="'+id+'">'+label+'</button>').join('')+'</div>';
+ root.innerHTML='<h1>Implementation evidence</h1>'+shortcuts+implementationPaths()+ownershipMatrix()+'<p class="lead">Source bindings establish implementation choices. Asset records distinguish declarations, local fixtures and measured runs.</p><div class="cards">'+atlas.repositories.map(r=>'<article class="listing"><h2>'+esc(r.engine)+'</h2><p>'+ext(r.pin.slice(0,12),r.base+'/tree/'+r.pin)+' · '+new Set(atlas.roles.flatMap(cc=>cc.examples.filter(x=>x.engine===r.engine).map(x=>x.url))).size+' distinct source locations</p>'+'</article>').join('')+'</div>'+
+ receiptGuide()+sec('Muse Spark Open and DGX Spark',references(atlas.muse.refs))+'<div class="sheet" id="history-section" tabindex="-1"><h2>Integration history</h2><p>The native parent supplied 42 top-level and eight nested CC manifests. The workflow merge retained all 50. The subsequent snapshot added throughput_campaign and revised standard_benchmark with cancellation support. The historical two Strata screens reported +8.30% and +9.28% against a 10% threshold on their frozen workload.</p>'+
  ext('Native workflow integration',docs+'DGX-SPARK/NATIVE-WORKFLOW-INTEGRATION.md')+
  '<h3>Design references</h3><p>The 17-page <i>Inference Engine: Layered Architecture and Profiling Plan</i> supplies the startup, request, scheduler, generation, model, kernel and host vocabulary. Its memory column spans execution layers. The graph treats the host as a deployment dependency and attributes queue, state and launch waits individually.</p>'+ext('Inference layers and profiling',notes+'Inference%20layers%20and%20profiling.md')+' · '+ext('Post-presentation design revision',notes+'Post-presentation%20design%20revision.md')+
  details('Existing assets · '+atlas.assets.length,atlas.assets.map(assetRow).join(''))+
  details('Pinned source index · '+atlas.sources.length,atlas.sources.map(sourceRow).join(''))+
  details('Inventory decisions',Object.entries(atlas.mergers).map(([a,b])=>'<p>'+esc(a)+' → '+pill(b,'#cc/'+b)+'</p>').join('')+'<p>Image, audio and diffusion work is outside the text-engine contract.</p>')+'</div>';
+ for(const button of root.querySelectorAll('[data-section]')){
+   button.onclick=()=>{
+     const section=document.getElementById(button.dataset.section);
+     section.focus({preventScroll:true});
+     section.scrollIntoView({block:'start'});
+   };
+ }
 }

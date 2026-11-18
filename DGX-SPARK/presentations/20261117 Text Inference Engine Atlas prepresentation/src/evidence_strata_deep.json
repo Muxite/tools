@@ -1,0 +1,344 @@
+{
+  "backend.execute_operators": [
+    {
+      "engine": "Strata",
+      "title": "CPU guard path 1: canonical pack admission differs from native packs",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/program/generate.cpp#L5241-L5267",
+      "detail": "The main generate program calls cpu_require_expert_support only for the canonical non-native pack. It diagnoses a missing native_experts.txt before the canonical AVX-512 refusal; the native branch has separate x86/ARM reporting. Do not generalize the canonical pack CPU requirement to all Strata formats or architectures."
+    },
+    {
+      "engine": "Strata",
+      "title": "CPU guard path 2: native kernels gate ISA before calling wide-ISA objects",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cpu/native_expert.cpp#L459-L494",
+      "detail": "native_gu_rows_impl checks VNNI-capable AVX-512, AVX2/FMA availability, environment overrides and the older AVX tier before selecting specialized code. Singleton exactness also depends on the linked reference library ISA and row-group size. These are runtime safety/numerical-path guards; comment performance figures are not measurements from this audit."
+    },
+    {
+      "engine": "Strata",
+      "title": "CPU guard path 3: format capability predicates avoid unsafe ISA-bearing helpers",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cpu/native_expert.cpp#L246-L260",
+      "detail": "The source deliberately keeps iq512_supported, iq256_supported and kq256_supported in the baseline dispatch translation unit: calling a comparison helper compiled with unsupported wide ISA could itself fault before the caller checks CPU support. The format lists differ by implementation tier."
+    },
+    {
+      "engine": "Strata",
+      "title": "CUDA dispatch path 1: native and canonical projections consume different activation layouts",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/layer.cpp#L168-L200",
+      "detail": "gemv_quantized consumes the WeightRef fields published by NativeDense, requires matching FP32 input, Q8_1 scratch, stream and dimensions, quantizes unless the same input scratch is already valid, and calls native_mmvq. The canonical branch separately checks Q8_0 versus Q8_K using act_kind, plus S2 offset/group/bias constraints. Bit width alone cannot safely choose the activation codec."
+    },
+    {
+      "engine": "Strata",
+      "title": "CUDA dispatch path 2: supported type table and byte geometry are explicit",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/native_mmvq.cu#L3520-L3551",
+      "detail": "native_mmvq_supported lists the admitted GGML type IDs; native_mmvq_weight_bytes derives each block byte count, checks divisibility and output width, and rejects unsupported types or size overflow. A CPU-native expert type or a name recognized by the reader is not automatically admitted to this CUDA matrix path."
+    },
+    {
+      "engine": "Strata",
+      "title": "CUDA dispatch path 3: type switch selects real kernels and emits dispatch identity",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/native_mmvq.cu#L3554-L3585",
+      "detail": "native_mmvq splits oversized column groups into bounded calls, records the dense type/shape choice through strata::dispatch::kernel and switches to the corresponding Q4/Q5/Q8/K/IQ/Q2 implementation. Unknown types throw. This connects loaded type identity to an execution implementation; source inspection does not prove kernel throughput or target numerical tolerance."
+    },
+    {
+      "engine": "Strata",
+      "title": "CUDA dispatch path 4: shape, pointer and stream errors remain explicit",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cuda/native_mmvq.cu#L2339-L2357",
+      "detail": "Shared validation routines reject nonpositive or non-block-aligned input widths, invalid column counts, null or unaligned pointers and null streams; launch_check reports CUDA launch errors. These guards do not detect all bad device-pointer ownership or asynchronous numerical failures."
+    }
+  ],
+  "engine.expert_streaming": [
+    {
+      "engine": "Strata",
+      "title": "Storage path 1: source retrieval distinguishes RAM, overrides, staged and mapped files",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L4709-L4746",
+      "detail": "FileExpertSource::blob validates layer/expert identity, first checks resident RAM/overrides and otherwise chooses io_blob, staged_blob or mapped_blob according to the source mode. It updates separate RAM/file/logical-byte counters. A file-tier access is not necessarily a physical SSD read because mapped pages can already be cached."
+    },
+    {
+      "engine": "Strata",
+      "title": "Storage path 2: direct reads fall back to valid mapped or positional reads",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L1806-L1839",
+      "detail": "copy_from_files attempts read_direct first and increments direct_fallbacks on failure. On Linux it observes page residency and may pread uncached spans when the decode I/O gate permits, otherwise copies mapped bytes. This is an actual fallback path; fallback requires usable mappings and does not imply the same storage latency."
+    },
+    {
+      "engine": "Strata",
+      "title": "Storage path 3: Windows coalesces nearby aligned ranges and waits for issued requests",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L2850-L2912",
+      "detail": "The Windows read_direct branch sorts file/range windows, merges nearby requests within a 32 MiB bound, queues overlapped ReadFile operations before waiting, drains issued requests and validates that each role payload arrived. This branch has OS-specific gap merging and must not be presented as the Linux DGX implementation."
+    },
+    {
+      "engine": "Strata",
+      "title": "Storage path 4: Linux AIO drains each queued wave before publishing payloads",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L3008-L3056",
+      "detail": "The Linux read_direct branch builds positional AIO requests, retries interrupted submission, drains all queued completions and destroys an unknown-state context before returning failure. Only successful sufficiently long completions are copied into requested expert destinations. Wave depth and merging policy are platform-specific source choices, not measured drive bandwidth."
+    },
+    {
+      "engine": "Strata",
+      "title": "Readiness path 1: asynchronous fill records success or invalidates the stage key",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L2078-L2099",
+      "detail": "fill_stage copies the exact expert bytes and calls publish_stage. Publication accounts successful bytes, clears stage_busy under the mutex, removes the key on failed reads and notifies waiters. Clearing busy is completion notification; only a still-matching key signifies a usable staged blob."
+    },
+    {
+      "engine": "Strata",
+      "title": "Readiness path 2: an on-demand consumer joins matching in-flight storage work",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L2134-L2162",
+      "detail": "staged_blob claims a stage keyed by layer/expert. If another worker is filling it, the consumer waits until busy clears or identity changes and returns null on failed-key replacement; otherwise it performs its own fill. This closes the storage-read-to-CPU-consumer readiness boundary."
+    },
+    {
+      "engine": "Strata",
+      "title": "Readiness path 3: storage prefetch tracks pending versus landed experts",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L2263-L2326",
+      "detail": "prefetch_begin handles separate page-fill/zero-copy/staged modes, claims pending expert fills and launches bounded direct-read or per-expert workers. Successful direct batches publish each stage; failed batches retry fill_stage. Return values and pending bits describe scheduling state, not completed GPU residency."
+    },
+    {
+      "engine": "Strata",
+      "title": "Readiness path 4: landing notifications can also trigger failure fallback",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L2329-L2343",
+      "detail": "wait_landed wakes when a pending stage is no longer busy or its mapping vanished, promoting state 1 to state 2. A removed failed mapping is deliberately allowed to wake the dispatcher because the subsequent blob call retries. State 2 therefore means eligible to resolve next, not unconditional proof of successful storage bytes."
+    },
+    {
+      "engine": "Strata",
+      "title": "Consume path 1: ready CPU experts run before pending reads complete",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L5250-L5285",
+      "detail": "The multi-token dispatcher deduplicates CPU misses, starts prefetch_begin and tracks per-expert states 0 ready, 1 reading, 2 landed and 3 computed. The selected cold mode can wait for all reads or allow ready-first execution. The source keeps original per-token result rows, making batch ordering independent of final weighted reduction."
+    },
+    {
+      "engine": "Strata",
+      "title": "Consume path 2: resolved blobs become one grouped job per distinct expert",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L5323-L5367",
+      "detail": "For each CPU-owned expert the dispatcher resolves a zero-copy role view or blob; null fails the request with layer/expert identity. It constructs per-expert jobs, adapts role offsets for mapped GGUF order and retains each original token output pointer, splitting overlarge token groups into more jobs."
+    },
+    {
+      "engine": "Strata",
+      "title": "Consume path 3: CPU batches, landing waits and read workers are all joined",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L5370-L5421",
+      "detail": "The dispatcher executes ready native/canonical pool work, clears completed jobs, waits for the next landing only when needed, then joins prefetch workers before recording cold-read timing and final work counts. ms_cold_hide is accumulated as min(read time, first ready-compute time), an upper-bound overlap quantity rather than directly measured saved latency."
+    },
+    {
+      "engine": "Strata",
+      "title": "DMA lifetime path 1: pinned staging allocation has a pageable fallback",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L1910-L1936",
+      "detail": "Stage allocation attempts cudaHostAlloc only when policy and available memory allow it; allocation failure falls back to ordinary host storage with explicit per-buffer pin ownership. Pinned is a property of each actual buffer, not an unconditional guarantee of the file source."
+    },
+    {
+      "engine": "Strata",
+      "title": "DMA lifetime path 2: copy completion is attached to the source stage",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L2102-L2123",
+      "detail": "note_async_read recognizes pinned staging pointers and records a non-timing CUDA event after queued consumers on their stream. If event creation or recording fails, it synchronizes that stream before returning. Untracked mapped/resident pointers and pageable buffers have different lifetime rules."
+    },
+    {
+      "engine": "Strata",
+      "title": "DMA lifetime path 3: stage replacement waits for prior GPU readers",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L1942-L1964",
+      "detail": "Before reassigning an existing stage to a new layer/expert key, claim_stage checks any live completion event and synchronizes an unfinished transfer, incrementing stage_fence_waits. It then marks the replacement busy. This closes the storage-buffer-reuse race after asynchronous host-to-device upload."
+    },
+    {
+      "engine": "Strata",
+      "title": "GPU hit path 1: exact-demand admission fills before same-stream consumption",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L5475-L5515",
+      "detail": "expert_hit_run asks the cache for each selected ID, admits and fills a missing slot when capacity permits, records the source stage asynchronous read and builds destination-row lists. Unadmitted misses remain CPU work; a newly enqueued fill can be a hit on this call because later compute uses the same ordered stream. This hit-split path must not be conflated with native verify-window dispatch."
+    },
+    {
+      "engine": "Strata",
+      "title": "Foresight path 1: optional swap-space creation has explicit incompatible-mode guards",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L6779-L6799",
+      "detail": "The swap-space factory is disabled when STRATA_FS_SLOTS is absent/nonpositive or device-side planning is active. Enabled instances have bounded slots, copy budget, admission/depth rules and optional byte verification. An available class or environment knob does not mean a normal run enabled it."
+    },
+    {
+      "engine": "Strata",
+      "title": "Foresight path 2: startup connects predictor, dispatcher and source ownership",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/program/generate.cpp#L13769-L13789",
+      "detail": "The verifier setup attaches its plan sink to ExpertDispatch, creates per-layer card ownership for ForesightSwap, connects it to the dispatcher and lookahead predictor and registers source exchange holds. A destructor detaches the worker/source references before swap destruction, making the lifetime boundary explicit."
+    },
+    {
+      "engine": "Strata",
+      "title": "Foresight path 3: fill worker publishes issued only after copy and event submission",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L6619-L6643",
+      "detail": "The named fill thread dequeues slots, selects the correct device/stream and queues bytes plus a completion event. A failure disables swap service and deliberately never marks that slot issued. Successful submission releases issued=true; it does not yet mark the bytes ready."
+    },
+    {
+      "engine": "Strata",
+      "title": "Foresight path 4: take requires actual event completion and can verify exact bytes",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L6646-L6680",
+      "detail": "take resolves the exact key and rejects unissued or unfinished slots, counting pending attempts. After successful event query it marks the slot ready; optional verification reads bytes back and invalidates mismatches. Only then does it return the device pointer, refresh its reference generation and count a served hit."
+    },
+    {
+      "engine": "Strata",
+      "title": "Foresight path 5: the dispatcher uses ready swap pointers and preserves a miss path",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L5087-L5124",
+      "detail": "For each distinct demand, expert_pool_dispatch_multi first checks resident slots and peers, then tries ForesightSwap::take. A ready swap pointer becomes an ordinary resident GPU group with original destination/token provenance. A not-ready swap calls note_miss and may use bounded pinned PCIe staging or CPU work instead. A prediction miss therefore need not change the selected expert."
+    },
+    {
+      "engine": "Strata",
+      "title": "Prediction-to-I/O path: confidence and byte budgets govern queued warming",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L1151-L1179",
+      "detail": "warm_scored requires the appropriate scheduler, prefetch mode and open gate; otherwise it falls back to warm. It skips RAM-resident candidates, raises the confidence threshold with queue pressure, rejects budget overflow and suppresses duplicate queued jobs. Counters separately record confidence and budget rejections."
+    }
+  ],
+  "graph.lower_capture_replay": [
+    {
+      "engine": "Strata",
+      "title": "Graph completion evidence: capture rejects empty bodies and replay records a done event",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/graph.cpp#L60-L89",
+      "detail": "CapturedGraph rejects zero-node capture before instantiation, creates a reusable completion event and records it after cudaGraphLaunch. wait_ms is explicitly bounded and queries completion. This is stronger than a bare launch helper, but this block still does not establish a comprehensive shape/address cache invalidation policy."
+    }
+  ],
+  "merge.expert_contributions": [
+    {
+      "engine": "Strata",
+      "title": "GPU hit path 3: completion observation and combine preserve row ownership",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L5559-L5569",
+      "detail": "The Combine phase consumes a pending hit result once, optionally queries its completion event for hit_ready versus hit_late counts and queues add_inplace after the CPU/miss rows on the stream. Event-query classification is not a complete proof of start-time cause or measured overlap benefit."
+    }
+  ],
+  "model.expert_ffn": [
+    {
+      "engine": "Strata",
+      "title": "CPU consumption path: ready expert jobs become independent row ranges",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cpu/pool.cpp#L1202-L1240",
+      "detail": "The worker pool chooses per-job or default NativeFmt, dispatches native Q2 gate/up rows or native_gu_rows, and dispatches down rows separately. NativeArithmetic::WindowInvariant has explicit alternative entrypoints. Outputs belong to each job/token row; expert routing weights are not applied inside these projection calls."
+    },
+    {
+      "engine": "Strata",
+      "title": "Dispatch admission path: token-window limits precede expert job construction",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L4933-L4968",
+      "detail": "expert_pool_dispatch_multi refuses unsupported token-window sizes and assignment-table overflow, allocates per-window activation/job storage and sets decode-scope accounting. It scores the previous prediction against actual IDs before submitting current hidden rows as the next-layer hint. This is a concrete shared host dispatch path, not the separate all-cards split implementation."
+    },
+    {
+      "engine": "Strata",
+      "title": "CPU execution path: only CPU-owned entries receive host activation encoding",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L5220-L5247",
+      "detail": "The dispatcher distinguishes resident/PCIe/peer ownership from CPU misses and skipped entries, checks whether any CPU work exists, and selects Q2-native, native-format or canonical activation quantizers for those rows. This prevents treating a resident-cache hit as another CPU expert job."
+    },
+    {
+      "engine": "Strata",
+      "title": "GPU hit path 2: fresh scaled activations precede grouped resident FFNs",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L5521-L5552",
+      "detail": "The hit path clears sparse output rows, stages slot/destination lists, rejects absent FP32 activation scales and quantizes the current layer mixed input with the CPU-compatible scaled codec before grouped S2 execution. Reusing the previous layer activation or the old FP16-scale codec would yield plausible but wrong outputs. Source comments cite earlier tests; this audit did not rerun them."
+    },
+    {
+      "engine": "Strata",
+      "title": "Algorithm variant guard: selected tail experts can be skipped by default",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/program/generate.cpp#L13817-L13863",
+      "detail": "Eligible CUDA/HIP native verifier configurations default STRATA_ROUTE_TAIL_SKIP to rank 7 when experts are not all/nearly resident, batch slots are off, architecture defaults permit it and no peer device is configured. Any NVFP4 expert suppresses this default. The code explicitly says answers change; set STRATA_ROUTE_TAIL_SKIP=0 for an exact full-expert reference comparison. Commented quality/performance figures are historical claims, not this audit results."
+    },
+    {
+      "engine": "Strata",
+      "title": "Algorithm variant effect: a skipped demand is marked separately and contributes zero",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L5306-L5320",
+      "detail": "The dispatcher treats kind=-2 as an intentional tail skip, zeroes that original expert output row and increments tail_skipped. Resident/PCIe/peer rows have separate hit/offload counters and zeroing rules. Thus exact router IDs alone do not prove the full mathematical MoE sum was executed."
+    }
+  ],
+  "observability.runtime_events": [
+    {
+      "engine": "Strata",
+      "title": "Dispatch evidence 1: eager choices and capture bins have different counting semantics",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/include/strata/core/dispatch_stats.hpp#L1-L12",
+      "detail": "Existing aggregate instrumentation records kernel path choices by type/shape and declined-path reasons. During capture a choice is counted once per recorded width/kind; graph launches are counted separately. Eager calls count directly. This is a real backend-independent telemetry facility, not NVTX annotations or a per-kernel timestamp trace."
+    },
+    {
+      "engine": "Strata",
+      "title": "Dispatch evidence 2: report exposes separate launch counts and typed choices",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/include/strata/core/dispatch_stats.hpp#L70-L119",
+      "detail": "Stats stores atomic graph launches by token width/kind, serializes those separately from scoped path-count records and writes JSON at exit when STRATA_DISPATCH_REPORT is set. STRATA_DISPATCH_STATS=0 disables collection. Capture counts require interpretation alongside launch counts; source instrumentation coverage is not proof that every launched kernel is observed."
+    },
+    {
+      "engine": "Strata",
+      "title": "Dispatch evidence 3: verifier binds capture scope to concrete execution mode",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/verify.cpp#L1406-L1415",
+      "detail": "record_window creates a dispatch Scope using width and graph kind and records active window/PDL/shared-stream/profiler choices. It distinguishes all-resident, doorbell and batch contexts. Mode notes describe the selected capture path; they do not supply event durations."
+    },
+    {
+      "engine": "Strata",
+      "title": "Dispatch evidence 4: verifier counts a replay at the actual graph submission",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/verify.cpp#L3229-L3235",
+      "detail": "The prelaunch path waits for the adaptive tier when required, increments the graph-launch counter immediately before cudaGraphLaunch and checks the returned status. A counted submission is not necessarily completed successful model work, so failed attempts must retain their error status."
+    },
+    {
+      "engine": "Strata",
+      "title": "Manifest evidence: actual chosen paths, budgets and held tensor formats are distinct",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/include/strata/core/run_manifest.hpp#L1-L18",
+      "detail": "STRATA_MANIFEST opts into a JSON record of engine choices, budgets, selected/declined paths and held tensor formats after load-time conversion. Entries are decision snapshots with sorted keys and no timestamps; recording the same path replaces its previous entry. This is configuration/selection provenance rather than a complete execution timeline."
+    },
+    {
+      "engine": "Strata",
+      "title": "Storage accounting evidence: process storage bytes differ from logical expert bytes",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/program/generate.cpp#L21409-L21427",
+      "detail": "Request reporting samples process I/O and FileExpertSource counters, showing OS storage bytes/major faults separately from logical expert bytes and observed page-cache coverage. The first delta uses initial counter state; process-level reads can include activity beyond one expert fetch. File-tier access totals must not be labeled SSD throughput."
+    },
+    {
+      "engine": "Strata",
+      "title": "Overlap accounting evidence: reported hidden-read time is explicitly bounded",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/program/generate.cpp#L21457-L21474",
+      "detail": "The request report emits cold-mode counts, read duration R, ready compute C_r, later compute C_c, actual wait and min(R,C_r). The last quantity is the dispatcher upper-bound overlap estimate, not an independent measured reduction in token latency. Deltas are taken from accumulated dispatch state."
+    }
+  ],
+  "routing.forecast_expert_demand": [
+    {
+      "engine": "Strata",
+      "title": "Prediction path 1: startup admits lookahead only with suitable routers and source modes",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/program/generate.cpp#L9609-L9647",
+      "detail": "The main program gates lookahead on file warming, swap-space prediction or statistics mode and an explicit override. It gathers per-layer BF16 router tensors with expected byte geometry before starting the thread, enables optional scoring/depth and can detach the predictor when all experts are already resident. This is real startup wiring rather than a prediction helper in isolation."
+    },
+    {
+      "engine": "Strata",
+      "title": "Prediction path 2: submit snapshots available hidden rows and future residency",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L3151-L3167",
+      "detail": "RouterLookahead::submit ignores final layers/empty input, counts skipped submissions while busy, copies at most eight current hidden rows and snapshots future-layer residency under its mutex. It queues layer+1 with a generation marker. This is a causal next-layer approximation, not the actual hidden state after that next layer."
+    },
+    {
+      "engine": "Strata",
+      "title": "Prediction path 3: generated candidates feed file warming and optional swap copies",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L3370-L3388",
+      "detail": "The worker publishes vote/mask predictions with release generation ordering, calls warm_scored or warm for the candidate set and only sends next-layer candidates into ForesightSwap::predict. It counts candidate hints and worker busy time; predicted count is neither cache hits nor useful completed transfers."
+    },
+    {
+      "engine": "Strata",
+      "title": "Prediction evaluation path: precision and recall are against nonresident demand",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/expert_source.cpp#L3230-L3262",
+      "detail": "Online statistics intersect prediction masks with actual nonresident demand and report precision/recall at k, k+4 and k+10 plus vote-ranked miss/PCIe coverage and predictor CPU time. Reporting is every hundred scored windows. These counters do not establish held-out generalization, causal end-to-end speedup or correct physical I/O attribution."
+    }
+  ],
+  "weights.decode_blocks": [
+    {
+      "engine": "Strata",
+      "title": "Expert artifact path 2: type traits determine dot products, activation codecs and block geometry",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cpu/native_expert.cpp#L262-L311",
+      "detail": "native_fmt derives gate/up and down dot-product traits and their different activation types, rejects missing dot/quantizer support or incomplete blocks and derives row/role offsets. NVFP4 adds an explicit per-blob scale tail; activation scratch sizes are bounded. CPU support is a complete representation contract, not merely a GGUF type-name lookup."
+    }
+  ],
+  "weights.load_checkpoint": [
+    {
+      "engine": "Strata",
+      "title": "Artifact path 1: GGUF v3 directory preserves type, geometry and offsets",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/include/strata/artifact/gguf_reader.hpp#L478-L522",
+      "detail": "GgufFile::parse checks magic and version, rejects duplicate tensor names and invalid dimension counts, and records each tensor shape/type/offset before aligning the data section. Metadata-only first shards are handled explicitly. Parsing a known type ID is not proof that a compute backend supports it."
+    },
+    {
+      "engine": "Strata",
+      "title": "Artifact path 2: packed index carries storage and activation contracts",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/weights.cpp#L176-L223",
+      "detail": "WeightTable::load reads pack/index.txt and requires all 19 fields, including source/destination byte ranges, geometry, quantization planes, scale width and act_kind. Raw BF16/F16 index kinds are normalized to engine forms. This canonical packed-index path is distinct from directly executing arbitrary GGUF tensors."
+    },
+    {
+      "engine": "Strata",
+      "title": "Artifact path 3: native dense shard admission validates family and split identity",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/native_dense.cpp#L329-L372",
+      "detail": "NativeDense::load opens every named GGUF shard, admits the architecture from the first shard and checks matching split counts/numbers/tensor totals on additional shards. Duplicate shard numbers fail. It is an architecture-bound override of WeightTable entries, not a generic full-model reader."
+    },
+    {
+      "engine": "Strata",
+      "title": "Artifact path 4: native matrices require valid payload and canonical tensor bindings",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/native_dense.cpp#L395-L449",
+      "detail": "Before upload, the loader rejects payload overflow/truncation/overlap, duplicate tensor names and absent canonical bindings. Only eligible in-range native MMVQ types become overrides, with quantized two-dimensional geometry checks. One BF16 projection branch explicitly converts to Q8_0, so on-disk precision need not equal execution precision."
+    },
+    {
+      "engine": "Strata",
+      "title": "Artifact path 5: references are published only after allocations succeed",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/core/native_dense.cpp#L595-L615",
+      "detail": "After preparing all pending matrices and shared Q8_1 scratch, the loader attaches native_data, native_type and native_q8_1 to the canonical WeightRef objects. Those fields are the concrete bridge into layer.cpp dispatch; the record establishes source wiring, not a successful device load on DGX Spark."
+    },
+    {
+      "engine": "Strata",
+      "title": "Expert artifact path 1: pack layout selects canonical versus native interpretation",
+      "url": "https://github.com/Niko1221/Strata/blob/c77572806996349b49995e4f98d41b5294d36a21/src/kernels/cpu/expert_layout.cpp#L501-L557",
+      "detail": "expert_layout_load treats an absent native_experts.txt as canonical fixed-layout Q2_0. A present native file requires STRATA_NATIVE_EXPERTS, a recognized version, valid layer fields, an admitted NativeFmt and matching blob byte count. The native header can override compile-time expert count for pruned models. Wrong or incomplete pack directories can therefore change admission behavior."
+    }
+  ]
+}

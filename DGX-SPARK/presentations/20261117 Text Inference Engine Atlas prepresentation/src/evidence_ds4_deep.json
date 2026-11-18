@@ -1,0 +1,132 @@
+{
+  "weights.prepare_artifact": [
+    {
+      "engine": "ds4",
+      "title": "Build aligned tensors and fall back to raw weights",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_cuda.cu#L4932",
+      "detail": "Startup builds derived Q2_K, IQ2 and Q8 artifacts conditionally, then publishes successful device ranges indexed by source offsets. Failure or an empty result frees partial allocations and leaves the raw-weight path available. A derived layout can fail independently of model loading."
+    }
+  ],
+  "weights.decode_blocks": [
+    {
+      "engine": "ds4",
+      "title": "Inverse of the aligned Q2_K repack",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/cuda/mmq/ds4_mmq.cu#L5167",
+      "detail": "q2_k_aligned_derepack_kernel reconstructs raw block layout from the weight-server’s aligned representation. Testing this inverse detects fields misplaced by repacking; numerical output still needs a separate operator comparison."
+    }
+  ],
+  "backend.execute_operators": [
+    {
+      "engine": "ds4",
+      "title": "Gate packed MMQ versus dequantization and cuBLAS",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/cuda/mmq/ds4_mmq.cu#L383",
+      "detail": "ds4_should_use_mmq_impl checks weight format, compute capability, matrix width and expert count. Forced cuBLAS bypasses MMQ. A worker can test a format accepted by both paths at neighboring batch sizes and compare outputs at fixed input."
+    }
+  ],
+  "batch.execution_layout": [
+    {
+      "engine": "ds4",
+      "title": "Validate the session’s prompt subrange",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L38978",
+      "detail": "metal_graph_prefill_chunked_range receives one prompt, start and token count. It rejects an invalid span or zero capacity and may take a streaming decode-style path. This is evidence for packing work within one session."
+    },
+    {
+      "engine": "ds4",
+      "title": "Choose token rows at a resumed boundary",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L39044",
+      "detail": "Compute remaining prompt tokens and local chunk cap from pos0 and raw/prefill capacity. For a resumed session, shorten the first partial chunk to the prefill-cap boundary; the layer caller receives explicit position and count."
+    }
+  ],
+  "decode.advance_sequence": [
+    {
+      "engine": "ds4",
+      "title": "Return logits only for needed chunks",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L39061",
+      "detail": "The chunk loop requests logits for the last span or when progress callbacks need them. It passes the prompt, absolute position and chunk length directly to metal_graph_prefill_layer_major. Compare final logits between a resumed span and full prefill."
+    }
+  ],
+  "scheduler.request_lifecycle": [
+    {
+      "engine": "ds4",
+      "title": "Check mixed prefill/decode eligibility",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L87713",
+      "detail": "A separate path accepts one prefill session and multiple decode items. It is disabled on Apple in this revision. Its other branch checks decode_count, prefill row range, CUDA TP/EP placement and workspace compatibility. A single prompt’s chunking alone says nothing about cross-request scheduling."
+    }
+  ],
+  "model.expert_routing": [
+    {
+      "engine": "ds4",
+      "title": "Compute DeepSeek router values",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L12985",
+      "detail": "layer_router_probs_one projects a hidden vector with ffn_gate_inp and applies sqrt(softplus(logit)). This ds4 transform differs from Muse’s sigmoid. Transfer the routing job and oracle method, then bind the target’s transform."
+    },
+    {
+      "engine": "ds4",
+      "title": "Rank with correction bias, gather original weights",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L13062",
+      "detail": "Copy the transformed scores, add ffn_exp_probs_b to the ranks when present, select IDs, gather the unbiased scores and normalize against a floored sum before DS4_EXPERT_WEIGHT_SCALE. The weighting denominator and scaling are model-specific."
+    },
+    {
+      "engine": "ds4",
+      "title": "Select table lookup or scored routing per layer",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L13410",
+      "detail": "The batched CPU path uses token IDs for layers with ffn_gate_tid2eid and computes weights at those selected IDs. Otherwise it runs the score-based selector. Both branches feed (token, slot) assignments and aligned weights into packing."
+    }
+  ],
+  "model.expert_ffn": [
+    {
+      "engine": "ds4",
+      "title": "Quantize each token row once for Q8 work",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L13443",
+      "detail": "In the Q8_0 CPU path, quantize normalized input by token into reusable Q8 activation blocks and scales. Grouped workers consume those prepared rows via the assignment table; the active geometry determines the work count."
+    }
+  ],
+  "merge.expert_contributions": [
+    {
+      "engine": "ds4",
+      "title": "Build per-expert row ranges from selected assignments",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L13427",
+      "detail": "Prefix-sum the per-expert counts, record nonempty experts, and scatter pair indices using per-expert cursors. Token and choice-slot identity remain available through the pair table while compute proceeds expert by expert."
+    },
+    {
+      "engine": "ds4",
+      "title": "Accumulate grouped down projections by original output row",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L13507",
+      "detail": "Resolve each active expert’s down-projection weights and validate input/output dimensions. The Q8_0 path dispatches its row accumulator after preparing pair IDs and weights, restoring per-token outputs from grouped intermediate rows."
+    }
+  ],
+  "engine.expert_streaming": [
+    {
+      "engine": "ds4",
+      "title": "Admit exact demanded experts against real capacity",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_cuda.cu#L29069",
+      "detail": "The selected cache compares unique demanded experts to the slots that fit after reserved system headroom. It fails before publishing live slots when the exact set will not fit. An agent must supply a viable capacity or a different execution schedule."
+    },
+    {
+      "engine": "ds4",
+      "title": "Bind compact slots to the routed compute path",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_cuda.cu#L26521",
+      "detail": "When selected-cache mode is active, substitute the cache’s slot-selected tensor and compact expert count and use cache-backed gate, up and down weight pointers. Expert IDs in compute space can consequently differ from model IDs."
+    },
+    {
+      "engine": "ds4",
+      "title": "Coalesce adjacent storage and destination spans",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4_cuda.cu#L29486",
+      "detail": "After enumerating missing next-layer expert weights, merge adjacent file ranges only when their destination slots are contiguous. A two-buffer staging ring overlaps copying with reads. This stages known next-layer weights and does not evaluate a demand predictor."
+    }
+  ],
+  "observability.runtime_events": [
+    {
+      "engine": "ds4",
+      "title": "Synchronize to read selected IDs and weights",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L24000",
+      "detail": "The Metal trace path ends the active command batch to read back both selected IDs and aligned weights, then resumes submission. A timing study should report that synchronization as observer overhead."
+    },
+    {
+      "engine": "ds4",
+      "title": "Attach route samples to layer and token position",
+      "url": "https://github.com/antirez/ds4/blob/b3f50180ec2c7324892be1f50bc83555ccb8d5e7/ds4.c#L24028",
+      "detail": "On successful readback the caller forwards layer, position, selected IDs and weights to ds4_expert_profile_record. This record observes realized routing; it does not establish cache hits, transfer savings or predictive accuracy."
+    }
+  ]
+}

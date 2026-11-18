@@ -118,7 +118,7 @@ def assemble():
         bucket=roles[current(key)]['examples']
         if not any(x['url']==row['url'] for x in bucket):
             bucket.append(row)
-    for name in ['evidence_runtime.json','evidence_math.json','evidence_peers.json']:
+    for name in ['evidence_runtime.json','evidence_math.json','evidence_peers.json','evidence_ds4_deep.json','evidence_strata_deep.json']:
         for key,rows in read(name).items():
             for row in rows:
                 example(key,row)

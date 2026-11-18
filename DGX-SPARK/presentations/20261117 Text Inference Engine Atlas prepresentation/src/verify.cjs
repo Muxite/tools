@@ -122,6 +122,15 @@ async function main() {
     assert((await page.locator('main').innerText()).includes('weights.decode_blocks'), 'Library misses a source-symbol match');
     await jump('#sources');
     assert(await page.locator('main a[href*="github.com/"]').count() > 0, 'Evidence view contains no upstream source links');
+    for(const section of ['paths-section','matrix-section','history-section']){
+      await page.locator('button[data-section="'+section+'"]').click();
+      assert.equal(await page.evaluate(()=>document.activeElement.id),section);
+    }
+    for(const trail of await page.locator('#paths-section details').all()){
+      await trail.locator('summary').click();
+      assert.equal(await trail.locator('ol li').count(),4);
+      assert.equal(await trail.locator('ol a[href*="/blob/"]').count(),4);
+    }
     const repoNames = ['Strata','llama.cpp','ds4','SGLang'];
     const targetRoles = data.roles.filter(r => r.kind !== 'factory' && r.target !== false);
     const matrix = page.locator('table.matrix');
