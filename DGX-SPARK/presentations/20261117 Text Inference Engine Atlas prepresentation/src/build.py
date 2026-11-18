@@ -110,6 +110,7 @@ def assemble():
     muse=read('muse_evidence.json')
     for key,r in roles.items():
         r['review']=review[key]
+        assert review[key]['summary'].strip(), key
         assert review[key]['site'].split('/') in r['sites'], key
         r['handoff']=handoffs[key]
         r['examples']=[]

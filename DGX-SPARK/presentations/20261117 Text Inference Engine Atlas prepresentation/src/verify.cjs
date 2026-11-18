@@ -63,6 +63,7 @@ async function verifyConstruction(page, roleRecords, jump) {
   for (const job of jobs) {
     await jump('#construction/'+job.id);
     await detail.waitFor();
+    assert.deepEqual(await detail.locator('.cc-descriptions dd').allTextContents(),job.cc.map(cc=>roleRecords.find(r=>r.id===cc).review.summary));
     const hrefs = new Set(await detail.locator('a[href]').evaluateAll(links=>links.map(a=>a.getAttribute('href'))));
     for (const cc of job.cc) assert(hrefs.has('#cc/'+cc),job.id+' has no working CC link to '+cc);
     for (const [provider,receipt] of job.needs) {
@@ -172,6 +173,7 @@ async function main() {
     await graphNode('model.expert_routing').click();
     await page.waitForFunction(() => document.querySelector('main').textContent.includes('model.expert_routing'));
     await jump('#cc/routing.top_k');
+    assert.equal(await page.locator('#inspector h2 + .cc-summary').innerText(),data.roles.find(r=>r.id==='model.expert_routing').review.summary);
     assert((await page.locator('main').innerText()).includes('model.expert_routing'), 'Legacy routing link failed');
     const router = page.locator('#routing-case');
     await router.selectOption('0.08');
@@ -246,6 +248,7 @@ async function main() {
       assert.deepEqual(await page.locator('main .cap-row a').evaluateAll(as=>as.map(a=>a.href)),expected.map(e=>e.url));
     }
     await jump('#library');
+    for(const r of data.roles)assert.equal(await page.locator('#results a[href="#cc/'+r.id+'"] .cc-summary').textContent(),r.review.summary);
     assert.deepEqual(await page.locator('#results a.listing').evaluateAll(nodes=>nodes.map(n=>n.hash.slice(4)).sort()),data.roles.map(r=>r.id).sort());
     await page.locator('#search').fill('dequantize_q6_K');
     await page.locator('#scope').selectOption('Engine');

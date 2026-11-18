@@ -1,154 +1,192 @@
 {
   "attention.dense_execution": {
     "site": "model/attend",
-    "boundary": "Own the attention result for a specified mask, head layout and sequence position. A failing attention row can be reproduced with fixed Q, K and V independently of the cache allocator."
+    "boundary": "Own the attention result for a specified mask, head layout and sequence position. A failing attention row can be reproduced with fixed Q, K and V independently of the cache allocator.",
+    "summary": "Compare each query with the keys it is allowed to see and use the resulting weights to combine their values."
   },
   "backend.execute_operators": {
     "site": "backend/dispatch",
-    "boundary": "Own shape and dtype admission, fallback and launch. The same correct model operator can dispatch to an incompatible device kernel."
+    "boundary": "Own shape and dtype admission, fallback and launch. The same correct model operator can dispatch to an incompatible device kernel.",
+    "summary": "Choose and run a CPU or GPU kernel that supports the operation’s tensor shapes and data types."
   },
   "batch.execution_layout": {
     "site": "schedule/batch",
-    "boundary": "Turn admitted requests into offsets, positions and state handles. A batch can be scheduled fairly yet still mix two sequences’ rows."
+    "boundary": "Turn admitted requests into offsets, positions and state handles. A batch can be scheduled fairly yet still mix two sequences’ rows.",
+    "summary": "Map each scheduled token to a batch row, its sequence position and the state it reads or updates."
   },
   "decode.advance_sequence": {
     "site": "generate/step",
-    "boundary": "Own the transition from committed token and sequence state to next-step logits. Cached execution can be compared with full-context recomputation."
+    "boundary": "Own the transition from committed token and sequence state to next-step logits. Cached execution can be compared with full-context recomputation.",
+    "summary": "Run a prompt or the next token through the model, update the sequence state and return scores for the following token."
   },
   "dense.feed_forward": {
     "site": "model/dense",
-    "boundary": "Where the layer configuration selects a dense FFN, verify its projections, activation and residual shape without expert selection or token packing."
+    "boundary": "Where the layer configuration selects a dense FFN, verify its projections, activation and residual shape without expert selection or token packing.",
+    "summary": "Transform each token’s hidden vector using the dense layer’s projections and activation function."
   },
   "engine.expert_streaming": {
     "site": "state/fill",
-    "boundary": "Own a demanded weight range from admission through read completion and last use. One controller must protect slots and enforce the byte ceiling."
+    "boundary": "Own a demanded weight range from admission through read completion and last use. One controller must protect slots and enforce the byte ceiling.",
+    "summary": "Load the selected experts into available memory slots and keep their weights there until the calculation finishes."
   },
   "graph.lower_capture_replay": {
     "site": "backend/capture",
-    "boundary": "A captured graph is a reusable executable with validity constraints. Qualify pointer, shape and state changes against uncaptured execution before enabling replay."
+    "boundary": "A captured graph is a reusable executable with validity constraints. Qualify pointer, shape and state changes against uncaptured execution before enabling replay.",
+    "summary": "Turn model operations into device work and replay repeated launches when their shapes and buffers are compatible."
   },
   "memory.reusable_sessions": {
     "site": "state/reuse",
-    "boundary": "Share cached prefixes only across compatible identities. A correct per-sequence KV allocator can still reuse stale prefix content across requests."
+    "boundary": "Share cached prefixes only across compatible identities. A correct per-sequence KV allocator can still reuse stale prefix content across requests.",
+    "summary": "Find stored state for a matching prompt prefix so the engine can resume from it and skip repeated work."
   },
   "memory.runtime_arenas": {
     "site": "state/scratch",
-    "boundary": "Own physical workspace lifetimes and alignment across operators. Verify peak live bytes and overlap separately from model arithmetic."
+    "boundary": "Own physical workspace lifetimes and alignment across operators. Verify peak live bytes and overlap separately from model arithmetic.",
+    "summary": "Reserve memory for working buffers and let operations reuse a buffer once its last reader finishes."
   },
   "memory.sequence_kv": {
     "site": "state/append",
-    "boundary": "Own the mapping from logical position to live KV bytes, including migration and reclamation. Moving a page must update the same map that readers use."
+    "boundary": "Own the mapping from logical position to live KV bytes, including migration and reclamation. Moving a page must update the same map that readers use.",
+    "summary": "Map each token position to the memory holding its attention keys and values so later tokens can read them."
   },
   "merge.expert_contributions": {
     "site": "model/dispatch",
-    "boundary": "Own both ends of token permutation. Packing and weighted reconstruction must agree on token identity, order and aligned mixture weights."
+    "boundary": "Own both ends of token permutation. Packing and weighted reconstruction must agree on token identity, order and aligned mixture weights.",
+    "summary": "Group token rows by expert, then return each result to its original token and add it with the correct weight."
   },
   "model.decoder_architecture": {
     "site": "model/norm",
-    "boundary": "Own block order, residual state and site-specific normalization. A passing kernel can still be inserted at the wrong residual boundary."
+    "boundary": "Own block order, residual state and site-specific normalization. A passing kernel can still be inserted at the wrong residual boundary.",
+    "summary": "Connect attention, feed-forward layers, normalization and residual additions in the order the checkpoint specifies."
   },
   "model.embedding_service": {
     "site": "model/embed",
-    "boundary": "Map vocabulary IDs to the exact checkpoint rows and embedding representation consumed by the first layer. Verify with known IDs before testing the stack."
+    "boundary": "Map vocabulary IDs to the exact checkpoint rows and embedding representation consumed by the first layer. Verify with known IDs before testing the stack.",
+    "summary": "Look up each token ID in the model’s embedding table to get the vector that enters the first layer."
   },
   "model.expert_routing": {
     "site": "model/route",
-    "boundary": "Produce authoritative expert IDs and corresponding unbiased mixture weights. This decision can be checked before loading or executing an expert."
+    "boundary": "Produce authoritative expert IDs and corresponding unbiased mixture weights. This decision can be checked before loading or executing an expert.",
+    "summary": "Choose which experts run for each token and give each selected expert a weight for combining its answer."
   },
   "model.logit_head": {
     "site": "model/head",
-    "boundary": "Turn the final hidden row into vocabulary logits under the checkpoint’s projection and output transform. This is a small independently testable boundary between model math and sampling."
+    "boundary": "Turn the final hidden row into vocabulary logits under the checkpoint’s projection and output transform. This is a small independently testable boundary between model math and sampling.",
+    "summary": "Turn the final hidden vector into one score for each possible next token."
   },
   "observability.runtime_events": {
     "site": "backend/signal",
-    "boundary": "Own optional source annotations, correlation IDs and their measured overhead. Kernel owners expose hooks; the lab interprets the resulting trace."
+    "boundary": "Own optional source annotations, correlation IDs and their measured overhead. Kernel owners expose hooks; the lab interprets the resulting trace.",
+    "summary": "Add timing and tracing hooks so a profiler can tell which request, layer or expert was running or waiting."
   },
   "placement.partition_model": {
     "site": "startup/place",
-    "boundary": "Produce a feasible placement plan for the target and the deployed pack. The runtime cache then enforces that plan under real demand."
+    "boundary": "Produce a feasible placement plan for the target and the deployed pack. The runtime cache then enforces that plan under real demand.",
+    "summary": "Decide which weights stay in memory and which must be read from storage, leaving room for the running requests."
   },
   "routing.forecast_expert_demand": {
     "site": "model/predict",
-    "boundary": "A predictor emits optional time-bounded hints. Held-out demand can score its lead time and wasted bytes independently of routing correctness."
+    "boundary": "A predictor emits optional time-bounded hints. Held-out demand can score its lead time and wasted bytes independently of routing correctness.",
+    "summary": "Predict which experts to fetch early so their weights can be ready when the router makes its actual selection."
   },
   "sampling.select_tokens": {
     "site": "generate/sample",
-    "boundary": "Convert logits into a selected token under an explicit sampling policy, seed and constraints. Replay with frozen logits."
+    "boundary": "Convert logits into a selected token under an explicit sampling policy, seed and constraints. Replay with frozen logits.",
+    "summary": "Choose the next token from the vocabulary scores using the request’s rules and sampling settings."
   },
   "scheduler.request_lifecycle": {
     "site": "schedule/admit",
-    "boundary": "Own admission, fairness and slot retirement under capacity constraints. The batch layout worker consumes the accepted assignments."
+    "boundary": "Own admission, fairness and slot retirement under capacity constraints. The batch layout worker consumes the accepted assignments.",
+    "summary": "Choose which requests run next, reserve their resources and release their slots when they finish or are cancelled."
   },
   "serving.request_gateway": {
     "site": "interface/accept",
-    "boundary": "Own the interface a client, launcher or profiler uses from outside the engine image. The builder packages it, runtime observability produces the events, and the lab exercises the published interface."
+    "boundary": "Own the interface a client, launcher or profiler uses from outside the engine image. The builder packages it, runtime observability produces the events, and the lab exercises the published interface.",
+    "summary": "Define how clients send requests and receive results, how the launcher mounts files and how operators access diagnostics."
   },
   "tokenizer.prepare_request": {
     "site": "interface/encode",
-    "boundary": "Own text-to-ID and committed-ID-to-text conventions, including incremental buffering. Both ends depend on the same vocabulary and special-token rules."
+    "boundary": "Own text-to-ID and committed-ID-to-text conventions, including incremental buffering. Both ends depend on the same vocabulary and special-token rules.",
+    "summary": "Turn a formatted text prompt into the model’s token IDs and turn committed output IDs back into text."
   },
   "weights.decode_blocks": {
     "site": "backend/quant",
-    "boundary": "Own the runtime interpretation of bytes, block metadata and scales. A format-specific fixture can fail even when the manifest and exporter pass."
+    "boundary": "Own the runtime interpretation of bytes, block metadata and scales. A format-specific fixture can fail even when the manifest and exporter pass.",
+    "summary": "Decode packed weights into numbers or rearrange their blocks into the layout a kernel needs."
   },
   "weights.load_checkpoint": {
     "site": "startup/manifest",
-    "boundary": "Admit a complete tensor inventory and bind names and offsets to the model. Reject incompatible packs before any kernel consumes them."
+    "boundary": "Admit a complete tensor inventory and bind names and offsets to the model. Reject incompatible packs before any kernel consumes them.",
+    "summary": "Find each weight tensor in the checkpoint files and verify its shape, format and byte range before the engine uses it."
   },
   "weights.prepare_artifact": {
     "site": "startup/layout",
-    "boundary": "Produce a reproducible deployable pack and record how it was made. A new conversion can be evaluated independently with the same runtime decoder."
+    "boundary": "Produce a reproducible deployable pack and record how it was made. A new conversion can be evaluated independently with the same runtime decoder.",
+    "summary": "Convert the model’s weights into files the engine can read, using the layout and precision chosen for the build."
   },
   "model.expert_ffn": {
     "site": "model/expert",
-    "boundary": "Consume ready expert weights and assigned rows and return per-expert activations. A fixed expert fixture isolates projection errors from routing or cache policy."
+    "boundary": "Consume ready expert weights and assigned rows and return per-expert activations. A fixed expert fixture isolates projection errors from routing or cache policy.",
+    "summary": "Run each selected expert’s feed-forward calculation on the token rows assigned to it."
   },
   "compiler.engine_contract": {
     "site": "f_spec/freeze",
-    "boundary": "Turn the reviewed intent brief and system ontology into a versioned contract with model obligations, budgets and measurable acceptance gates."
+    "boundary": "Turn the reviewed intent brief and system ontology into a versioned contract with model obligations, budgets and measurable acceptance gates.",
+    "summary": "Turn the reviewed request and system ontology into engine requirements, resource limits and measurable acceptance criteria."
   },
   "factory.workflow_planning": {
     "site": "f_plan/workorder",
-    "boundary": "Bind each deliverable to a work order, dependencies and an acceptance decision. Several agents may share the same CC."
+    "boundary": "Bind each deliverable to a work order, dependencies and an acceptance decision. Several agents may share the same CC.",
+    "summary": "Inspect what already works and use the available evidence to choose the next job and assign its CCs to an agent."
   },
   "factory.source_integration": {
     "site": "f_build/apply",
-    "boundary": "Produce a reviewable diff from the work order, including any optional annotation changes, before the independent build."
+    "boundary": "Produce a reviewable diff from the work order, including any optional annotation changes, before the independent build.",
+    "summary": "Make the assigned change in the source tree and give the builder a tested, reviewable patch."
   },
   "factory.builder": {
     "site": "f_build/build",
-    "boundary": "Turn the revision and diff into an identified executable image. Its manifest makes it possible to reproduce the candidate that was measured."
+    "boundary": "Turn the revision and diff into an identified executable image. Its manifest makes it possible to reproduce the candidate that was measured.",
+    "summary": "Build a runnable image from the identified source revision and record the dependencies needed to reproduce it."
   },
   "factory.controlled_experiment": {
     "site": "f_lab/pair",
-    "boundary": "Own controls, measurement and verdict together. Quantization quality, latency and storage measurements must refer to the same candidate and trial."
+    "boundary": "Own controls, measurement and verdict together. Quantization quality, latency and storage measurements must refer to the same candidate and trial.",
+    "summary": "Run the identified engine image on a fixed workload and use the measurements to decide which contract requirements it meets."
   },
   "parallel.expert_exchange": {
     "site": "model/dispatch",
-    "boundary": "Extension for distributed expert dispatch and the return mapping of remote outputs."
+    "boundary": "Extension for distributed expert dispatch and the return mapping of remote outputs.",
+    "summary": "Send token rows to the devices holding their selected experts and return the results to the devices that own the tokens."
   },
   "parallel.model_execution": {
     "site": "generate/handoff",
-    "boundary": "Extension for rank-local work, collectives and transfer of prefill state between workers."
+    "boundary": "Extension for rank-local work, collectives and transfer of prefill state between workers.",
+    "summary": "Split model computation across devices and pass intermediate results between them."
   },
   "sequence.recurrent_execution": {
     "site": "model/recur",
-    "boundary": "Extension for models whose next step consumes a recurrent state rather than only the attention cache."
+    "boundary": "Extension for models whose next step consumes a recurrent state rather than only the attention cache.",
+    "summary": "Update each sequence’s recurrent state after a token and carry that state into the next step."
   },
   "decode.speculative_execution": {
     "site": "generate/draft",
-    "boundary": "Extension for a proposer, target verification and rollback of rejected state."
+    "boundary": "Extension for a proposer, target verification and rollback of rejected state.",
+    "summary": "Propose several tokens at once, check them with the target model and undo state changes for rejected tokens."
   },
   "attention.sparse_execution": {
     "site": "model/shortlist",
-    "boundary": "Extension for selecting candidate blocks before attention over a subset of KV."
+    "boundary": "Extension for selecting candidate blocks before attention over a subset of KV.",
+    "summary": "Find the positions allowed by the model’s sparse attention rule and compute attention over those keys and values."
   },
   "weights.adapter_binding": {
     "site": "startup/bind",
-    "boundary": "Extension for composing adapter parameters with a base revision and isolating their effects."
+    "boundary": "Extension for composing adapter parameters with a base revision and isolating their effects.",
+    "summary": "Load the requested adapter and apply its changes to the matching model projections for that request."
   },
   "compiler.intent_brief": {
     "site": "f_spec/intake",
-    "boundary": "Capture the user’s goals, constraints, preferences and open decisions in a reviewed intent brief. Preserve their provenance for the Contract Compiler."
+    "boundary": "Capture the user’s goals, constraints, preferences and open decisions in a reviewed intent brief. Preserve their provenance for the Contract Compiler.",
+    "summary": "Record what the user wants to build, which constraints are fixed and which questions still need answers."
   }
 }

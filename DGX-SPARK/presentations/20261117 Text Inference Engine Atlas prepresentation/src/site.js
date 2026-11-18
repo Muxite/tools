@@ -47,12 +47,15 @@ const kindTerms={component:'Reusable code an agent can integrate into the engine
 function kindLabel(k){return '<span class="cap-kind cap-'+k+'">'+esc(k)+'</span>'}
 function kindStrip(r){return [...new Set(r.contents.map(c=>c.kind))].map(kindLabel).join(' ')}
 function capabilityKey(){return details('Capability types',Object.entries(kindTerms).map(([k,v])=>'<p>'+kindLabel(k)+' '+esc(v)+'</p>').join(''))}
+function ccDescriptions(ids){
+ return '<dl class="cc-descriptions">'+ids.map(id=>'<dt>'+pill(id,'#cc/'+id)+'</dt><dd>'+esc(roleIndex.get(id).review.summary)+'</dd>').join('')+'</dl>';
+}
 function ccPanel(r,overlay){
  const ex=atlas.assets.filter(a=>r.ex.includes(a.name)), rows=atlas.sources.filter(s=>s.assigned===r.id);
  const target=museRows(r.id),museCode=target.filter(s=>!s.url.includes('/Muxite/tools/'));
  const picks=engines.map(e=>r.examples.find(s=>s.engine===e)).filter(Boolean);
  const examples=references([...museCode.slice(0,1),...picks.slice(0,2)].filter((s,i,rs)=>rs.findIndex(v=>v.url===s.url)===i));
- return '<div class="tagline">'+(r.kind==='factory'?'Software factory':r.target===false?'Reference extension':'Muse engine construction')+' CC</div><h2>'+esc(r.title)+'</h2><code>'+esc(r.id)+'</code> '+essentialTag(r.essential)+
+ return '<div class="tagline">'+(r.kind==='factory'?'Software factory':r.target===false?'Reference extension':'Muse engine construction')+' CC</div><h2>'+esc(r.title)+'</h2><p class="cc-summary">'+esc(r.review.summary)+'</p><code>'+esc(r.id)+'</code> '+essentialTag(r.essential)+
  sec('What it owns',list(r.review.boundary))+ (r.id==='model.expert_routing'?routingCase():r.id==='model.decoder_architecture'?normalizationGuide():'')+
  sec('Interface to preserve','<b>Consumes</b>'+list(r.inputs)+'<b>Produces</b>'+list(r.outputs))+sec('Check the result',list(r.check))+sec('Proposed agent handoff',handoffPanel(r.handoff))+(r.tierHandoff?details('When moving KV pages between tiers',handoffPanel(r.tierHandoff)):'')+(r.id==='observability.runtime_events'?nvtxGuide():'')+(['weights.prepare_artifact','weights.decode_blocks','factory.controlled_experiment'].includes(r.id)?pill('Quantization experiments','#quantization'):'')+
  (examples?sec('Implementation evidence',examples+'<div class="pills">'+engines.filter(e=>r.examples.some(s=>s.engine===e)).map(e=>pill(e+' examples',address('sources',r.id,{engine:e}))).join(' ')+'</div>'):'')+details('Design notes',references(target.filter(s=>s.url.includes('/Muxite/tools/'))))+details('Agent capabilities · '+r.contents.length,'<p>Choose the capabilities required by the work order. These are proposed contents.</p>'+r.contents.map(c=>'<article class="cap-row">'+kindLabel(c.kind)+' <b>'+esc(c.name)+'</b><p>'+esc(c.detail)+'</p></article>').join('')+capabilityKey())+
@@ -92,8 +95,8 @@ function library(query){
  const input=root.querySelector('#search'),scope=root.querySelector('#scope');input.value=q;scope.value=query.get('scope')||'All CCs';const type=root.querySelector('#captype');type.value=query.get('type')||'';
  function update(){
  const terms=input.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
- const jobs=atlas.roles.filter(r=>{const hay=[r.id,r.title,r.why,r.capabilities,...r.contents.map(c=>[c.name,c.detail,c.kind].join(" ")),...Object.keys(atlas.aliases).filter(k=>atlas.aliases[k]===r.id),...atlas.sources.filter(s=>s.assigned===r.id).map(s=>s.symbol)].join(' ').toLowerCase();return (!type.value||r.contents.some(c=>c.kind===type.value))&&terms.every(x=>hay.includes(x))&&(scope.value==='All CCs'||(scope.value==='Reference extensions'?r.target===false:r.target!==false&&(scope.value==='Software factory')===(r.kind==='factory')))});
- root.querySelector('#results').innerHTML='<p class="caption">'+jobs.length+' CCs</p><div class="cards">'+jobs.map(r=>'<a class="listing" href="#cc/'+esc(r.id)+'"><strong>'+esc(r.title)+'</strong> '+essentialTag(r.essential)+'<br><code>'+esc(r.id)+'</code><div class="caption">'+(r.target===false?'Reference extension':r.kind==='factory'?'Software factory':'Engine')+'</div><p>'+esc(r.why)+'</p><div>'+kindStrip(r)+'</div></a>').join('')+'</div>';
+ const jobs=atlas.roles.filter(r=>{const hay=[r.id,r.title,r.review.summary,r.why,r.capabilities,...r.contents.map(c=>[c.name,c.detail,c.kind].join(" ")),...Object.keys(atlas.aliases).filter(k=>atlas.aliases[k]===r.id),...atlas.sources.filter(s=>s.assigned===r.id).map(s=>s.symbol)].join(' ').toLowerCase();return (!type.value||r.contents.some(c=>c.kind===type.value))&&terms.every(x=>hay.includes(x))&&(scope.value==='All CCs'||(scope.value==='Reference extensions'?r.target===false:r.target!==false&&(scope.value==='Software factory')===(r.kind==='factory')))});
+ root.querySelector('#results').innerHTML='<p class="caption">'+jobs.length+' CCs</p><div class="cards">'+jobs.map(r=>'<a class="listing" href="#cc/'+esc(r.id)+'"><strong>'+esc(r.title)+'</strong><p class="cc-summary">'+esc(r.review.summary)+'</p>'+essentialTag(r.essential)+'<code>'+esc(r.id)+'</code><div class="caption">'+(r.target===false?'Reference extension':r.kind==='factory'?'Software factory':'Engine')+'</div><p>'+esc(r.why)+'</p><div>'+kindStrip(r)+'</div></a>').join('')+'</div>';
  history.replaceState(history.state,'',address('library','',{q:input.value,type:type.value,scope:scope.value==='All CCs'?'':scope.value}));
  }
  input.oninput=update;scope.onchange=update;type.onchange=update;update();

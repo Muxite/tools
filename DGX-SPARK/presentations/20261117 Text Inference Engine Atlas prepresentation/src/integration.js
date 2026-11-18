@@ -62,7 +62,7 @@ function presentationCoverage(){
  ];
  return '<section class="sheet" id="coverage"><h2>Design coverage</h2><p>Each of the '+atlas.roles.length+' CCs has a primary worksite, an engineering responsibility, capabilities and an evidence handoff. Open a group to inspect any assignment.</p><div class="coverage-list">'+sections.map(([title,include])=>{
   const rows=atlas.roles.filter(include);
-  return details(title+' · '+rows.length+' CCs','<div class="pills">'+rows.map(r=>pill(r.id,'#cc/'+r.id)).join(' ')+'</div>');
+  return details(title+' · '+rows.length+' CCs',ccDescriptions(rows.map(r=>r.id)));
  }).join('')+'</div><p>'+pill('All CCs','#library')+' '+pill('Check source evidence','#sources')+'</p></section>';
 }
 function presenterBrief(){
