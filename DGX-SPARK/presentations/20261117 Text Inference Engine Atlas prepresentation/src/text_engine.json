@@ -33,12 +33,19 @@
           "weights.read_gguf",
           "weights.validate_shapes",
           "weights.select_loader"
-        ]
+        ],
+        "example": {
+          "title": "How does a name turn into bytes?",
+          "body": [
+            "Suppose the packed values for layer 12, expert 17 start 64 MiB into shard 03. Their 4 MiB span ends at 68 MiB. A separate 0.5 MiB scale span ends at 68.5 MiB. Validate both spans against the shard length before returning a handle. A valid tensor name alone tells the reader nothing about a truncated scale array."
+          ],
+          "next": "startup/layout"
+        }
       },
       {
         "id": "layout",
         "group": "Model assets",
-        "title": "Prepare weight layouts",
+        "title": "Match stored weights to a kernel layout",
         "detail": "Select a checkpoint representation the execution backend accepts. When repacking or converting, bind block metadata, scales, axes and padded dimensions to the layout used by the consuming kernel. Prepared packs may be supplied offline.",
         "check": "Round-trip representative full blocks, tails and signed extremes against the declared source representation.",
         "metric": "Pack build time and size; first-use repack time if done at startup.",
@@ -50,7 +57,38 @@
           "weights.repack_for_kernel",
           "weights.convert_checkpoint",
           "weights.configure_quantization"
-        ]
+        ],
+        "example": {
+          "title": "What does an accepted weight layout look like?",
+          "body": [
+            "Take layer 12, expert 17’s gate projection. The loader needs enough information to locate the bytes; the kernel needs enough to interpret them.",
+            "Each row has 2,048 bytes of values and 128 two-byte scales, or 2,304 bytes. Across 2,048 rows that is 4.5 MiB before padding. Expanding every value to FP16 takes 16 MiB.",
+            "A compatible kernel reads this pack directly. A tiled kernel may need the same bits rearranged once at pack preparation. A fallback may decode to FP16; if it materializes the full projection, placement must budget the extra live buffer."
+          ],
+          "rows": [
+            [
+              "Tensor",
+              "layer.12.expert.17.gate_proj · 2,048 output rows × 4,096 input columns"
+            ],
+            [
+              "Values",
+              "Signed two’s-complement INT4, two values per byte, first column in the low nibble"
+            ],
+            [
+              "Scales",
+              "One little-endian FP16 scale per group of 32 consecutive columns within each row. Weight = integer × scale."
+            ],
+            [
+              "Layout",
+              "Row-major packed values, followed by a row-major scale array. No row padding in this example."
+            ],
+            [
+              "Location",
+              "Shard name, byte offset and byte length for each array."
+            ]
+          ],
+          "next": "backend/dispatch"
+        }
       },
       {
         "id": "bind",
@@ -84,7 +122,14 @@
         "bindings": [
           "placement.partition_layers",
           "placement.map_weights"
-        ]
+        ],
+        "example": {
+          "title": "How much of an expert can stay resident?",
+          "body": [
+            "Suppose 54 MiB remain for expert payloads after KV, staging, scratch and system headroom. Three 4.5 MiB projections per equal-size expert would cost 13.5 MiB, so four fit. Alignment, format metadata or a bigger down projection can reduce that count. Use actual tensor spans before admitting an expert."
+          ],
+          "next": "state/residency"
+        }
       },
       {
         "id": "reserve",
@@ -264,7 +309,14 @@
         "metric": "Required paths resolved; readiness and startup outcome.",
         "cc": [
           "serving.request_gateway"
-        ]
+        ],
+        "example": {
+          "title": "Which paths does the image see?",
+          "body": [
+            "A launcher might bind /srv/muse/pack read-only at /models/current and a writable host results directory at /runs/out. Startup opens /models/current/manifest.json. The lab retrieves traces through /runs/out. Probe both paths from inside the image and check the produced file from the host."
+          ],
+          "next": "interface/diagnostics"
+        }
       },
       {
         "id": "diagnostics",
@@ -405,7 +457,14 @@
         ],
         "bindings": [
           "batch.assemble"
-        ]
+        ],
+        "example": {
+          "title": "What is in a mixed execution batch?",
+          "body": [
+            "If the scheduler supports mixed prefill and decode, request A might supply prompt positions 6, 7 and 8 while B supplies decode position 41. Four physical rows carry sequence IDs [A,A,A,B] and logical positions [6,7,8,41]. Keep these fields attached when kernels reorder rows or write KV."
+          ],
+          "next": "state/append"
+        }
       },
       {
         "id": "advance",
@@ -842,7 +901,14 @@
         "bindings": [
           "routing.top_k",
           "routing.hash_lookup"
-        ]
+        ],
+        "example": {
+          "title": "Which score selects the expert, and which weights its output?",
+          "body": [
+            "Suppose unbiased scores for E0, E1 and E2 are 0.50, 0.30 and 0.20. With routed width 2, a +0.15 ranking bias on E2 selects E0 and E2. Under a contract that normalizes the original selected scores to sum to one, their mixture weights are 5/7 and 2/7. Carry those weights alongside their IDs through dispatch."
+          ],
+          "next": "model/dispatch"
+        }
       },
       {
         "id": "predict",
@@ -890,7 +956,14 @@
         "bindings": [
           "experts.pack_tokens",
           "parallel.dispatch_experts"
-        ]
+        ],
+        "example": {
+          "title": "How are token rows grouped without losing their owners?",
+          "body": [
+            "Token A selects E2 and E5; token B selects E5 and E7. The grouped E5 batch contains two rows. Store the reverse map [(A, choice 1), (B, choice 0)] using zero-based choices. It tells the merge where to send each E5 result and which mixture weight belongs to it."
+          ],
+          "next": "model/combine"
+        }
       },
       {
         "id": "expert",
@@ -937,7 +1010,14 @@
         "bindings": [
           "merge.expert_outputs",
           "parallel.combine_experts"
-        ]
+        ],
+        "example": {
+          "title": "What comes back from grouped execution?",
+          "body": [
+            "For one hidden coordinate, token A gives E2 weight 0.25 and E5 weight 0.75. If their outputs are 4 and 8, A receives 7. The other row in E5’s batch belongs to B. A useful test swaps the packed expert order and checks that each reconstructed token still gets the same result."
+          ],
+          "next": "model/dispatch"
+        }
       },
       {
         "id": "layerout",
@@ -1154,7 +1234,14 @@
           "cuda.admit_router_kernel",
           "attention.select_backend",
           "cuda.dispatch_operator"
-        ]
+        ],
+        "example": {
+          "title": "Why can a valid pack miss the fast kernel?",
+          "body": [
+            "Consider a kernel that accepts tiled INT4 weights, 32-column scale groups and aligned tile starts. The 4.5 MiB row-major projection has the right numerical values but the wrong physical order. Select a compatible kernel, use a validated prepacked tile layout, or dispatch a decode fallback. Record which path actually ran for prompt rows and one-token decode."
+          ],
+          "next": "backend/quant"
+        }
       },
       {
         "id": "quant",
@@ -1171,7 +1258,14 @@
         "bindings": [
           "weights.unpack_blocks",
           "weights.repack_for_kernel"
-        ]
+        ],
+        "example": {
+          "title": "What does one packed byte decode to?",
+          "body": [
+            "With the INT4 convention in the layout example, byte 0x2D stores −3 in its low nibble and +2 in its high nibble. If the group scale is 0.25, the first two weights are −0.75 and +0.50. Reversing nibble order yields plausible numbers in the wrong columns. Test signed extremes and the first element of the next scale group as well."
+          ],
+          "next": "startup/layout"
+        }
       },
       {
         "id": "gemm",
@@ -1240,7 +1334,14 @@
         "bindings": [
           "transfer.copy_tensor",
           "parallel.peer_transport"
-        ]
+        ],
+        "example": {
+          "title": "Which completion is the consumer waiting for?",
+          "body": [
+            "A copy stream fills slot 3 and records a ready event. The compute stream waits on that event before launching the expert kernel. After that kernel, record a separate last-reader event. The first event permits reading the slot; the second permits overwriting it."
+          ],
+          "next": "state/release"
+        }
       },
       {
         "id": "capture",
@@ -1396,7 +1497,14 @@
         ],
         "bindings": [
           "placement.map_expert_replicas"
-        ]
+        ],
+        "example": {
+          "title": "Does a free slot guarantee the next route fits?",
+          "body": [
+            "Four payload slots hold experts 2, 5, 7 and 11. A token needs experts 5 and 17. Expert 5 is a hit. The streamer can claim a slot for 17 only after its previous reader releases it. If all three other slots are busy, wait or schedule a smaller work unit. Keep the original route intact."
+          ],
+          "next": "state/fill"
+        }
       },
       {
         "id": "fill",
@@ -1410,7 +1518,14 @@
         ],
         "bindings": [
           "engine.expert_streaming"
-        ]
+        ],
+        "example": {
+          "title": "When is an expert safe to consume?",
+          "body": [
+            "Slot 3 previously held expert 7. Reassigning it to expert 17 starts a new slot generation. A queued SSD read is still pending. Publish the new handle after all required spans are ready, then keep its generation pinned until the final consuming kernel finishes. A late completion for expert 7 must never satisfy the wait for 17."
+          ],
+          "next": "backend/streams"
+        }
       },
       {
         "id": "allocate",
@@ -1439,7 +1554,14 @@
         "bindings": [
           "memory.windowed_kv",
           "memory.encode_kv"
-        ]
+        ],
+        "example": {
+          "title": "Is token position the same as a memory address?",
+          "body": [
+            "With 16 positions per KV page, logical position 41 falls in logical page 2 at offset 9. If B’s page table maps page 2 to physical page 7, append its K and V at page 7, offset 9. Another sequence at position 41 uses its own page table."
+          ],
+          "next": "schedule/batch"
+        }
       },
       {
         "id": "reuse",

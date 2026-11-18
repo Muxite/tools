@@ -69,11 +69,18 @@ function assignmentExample(){
  ];
  return sec('Example work orders', '<p>Each agent receives the CCs needed for its assigned output. Two agents share the streaming CC so both implement the same slot-lifetime contract.</p>'+rows.map(([name,task,ids])=>'<article class="cap-row"><b>'+esc(name)+'</b><p>'+esc(task)+'</p>'+ids.map(id=>pill(roleIndex.get(id).title,'#cc/'+id)).join(' ')+'</article>').join(''));
 }
+function workedExample(example,overlay){
+ if(!example)return '';
+ const table=example.rows?'<dl class="receipt">'+example.rows.map(([field,value])=>'<dt>'+esc(field)+'</dt><dd>'+esc(value)+'</dd>').join('')+'</dl>':'';
+ const [l,o]=example.next.split('/');
+ const dest=layerIndex.get(l).ops.find(op=>op.id===o);
+ return '<section class="worked-example"><div class="tagline">Illustrative example</div><h3>'+esc(example.title)+'</h3>'+list(example.body[0])+table+example.body.slice(1).map(list).join('')+pill(dest.title,at(l,o,{overlay}))+'</section>';
+}
 function opPanel(layer,op,overlay){
  const relevant=atlas.sources.filter(s=>op.cc.includes(s.assigned));
  const exact=relevant.filter(s=>(op.bindings||[]).includes(s.previous)||(op.bindings||[]).includes(s.id));
  const linked=layer.edges.filter(([a,b])=>a===op.id||b===op.id);
- return '<div class="tagline">'+esc(layer.title)+'</div><h2>'+esc(op.title)+'</h2>'+essentialTag(op.essential)+list(op.detail)+(layer.id==='f_plan'&&['assign','workorder'].includes(op.id)?assignmentExample():'')+sec('Optimize',list(op.metric))+sec('Check',list(op.check))+
+ return '<div class="tagline">'+esc(layer.title)+'</div><h2>'+esc(op.title)+'</h2>'+essentialTag(op.essential)+list(op.detail)+workedExample(op.example,overlay)+(layer.id==='f_plan'&&['assign','workorder'].includes(op.id)?assignmentExample():'')+sec('Optimize',list(op.metric))+sec('Check',list(op.check))+
  (op.condition?sec('Applies when',list(op.condition)):'')+sec('CCs for this operation',op.cc.map(k=>pill(roleIndex.get(k).title,at(layer.id,op.id,{cc:k,overlay}))).join(' '))+
  sec('Data flow',linked.map(([a,b,l])=>{const other=a===op.id?b:a;return '<p>'+esc(a===op.id?'Sends ':'Receives ')+esc(l)+(a===op.id?' to ':' from ')+pill(layer.ops.find(n=>n.id===other).title,at(layer.id,other,{overlay}))+'</p>'}).join(''))+
  sec('Implementation examples',exact.slice(0,2).map(sourceRow).join(''))+

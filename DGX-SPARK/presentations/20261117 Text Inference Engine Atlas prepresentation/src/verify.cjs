@@ -334,6 +334,14 @@ async function main() {
       assert(step.cc.every(k=>roles.has(k)));
       assert.equal(await page.locator('#integration-detail a[href*="github.com/Stellven/"]').count(),step.refs.length);
     }
+    for(const layer of data.engine)for(const op of layer.ops.filter(x=>x.example)){
+      await jump('#engine/'+layer.id+'?op='+op.id);
+      const panel=page.locator('.worked-example');
+      await panel.getByRole('heading',{name:op.example.title,exact:true}).waitFor();
+      const [l,o]=op.example.next.split('/');
+      assert(data.engine.find(x=>x.id===l).ops.some(x=>x.id===o));
+      assert((await panel.locator('a').getAttribute('href')).startsWith('#engine/'+l+'?'));
+    }
     const jobId=await verifyConstruction(page,data.roles,jump);
     await page.setViewportSize({ width:390, height:844 });
     for (const h of ['#engine','#engine/model?op=' + route.id,'#factory','#library','#sources','#quantization','#sources/weights.decode_blocks?engine=Strata','#integration','#construction/trials','#construction/designs','#construction','#construction/'+jobId]) {
