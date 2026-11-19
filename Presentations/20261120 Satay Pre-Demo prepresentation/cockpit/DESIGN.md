@@ -1,0 +1,9 @@
+# Cockpit design
+
+The run ledger is `run/<id>/events.jsonl`. Writers use `bin/ev`, which serializes sequence assignment and append with flock. Events have monotonic and UTC timestamps. A file reference is workspace-relative and carries its SHA-256 at emission. Commands write distinct attempt logs and should seal receipts before emitting events. A separate state lock guards workflow scheduling and view selections. Each scheduled step has an explicit expectation and timeout.
+
+The panes are views over the ledger and the files it references. They redraw when their input files, selection or terminal dimensions change. The experiment pane takes one command request from the director over a per-run local socket. Its stdout and stderr go to an attempt log. The view shows the available log as it grows during ordinary steps. A fixture run executes its Git operations and shell commands live and displays the received results with their fixture stage.
+
+For a timed command, the experiment pane turns on `QUIET` before launching the workload. The activity lock lets an in-flight redraw finish at the transition. Each observer checks only the quiet flag every two seconds while it is on. The director waits on the command response and leaves pane controls alone. Completion turns quiet off before the director emits the result event. The recorder's tmux client and pipe readers block for output while the views are frozen.
+
+The asciicast records a real attached tmux client in a private PTY. Per-pane pipes retain timestamped terminal output. A bundle contains the event and wording ledgers, state, recorded outputs, immutable references, command arguments and Git provenance. The verifier checks the inventory and hashes, including every result receipt. Wording entries are an append-only record of edits to claims and captions. The comparison contract holds the baseline definition and the claim-to-receipt mapping.

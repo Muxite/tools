@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+die() { printf '%s\n' "$*" >&2; exit 1; }
+
+run_id=${COCKPIT_RUN:-}
+if [[ -z $run_id ]]; then
+    read -r run_id < run/active || die "No cockpit run"
+fi
+[[ $run_id =~ ^[A-Za-z0-9_-]+$ && -d run/$run_id ]] || die "Invalid run ID"
+dir=run/$run_id
+mode=
+if [[ ${1:-} == quiet && ${2:-} =~ ^(on|off)$ && $# == 2 ]]; then
+    mode=$2
+    set -- quiet ok --data "{\"mode\":\"$mode\"}"
+fi
+[[ $# -ge 2 ]] || die "Usage: ev KIND STATUS [--step ID] [--cc NAME] [--stage STAGE] [--ref PATH] [--data JSON]"
+kind=$1 status=$2
+shift 2
+step=${COCKPIT_STEP:-} cc= stage=${COCKPIT_STAGE:-} ref= data='{}'
+while (( $# )); do
+    [[ $# -ge 2 ]] || die "Missing value for $1"
+    case $1 in
+        --step) step=$2 ;;
+        --cc) cc=$2 ;;
+        --stage) stage=$2 ;;
+        --ref) ref=$2 ;;
+        --data) data=$2 ;;
+        *) die "Unknown option $1" ;;
+    esac
+    shift 2
+done
+[[ $kind =~ ^(plan|task|cc_apply|verify|build|activate|run|result|decision|note|quiet)$ ]] || die "Invalid kind"
+[[ $status =~ ^(start|ok|fail|skip)$ ]] || die "Invalid status"
+[[ -z $step || $step =~ ^s[0-9]+$ ]] || die "Invalid step"
+[[ -z $stage || $stage =~ ^(fixture|native|compile|runtime|hardware)$ ]] || die "Invalid stage"
+[[ ${COCKPIT_STAGE:-} != fixture || $stage == fixture ]] || die "Fixture events require stage fixture"
+jq -e 'type == "object"' <<< "$data" >/dev/null || die "Data must be a JSON object"
+
+digest=
+if [[ -n $ref ]]; then
+    if [[ $ref == demo/fixtures/* || $ref == ./demo/fixtures/* ]]; then
+        [[ -z $stage || $stage == fixture ]] || die "Fixture receipts require stage fixture"
+        stage=fixture
+    fi
+    digest=$(python3 - "$ref" "$kind" "$stage" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+name, kind, stage = sys.argv[1:]
+ref = Path(name)
+if ref.is_absolute() or ".." in ref.parts or not ref.resolve().is_relative_to(Path.cwd()):
+    sys.exit("Event ref must be inside the cockpit")
+if any(character in name for character in "\n\r\\"):
+    sys.exit("Invalid character in event ref")
+if ref.is_file():
+    if kind == "result" and ref.suffix == ".json":
+        try:
+            receipt = json.loads(ref.read_bytes())
+        except (ValueError, UnicodeError):
+            receipt = None
+        if isinstance(receipt, dict) and receipt.get("stage") == "fixture" and stage != "fixture":
+            sys.exit("Fixture receipts require stage fixture")
+    digest = hashlib.sha256()
+    with ref.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    print(digest.hexdigest())
+PY
+)
+fi
+if [[ -n $mode ]]; then
+    exec 8>>"$dir/activity.lock"
+    flock -x 8
+fi
+exec 9>>"$dir/events.lock"
+flock -x 9
+last=0
+if [[ -s $dir/events.jsonl ]]; then
+    last=$(tail -n 1 "$dir/events.jsonl" | jq -er '.seq')
+fi
+if [[ -z $step && -s $dir/state.json ]]; then
+    step=$(jq -r '.current_step // empty' "$dir/state.json")
+fi
+step=${step:-s00}
+if [[ $kind == quiet && -z $stage && -s $dir/state.json ]]; then
+    stage=$(jq -r --arg step "$step" '
+        ([.script[] | select(.id == $step) | .action.stage] | first)
+        // (if all(.script[]; .action.stage == "fixture") then "fixture" else empty end)
+    ' "$dir/state.json")
+fi
+[[ $kind != result || -n $digest ]] || die "Result events require an existing receipt file"
+read -r t_ns wall < <(python3 -c 'import time; from datetime import datetime, timezone; print(time.monotonic_ns(), datetime.now(timezone.utc).isoformat())')
+event=$(jq -cn --argjson seq "$((last + 1))" --arg wall "$wall" \
+    --arg step "$step" --arg kind "$kind" --arg cc "$cc" --arg stage "$stage" \
+    --arg status "$status" --arg ref "$ref" --arg hash "$digest" --argjson data "$data" '
+    def optional: if . == "" then null else . end;
+    {seq:$seq,wall:$wall,step:($step|optional),kind:$kind,cc:($cc|optional),
+     stage:($stage|optional),status:$status,ref:($ref|optional),sha256:($hash|optional),data:$data}')
+case $mode in
+    on) : > "$dir/QUIET" ;;
+    off) rm -f -- "$dir/QUIET" ;;
+esac
+event="{\"t_ns\":$t_ns,${event:1}"
+printf '%s\n' "$event" >> "$dir/events.jsonl"
+printf '%s\n' "$event"

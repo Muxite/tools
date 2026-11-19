@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+[[ $# == 1 ]] || { printf '%s\n' 'Usage: verify-bundle <dir>' >&2; exit 2; }
+exec python3 -B "$(dirname -- "${BASH_SOURCE[0]}")/../artifacts.py" "$1"

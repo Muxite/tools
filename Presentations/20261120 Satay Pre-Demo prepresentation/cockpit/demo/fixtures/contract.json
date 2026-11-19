@@ -1,0 +1,12 @@
+{
+  "task": "Compare the stock and candidate expert weight caches on one model and one machine",
+  "baseline": "A = stock runtime from the stock git revision, identical model, prompt, batch, and sampling settings",
+  "candidate": "B = stock runtime plus the Expert Weight Cache patch",
+  "acceptance": "Exact output match, at least 10% lower median TTFT, and memory no more than 512 MiB above stock",
+  "claim_receipts": {
+    "paired_comparison": "demo/fixtures/abba.json",
+    "stock_metrics": "demo/fixtures/arm-a.json",
+    "candidate_metrics": "demo/fixtures/arm-b.json"
+  },
+  "stage": "fixture"
+}

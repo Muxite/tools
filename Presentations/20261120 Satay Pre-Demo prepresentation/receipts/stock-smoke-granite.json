@@ -1,0 +1,57 @@
+{
+  "status": "failed",
+  "command": [
+    "/home/muk/predemo/build-stock-cuda87/bin/llama-cli",
+    "-m",
+    "/home/muk/models/campaign/gguf/granite-3.1-1b-a400m-instruct-Q8_0.gguf",
+    "-ngl",
+    "99",
+    "-p",
+    "In one paragraph, explain why the sky appears blue during the day.",
+    "--temp",
+    "0",
+    "-n",
+    "16",
+    "-c",
+    "512",
+    "-t",
+    "4",
+    "--single-turn",
+    "--simple-io",
+    "--show-timings",
+    "--log-verbosity",
+    "5",
+    "--output-file",
+    "/home/muk/predemo/logs/stock-smoke-granite-output.txt"
+  ],
+  "model": "/home/muk/models/campaign/gguf/granite-3.1-1b-a400m-instruct-Q8_0.gguf",
+  "prompt": "In one paragraph, explain why the sky appears blue during the day.",
+  "requested_gpu_layers": 99,
+  "requested_output_tokens": 16,
+  "temperature": 0,
+  "exit_status": 1,
+  "start_utc": "2026-11-19T21:31:34.714Z",
+  "end_utc": "2026-11-19T21:31:34.857Z",
+  "wall_seconds": 0.143,
+  "gpu_offload": [],
+  "output_text": null,
+  "output_token_ids": [],
+  "output_token_count": null,
+  "timings": {},
+  "errors": [
+    "NvRmMemInitNvmap failed with No such file or directory",
+    "****NvRmMemMgrInit failed**** error type: 196626",
+    "0.00.055.119 E ggml_cuda_init: failed to initialize CUDA: unknown error",
+    "failed to get a free port"
+  ],
+  "log": "/home/muk/predemo/logs/stock-smoke-granite.log",
+  "device_probe": {
+    "command": [
+      "/home/muk/predemo/build-stock-cuda87/bin/llama-bench",
+      "--list-devices"
+    ],
+    "exit_status": 0,
+    "stdout": "Available devices:\n  (none)\n",
+    "stderr": "NvRmMemInitNvmap failed with No such file or directory\n356: Memory Manager Not supported\n\n\n\n****NvRmMemMgrInit failed**** error type: 196626\n\n\nggml_cuda_init: failed to initialize CUDA: unknown error\n"
+  }
+}

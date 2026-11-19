@@ -1,0 +1,107 @@
+{
+  "status": "passed",
+  "hostname": "satay",
+  "architecture": "aarch64",
+  "source_path": "/home/muk/predemo/llama.cpp-fill",
+  "source_commit": "9048bad8d6e3a0f9f1726e238e451181c7e02613",
+  "applied_diff": {
+    "path": "/home/muk/predemo/receipts/fill-applied.diff",
+    "sha256": "a4b2fe1a0d5b3475c2c66e57031353e80cb4d111e0ebfdbadedcf8236d17fca1",
+    "verified_after_build": true
+  },
+  "configure_flags": [
+    "-S",
+    "/home/muk/predemo/llama.cpp-fill",
+    "-B",
+    "/home/muk/predemo/build-fill-cuda87",
+    "-G",
+    "Ninja",
+    "-DCMAKE_MAKE_PROGRAM=/home/muk/.local/bin/ninja",
+    "-DCMAKE_C_COMPILER=/usr/bin/gcc",
+    "-DCMAKE_CXX_COMPILER=/usr/bin/g++",
+    "-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc",
+    "-DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++",
+    "-DCMAKE_C_COMPILER_LAUNCHER=/usr/bin/ccache",
+    "-DCMAKE_CXX_COMPILER_LAUNCHER=/usr/bin/ccache",
+    "-DCMAKE_CUDA_COMPILER_LAUNCHER=/usr/bin/ccache",
+    "-DGGML_CUDA=ON",
+    "-DCMAKE_CUDA_ARCHITECTURES=87",
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DGGML_NATIVE=ON",
+    "-DGGML_CUDA_FA_ALL_QUANTS=OFF"
+  ],
+  "build_targets": [
+    "llama-server",
+    "llama-cli",
+    "llama-bench"
+  ],
+  "environment": {
+    "CCACHE_TEMPDIR": "/home/muk/predemo/build-fill-cuda87/tmp",
+    "CCACHE_DIR": "/home/muk/predemo/build-fill-cuda87/ccache",
+    "TMPDIR": "/home/muk/predemo/build-fill-cuda87/tmp"
+  },
+  "log": "/home/muk/predemo/logs/build-fill-cuda87.log",
+  "build": {
+    "job_counts": [
+      4
+    ],
+    "start_utc": "2026-11-19T21:34:23.498258+00:00",
+    "phase": "verification",
+    "exit_status": 0,
+    "compile_wall_seconds": 1876.075,
+    "end_utc": "2026-11-19T22:05:50.203810+00:00",
+    "wall_seconds": 1886.71
+  },
+  "binaries": {
+    "llama-server": {
+      "path": "/home/muk/predemo/build-fill-cuda87/bin/llama-server",
+      "resolved_path": "/home/muk/predemo/build-fill-cuda87/bin/llama-server",
+      "sha256": "f81d13bed1601d83127e6883f58c4c2599e2573b7c47d8c881c56ac7cc7bc1e9"
+    },
+    "libggml-cuda.so": {
+      "path": "/home/muk/predemo/build-fill-cuda87/bin/libggml-cuda.so",
+      "resolved_path": "/home/muk/predemo/build-fill-cuda87/bin/libggml-cuda.so.1.0.0",
+      "sha256": "63c5174716a4f7dda44d09fdddf459d446bb049c11c96e7fae69a41d2874d7f4"
+    },
+    "libggml-cpu.so": {
+      "path": "/home/muk/predemo/build-fill-cuda87/bin/libggml-cpu.so",
+      "resolved_path": "/home/muk/predemo/build-fill-cuda87/bin/libggml-cpu.so.1.0.0",
+      "sha256": "75d32275f1e6a66050a1c6e8188fa5da859756499b04d5b1f29f8b57604b1dc3"
+    }
+  },
+  "ldd": {
+    "llama-server": {
+      "exit_status": 0,
+      "stdout": "\tlinux-vdso.so.1 (0x0000ffffbc8f1000)\n\tlibllama-server-impl.so => /home/muk/predemo/build-fill-cuda87/bin/libllama-server-impl.so (0x0000ffffbc530000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffffbc2e0000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffffbc2b0000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffbc100000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffbc8b8000)\n\tlibllama-common.so.1 => /home/muk/predemo/build-fill-cuda87/bin/libllama-common.so.1 (0x0000ffffbbc30000)\n\tlibmtmd.so.1 => /home/muk/predemo/build-fill-cuda87/bin/libmtmd.so.1 (0x0000ffffbb9f0000)\n\tlibllama.so.1 => /home/muk/predemo/build-fill-cuda87/bin/libllama.so.1 (0x0000ffffbb5b0000)\n\tlibggml.so.1 => /home/muk/predemo/build-fill-cuda87/bin/libggml.so.1 (0x0000ffffbb590000)\n\tlibggml-base.so.1 => /home/muk/predemo/build-fill-cuda87/bin/libggml-base.so.1 (0x0000ffffbb4c0000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffbb420000)\n\tlibggml-cpu.so.1 => /home/muk/predemo/build-fill-cuda87/bin/libggml-cpu.so.1 (0x0000ffffbb290000)\n\tlibggml-cuda.so.1 => /home/muk/predemo/build-fill-cuda87/bin/libggml-cuda.so.1 (0x0000ffffac750000)\n\tlibgomp.so.1 => /lib/aarch64-linux-gnu/libgomp.so.1 (0x0000ffffac6f0000)\n\tlibcudart.so.12 => /usr/local/cuda/targets/aarch64-linux/lib/libcudart.so.12 (0x0000ffffac610000)\n\tlibcublas.so.12 => /usr/local/cuda/targets/aarch64-linux/lib/libcublas.so.12 (0x0000ffffa4f20000)\n\tlibcublasLt.so.12 => /usr/local/cuda/targets/aarch64-linux/lib/libcublasLt.so.12 (0x0000ffff8ce70000)\n\tlibcuda.so.1 => /usr/lib/aarch64-linux-gnu/nvidia/libcuda.so.1 (0x0000ffff8a600000)\n\tlibdl.so.2 => /lib/aarch64-linux-gnu/libdl.so.2 (0x0000ffff8a5e0000)\n\tlibpthread.so.0 => /lib/aarch64-linux-gnu/libpthread.so.0 (0x0000ffff8a5c0000)\n\tlibrt.so.1 => /lib/aarch64-linux-gnu/librt.so.1 (0x0000ffff8a5a0000)\n\tlibnvrm_gpu.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvrm_gpu.so (0x0000ffff8a520000)\n\tlibnvrm_mem.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvrm_mem.so (0x0000ffff8a500000)\n\tlibnvos.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvos.so (0x0000ffff8a4d0000)\n\tlibnvsocsys.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvsocsys.so (0x0000ffff8a4b0000)\n\tlibnvtegrahv.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvtegrahv.so (0x0000ffff8a490000)\n\tlibnvrm_sync.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvrm_sync.so (0x0000ffff8a470000)\n\tlibnvsciipc.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvsciipc.so (0x0000ffff8a430000)\n\tlibnvrm_chip.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvrm_chip.so (0x0000ffff8a410000)\n\tlibnvrm_host1x.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvrm_host1x.so (0x0000ffff8a3e0000)\n",
+      "stderr": "",
+      "unresolved": [],
+      "ok": true
+    },
+    "libggml-cuda.so": {
+      "exit_status": 0,
+      "stdout": "\tlinux-vdso.so.1 (0x0000ffffa16ce000)\n\tlibggml-base.so.1 => /home/muk/predemo/build-fill-cuda87/bin/libggml-base.so.1 (0x0000ffff92a80000)\n\tlibcudart.so.12 => /usr/local/cuda/targets/aarch64-linux/lib/libcudart.so.12 (0x0000ffff92990000)\n\tlibcublas.so.12 => /usr/local/cuda/targets/aarch64-linux/lib/libcublas.so.12 (0x0000ffff8b2a0000)\n\tlibcublasLt.so.12 => /usr/local/cuda/targets/aarch64-linux/lib/libcublasLt.so.12 (0x0000ffff731f0000)\n\tlibcuda.so.1 => /usr/lib/aarch64-linux-gnu/nvidia/libcuda.so.1 (0x0000ffff70980000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffff70750000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff706b0000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffff70680000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff704d0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffa1695000)\n\tlibgomp.so.1 => /lib/aarch64-linux-gnu/libgomp.so.1 (0x0000ffff70470000)\n\tlibdl.so.2 => /lib/aarch64-linux-gnu/libdl.so.2 (0x0000ffff70450000)\n\tlibpthread.so.0 => /lib/aarch64-linux-gnu/libpthread.so.0 (0x0000ffff70430000)\n\tlibrt.so.1 => /lib/aarch64-linux-gnu/librt.so.1 (0x0000ffff70410000)\n\tlibnvrm_gpu.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvrm_gpu.so (0x0000ffff70390000)\n\tlibnvrm_mem.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvrm_mem.so (0x0000ffff70370000)\n\tlibnvos.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvos.so (0x0000ffff70340000)\n\tlibnvsocsys.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvsocsys.so (0x0000ffff70320000)\n\tlibnvtegrahv.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvtegrahv.so (0x0000ffff70300000)\n\tlibnvrm_sync.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvrm_sync.so (0x0000ffff702e0000)\n\tlibnvsciipc.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvsciipc.so (0x0000ffff702a0000)\n\tlibnvrm_chip.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvrm_chip.so (0x0000ffff70280000)\n\tlibnvrm_host1x.so => /usr/lib/aarch64-linux-gnu/nvidia/libnvrm_host1x.so (0x0000ffff70250000)\n",
+      "stderr": "",
+      "unresolved": [],
+      "ok": true
+    },
+    "libggml-cpu.so": {
+      "exit_status": 0,
+      "stdout": "\tlinux-vdso.so.1 (0x0000ffff9aee7000)\n\tlibggml-base.so.1 => /home/muk/predemo/build-fill-cuda87/bin/libggml-base.so.1 (0x0000ffff9ac50000)\n\tlibgomp.so.1 => /lib/aarch64-linux-gnu/libgomp.so.1 (0x0000ffff9abd0000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffff9a9a0000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff9a900000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffff9a8d0000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff9a720000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff9aeae000)\n",
+      "stderr": "",
+      "unresolved": [],
+      "ok": true
+    }
+  },
+  "llama_server_version": {
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": "version: 1.0.0-dev (build 1, commit 9048bad)\nbuilt with GNU 11.4.0 for Linux aarch64\n"
+  },
+  "cuda_library_native_code": {
+    "exit_status": 0,
+    "architectures": [
+      "sm_87"
+    ],
+    "stderr": ""
+  }
+}

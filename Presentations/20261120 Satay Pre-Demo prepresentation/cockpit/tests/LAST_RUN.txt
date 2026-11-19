@@ -1,0 +1,22 @@
+Cockpit tests  2026-11-19T22:21:47Z
+
+[syntax] Bash and Python
+7 Bash scripts and 14 Python files passed
+
+[atomicity] 8 concurrent writers
+48 intact, consecutive events from 8 writers, with integer monotonic timestamps
+
+[tmux] Private server startup
+{"ok": false, "error": "error connecting to /home/muk/predemo/cockpit/run/tmux.sock (Operation not permitted)"}
+[blocked] Unattached autopilot, tmux capture-pane, agent drive, recording, tmux quiet CPU and pane respawn.
+
+[fallback] Actual fixture commands and ledger with tmux display and job transport substituted
+{"ok": true, "files": 27}
+14 steps, 62 fixture events, 3 result receipts, one quiet interval
+Standalone bundle verified: 27 files
+Verifier rejected both altered receipt bytes and a missing result reference
+Standalone PTY observers, without a tmux server:
+{"seconds": 10, "clock_ticks_per_second": 100, "panes": {"plan": {"pid": 1272, "delta_ticks": 0}, "data": {"pid": 1273, "delta_ticks": 0}, "experiment": {"pid": 1274, "delta_ticks": 0}, "cc": {"pid": 1275, "delta_ticks": 0}, "result": {"pid": 1276, "delta_ticks": 0}}}
+asciinema started in a PTY and captured the tmux socket error. Pane pipe preserved both sample lines.
+
+FAIL: tmux integration is blocked. No private tmux server was started.

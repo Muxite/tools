@@ -1,0 +1,291 @@
+[
+  {
+    "id": "s01",
+    "title": "Stock inputs",
+    "section": "problem",
+    "narration": "Start from the contract, ontology, stock source and prior receipts.",
+    "action": {
+      "type": "shell",
+      "stage": "fixture",
+      "command": "demo/fixture.sh stock"
+    },
+    "expect": {
+      "event_kind": "plan",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s02",
+    "title": "Freeze comparison",
+    "section": "problem",
+    "narration": "One model, one machine. Freeze the stock baseline and claim-to-receipt mapping.",
+    "action": {
+      "type": "emit",
+      "stage": "fixture",
+      "events": [
+        {
+          "kind": "decision",
+          "cc": "requirements_capsule",
+          "ref": "demo/fixtures/contract.json",
+          "data": {
+            "decision": "baseline",
+            "reason": "Hold model, prompt, batch and sampling constant."
+          }
+        }
+      ]
+    },
+    "expect": {
+      "event_kind": "decision",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s03",
+    "title": "Cache hypothesis",
+    "section": "problem",
+    "narration": "The Task Planner proposes one falsifiable cache hypothesis.",
+    "action": {
+      "type": "emit",
+      "stage": "fixture",
+      "events": [
+        {
+          "kind": "plan",
+          "cc": "task_planner",
+          "data": {
+            "hypothesis": "Expert residency lowers median TTFT ≥10%, with exact output and ≤512 MiB extra memory."
+          }
+        }
+      ]
+    },
+    "expect": {
+      "event_kind": "plan",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s04",
+    "title": "Expert cache patch",
+    "section": "change",
+    "narration": "The Expert Weight Cache CC owns this one component change.",
+    "action": {
+      "type": "shell",
+      "stage": "fixture",
+      "command": "demo/fixture.sh cache"
+    },
+    "expect": {
+      "event_kind": "cc_apply",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s05",
+    "title": "Source verification",
+    "section": "change",
+    "narration": "Check the source diff and verify that the expected patch is present.",
+    "action": {
+      "type": "shell",
+      "stage": "fixture",
+      "command": "demo/fixture.sh verify"
+    },
+    "expect": {
+      "event_kind": "verify",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s06",
+    "title": "Inspect patch",
+    "section": "change",
+    "narration": "Inspect the recorded git diff for the Expert Weight Cache.",
+    "action": {
+      "type": "show",
+      "stage": "fixture",
+      "pane": "result",
+      "view": "diff",
+      "cc": "expert_weight_cache"
+    },
+    "expect": {
+      "event_kind": "task",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s07",
+    "title": "Image receipt",
+    "section": "change",
+    "narration": "The Image Builder produces a fixture build log and a sealed image receipt.",
+    "action": {
+      "type": "shell",
+      "stage": "fixture",
+      "command": "demo/fixture.sh build"
+    },
+    "expect": {
+      "event_kind": "build",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s08",
+    "title": "Activation marker",
+    "section": "change",
+    "narration": "Find the activation marker in the fixture server output.",
+    "action": {
+      "type": "shell",
+      "stage": "fixture",
+      "command": "demo/fixture.sh activate"
+    },
+    "expect": {
+      "event_kind": "activate",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s09",
+    "title": "Acceptance gate",
+    "section": "change",
+    "narration": "Require the recorded activation marker before comparison.",
+    "action": {
+      "type": "wait",
+      "stage": "fixture",
+      "match_step": "s08",
+      "allow_existing": true
+    },
+    "expect": {
+      "event_kind": "activate",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s10",
+    "title": "Paired ABBA",
+    "section": "compare",
+    "narration": "Lab Client compares stock and candidate in ABBA order with observers quiet.",
+    "action": {
+      "type": "quiet_run",
+      "stage": "fixture",
+      "command": "demo/fixture.sh abba",
+      "ref": "demo/fixtures/abba.json",
+      "data": {
+        "role": "paired"
+      },
+      "cc": "lab_client"
+    },
+    "expect": {
+      "event_kind": "result",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s11",
+    "title": "Arm receipts",
+    "section": "compare",
+    "narration": "Inspect each arm’s timing, memory and output check.",
+    "action": {
+      "type": "emit",
+      "stage": "fixture",
+      "events": [
+        {
+          "kind": "result",
+          "cc": "evidence_collector",
+          "ref": "demo/fixtures/arm-a.json",
+          "data": {
+            "arm": "A"
+          }
+        },
+        {
+          "kind": "result",
+          "cc": "evidence_collector",
+          "ref": "demo/fixtures/arm-b.json",
+          "data": {
+            "arm": "B"
+          }
+        }
+      ]
+    },
+    "expect": {
+      "event_kind": "result",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s12",
+    "title": "Compare arms",
+    "section": "compare",
+    "narration": "Fixture medians are 162 and 140 ms TTFT, with 224 MiB greater peak memory.",
+    "action": {
+      "type": "show",
+      "stage": "fixture",
+      "pane": "result",
+      "view": "results"
+    },
+    "expect": {
+      "event_kind": "task",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s13",
+    "title": "Analysis wording",
+    "section": "scope",
+    "narration": "Confine the wording to the recorded fixture comparison.",
+    "action": {
+      "type": "emit",
+      "stage": "fixture",
+      "events": [
+        {
+          "kind": "decision",
+          "cc": "methodology_capsule",
+          "ref": "demo/fixtures/abba.json",
+          "data": {
+            "decision": "revise",
+            "reason": "Say synthetic threshold met. Both arms passed the fixture output check."
+          }
+        }
+      ]
+    },
+    "expect": {
+      "event_kind": "decision",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  },
+  {
+    "id": "s14",
+    "title": "Report and next run",
+    "section": "scope",
+    "narration": "Next decision is a real compile, runtime acceptance and then a paired hardware trial.",
+    "action": {
+      "type": "emit",
+      "stage": "fixture",
+      "events": [
+        {
+          "kind": "decision",
+          "cc": "task_planner",
+          "ref": "demo/fixtures/contract.json",
+          "data": {
+            "decision": "next",
+            "verdict": "Fixture complete",
+            "reason": "Advance only when the real image and activation receipts are available."
+          }
+        }
+      ]
+    },
+    "expect": {
+      "event_kind": "decision",
+      "status": "ok"
+    },
+    "timeout_s": 20
+  }
+]

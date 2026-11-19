@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export COCKPIT_INVOKER=$0 COCKPIT_INVOKER_CWD=$PWD
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+exec python3 -B director.py _wording "$@"
