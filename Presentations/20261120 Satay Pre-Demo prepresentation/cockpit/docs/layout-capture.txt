@@ -1,7 +1,5 @@
-tmux capture-pane was blocked by EPERM on the private Unix socket.
-The sections below are standalone renderer output at representative pane sizes.
 
-=== 200x55 PLAN (51x33) ===
+=== 200x55 PLAN ===
 PLAN  •  TASK GRAPH
 PROBLEM
 ✓ s01 Stock inputs
@@ -28,31 +26,39 @@ s14 next [fixture] Advance only when the real image
 and activation receipts are available.
 s13 revise [fixture] Say synthetic threshold met.
 Both arms passed the fixture output check.
-s02 baseline [fixture] Hold model, prompt, batch
-and sampling constant.
+s02 baseline [fixture] Hold model, prompt, batch and
+sampling constant.
 
-=== 200x55 DATA (51x17) ===
+
+
+
+
+
+
+
+=== 200x55 DATA ===
 DATA  •  EVENT & RECEIPT FEED
-[fixture]  48 s10 run ok s10-30c3af0c57.log
+[fixture]  46 s10 quiet ok
+[fixture]  47 s10 quiet ok
+[fixture]  48 s10 run ok s10-ffcd319547.log
 [fixture]  49 s10 result ok demo/fixtures/abba.json
 [fixture]  50 s10 task ok Paired ABBA
 [fixture]  51 s11 task start Arm receipts
-[fixture]  52 s11 result ok arm-a.json
-[fixture]  53 s11 result ok arm-b.json
+[fixture]  52 s11 result ok demo/fixtures/arm-a.json
+[fixture]  53 s11 result ok demo/fixtures/arm-b.json
 [fixture]  54 s11 task ok Arm receipts
 [fixture]  55 s12 task start Compare arms
-[fixture]  56 s12 task ok 
+[fixture]  56 s12 task ok
 [fixture]  57 s13 task start Analysis wording
 [fixture]  58 s13 decision ok abba.json
 [fixture]  59 s13 task ok Analysis wording
 [fixture]  60 s14 task start Report and next run
 [fixture]  61 s14 decision ok contract.json
 [fixture]  62 s14 task ok Report and next run
-[fixture]  63 s14 note ok synthetic threshold met
 
-=== 200x55 EXPERIMENT (94x53) ===
+=== 200x55 EXPERIMENT ===
 EXPERIMENT  •  COMMAND OUTPUT
-s10 [fixture] s10-30c3af0c57.log
+s10 [fixture] s10-ffcd319547.log
 $ demo/fixture.sh abba
 [fixture] paired laboratory comparison, one model on one machine
 arm=A ttft_ms=165 native_prefill_ms=124 decode_tps=38.1 memory_mib=10462
@@ -62,7 +68,51 @@ arm=A ttft_ms=159 native_prefill_ms=120 decode_tps=38.3 memory_mib=10462
 
 [exit 0]
 
-=== 200x55 CC (53x24) ===
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=== 200x55 CC ===
 CC  •  CAPABILITY CAPSULES
 V verified · A activated
 ★ Runtime Event Recorder · +1/−1
@@ -88,7 +138,8 @@ factory→receipts [fixture] V:N A:N
   Methodology Capsule · —
 factory→comparison rules [fixture] V:N A:N
 
-=== 200x55 RESULT (53x27) ===
+
+=== 200x55 RESULT ===
 RESULTS  •  PAIRED COMPARISON
 TTFT ms | Prefill ms | Decode t/s | MiB
 Native prefill · peak memory
@@ -101,10 +152,27 @@ B [fixture]
 Output pass · synthetic threshold met
 demo/fixtures/arm-b.json
 
-=== 200x55 DIFF (53x27) ===
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=== 200x55 DIFF ===
 DIFF  •  Expert Weight Cache
 [fixture] 1–9/9  j/k PgUp/PgDn g
-diff --git a/runtime/expert_weight_cache.c b/runtime/
+diff --git a/runtime/expert_weight_cache.c b/runtime
 index bc07b4a..a1c16e5 100644
 --- a/runtime/expert_weight_cache.c
 +++ b/runtime/expert_weight_cache.c
@@ -114,8 +182,26 @@ index bc07b4a..a1c16e5 100644
 +    return 64;
  }
 
-=== 160x45 PLAN (41x27) ===
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=== 160x45 PLAN ===
 PLAN  •  TASK GRAPH
+PROBLEM
 ✓ s01 Stock inputs
 ✓ s02 Freeze comparison
 ✓ s03 Cache hypothesis
@@ -135,33 +221,34 @@ SCOPE
 ✓ s14 Report and next run
 
 H [fixture] Expert residency lowers
-median TTFT ≥10%, with exact output and
-≤512 MiB extra memory.
-s14 next [fixture] Advance only when the
-real image and activation receipts are
-available.
+median TTFT ≥10%, with exact output
+and ≤512 MiB extra memory.
+s14 next [fixture] Advance only when
+the real image and activation receipts
+are available.
 s13 revise [fixture] Say synthetic
 threshold met. Both arms passed the
+fixture output check.
+s02 baseline [fixture] Hold model,
 
-=== 160x45 DATA (41x14) ===
+=== 160x45 DATA ===
 DATA  •  EVENT & RECEIPT FEED
-[fixture]  51 s11 task start Arm receipts
+[fixture]  51 s11 task start Arm recei
 [fixture]  52 s11 result ok arm-a.json
 [fixture]  53 s11 result ok arm-b.json
 [fixture]  54 s11 task ok Arm receipts
-[fixture]  55 s12 task start Compare arms
-[fixture]  56 s12 task ok 
-[fixture]  57 s13 task start Analysis wor
-[fixture]  58 s13 decision ok abba.json
-[fixture]  59 s13 task ok Analysis wordin
-[fixture]  60 s14 task start Report and n
-[fixture]  61 s14 decision ok contract.js
-[fixture]  62 s14 task ok Report and next
-[fixture]  63 s14 note ok synthetic thres
+[fixture]  55 s12 task start Compare a
+[fixture]  56 s12 task ok
+[fixture]  57 s13 task start Analysis
+[fixture]  58 s13 decision ok abba.jso
+[fixture]  59 s13 task ok Analysis wor
+[fixture]  60 s14 task start Report an
+[fixture]  61 s14 decision ok contract
+[fixture]  62 s14 task ok Report and n
 
-=== 160x45 EXPERIMENT (75x43) ===
+=== 160x45 EXPERIMENT ===
 EXPERIMENT  •  COMMAND OUTPUT
-s10 [fixture] s10-30c3af0c57.log
+s10 [fixture] s10-ffcd319547.log
 $ demo/fixture.sh abba
 [fixture] paired laboratory comparison, one model on one machine
 arm=A ttft_ms=165 native_prefill_ms=124 decode_tps=38.1 memory_mib=10462
@@ -171,15 +258,51 @@ arm=A ttft_ms=159 native_prefill_ms=120 decode_tps=38.3 memory_mib=10462
 
 [exit 0]
 
-=== 160x45 CC (42x19) ===
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=== 160x45 CC ===
 CC  •  CAPABILITY CAPSULES
 V verified · A activated · j/k scroll
 ★ Runtime Event Recorder · +1/−1
 runtime→event stream [fixture] V:N A:N
 ★ Expert Weight Cache · +1/−1
-weights→expert residency [fixture] V:Y A:Y
+weights→expert residency [fixture] V:Y
+A:Y
 ★ Weight Placement Planner · +1/−1
-weights→device placement [fixture] V:N A:N
+weights→device placement [fixture] V:N
+A:N
 ★ Expert Demand Predictor · +1/−1
 router→expert demand [fixture] V:N A:N
 ★ Batch Layout Mapper · +1/−1
@@ -190,9 +313,8 @@ factory→task graph [fixture] V:N A:N
 factory→contract [fixture] V:N A:N
   Image Builder · —
 factory→sealed image [fixture] V:N A:N
-  Lab Client · —
 
-=== 160x45 RESULT (42x22) ===
+=== 160x45 RESULT ===
 RESULTS  •  PAIRED COMPARISON
 TTFT ms | Prefill ms | Decode t/s | MiB
 Native prefill · peak memory
@@ -205,10 +327,22 @@ B [fixture]
 Output pass · synthetic threshold met
 demo/fixtures/arm-b.json
 
-=== 160x45 DIFF (42x22) ===
+
+
+
+
+
+
+
+
+
+
+
+
+=== 160x45 DIFF ===
 DIFF  •  Expert Weight Cache
 [fixture] 1–9/9  j/k PgUp/PgDn g
-diff --git a/runtime/expert_weight_cache.c
+diff --git a/runtime/expert_weight_cach
 index bc07b4a..a1c16e5 100644
 --- a/runtime/expert_weight_cache.c
 +++ b/runtime/expert_weight_cache.c
@@ -217,3 +351,15 @@ index bc07b4a..a1c16e5 100644
 -    return 0;
 +    return 64;
  }
+
+
+
+
+
+
+
+
+
+
+
+
