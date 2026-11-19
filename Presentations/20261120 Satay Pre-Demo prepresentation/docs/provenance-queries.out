@@ -1,0 +1,29 @@
+moe-cache-mib                      common/arg.cpp               d6cf9acb2 2026-10-07 llama : add a GPU cache for MoE experts kept in host memory (#29887)
+n-cpu-moe                          common/arg.cpp               ec428b02c 2025-08-05 llama : add --n-cpu-moe option (#15077)
+cpu-moe                            common/arg.cpp               a06ed5fea 2025-07-31 llama : add simple option to enable CPU for MoE weights (--cpu-moe) (#14992)
+sched_copy_experts                 src/llama-context.cpp        6753a033f0 2026-10-06 ggml: refactor selective expert copying to user code (#29943)
+callback while copying input weights ggml/include/ggml-backend.h  not found
+ggml_backend_sched_set_cpu_callback ggml/include/ggml-backend.h  not found
+LLAMA_EXPERT_FILL                  src/llama-context.cpp        not found
+expert_fill                        src/llama-context.cpp        not found
+## latest upstream commits on moe-cache path
+c56be864f 2026-11-14 ggml-backend : start a new split at an incompatible weight in a split without inputs (#31775)
+951d465f5 2026-11-13 llama: move moe-cache code out of llama-graph (#32157)
+e95426f16 2026-11-08 llama_moe_cache: run missed experts on CPU, add tuning script (#30966)
+c4fb57969 2026-11-06 moe-cache : LRFU/MQ-like hybrid cache, ClassLRU (#31233)
+a4699400e 2026-10-26 llama : move no_alloc out of llama_hparams (#31141)
+33d6135cb 2026-10-19 moe-cache : replace MoE LRU cache with a 50/50 SLRU cache (#30637)
+c811cb8f0 2026-10-08 llama: support MoE cache over multiple GPUs (#30112)
+d6cf9acb2 2026-10-07 llama : add a GPU cache for MoE experts kept in host memory (#29887)
+## callback typedefs at pin
+218:    // The caller provides bootstrap_callback, which moves bytes between the ranks before the
+223:    typedef bool   (*ggml_backend_comm_bootstrap_callback)(void * user_data, const void * send_buf, void * recv_buf, size_t size);
+224:    typedef void * (*ggml_backend_comm_init_rank_t)(ggml_backend_t backend, int rank, int world_size, ggml_backend_comm_bootstrap_callback bootstrap_callback, void * bootstrap_callback_data);
+235:    // Set the abort callback for the backend
+236:    typedef void                         (*ggml_backend_set_abort_callback_t)(ggml_backend_t backend, ggml_abort_callback abort_callback, void * abort_callback_data);
+326:    // Evaluation callback for each node in the graph (set with ggml_backend_sched_set_eval_callback)
+333:    typedef bool (*ggml_backend_sched_eval_callback)(struct ggml_tensor * t, bool ask, void * user_data);
+335:    // Callback while copying input weights of a split
+337:    // the callback is called only for input weights in host buffers
+338:    // the callback is called after all non-weight inputs of the split have been copied
+PROV2-DONE
