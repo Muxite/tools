@@ -1,0 +1,1012 @@
+diff --git a/jiuwenswarm/factory/ccs/expert_route_capture/.gitattributes b/jiuwenswarm/factory/ccs/expert_route_capture/.gitattributes
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/expert_route_capture/.gitattributes
+@@ -0,0 +1 @@
++*.cpp text eol=lf
+diff --git a/jiuwenswarm/factory/ccs/expert_route_capture/METHOD.md b/jiuwenswarm/factory/ccs/expert_route_capture/METHOD.md
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/expert_route_capture/METHOD.md
+@@ -0,0 +1,9 @@
++# Expert Route Capture
++
++Use this capsule when a planner needs actual selected-expert demand before deciding whether to change weight residency or admission. The native diagnostic reads the post-selection tensor on the pinned llama.cpp graph. Capture requests only matching tensors in fixed single-token decode steps. The uncaptured arm runs the same model and exact greedy steps with the callback absent. The probe evaluates all eight sampled tokens, including the last one, even if a sampled token would ordinarily end a serving request.
++
++Call `plan` with the exact engine revision, then retrieve `probe` and `geometry` as sealed CC materials. Compare the probe digest with the plan. Build it against the pinned `llama` and `ggml` public headers and libraries. Run it twice against the same model and prompt, passing `off` and `on`, and retain stdout and stderr. Use the sealed geometry reader with the GGUF Python module from the same engine checkout. It verifies the packed gate, up and down slices and hashes the GGUF.
++
++Call `adapt` with the two stdout streams, geometry and a request ID. It requires matching greedy IDs, complete layer coverage, unique in-range expert IDs and the declared selection width. Feed its `cache_lab_input` directly to `engine.expert_cache_lab.validate`. Replay can use the same events under a named byte budget. Packed tensor bytes count logical expert payload only. Capture brings backend synchronization, and the event stream records neither physical storage reads nor whether a weight was resident.
++
++This first binding requires the Granite MoE tensor layout and ordered, fixed-step, single-request decode. Verify the exact target architecture, tensor layouts and hooks before extending it to DeepSeek or prefill.
+diff --git a/jiuwenswarm/factory/ccs/expert_route_capture/cc.yaml b/jiuwenswarm/factory/ccs/expert_route_capture/cc.yaml
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/expert_route_capture/cc.yaml
+@@ -0,0 +1,40 @@
++cc: '2'
++id: observability.expert_route_capture
++version: 1.0.0
++materials:
++  method:
++    kind: method
++    path: METHOD.md
++  probe:
++    kind: reference
++    path: expert_route_probe.cpp
++  geometry:
++    kind: reference
++    path: gguf_geometry.py
++bindings:
++  default:
++    kind: native
++    command: ['{python}', '{bundle}/run.py']
++capabilities:
++  plan:
++    kind: tool
++    does: Identify the exact llama.cpp route probe and supported diagnostic workload.
++    takes:
++      engine_commit: {kind: text}
++    gives:
++      capture: {kind: json}
++    needs: [python]
++    changes: [process.exec]
++  adapt:
++    kind: tool
++    does: Confirm route-off/route-on parity and adapt decode selections to the existing expert cache replay trace.
++    takes:
++      reference: {kind: text}
++      capture: {kind: text}
++      geometry: {kind: json}
++      request_id: {kind: text}
++    gives:
++      verification: {kind: json}
++      cache_lab_input: {kind: json}
++    needs: [python]
++    changes: [process.exec]
+diff --git a/jiuwenswarm/factory/ccs/expert_route_capture/expert_route_probe.cpp b/jiuwenswarm/factory/ccs/expert_route_capture/expert_route_probe.cpp
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/expert_route_capture/expert_route_probe.cpp
+@@ -0,0 +1,119 @@
++#include "llama.h"
++#include "ggml-backend.h"
++
++#include <charconv>
++#include <cstdio>
++#include <memory>
++#include <string_view>
++#include <vector>
++
++struct route_capture {
++    int position = -1;
++    bool invalid_tensor = false;
++};
++
++static bool capture_selected_experts(ggml_tensor * tensor, bool ask, void * user_data) {
++    auto & capture = *static_cast<route_capture *>(user_data);
++    constexpr std::string_view prefix = "ffn_moe_topk-";
++    const std::string_view name(tensor->name);
++    if (capture.position < 0 || name.substr(0, prefix.size()) != prefix) {
++        return false;
++    }
++    if (ask) {
++        return true;
++    }
++
++    int layer = -1;
++    const auto parsed = std::from_chars(name.data() + prefix.size(), name.data() + name.size(), layer);
++    // The probe evaluates one decode token at a time. One expert-ID row is expected.
++    if (parsed.ec != std::errc{} || parsed.ptr != name.data() + name.size() || layer < 0
++            || tensor->type != GGML_TYPE_I32 || tensor->nb[0] != sizeof(int32_t)
++            || tensor->ne[0] < 1 || tensor->ne[0] > 512
++            || tensor->ne[1] != 1 || tensor->ne[2] != 1 || tensor->ne[3] != 1) {
++        capture.invalid_tensor = true;
++        return true;
++    }
++
++    std::vector<int32_t> experts(tensor->ne[0]);
++    ggml_backend_tensor_get(tensor, experts.data(), 0, experts.size() * sizeof(int32_t));
++    std::printf("R %d %d", capture.position, layer);
++    for (const auto expert : experts) {
++        std::printf(" %d", expert);
++    }
++    std::puts("");
++    return true;
++}
++
++static bool run(const char * path, bool enable_capture, std::string_view text) {
++    constexpr int batch_limit = 64;
++    constexpr int generated_count = 8;
++    auto model_params = llama_model_default_params();
++    model_params.n_gpu_layers = 0;
++    std::unique_ptr<llama_model, decltype(&llama_model_free)> model(
++            llama_model_load_from_file(path, model_params), llama_model_free);
++    if (!model) {
++        return false;
++    }
++
++    const llama_vocab * vocab = llama_model_get_vocab(model.get());
++    std::vector<llama_token> prompt(batch_limit);
++    const int prompt_size = llama_tokenize(vocab, text.data(), static_cast<int>(text.size()),
++            prompt.data(), prompt.size(), true, false);
++    if (prompt_size < 1 || prompt_size > batch_limit) {
++        std::fputs("Expected a nonempty prompt of at most 64 tokens\n", stderr);
++        return false;
++    }
++
++    route_capture capture;
++    auto ctx_params = llama_context_default_params();
++    ctx_params.n_ctx = 128;
++    ctx_params.n_batch = batch_limit;
++    ctx_params.n_ubatch = batch_limit;
++    ctx_params.n_threads = 2;
++    ctx_params.n_threads_batch = 2;
++    ctx_params.offload_kqv = false;
++    if (enable_capture) {
++        ctx_params.cb_eval = capture_selected_experts;
++        ctx_params.cb_eval_user_data = &capture;
++    }
++    std::unique_ptr<llama_context, decltype(&llama_free)> context(
++            llama_init_from_model(model.get(), ctx_params), llama_free);
++    if (!context || llama_decode(context.get(), llama_batch_get_one(prompt.data(), prompt_size)) != 0) {
++        return false;
++    }
++    std::unique_ptr<llama_sampler, decltype(&llama_sampler_free)> sampler(
++            llama_sampler_init_greedy(), llama_sampler_free);
++    if (!sampler) {
++        return false;
++    }
++
++    char architecture[64] = {};
++    const int length = llama_model_meta_val_str(model.get(), "general.architecture", architecture, sizeof(architecture));
++    if (length <= 0 || length >= static_cast<int>(sizeof(architecture))) {
++        return false;
++    }
++    std::printf("M %s %d\n", architecture, llama_model_n_layer(model.get()));
++    std::printf("P %d\n", prompt_size);
++    for (int step = 0; step < generated_count; ++step) {
++        auto token = llama_sampler_sample(sampler.get(), context.get(), -1);
++        capture.position = prompt_size + step;
++        std::printf("G %d %d\n", capture.position, token);
++        if (llama_decode(context.get(), llama_batch_get_one(&token, 1)) != 0 || capture.invalid_tensor) {
++            std::fputs("Could not evaluate a single decode token with the expected expert tensor\n", stderr);
++            return false;
++        }
++    }
++    llama_synchronize(context.get());
++    return true;
++}
++
++int main(int argc, char ** argv) {
++    if (argc != 4 || (std::string_view(argv[2]) != "on" && std::string_view(argv[2]) != "off")) {
++        std::fputs("Usage: expert-route-probe MODEL {on|off} PROMPT\n", stderr);
++        return 2;
++    }
++    llama_backend_init();
++    const bool ok = run(argv[1], std::string_view(argv[2]) == "on", argv[3]);
++    llama_backend_free();
++    return ok ? 0 : 1;
++}
+diff --git a/jiuwenswarm/factory/ccs/expert_route_capture/gguf_geometry.py b/jiuwenswarm/factory/ccs/expert_route_capture/gguf_geometry.py
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/expert_route_capture/gguf_geometry.py
+@@ -0,0 +1,39 @@
++"""Read and check the packed expert tensor geometry using the pinned GGUF reader."""
++
++import argparse
++import hashlib
++import json
++from pathlib import Path
++
++from gguf import GGUFReader
++
++
++def geometry(model):
++    reader = GGUFReader(model)
++    architecture = reader.get_field("general.architecture").contents()
++    if architecture != "granitemoe":
++        raise ValueError("This geometry adapter supports granitemoe")
++    layers = int(reader.get_field("granitemoe.block_count").contents())
++    experts = int(reader.get_field("granitemoe.expert_count").contents())
++    top_k = int(reader.get_field("granitemoe.expert_used_count").contents())
++    tensors = {tensor.name: tensor for tensor in reader.tensors}
++    layer_bytes = []
++    for layer in range(layers):
++        total = 0
++        for role in ("gate", "up", "down"):
++            tensor = tensors.get(f"blk.{layer}.ffn_{role}_exps.weight")
++            if (tensor is None or len(tensor.shape) != 3 or int(tensor.shape[2]) != experts
++                    or tensor.n_bytes <= 0 or tensor.n_bytes % experts != 0):
++                raise ValueError(f"Invalid packed {role} expert tensor at layer {layer}")
++            total += int(tensor.n_bytes) // experts
++        layer_bytes.append(total)
++    with Path(model).open("rb") as stream:
++        model_sha256 = hashlib.file_digest(stream, "sha256").hexdigest()
++    return {"architecture": architecture, "layers": layers, "experts": experts, "top_k": top_k,
++            "expert_bytes": layer_bytes, "model_sha256": model_sha256}
++
++
++if __name__ == "__main__":
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("model", type=Path)
++    print(json.dumps(geometry(parser.parse_args().model)))
+diff --git a/jiuwenswarm/factory/ccs/expert_route_capture/run.py b/jiuwenswarm/factory/ccs/expert_route_capture/run.py
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/expert_route_capture/run.py
+@@ -0,0 +1,115 @@
++"""CCv2 entry point for the pinned decode-only route observation."""
++
++import hashlib
++import json
++import re
++import sys
++from pathlib import Path
++
++
++ENGINE_COMMIT = "cf34d311332e362198f0a410c466d1e940287d02"
++ARCHITECTURE = "granitemoe"
++DECODE_STEPS = 8
++PROBE = Path(__file__).with_name("expert_route_probe.cpp")
++
++
++def parse_probe(raw):
++    if len(raw) > 200_000:
++        raise ValueError("Probe output exceeds the diagnostic limit")
++    metadata, prompt = None, None
++    tokens, routes = [], []
++    for line in raw.splitlines():
++        record, *fields = line.split()
++        if record == "M" and len(fields) == 2 and metadata is None:
++            metadata = fields[0], int(fields[1])
++        elif record == "P" and len(fields) == 1 and prompt is None:
++            prompt = int(fields[0])
++        elif record == "G" and len(fields) == 2:
++            tokens.append(tuple(map(int, fields)))
++        elif record == "R" and len(fields) >= 3:
++            position, layer, *experts = map(int, fields)
++            routes.append((position, layer, experts))
++        else:
++            raise ValueError("Unexpected probe record")
++    if metadata is None or prompt is None or not 1 <= prompt <= 64:
++        raise ValueError("Missing or invalid model or prompt metadata")
++    if [pos for pos, _ in tokens] != list(range(prompt, prompt + DECODE_STEPS)) or any(tok < 0 for _, tok in tokens):
++        raise ValueError("Expected a complete series of fixed-step greedy tokens")
++    return metadata, prompt, tokens, routes
++
++
++def count(value, maximum, label):
++    if type(value) is not int or not 1 <= value <= maximum:
++        raise ValueError(f"Invalid {label}")
++    return value
++
++
++def adapt(reference, capture, geometry, request_id):
++    fields = {"architecture", "layers", "experts", "top_k", "expert_bytes", "model_sha256"}
++    if not isinstance(geometry, dict) or set(geometry) != fields or geometry["architecture"] != ARCHITECTURE:
++        raise ValueError("Expected pinned Granite MoE geometry")
++    layers = count(geometry["layers"], 256, "layer count")
++    experts = count(geometry["experts"], 512, "expert count")
++    top_k = count(geometry["top_k"], experts, "selected expert count")
++    sizes = geometry["expert_bytes"]
++    if not isinstance(sizes, list) or len(sizes) != layers:
++        raise ValueError("A packed expert byte size is required for every layer")
++    for size in sizes:
++        count(size, 2**53, "packed expert byte size")
++    digest = geometry["model_sha256"]
++    if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
++        raise ValueError("Invalid model SHA-256")
++    if not request_id.strip() or len(request_id) > 96 or DECODE_STEPS * layers * top_k > 100_000:
++        raise ValueError("Invalid request identifier or excessive replay size")
++
++    baseline = parse_probe(reference)
++    observed = parse_probe(capture)
++    if baseline[3] or baseline[:3] != observed[:3] or observed[0] != (ARCHITECTURE, layers):
++        raise ValueError("Capture must preserve the uncaptured model, prompt and greedy token IDs")
++    positions = {position for position, _ in observed[2]}
++    groups, trace = set(), []
++    previous_position = -1
++    for position, layer, choices in observed[3]:
++        key = (position, layer)
++        if position < previous_position or position not in positions or not 0 <= layer < layers or key in groups:
++            raise ValueError("Unexpected or duplicate decode position and layer")
++        if len(choices) != top_k or len(set(choices)) != top_k or any(not 0 <= expert < experts for expert in choices):
++            raise ValueError("Invalid selected expert set")
++        previous_position = position
++        groups.add(key)
++        for expert in choices:
++            trace.append({"seq": len(trace), "request": request_id, "token": position,
++                          "layer": layer, "expert": expert, "bytes": sizes[layer]})
++    if len(groups) != DECODE_STEPS * layers:
++        raise ValueError("Missing decode layer coverage")
++    return {
++        "verification": {"exact_greedy_parity": True, "mode": "decode-only-logical-demand",
++                         "positions": len(positions), "groups": len(groups), "events": len(trace),
++                         "model_sha256": digest},
++        "cache_lab_input": {"layers": layers, "experts": experts, "trace": trace},
++    }
++
++
++def main():
++    packet = json.load(sys.stdin)
++    inputs = packet["inputs"]
++    try:
++        if packet["capability"] == "plan":
++            if inputs["engine_commit"] != ENGINE_COMMIT:
++                raise ValueError("Unsupported llama.cpp engine revision")
++            outputs = {"capture": {"engine_commit": ENGINE_COMMIT, "architecture": ARCHITECTURE,
++                                   "phase": "decode-only", "decode_steps": DECODE_STEPS,
++                                   "tensor": "ffn_moe_topk-<layer>", "acceleration": "cpu",
++                                   "probe_sha256": hashlib.sha256(PROBE.read_bytes()).hexdigest()}}
++        elif packet["capability"] == "adapt":
++            outputs = adapt(**inputs)
++        else:
++            raise ValueError("Unsupported capability")
++        result = {"outcome": "ok", "outputs": outputs}
++    except ValueError as error:
++        result = {"outcome": "error", "error": {"code": "INVALID_INPUT", "message": str(error)}}
++    print(json.dumps(result))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/jiuwenswarm/factory/ccs/prompt_batch_layout/.gitattributes b/jiuwenswarm/factory/ccs/prompt_batch_layout/.gitattributes
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/prompt_batch_layout/.gitattributes
+@@ -0,0 +1 @@
++*.patch text eol=lf
+diff --git a/jiuwenswarm/factory/ccs/prompt_batch_layout/METHOD.md b/jiuwenswarm/factory/ccs/prompt_batch_layout/METHOD.md
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/prompt_batch_layout/METHOD.md
+@@ -0,0 +1,9 @@
++# Prompt Batch Layout
++
++This capsule owns the text prompt contribution to a llama.cpp scheduler batch in single-slot serving. The planner supplies the pinned engine, scope and token budget from its contract and ontology. The runtime reuses the stock queue, splitting, checkpoint and output paths. The cap applies to splittable causal text completions without embeddings or a loaded multimodal projector. Multi-slot serving bypasses the policy. The earlier Satay prototype activated the policy in multi-slot serving and reproducibly changed the long request's greedy output.
++
++Call `plan` with `engine_commit`, `scope` (`single-slot-causal-text-completion`), `parallel` (1), `n_batch`, `n_ubatch` and `prompt_cap`. Use the returned arguments and environment, and apply the sealed `server_patch` material to the exact pinned stock source. Compare its SHA-256 with the returned policy before applying. Run the candidate with the variable unset to retain the stock scheduling path. The enabled path logs functional engagement per slot.
++
++Call `verify` with the same spec and uncached fixture records drawn from independent stock and candidate runs. Each record identifies the fixture, prompt token count, ordered cap engagement rows, and each arm's generated token IDs and stop reason. Include at least one fixture longer than the cap. Retain the raw request, response and server log. If mixed workloads or reused prefixes are part of the proposed test, isolate and account for the newly processed tokens per slot before adding their fixture requirements.
++
++The Satay pilot checks integration and functional equivalence on a small routed model. Its test plan carries no throughput or DGX Spark performance gate. A Spark evaluation needs its own source applicability check and matched stock comparisons, including stock batch and microbatch settings.
+diff --git a/jiuwenswarm/factory/ccs/prompt_batch_layout/cc.yaml b/jiuwenswarm/factory/ccs/prompt_batch_layout/cc.yaml
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/prompt_batch_layout/cc.yaml
+@@ -0,0 +1,34 @@
++cc: '2'
++id: engine.prompt_batch_layout
++version: 1.0.1
++materials:
++  method:
++    kind: method
++    path: METHOD.md
++  server_patch:
++    kind: reference
++    path: llama-cf34d311-prompt-batch-layout.patch
++bindings:
++  default:
++    kind: native
++    command: ['{python}', '{bundle}/run.py']
++capabilities:
++  plan:
++    kind: tool
++    does: Validate a pinned single-slot llama.cpp text prompt batch policy and emit its activation and source patch digest.
++    takes:
++      spec: {kind: json}
++    gives:
++      policy: {kind: json}
++    needs: [python]
++    changes: [process.exec]
++  verify:
++    kind: tool
++    does: Verify engagement, token accounting and exact greedy parity against the planned fixture.
++    takes:
++      spec: {kind: json}
++      fixtures: {kind: json}
++    gives:
++      verification: {kind: json}
++    needs: [python]
++    changes: [process.exec]
+diff --git a/jiuwenswarm/factory/ccs/prompt_batch_layout/llama-cf34d311-prompt-batch-layout.patch b/jiuwenswarm/factory/ccs/prompt_batch_layout/llama-cf34d311-prompt-batch-layout.patch
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/prompt_batch_layout/llama-cf34d311-prompt-batch-layout.patch
+@@ -0,0 +1,83 @@
++diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
++--- a/tools/server/server-context.cpp
+++++ b/tools/server/server-context.cpp
++@@ -25,12 +25,15 @@
++ 
++ #include <algorithm>
++ #include <cstddef>
+++#include <charconv>
+++#include <cstdlib>
++ #include <cinttypes>
++ #include <deque>
++ #include <exception>
++ #include <memory>
++ #include <filesystem>
++ #include <random>
+++#include <string_view>
++ #include <utility>
++ #include <fstream>
++ 
++@@ -1077,6 +1080,7 @@
++     // use server_context methods instead
++ 
++     common_params params_base;
+++    int32_t prompt_batch_token_cap = 0;
++ 
++     // note: keep these alive - they determine the lifetime of the model, context, etc.
++     common_init_result_ptr llama_init;
++@@ -1204,6 +1208,15 @@
++     // load the model and initialize llama_context
++     // this may also be called to resume from sleeping state
++     bool load_model(common_params & params) {
+++        prompt_batch_token_cap = 0;
+++        if (const char * value = std::getenv("LLAMA_PREFILL_PROMPT_CAP")) {
+++            const std::string_view text(value);
+++            const auto result = std::from_chars(text.data(), text.data() + text.size(), prompt_batch_token_cap);
+++            if (result.ec != std::errc{} || result.ptr != text.data() + text.size() || prompt_batch_token_cap <= 0) {
+++                SRV_ERR("%s", "LLAMA_PREFILL_PROMPT_CAP must be a positive 32-bit integer\n");
+++                return false;
+++            }
+++        }
++         load_progress_data load_progress_text  (this, "text_model");
++         load_progress_data load_progress_mmproj(this, "mmproj_model");
++         load_progress_data load_progress_spec  (this, "spec_model");
++@@ -1211,6 +1224,9 @@
++         const bool is_resume = sleeping;
++ 
++         params_base = params;
+++        if (prompt_batch_token_cap > 0 && params_base.n_parallel != 1) {
+++            SRV_WRN("%s", "prompt_batch_layout: disabled unless exactly one slot is configured\n");
+++        }
++         const auto output_limits = server_output_limits(params_base);
++         params_base.n_outputs_max = output_limits.total;
++         params_base.n_outputs_max_per_seq = output_limits.per_seq;
++@@ -4483,8 +4499,15 @@
++ 
++                     const int32_t n_decision_first = slot.task->type == SERVER_TASK_TYPE_DECISION ? slot.task->decision.pos_first() : -1;
++ 
++-                    // add prompt tokens for processing in the current batch
++-                    while (slot.prompt.n_tokens() < slot.task->n_tokens() && batch.size() < n_batch) {
+++                    const bool cap_prompt = prompt_batch_token_cap > 0 && slots.size() == 1
+++                        && slot.task->type == SERVER_TASK_TYPE_COMPLETION
+++                        && mctx == nullptr && !input_tokens.has_mtmd && !slot.need_embd()
+++                        && slot.can_split() && llama_get_causal_attn(ctx_tgt);
+++                    const auto prompt_batch_start = batch.size();
+++
+++                    // Apply a per-slot text cap after accounting for all tokens already queued.
+++                    while (slot.prompt.n_tokens() < slot.task->n_tokens() && batch.size() < n_batch
+++                            && (!cap_prompt || batch.size() - prompt_batch_start < prompt_batch_token_cap)) {
++                         // get next token to process
++                         llama_token cur_tok = input_tokens[slot.prompt.n_tokens()];
++                         if (cur_tok == LLAMA_TOKEN_NULL) {
++@@ -4552,6 +4575,11 @@
++                                 break;
++                             }
++                         }
+++                    }
+++
+++                    if (cap_prompt && batch.size() > prompt_batch_start) {
+++                        SLT_INF(slot, "prompt_batch_layout: tokens = %d, cap = %d\n",
+++                                batch.size() - prompt_batch_start, prompt_batch_token_cap);
++                     }
++ 
++                     // the number of tokens added to the batch for the current slot
+diff --git a/jiuwenswarm/factory/ccs/prompt_batch_layout/run.py b/jiuwenswarm/factory/ccs/prompt_batch_layout/run.py
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/prompt_batch_layout/run.py
+@@ -0,0 +1,98 @@
++"""Plan and verify a pinned text prompt policy through CCv2."""
++
++import hashlib
++import json
++import sys
++from pathlib import Path
++
++
++ENGINE_COMMIT = "cf34d311332e362198f0a410c466d1e940287d02"
++SCOPE = "single-slot-causal-text-completion"
++CAP_VARIABLE = "LLAMA_PREFILL_PROMPT_CAP"
++PATCH = Path(__file__).with_name("llama-cf34d311-prompt-batch-layout.patch")
++
++
++def record(value, fields, name):
++    if not isinstance(value, dict) or set(value) != set(fields.split()):
++        raise ValueError(f"{name} must contain {fields}")
++    return value
++
++
++def integer(value, limit, name):
++    if type(value) is not int or not 1 <= value <= limit:
++        raise ValueError(f"{name} must be an integer in [1, {limit}]")
++    return value
++
++
++def policy(spec):
++    record(spec, "engine_commit scope parallel n_batch n_ubatch prompt_cap", "spec")
++    if spec["engine_commit"] != ENGINE_COMMIT or spec["scope"] != SCOPE:
++        raise ValueError("Unsupported engine revision or completion scope")
++    integer(spec["parallel"], 1, "parallel")
++    batch = integer(spec["n_batch"], 2**31 - 1, "n_batch")
++    ubatch = integer(spec["n_ubatch"], batch, "n_ubatch")
++    cap = integer(spec["prompt_cap"], ubatch, "prompt_cap")
++    return {
++        "engine_commit": ENGINE_COMMIT,
++        "scope": SCOPE,
++        "argv": ["--batch-size", str(batch), "--ubatch-size", str(ubatch), "--parallel", "1"],
++        "env": {CAP_VARIABLE: str(cap)},
++        "patch_sha256": hashlib.sha256(PATCH.read_bytes()).hexdigest(),
++    }
++
++
++def verify(spec, fixtures):
++    run_policy = policy(spec)
++    cap = int(run_policy["env"][CAP_VARIABLE])
++    if not isinstance(fixtures, list) or not fixtures:
++        raise ValueError("fixtures must be a nonempty list")
++    results = []
++    names = set()
++    for fixture in fixtures:
++        record(fixture, "name prompt_tokens chunks stock candidate", "fixture")
++        name = fixture["name"]
++        if not isinstance(name, str) or not name or name in names:
++            raise ValueError("Fixture names must be unique nonempty strings")
++        names.add(name)
++        prompt_tokens = integer(fixture["prompt_tokens"], 2**31 - 1, "prompt_tokens")
++        chunks = fixture["chunks"]
++        if not isinstance(chunks, list) or not chunks:
++            raise ValueError(f"{name}: no prompt batch rows observed")
++        for chunk in chunks:
++            integer(chunk, cap, f"{name} chunk size")
++        if sum(chunks) != prompt_tokens:
++            raise ValueError(f"{name}: batch rows do not account for the full processed prompt")
++        if prompt_tokens > cap and max(chunks) != cap:
++            raise ValueError(f"{name}: long fixture never reached the requested cap")
++        for arm in ("stock", "candidate"):
++            output = record(fixture[arm], "tokens stop", arm)
++            if (not isinstance(output["tokens"], list) or not output["tokens"]
++                    or any(type(token) is not int or token < 0 for token in output["tokens"])
++                    or not isinstance(output["stop"], str) or not output["stop"]):
++                raise ValueError(f"{name}: incomplete {arm} token or stop evidence")
++        if fixture["stock"] != fixture["candidate"]:
++            raise ValueError(f"{name}: greedy token IDs or stop reason differ")
++        results.append({"name": name, "prompt_tokens": prompt_tokens, "chunks": chunks})
++    if not any(row["prompt_tokens"] > cap for row in results):
++        raise ValueError("At least one fixture must cross the cap")
++    return {"exact_greedy_parity": True, "prompt_cap": cap, "fixtures": results}
++
++
++def main():
++    packet = json.load(sys.stdin)
++    inputs = packet["inputs"]
++    try:
++        if packet["capability"] == "plan":
++            outputs = {"policy": policy(inputs["spec"])}
++        elif packet["capability"] == "verify":
++            outputs = {"verification": verify(inputs["spec"], inputs["fixtures"])}
++        else:
++            raise ValueError("Unsupported capability")
++        result = {"outcome": "ok", "outputs": outputs}
++    except ValueError as error:
++        result = {"outcome": "error", "error": {"code": "INVALID_INPUT", "message": str(error)}}
++    print(json.dumps(result))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/jiuwenswarm/factory/ccs/prompt_batch_layout/satay_smoke.py b/jiuwenswarm/factory/ccs/prompt_batch_layout/satay_smoke.py
+new file mode 100644
+--- /dev/null
++++ b/jiuwenswarm/factory/ccs/prompt_batch_layout/satay_smoke.py
+@@ -0,0 +1,190 @@
++"""Exercise the capsule and its pinned server patch on a small local model."""
++
++import argparse
++import json
++import os
++import re
++import socket
++import subprocess
++import time
++from pathlib import Path
++from urllib.error import URLError
++from urllib.request import Request, urlopen
++
++from jiuwenswarm.ccv2.ccv2 import Host
++
++from run import CAP_VARIABLE, ENGINE_COMMIT, SCOPE
++
++
++PORT = 5175
++ROWS = re.compile(r"prompt_batch_layout: tokens = (\d+), cap = (\d+)")
++PROMPTS = {
++    "short": "The capital of France is",
++    "medium": (
++        "Finish the simple arithmetic sequence. Each integer increases by one. "
++        "Continue with integers only: 1, 2, 3, 4, 5,"
++    ),
++    "long": (
++        "The following sentences are background for a reading exercise. "
++        + "The little green train arrives at the station early each Monday. " * 11
++        + "Complete this sentence with the name of the country: Paris is the capital of"
++    ),
++}
++
++
++def request(route, payload=None, timeout=45):
++    data = None if payload is None else json.dumps(payload).encode()
++    req = Request(f"http://127.0.0.1:{PORT}/{route}", data, {"Content-Type": "application/json"})
++    with urlopen(req, timeout=timeout) as response:
++        return json.load(response)
++
++
++def write_json(path, value):
++    path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
++
++
++def wait_ready(process):
++    deadline = time.monotonic() + 120
++    while time.monotonic() < deadline and process.poll() is None:
++        try:
++            if request("health", timeout=2).get("status") == "ok":
++                return
++        except (URLError, TimeoutError):
++            pass
++        time.sleep(0.25)
++    raise RuntimeError(f"Server did not become ready (exit={process.poll()})")
++
++
++def stop(process):
++    if process.poll() is None:
++        process.terminate()
++        try:
++            process.wait(timeout=10)
++        except subprocess.TimeoutExpired:
++            process.kill()
++            process.wait()
++
++
++def run_arm(base, binary, model, arm, flags, setting=None):
++    with socket.socket() as probe:
++        if probe.connect_ex(("127.0.0.1", PORT)) == 0:
++            raise RuntimeError(f"Port {PORT} is already in use")
++    env = os.environ.copy()
++    env.pop(CAP_VARIABLE, None)
++    if setting is not None:
++        env[CAP_VARIABLE] = str(setting)
++    command = [
++        str(binary), "--host", "127.0.0.1", "--port", str(PORT), "--model", str(model),
++        "--gpu-layers", "0", "--ctx-size", "512", "--threads", "2",
++        "--ctx-checkpoints", "0", *flags,
++    ]
++    log = base / f"{arm}.log"
++    observations = {}
++    with log.open("wb", buffering=0) as output, log.open("rb") as reader:
++        process = subprocess.Popen(command, env=env, stdout=output, stderr=subprocess.STDOUT)
++        try:
++            if arm == "invalid":
++                if process.wait(timeout=20) == 0:
++                    raise RuntimeError("Invalid startup returned success")
++                if "must be a positive 32-bit integer" not in log.read_text(errors="replace"):
++                    raise RuntimeError("Server did not reject the malformed cap")
++                return {}
++            wait_ready(process)
++            for name, prompt in PROMPTS.items():
++                reader.seek(0, os.SEEK_END)
++                payload = {
++                    "prompt": prompt, "n_predict": 8, "temperature": 0, "seed": 47,
++                    "cache_prompt": False, "return_tokens": True, "stream": False,
++                }
++                response = request("completion", payload)
++                rows = ROWS.findall(reader.read().decode(errors="replace"))
++                if setting is None and rows:
++                    raise RuntimeError(f"{arm}/{name}: disabled policy emitted engagement")
++                if any(int(cap) != setting for _, cap in rows):
++                    raise RuntimeError(f"{arm}/{name}: runtime reported a different cap")
++                if response["truncated"] or not response["stop"]:
++                    raise RuntimeError(f"{arm}/{name}: fixture did not complete")
++                processed = response.pop("timings")["prompt_n"]
++                if processed != response["tokens_evaluated"]:
++                    raise RuntimeError(f"{arm}/{name}: fixture did not process the full uncached prompt")
++                observations[name] = {
++                    "request": payload,
++                    "response": response,
++                    "chunks": [int(tokens) for tokens, _ in rows],
++                    "prompt_tokens": response["tokens_evaluated"],
++                    "output": {"tokens": response["tokens"], "stop": response["stop_type"]},
++                }
++        finally:
++            stop(process)
++    write_json(base / f"{arm}.json", observations)
++    return observations
++
++
++def invoke(host, release, capability, inputs, receipt_path):
++    receipt = host.call(release, capability, inputs, grants=["process.exec"])
++    write_json(receipt_path, receipt)
++    if not receipt["outputs"]:
++        raise RuntimeError(f"CC {capability} failed. See {receipt_path}")
++    return receipt["outputs"]
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("stage", choices=("prepare", "stock", "candidate"))
++    parser.add_argument("--work", required=True, type=Path)
++    parser.add_argument("--binary", type=Path)
++    parser.add_argument("--model", type=Path)
++    args = parser.parse_args()
++
++    base = args.work
++    base.mkdir(parents=True, exist_ok=True)
++    host = Host(base / "cc-store")
++    release = host.prepare(Path(__file__).resolve().parent)
++    spec = {"engine_commit": ENGINE_COMMIT, "scope": SCOPE, "parallel": 1,
++            "n_batch": 128, "n_ubatch": 128, "prompt_cap": 16}
++    initial = invoke(host, release, "plan", {"spec": spec}, base / f"plan-{args.stage}.receipt.json")["policy"]
++    if args.stage == "prepare":
++        material = host.material(release, "server_patch")
++        if material["artifact"]["sha256"] != initial["patch_sha256"]:
++            raise RuntimeError("Sealed patch digest mismatch")
++        write_json(base / "server-patch.material.json", material)
++        (base / "server.patch").write_bytes(host.artifact_path(material["artifact"]).read_bytes())
++        return
++    if args.model is None or args.binary is None:
++        parser.error("--binary and --model are required for runtime checks")
++    if args.stage == "stock":
++        run_arm(base, args.binary, args.model, "stock", initial["argv"])
++        return
++
++    stock = json.loads((base / "stock.json").read_text(encoding="utf-8"))
++    rollback = run_arm(base, args.binary, args.model, "rollback", initial["argv"])
++    for name, reference in stock.items():
++        if any(rollback[name][key] != reference[key] for key in ("output", "prompt_tokens")):
++            raise RuntimeError(f"Rollback differs from the independently built stock fixture {name}")
++    run_arm(base, args.binary, args.model, "invalid", initial["argv"], setting="16x")
++
++    for cap in (16, 32):
++        spec["prompt_cap"] = cap
++        arm = f"cap{cap}"
++        trial = invoke(host, release, "plan", {"spec": spec}, base / f"plan-{arm}.receipt.json")["policy"]
++        candidate = run_arm(base, args.binary, args.model, arm, trial["argv"], int(trial["env"][CAP_VARIABLE]))
++        fixtures = []
++        for name, observation in candidate.items():
++            if stock[name]["prompt_tokens"] != observation["prompt_tokens"]:
++                raise RuntimeError(f"{arm}/{name}: processed prompt lengths differ")
++            full, remainder = divmod(observation["prompt_tokens"], cap)
++            expected_chunks = [cap] * full
++            if remainder:
++                expected_chunks.append(remainder)
++            if observation["chunks"] != expected_chunks:
++                raise RuntimeError(f"{arm}/{name}: expected {expected_chunks}, observed {observation['chunks']}")
++            fixtures.append({
++                "name": name, "prompt_tokens": observation["prompt_tokens"], "chunks": observation["chunks"],
++                "stock": stock[name]["output"], "candidate": observation["output"],
++            })
++        verdict = invoke(host, release, "verify", {"spec": spec, "fixtures": fixtures}, base / f"verify-{arm}.receipt.json")
++        print(json.dumps(verdict["verification"]), flush=True)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tests/factory/fixtures/satay_expert_route_campaign.py b/tests/factory/fixtures/satay_expert_route_campaign.py
+new file mode 100644
+--- /dev/null
++++ b/tests/factory/fixtures/satay_expert_route_campaign.py
+@@ -0,0 +1,101 @@
++"""Exercise the route-capture and existing cache methodology CCs on four Granite requests."""
++
++import argparse
++import json
++import subprocess
++from pathlib import Path
++
++from jiuwenswarm.ccv2.ccv2 import Host
++
++
++PROMPTS = {
++    "reference": "Complete this sentence: the capital of France is",
++    "arithmetic": "Continue the sequence of square numbers: 1, 4, 9, 16,",
++    "prose": "Write one sentence about a train arriving in the rain:",
++    "code": "In Python, write the first line of a function that adds two numbers:",
++}
++
++
++def write_json(path, record):
++    path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
++
++
++def run_probe(out, probe, model, request, prompt, mode):
++    with (out / f"{request}-{mode}.log").open("w", encoding="utf-8") as log:
++        process = subprocess.run([str(probe), str(model), mode, prompt], stdout=subprocess.PIPE, stderr=log,
++                                 text=True, check=True, timeout=90)
++    (out / f"{request}-{mode}.txt").write_text(process.stdout, encoding="utf-8")
++    return process.stdout
++
++
++def invoke(host, out, release, capability, inputs, label, expected="succeeded"):
++    receipt = host.call(release, capability, inputs, grants=["process.exec"], timeout=120)
++    write_json(out / f"{label}.receipt.json", receipt)
++    if receipt["state"] != expected:
++        raise RuntimeError(f"{label}: expected {expected}, got {receipt['state']}: {receipt['diagnostics']}")
++    return receipt
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    for field in ("work", "probe", "model", "geometry", "route-bundle", "cache-bundle"):
++        parser.add_argument(f"--{field}", required=True, type=Path)
++    args = parser.parse_args()
++
++    out = args.work
++    out.mkdir(parents=True, exist_ok=True)
++    host = Host(out / "cc-store")
++    route_release = host.prepare(args.route_bundle)
++    cache_release = host.prepare(args.cache_bundle)
++    geometry = json.loads(args.geometry.read_text(encoding="utf-8"))
++    events, routes = [], {}
++    for request, prompt in PROMPTS.items():
++        inputs = {
++            "request_id": request, "geometry": geometry,
++            "reference": run_probe(out, args.probe, args.model, request, prompt, "off"),
++            "capture": run_probe(out, args.probe, args.model, request, prompt, "on"),
++        }
++        adapted = invoke(host, out, route_release, "adapt", inputs, f"{request}-adapt")["outputs"]
++        routes[request] = adapted["verification"]
++        for event in adapted["cache_lab_input"]["trace"]:
++            events.append({**event, "seq": len(events)})
++        if request == "reference":
++            captured_rows = inputs["capture"].splitlines()
++            missing_row = captured_rows[:-1]
++            if not captured_rows[-1].startswith("R "):
++                raise RuntimeError("Missing-layer test did not select a route row")
++            rejection = invoke(host, out, route_release, "adapt",
++                               inputs | {"capture": "\n".join(missing_row)}, "missing-route-negative", expected="failed")
++            if rejection["reason"] != "INVALID_INPUT":
++                raise RuntimeError("Expected typed invalid input for missing layer coverage")
++
++    replay_input = {"trace": events, "layers": geometry["layers"], "experts": geometry["experts"]}
++    validated = invoke(host, out, cache_release, "validate", {"inputs": replay_input}, "cache-validate")
++    validation = validated["outputs"]["result"]
++    if validation["requests"] != len(PROMPTS) or validation["events"] != len(events):
++        raise RuntimeError("Cache lab did not validate the whole trace")
++    replays = {}
++    for mib in (64, 256, 512, 768):
++        call = invoke(host, out, cache_release, "replay", {
++            "inputs": replay_input | {"capacity_bytes": mib * 1024**2, "policy": "lru"},
++        }, f"lru-{mib}mib")
++        result = call["outputs"]["result"]
++        if result["hits"] + result["misses"] != len(events) or result["peak_resident_bytes"] > mib * 1024**2:
++            raise RuntimeError("Replay output violated the event or budget accounting")
++        replays[str(mib)] = {key: result[key] for key in ("hits", "misses", "peak_resident_bytes")}
++    prediction = invoke(host, out, cache_release, "predict", {
++        "inputs": replay_input | {"evaluation_requests": ["code"], "top_k": geometry["top_k"]},
++    }, "frozen-code-holdout")["outputs"]["result"]
++    if {row["request"] for row in prediction["predictions"]} != {"code"}:
++        raise RuntimeError("Prediction output crossed the request holdout")
++    summary = {
++        "route_release": route_release, "cache_release": cache_release, "captures": routes,
++        "validation": validation, "lru_replays_mib": replays, "heldout_request": "code",
++        "prediction": {key: prediction[key] for key in ("evaluation_groups", "evaluation_events", "hits")},
++    }
++    write_json(out / "summary.json", summary)
++    print(json.dumps(summary))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tests/factory/fixtures/satay_prompt_batch_overlap.py b/tests/factory/fixtures/satay_prompt_batch_overlap.py
+new file mode 100644
+--- /dev/null
++++ b/tests/factory/fixtures/satay_prompt_batch_overlap.py
+@@ -0,0 +1,103 @@
++"""Verify the single-slot policy bypass against an independent two-slot stock server.
++
++Add the deployed prompt_batch_layout directory to PYTHONPATH to reuse the
++single-slot pilot's localhost transport and process handling.
++"""
++
++import argparse
++import json
++import os
++import socket
++import subprocess
++from pathlib import Path
++
++from jiuwenswarm.ccv2.ccv2 import Host
++
++from satay_smoke import CAP_VARIABLE, ENGINE_COMMIT, PORT, ROWS, SCOPE, invoke, request, stop, wait_ready, write_json
++
++
++PROMPT = (
++    "The engine will process both a short prompt and a longer prompt. "
++    "Each slot should produce its own independent completion while the scheduler "
++    "continues to admit prompt tokens and evaluate the decode token of the other slot. "
++    "The little green train leaves the station again the next day."
++)
++
++
++def run_arm(base, arm, binary, model, policy, payload=None):
++    with socket.socket() as probe:
++        if probe.connect_ex(("127.0.0.1", PORT)) == 0:
++            raise RuntimeError(f"Port {PORT} is already in use")
++    env = os.environ.copy()
++    env.pop(CAP_VARIABLE, None)
++    env["LD_LIBRARY_PATH"] = str(binary.parent)
++    if arm == "overlap-candidate":
++        env.update(policy["env"])
++    command = [
++        str(binary), "--model", str(model), "--host", "127.0.0.1", "--port", str(PORT),
++        "--gpu-layers", "0", "--threads", "2", "--ctx-size", "512",
++        "--cont-batching", "--ctx-checkpoints", "0", *policy["argv"], "--parallel", "2",
++    ]
++    log = base / f"{arm}.log"
++    with log.open("wb", buffering=0) as output:
++        process = subprocess.Popen(command, env=env, stdout=output, stderr=subprocess.STDOUT)
++        try:
++            wait_ready(process)
++            if payload is None:
++                tokens = request("tokenize", {"content": PROMPT, "add_special": True})["tokens"]
++                if len(tokens) < 35:
++                    raise RuntimeError("Tokenizer did not provide enough IDs for the fixture")
++                payload = {
++                    "prompt": [tokens[:8], tokens[:35]], "cache_prompt": False, "n_predict": 4,
++                    "ignore_eos": True, "temperature": 0, "seed": 47, "return_tokens": True, "stream": False,
++                }
++            responses = sorted(request("completion", payload), key=lambda response: response["index"])
++        finally:
++            stop(process)
++    if len(responses) != 2 or responses[0]["id_slot"] == responses[1]["id_slot"]:
++        raise RuntimeError(f"{arm}: expected two distinct live slots")
++    for expected, response in zip((8, 35), responses):
++        processed = response.pop("timings")["prompt_n"]
++        if response["truncated"] or not response["stop"] or processed != expected:
++            raise RuntimeError(f"{arm}: unexpected uncached prompt processing")
++        if response["tokens_evaluated"] != expected or len(response["tokens"]) != 4:
++            raise RuntimeError(f"{arm}: unexpected input or generated token count")
++    log_text = log.read_text(encoding="utf-8", errors="replace")
++    if "retrying with smaller batch size" in log_text:
++        raise RuntimeError(f"{arm}: KV cache retried with a smaller batch")
++    write_json(base / f"{arm}.json", {"request": payload, "responses": responses})
++    return payload, responses, log_text
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--work", type=Path, required=True)
++    parser.add_argument("--bundle", type=Path, required=True)
++    parser.add_argument("--stock", type=Path, required=True)
++    parser.add_argument("--candidate", type=Path, required=True)
++    parser.add_argument("--model", type=Path, required=True)
++    args = parser.parse_args()
++    base = args.work
++    base.mkdir(parents=True, exist_ok=True)
++    host = Host(base / "cc-store")
++    release = host.prepare(args.bundle)
++    spec = {"engine_commit": ENGINE_COMMIT, "scope": SCOPE, "parallel": 1,
++            "n_batch": 64, "n_ubatch": 32, "prompt_cap": 16}
++    policy = invoke(host, release, "plan", {"spec": spec}, base / "overlap-plan.receipt.json")["policy"]
++    payload, stock, stock_log = run_arm(base, "overlap-stock", args.stock, args.model, policy)
++    _, candidate, candidate_log = run_arm(base, "overlap-candidate", args.candidate, args.model, policy, payload)
++    if ROWS.search(stock_log) or ROWS.search(candidate_log):
++        raise RuntimeError("A two-slot server unexpectedly emitted cap engagement rows")
++    if "disabled unless exactly one slot is configured" not in candidate_log:
++        raise RuntimeError("Guarded server did not report its disabled policy")
++    keys = ("tokens", "stop_type", "stopping_word")
++    if any(tuple(a[k] for k in keys) != tuple(b[k] for k in keys) for a, b in zip(stock, candidate)):
++        raise RuntimeError("Mixed workload changed exact greedy outputs or stops")
++    proof = {"cc_release": release, "exact_greedy_parity": True, "cap_multi_slot_bypassed": True,
++             "prompt_tokens": [8, 35], "generated_tokens": [4, 4]}
++    write_json(base / "overlap-verdict.json", proof)
++    print(json.dumps(proof))
++
++
++if __name__ == "__main__":
++    main()
