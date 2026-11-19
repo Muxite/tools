@@ -25,7 +25,7 @@ new file mode 100644
 @@ -0,0 +1,40 @@
 +cc: '2'
 +id: observability.expert_route_capture
-+version: 1.0.0
++version: 1.0.1
 +materials:
 +  method:
 +    kind: method
@@ -67,7 +67,7 @@ diff --git a/jiuwenswarm/factory/ccs/expert_route_capture/expert_route_probe.cpp
 new file mode 100644
 --- /dev/null
 +++ b/jiuwenswarm/factory/ccs/expert_route_capture/expert_route_probe.cpp
-@@ -0,0 +1,119 @@
+@@ -0,0 +1,137 @@
 +#include "llama.h"
 +#include "ggml-backend.h"
 +
@@ -114,6 +114,19 @@ new file mode 100644
 +    return true;
 +}
 +
++static bool evaluate(llama_context * context, llama_batch_ext * batch, const llama_token * tokens,
++        int count, llama_pos position) {
++    llama_batch_ext_clear(batch);
++    for (int index = 0; index < count; ++index, ++position) {
++        const int entry = llama_batch_ext_add_token(batch, 0, tokens[index]);
++        if (entry < 0 || !llama_batch_ext_set_pos(batch, entry, &position)
++                || !llama_batch_ext_set_output_logits(batch, entry, index == count - 1)) {
++            return false;
++        }
++    }
++    return llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch) == 0;
++}
++
 +static bool run(const char * path, bool enable_capture, std::string_view text) {
 +    constexpr int batch_limit = 64;
 +    constexpr int generated_count = 8;
@@ -148,7 +161,12 @@ new file mode 100644
 +    }
 +    std::unique_ptr<llama_context, decltype(&llama_free)> context(
 +            llama_init_from_model(model.get(), ctx_params), llama_free);
-+    if (!context || llama_decode(context.get(), llama_batch_get_one(prompt.data(), prompt_size)) != 0) {
++    if (!context) {
++        return false;
++    }
++    std::unique_ptr<llama_batch_ext, decltype(&llama_batch_ext_free)> batch(
++            llama_batch_ext_init(context.get()), llama_batch_ext_free);
++    if (!batch || !evaluate(context.get(), batch.get(), prompt.data(), prompt_size, 0)) {
 +        return false;
 +    }
 +    std::unique_ptr<llama_sampler, decltype(&llama_sampler_free)> sampler(
@@ -168,7 +186,7 @@ new file mode 100644
 +        auto token = llama_sampler_sample(sampler.get(), context.get(), -1);
 +        capture.position = prompt_size + step;
 +        std::printf("G %d %d\n", capture.position, token);
-+        if (llama_decode(context.get(), llama_batch_get_one(&token, 1)) != 0 || capture.invalid_tensor) {
++        if (!evaluate(context.get(), batch.get(), &token, 1, capture.position) || capture.invalid_tensor) {
 +            std::fputs("Could not evaluate a single decode token with the expected expert tensor\n", stderr);
 +            return false;
 +        }
