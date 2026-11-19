@@ -902,6 +902,113 @@ new file mode 100644
 +
 +if __name__ == "__main__":
 +    main()
+diff --git a/tests/factory/fixtures/satay_prompt_batch_cached_prefix.py b/tests/factory/fixtures/satay_prompt_batch_cached_prefix.py
+new file mode 100644
+--- /dev/null
++++ b/tests/factory/fixtures/satay_prompt_batch_cached_prefix.py
+@@ -0,0 +1,102 @@
++"""Check packed prompt admission when a single slot reuses its KV prefix."""
++
++import argparse
++import json
++import os
++import socket
++import subprocess
++from pathlib import Path
++
++from jiuwenswarm.ccv2.ccv2 import Host
++
++from satay_smoke import CAP_VARIABLE, ENGINE_COMMIT, PORT, ROWS, SCOPE, invoke, request, stop, wait_ready, write_json
++
++
++PROMPT = (
++    "Read this short example about the green train. "
++    + "The green train stops at the platform to collect passengers. " * 14
++    + "Paris is the capital of France. Dublin is the capital of Ireland. "
++    + "Berlin is the capital of Germany. Complete the sentence: Rome is the capital of"
++)
++
++
++def run_trial(out, arm, binary, model, policy, enabled, prompts=None):
++    with socket.socket() as probe:
++        if probe.connect_ex(("127.0.0.1", PORT)) == 0:
++            raise RuntimeError(f"Port {PORT} is already in use")
++    env = os.environ.copy()
++    env.pop(CAP_VARIABLE, None)
++    env["LD_LIBRARY_PATH"] = str(binary.parent)
++    if enabled:
++        env.update(policy["env"])
++    command = [
++        str(binary), "--model", str(model), "--host", "127.0.0.1", "--port", str(PORT),
++        "--ctx-size", "512", "--gpu-layers", "0", "--threads", "2", "--ctx-checkpoints", "0", *policy["argv"],
++    ]
++    path = out / f"{arm}.log"
++    results = []
++    with path.open("wb", buffering=0) as output, path.open("rb") as reader:
++        process = subprocess.Popen(command, env=env, stdout=output, stderr=subprocess.STDOUT)
++        try:
++            wait_ready(process)
++            if prompts is None:
++                tokens = request("tokenize", {"content": PROMPT, "add_special": True})["tokens"]
++                if len(tokens) <= 150:
++                    raise RuntimeError("The prompt did not produce the expected fixture length")
++                prompts = [tokens[:-36], tokens, tokens]
++            for index, tokens in enumerate(prompts):
++                reader.seek(0, os.SEEK_END)
++                response = request("completion", {
++                    "prompt": tokens, "seed": 47, "temperature": 0, "cache_prompt": True,
++                    "n_predict": 1 if index == 0 else 4, "return_tokens": True,
++                })
++                chunks = [int(count) for count, _ in ROWS.findall(reader.read().decode(errors="replace"))]
++                if response["truncated"] or not response["stop"] or response["tokens_evaluated"] != len(tokens):
++                    raise RuntimeError(f"{arm}: invalid completion or prompt length")
++                results.append({
++                    "tokens": response["tokens"], "stop": response["stop_type"], "chunks": chunks,
++                    "processed": response["timings"]["prompt_n"], "prompt_tokens": response["tokens_evaluated"],
++                })
++        finally:
++            stop(process)
++    write_json(out / f"{arm}.json", {"prompts": prompts, "results": results})
++    return prompts, results
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    for field in ("work", "bundle", "stock", "candidate", "model"):
++        parser.add_argument(f"--{field}", required=True, type=Path)
++    args = parser.parse_args()
++    out = args.work
++    out.mkdir(parents=True, exist_ok=True)
++    host = Host(out / "cc-store")
++    release = host.prepare(args.bundle)
++    spec = {"engine_commit": ENGINE_COMMIT, "scope": SCOPE, "parallel": 1,
++            "n_batch": 128, "n_ubatch": 128, "prompt_cap": 16}
++    first = invoke(host, release, "plan", {"spec": spec}, out / "plan-cap16.receipt.json")["policy"]
++    prompts, stock = run_trial(out, "stock", args.stock, args.model, first, enabled=False)
++    processed = [len(prompts[0]), len(prompts[1]) - len(prompts[0]), 1]
++    if [cell["processed"] for cell in stock] != processed:
++        raise RuntimeError("Stock did not process the expected fresh-prefix, suffix and final token counts")
++    summary = {"stock": stock}
++    for cap in (16, 32):
++        arm = f"cap{cap}"
++        spec["prompt_cap"] = cap
++        policy = first if cap == 16 else invoke(host, release, "plan", {"spec": spec}, out / "plan-cap32.receipt.json")["policy"]
++        _, candidate = run_trial(out, arm, args.candidate, args.model, policy, enabled=True, prompts=prompts)
++        summary[arm] = candidate
++        for baseline, actual in zip(stock, candidate):
++            if any(actual[key] != baseline[key] for key in ("tokens", "stop", "prompt_tokens", "processed")):
++                raise RuntimeError(f"{arm}: cached-prefix behavior differs from independent stock")
++            rows = actual["chunks"]
++            full, remainder = divmod(actual["processed"], cap)
++            expected = [cap] * full + ([remainder] if remainder else [])
++            if rows != expected:
++                raise RuntimeError(f"{arm}: expected prompt rows {expected}, observed {rows}")
++    write_json(out / "comparison.json", summary)
++    print(json.dumps(summary))
++
++
++if __name__ == "__main__":
++    main()
 diff --git a/tests/factory/fixtures/satay_prompt_batch_overlap.py b/tests/factory/fixtures/satay_prompt_batch_overlap.py
 new file mode 100644
 --- /dev/null
