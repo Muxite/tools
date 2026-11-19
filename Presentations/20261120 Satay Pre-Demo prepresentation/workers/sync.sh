@@ -21,6 +21,17 @@ cp_dir() { # src dst  (no rsync dependency)
 [ -d "$HOME/predemo/runs" ] && cp_dir "$HOME/predemo/runs" "$D/runs"
 [ -d "$HOME/predemo/docs-sync" ] && cp_dir "$HOME/predemo/docs-sync" "$D/docs"
 for f in one_shot.sh sync.sh w1.txt w2.txt w3.txt; do [ -f "$HOME/predemo/$f" ] && cp "$HOME/predemo/$f" "$D/workers/$f"; done
+# JiuwenSwarm worktree: the five new capsules, factory fix diff, new tasks/contracts
+W=/home/muk/predemo/jiuwenswarm-work
+if [ -d "" ]; then
+  mkdir -p "/jiuwenswarm"
+  for c in observability_event_recorder expert_weight_cache weight_placement_planner expert_demand_predictor batch_layout_mapper; do
+    [ -d "/jiuwenswarm/factory/ccs/" ] && cp_dir "/jiuwenswarm/factory/ccs/" "/jiuwenswarm/ccs/"
+  done
+  (cd "" && git diff -- jiuwenswarm tests :!jiuwenswarm/factory/ccs > "/home/muk/predemo/factory-source.diff" 2>/dev/null; true)
+  cp "/home/muk/predemo/factory-source.diff" "/jiuwenswarm/factory-source.diff" 2>/dev/null || true
+  for f in ""/jiuwenswarm/factory/contracts/star-* ""/jiuwenswarm/factory/tasks/star-* ""/jiuwenswarm/factory/tasks/STAR-README.md; do [ -f "" ] && { mkdir -p "/jiuwenswarm/factory-new"; cp "" "/jiuwenswarm/factory-new/"; }; done
+fi
 # keep logs small: only the tail of each worker/build log
 mkdir -p "$D/logs"
 for f in "$HOME"/predemo/logs/*.log; do [ -f "$f" ] && tail -n 200 "$f" > "$D/logs/$(basename "$f")"; done
