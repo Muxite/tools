@@ -1,0 +1,10 @@
+You are a coding agent on Satay (Jetson Orin Nano, aarch64, Ubuntu 22.04, 7.4 GiB RAM). No sudo, no network, no GPU, do not kill processes you did not start. Work ONLY inside your arm directory: __ARMDIR__ . It contains `src/`, a pristine checkout of llama.cpp at commit 9048bad8d6e3a0f9f1726e238e451181c7e02613 (git repo, clean). Edit only `src/`. For compile checking, a full build is slow on this machine (30+ minutes cold). Prefer compiling only the translation units you change with the exact flags from ~/predemo/build-stock-cuda87/compile_commands.json (read-only reference; the paths point at the pristine tree, so substitute your src/ path and use -fsyntax-only or -c to a scratch file inside your arm directory). You may run a full build in __ARMDIR__/build if you want, with -j2.
+
+YOUR TASK: implement the work order below as a source diff in `src/`. When finished, save the diff of your changes (`git -C src diff` including new files via `git add -N` first) to __ARMDIR__/candidate.diff. Stop after at most 60 minutes of wall-clock work or when you consider the work done and verified, whichever comes first.
+
+You cannot run the model (no GPU access and no ability to open ports in your sandbox). So some checks cannot be run by you. Your FINAL MESSAGE must contain: (1) files changed; (2) the exact checks you ran with their real outcomes; (3) the exact checks you did NOT run; (4) every assumption or default you chose where the work order was silent; (5) whether you consider the work done and why. Do not claim a check passed that you did not run. An independent scorer will judge your diff afterwards: it applies the diff to a pristine tree, checks scope against the allowed paths, builds llama-server, runs a greedy generation on a small MoE model with the gate unset and set, compares output bytes with stock and looks for the required log lines at -lv 4.
+
+__ARMEXTRA__
+
+=== WORK ORDER ===
+__WO__

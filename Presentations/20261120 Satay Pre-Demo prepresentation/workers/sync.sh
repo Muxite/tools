@@ -20,7 +20,7 @@ cp_dir() { # src dst  (no rsync dependency)
 [ -d "$HOME/predemo/receipts" ] && cp_dir "$HOME/predemo/receipts" "$D/receipts"
 [ -d "$HOME/predemo/runs" ] && cp_dir "$HOME/predemo/runs" "$D/runs"
 [ -d "$HOME/predemo/docs-sync" ] && cp_dir "$HOME/predemo/docs-sync" "$D/docs"
-for f in one_shot.sh sync.sh preflight.sh w1.txt w2.txt w3.txt wcc.txt wfix.txt wprep.txt prov.sh prov2.sh; do [ -f "$HOME/predemo/$f" ] && cp "$HOME/predemo/$f" "$D/workers/$f"; done
+for f in ab/arm_prompt.txt ab/ab_run.sh ab/driver.sh ab/wscore.txt one_shot.sh sync.sh preflight.sh w1.txt w2.txt w3.txt wcc.txt wfix.txt wprep.txt prov.sh prov2.sh; do [ -f "$HOME/predemo/$f" ] && cp "$HOME/predemo/$f" "$D/workers/$(basename $f)"; done
 # JiuwenSwarm worktree: the five new capsules, factory fix diff, new tasks/contracts
 W=/home/muk/predemo/jiuwenswarm-work
 if [ -d "" ]; then
