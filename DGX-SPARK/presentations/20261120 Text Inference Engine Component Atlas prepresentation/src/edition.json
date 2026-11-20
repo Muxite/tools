@@ -458,7 +458,7 @@
         "tone": "positive",
         "summary": "At 60 GiB, faster first token than same-budget stock in all ten pairs per size; decode unchanged. At 30 GiB, iteration 1 was negative and iteration 2 (direct seed, O_DIRECT) reached warm parity with a cold-start win.",
         "rows": [
-          {"grade": "Quiet ABBA · 60 GiB · report-v3", "tone": "positive", "result": "C3 returned the first token sooner than stock A+ in all ten pairs per size: paired median 27.08 s saved at 512 tokens and 92.07 s at 2048 tokens (medians 23.317 s vs 49.936 s and 65.004 s vs 156.641 s). Decode change was -0.183 and -0.149 tok/s, inside the intervals.", "link": "evidence/reports/spark-p4-cache60-build-overlap--report-v3.md"},
+          {"grade": "Quiet ABBA · 60 GiB · report-v3", "tone": "positive", "result": "C3 v1.3 (commit ad2130b0, page-cache seeding) returned the first token sooner than stock A+ in all ten pairs per size: paired median 27.08 s saved at 512 tokens and 92.07 s at 2048 tokens (medians 23.317 s vs 49.936 s and 65.004 s vs 156.641 s). Decode change was -0.183 and -0.149 tok/s, inside the intervals.", "link": "evidence/reports/spark-p4-cache60-build-overlap--report-v3.md"},
           {"grade": "Screening · 60 GiB · build overlap · superseded by report-v3", "tone": "positive", "result": "C3 saved time in 10/10 pairs per size: paired median 24.92 s at 512 tokens and 90.80 s at 2048 tokens; decode -0.41 and -0.15 tok/s.", "link": "evidence/reports/spark-p4-cache60-build-overlap--report-v2.md"},
           {"grade": "Quiet ABBA · 30 GiB · iteration 1", "tone": "negative", "result": "Negative: -1.18 s and -2.84 s TTFT saved at 512 and 2048 tokens; decode +0.19 and +0.03 tok/s.", "link": "evidence/reports/spark-p4-cache30-attribution--report.md"},
           {"grade": "Quiet ABBA · 30 GiB · iteration 2, direct seed (O_DIRECT)", "tone": "neutral", "result": "Warm parity: -0.02 s and +0.20 s TTFT saved at 512 and 2048 tokens. Cold-start win: the first 512-token request after ready was 15.83 s and 12.06 s sooner in the two passes (11.97 s and 1.06 s including startup).", "link": "evidence/reports/spark-p4-cache30-direct-seed--report-v2.md"}
@@ -627,7 +627,7 @@
         "component": "engine.expert_weight_cache",
         "built": "A seeded expert weight cache over the native MoE cache bank; iteration 2 seeds it directly with O_DIRECT.",
         "build": "Three revisions built and run: 30 GiB iteration 1, 30 GiB direct seed, 60 GiB.",
-        "lab": "60 GiB report-v3, quiet ABBA: C3 vs stock A+ at the same 61,440 MiB bank, median TTFT saved 27.08 s at 512 tokens and 92.07 s at 2048 tokens, faster in 20/20 pairs; decode unchanged. 30 GiB direct seed: near parity warm, plus a cold-start win. 30 GiB iteration 1: slower (-1.18 / -2.84 s).",
+        "lab": "60 GiB report-v3, quiet ABBA: C3 v1.3 (profile seeding through the page cache, commit ad2130b0) vs stock A+ at the same 61,440 MiB bank, on a running server (the seeded server is ready about 88 s later), median TTFT saved 27.08 s at 512 tokens and 92.07 s at 2048 tokens, faster in 20/20 pairs; decode unchanged. 30 GiB v1.4 direct seed (commit 8e704490; not run at 60 GiB): near parity warm, plus a cold-start win. 30 GiB iteration 1: slower (-1.18 / -2.84 s).",
         "link": "evidence/reports/spark-p4-cache60-build-overlap--report-v3.md"
       },
       {
