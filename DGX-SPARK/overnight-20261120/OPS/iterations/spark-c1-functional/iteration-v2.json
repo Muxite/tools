@@ -1,0 +1,78 @@
+{
+  "analysis": {
+    "ccs": [
+      {
+        "id": "analysis.expert_routing_profile",
+        "release": "485ce6c02fd1926a4252f6cdc3d076213ae6c53d2e173288d41bb88f546e494e",
+        "version": "1.1.0"
+      },
+      {
+        "id": "analysis.expert_routing_profile",
+        "version": "1.2.0",
+        "release": "b7fa53d5c91345807b1372df359850a4c49d5f3c4b2d7bbdfaf0bfa3c1a454fa"
+      }
+    ],
+    "output_artifact_ids": [
+      "routing-transfer-analysis-report.json",
+      "routing-copy-timing-analysis-report.json",
+      "spark-c1-functional/copy-replay/bandwidth.json",
+      "spark-c1-functional/copy-replay/c1-copy-replay-plan.json",
+      "spark-c1-functional/copy-replay/result.json"
+    ]
+  },
+  "do": {
+    "build_receipt_ids": [
+      "3d4a835381364f5c9d2b62380ae3ecab:receipt"
+    ],
+    "diff_artifact_id": "spark-source-product.diff",
+    "source_commit": "9d0733cba12c164827b646ea86af618ce7b5ca47",
+    "verification_receipt_ids": [
+      "spark-source-verification-receipt.json"
+    ]
+  },
+  "iteration_id": "spark-c1-functional",
+  "lab": {
+    "result_artifact_ids": [
+      "spark-c1-functional/c1-recorder-off-01/start.json",
+      "spark-c1-functional/c1-recorder-off-01/result.json",
+      "spark-c1-functional/c1-recorder-off-01/parity-512-result.json",
+      "spark-c1-functional/c1-recorder-on-01/start.json",
+      "spark-c1-functional/c1-recorder-on-01/result.json",
+      "spark-c1-functional/c1-recorder-on-01/parity-512-result.json",
+      "spark-c1-functional/events.jsonl"
+    ],
+    "status": "functional-capped-probe; elapsed time ineligible"
+  },
+  "next_plan": {
+    "decision_id": null
+  },
+  "plan": {
+    "builder_ccs": [
+      {
+        "id": "observability.build_runtime_event_recorder",
+        "release": "e21a0f43b435f50649dd577b30f65e168e5849f6f6bc1dff702c11121e6002a1",
+        "version": "1.1.2"
+      }
+    ],
+    "decision_id": "spark-star-observability-event-recorder:decision:5",
+    "incoming_report_ids": [],
+    "rationale": "Produce initial recorder source and measure its actual dispatch behavior on Spark. Initial DO began before publication of the retrospective reference report."
+  },
+  "predecessor_report_ids": [
+    {
+      "artifact_id": "spark-p1-reference-reconnaissance/report.md",
+      "home": "~/predemo-spark/factory-runs/spark-direct-benchmarks",
+      "sha256": "71c3a2f25cfb217efaf4614101163a5c52aa5bab14a3add8ff8e8a6ba15ea115",
+      "task_id": "spark-direct-benchmarks-20261120"
+    }
+  ],
+  "report": {
+    "artifact_id": "spark-c1-functional/report-v2.md",
+    "sha256": "a08c95234ee30a48ebb1c5498ce00938f797985ec0dc90b89e2b5888723f25a1",
+    "status": "functional evidence; independent fixture zero-loss pending",
+    "supersedes_artifact_id": "spark-c1-functional/report.md",
+    "supersedes_observation_id": "spark-c1-functional:report",
+    "revision": 2
+  },
+  "schema": "spark-factory-iteration/1"
+}
