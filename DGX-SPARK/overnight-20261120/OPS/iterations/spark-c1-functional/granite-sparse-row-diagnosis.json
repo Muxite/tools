@@ -1,0 +1,94 @@
+{
+  "configs": [
+    {
+      "config": "C1",
+      "expected_from_retained_s6_grid": 1152,
+      "missing_pair_under_s6_grid": [
+        [
+          0,
+          23
+        ]
+      ],
+      "summary": {
+        "bytes_transferred": 0,
+        "capacity_lost": 0,
+        "contended_lost": 0,
+        "expected": 1152,
+        "failed_dispatches": 0,
+        "flush_ns": 1658152,
+        "lost": 1,
+        "overhead_ns": 3969652,
+        "route_lost": 1,
+        "transfer_incomplete": 0,
+        "type": "summary",
+        "writer_lost": 0,
+        "written": 1151
+      },
+      "trace_artifact_id": "spark-c1-functional/granite-score-02/S6/C1/events.jsonl",
+      "trace_sha256": "b6cb2de8025ac011e12d727a3b6c4ffcb9292c7fe126cb76ecd90133512275e5"
+    },
+    {
+      "config": "C2",
+      "expected_from_retained_s6_grid": 1152,
+      "missing_pair_under_s6_grid": [
+        [
+          0,
+          23
+        ]
+      ],
+      "summary": {
+        "bytes_transferred": 0,
+        "capacity_lost": 0,
+        "contended_lost": 0,
+        "expected": 1152,
+        "failed_dispatches": 0,
+        "flush_ns": 1610808,
+        "lost": 1,
+        "overhead_ns": 16673982,
+        "route_lost": 1,
+        "transfer_incomplete": 0,
+        "type": "summary",
+        "writer_lost": 0,
+        "written": 1151
+      },
+      "trace_artifact_id": "spark-c1-functional/granite-score-02/S6/C2/events.jsonl",
+      "trace_sha256": "8cdc3db6ffd9b6369985f634f5f7aa878739f4569604ef73e93ccd0808471b28"
+    }
+  ],
+  "hypothesis": "Granite gathers output rows before the final MoE FFN. A sparse final-layer route tensor can have fewer rows than the microbatch; the recorder currently rejects tensor->ne[1] != batch.n_rows and increments route_lost for a routed layer without a captured event.",
+  "kind": "analysis",
+  "limitations": "The sparse shape explanation is a source-supported hypothesis. The retained trace has no shape/row map for the missing event and the S6 grid is not an independent runtime dispatch manifest.",
+  "schema": "spark-c1-fixture-sparse-row-diagnosis/1",
+  "source_anchors": {
+    "candidate_recorder": {
+      "revision": "9d0733cba12c164827b646ea86af618ce7b5ca47",
+      "rows": [
+        293,
+        314,
+        323,
+        331
+      ]
+    },
+    "stock_granite_graph": {
+      "revision": "9048bad8d6e3a0f9f1726e238e451181c7e02613",
+      "rows": [
+        174,
+        177,
+        179,
+        262
+      ]
+    }
+  },
+  "sources": {
+    "candidate-event-recorder.cpp": {
+      "artifact_id": "spark-c1-functional/granite-score-02/candidate-event-recorder.cpp",
+      "sha256": "824e3d69c3ddc14460acf370489fe04d5e3a52cb140fc40ca2464b1e15b49d2f"
+    },
+    "stock-granite-graph.cpp": {
+      "artifact_id": "spark-c1-functional/granite-score-02/stock-granite-graph.cpp",
+      "sha256": "bb11d97106203c1d0e639299226a60ce60ffde2720b71e28b4287bb331cf83f2"
+    }
+  },
+  "title": "Granite S6 loss localizes to the final routed layer on initial prefill",
+  "verified": "Both fixture configurations have exactly one route_lost and the only missing key under the S6 observed-layer/microbatch grid is [0, 23]. No capacity, contention, writer or transfer-incomplete losses in the summary."
+}

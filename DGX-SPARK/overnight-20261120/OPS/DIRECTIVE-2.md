@@ -39,3 +39,9 @@
       - each with its plan, the CCs it used, its diff, lab results, analysis artifacts and report
       - "what the planner learned and changed"
     - Keep each report self-contained, and link it to the next plan's decision record. Analysis before a run is allowed when it clearly helps, but the default is the post-lab report.
+12. **Quantization stretch (owner, ~08:40Z). A stretch goal, after the 5 star CCs have measured results.**
+    - **Scope.** Quantized-weight execution: how llama.cpp/ggml computes with IQ2_XXS and IQ4_NL weights on GB10 (CUDA mmq/mmvq and dequant paths, and the CPU expert lane with ARM repack). Strata/ds4 shares the GGUF block formats but ships its own kernels (`src/dsv41/ds4_iq.cu`, `ds4_iq_cpu.cpp`, `ds4_tq.cu`).
+    - **Analysis CC first.** analysis.quant_kernel_profile: the share of TTFT and decode time spent in quantized matmul and dequant, GPU vs CPU, per quant type, for llama.cpp, compared with Strata's kernels where measurable.
+    - **Then, only if kernel time is a material share:** a builder CC, e.g. a quantized expert matmul kernel builder or a CPU expert-lane repack builder. Its method is reverse-engineered from ds4_iq*, with the same weights and format and no requantization. Acceptance is a numeric tolerance on outputs plus the greedy hash where achievable.
+    - **Do not requantize or convert the 232 GB model tonight.** It changes the model, breaks the same-weights comparison with Strata, and costs hours.
+    - **The UI shows it** as an extra builder or analysis CC, not one of the 5 stars.

@@ -1,0 +1,115 @@
+{
+  "analysis": {
+    "ccs": [
+      {
+        "id": "analysis.request_fault_io",
+        "release": "c586994fa0d89fa302a80b25da2bc8133abe5cfce2f57b5c20722243192913a9",
+        "version": "1.1.1"
+      }
+    ],
+    "output_artifact_ids": [
+      "request-fault-io:20e596372e628a15d74640ec:report.json",
+      "request-fault-io:10dca72b78b4804cb4d613e9:report.json",
+      "request-fault-io:0ca6ae917d3564d1eef0a81f:report.json",
+      "request-fault-io:fe3b2d2066fb826a5f8687dd:report.json"
+    ]
+  },
+  "do": {
+    "build_receipt_ids": [
+      "8acc58cf6593463196eefefb4d58d71d:receipt"
+    ],
+    "diff_artifact_id": "spark-source-product.diff",
+    "source_commit": "7a068a8e2d8f4985a3ed43468c76795e420ed70f",
+    "verification_receipt_ids": [
+      "spark-source-verification-receipt.json"
+    ]
+  },
+  "iteration_id": "spark-c5-functional",
+  "lab": {
+    "result_artifact_ids": [
+      "spark-c5-functional/functional-facts.json",
+      "spark-c5-functional/off/start.json",
+      "spark-c5-functional/off/scope.json",
+      "spark-c5-functional/off/result.json",
+      "spark-c5-functional/off/stderr.log",
+      "spark-c5-functional/off/stdout.log",
+      "spark-c5-functional/off/memory.jsonl",
+      "spark-c5-functional/off/load-ready.json",
+      "spark-c5-functional/off/systemd-final.txt",
+      "spark-c5-functional/off/probe.json",
+      "spark-c5-functional/off/rep-0-512/request.json",
+      "spark-c5-functional/off/rep-0-512/result.json",
+      "spark-c5-functional/off/rep-0-512/resource-windows.json",
+      "spark-c5-functional/off/rep-0-2048/request.json",
+      "spark-c5-functional/off/rep-0-2048/result.json",
+      "spark-c5-functional/off/rep-0-2048/resource-windows.json",
+      "spark-c5-functional/on/start.json",
+      "spark-c5-functional/on/scope.json",
+      "spark-c5-functional/on/result.json",
+      "spark-c5-functional/on/stderr.log",
+      "spark-c5-functional/on/stdout.log",
+      "spark-c5-functional/on/memory.jsonl",
+      "spark-c5-functional/on/load-ready.json",
+      "spark-c5-functional/on/systemd-final.txt",
+      "spark-c5-functional/on/probe.json",
+      "spark-c5-functional/on/rep-0-512/request.json",
+      "spark-c5-functional/on/rep-0-512/result.json",
+      "spark-c5-functional/on/rep-0-512/resource-windows.json",
+      "spark-c5-functional/on/rep-0-2048/request.json",
+      "spark-c5-functional/on/rep-0-2048/result.json",
+      "spark-c5-functional/on/rep-0-2048/resource-windows.json",
+      "spark-c5-functional/factory-profile-plan.json",
+      "spark-c5-functional/server-context.cpp",
+      "spark-c5-functional/llama-batch-layout.h"
+    ],
+    "status": "functional parity; mapper bypassed"
+  },
+  "next_plan": {
+    "decision_id": null
+  },
+  "plan": {
+    "builder_ccs": [
+      {
+        "id": "engine.build_batch_layout_mapper",
+        "release": "9655985be2c3b7108d9e77a615cf452cee05d8e6d00571d11d582e1bb1748f4a",
+        "version": "1.1.3"
+      }
+    ],
+    "decision_id": "spark-star-batch-layout-mapper:decision:9",
+    "incoming_report_ids": [
+      {
+        "artifact_id": "spark-p1-reference-reconnaissance/report.md",
+        "home": "~/predemo-spark/factory-runs/spark-direct-benchmarks",
+        "sha256": "71c3a2f25cfb217efaf4614101163a5c52aa5bab14a3add8ff8e8a6ba15ea115",
+        "task_id": "spark-direct-benchmarks-20261120"
+      },
+      {
+        "artifact_id": "spark-c1-functional/report-v2.md",
+        "home": "~/predemo-spark/factory-runs/star-observability_event_recorder",
+        "sha256": "a08c95234ee30a48ebb1c5498ce00938f797985ec0dc90b89e2b5888723f25a1",
+        "task_id": "spark-star-observability-event-recorder"
+      }
+    ],
+    "rationale": "Under the single-slot placement-neutral 2048-token profile from spark-profile-1.1.3, aligning logical submissions from 2047/1 to 1536/512 may reduce ordinary physical microbatches from five to four without changing greedy outputs. Actual cuts and physical counts must establish engagement before independent timing; repeated expert-copy savings are a separate measured question."
+  },
+  "predecessor_report_ids": [
+    {
+      "artifact_id": "spark-p1-reference-reconnaissance/report.md",
+      "home": "~/predemo-spark/factory-runs/spark-direct-benchmarks",
+      "sha256": "71c3a2f25cfb217efaf4614101163a5c52aa5bab14a3add8ff8e8a6ba15ea115",
+      "task_id": "spark-direct-benchmarks-20261120"
+    },
+    {
+      "artifact_id": "spark-c1-functional/report-v2.md",
+      "home": "~/predemo-spark/factory-runs/star-observability_event_recorder",
+      "sha256": "a08c95234ee30a48ebb1c5498ce00938f797985ec0dc90b89e2b5888723f25a1",
+      "task_id": "spark-star-observability-event-recorder"
+    }
+  ],
+  "report": {
+    "artifact_id": "spark-c5-functional/report.md",
+    "sha256": "3103d2ab16df187c1e106bfd8ab0a2d9fd848b462e3a077fbaca755f6be5d441",
+    "status": "no mapper engagement; timing ineligible"
+  },
+  "schema": "spark-factory-iteration/1"
+}
