@@ -1,0 +1,8 @@
+WORK ORDER 1: runtime event recorder (llama.cpp pinned at 9048bad8d6e3a0f9f1726e238e451181c7e02613)
+Build, as a source diff, a runtime event recorder for MoE inference.
+- Records, per (microbatch, layer) at the point the router's selected expert IDs (`ffn_moe_topk-*` nodes) are available: request id, phase (prefill or decode), microbatch index, layer index, the selected expert IDs, monotonic nanosecond timestamps, and the bytes the scheduler submits to copy expert weights for that layer when it does.
+- Bounded in-memory ring (default 64 MiB, `LLAMA_EVENT_REC_MIB` overrides, whole decimal MiB), no file I/O in the hot path, flushed to a freshly created JSONL file at normal exit. When the ring is full, count the loss and drop the newest; report it in stats.
+- Gate: environment variable `LLAMA_EVENT_REC=<path to JSONL file>`. Unset means the binary behaves exactly as stock, with zero extra work beyond one cached getenv check.
+- Log lines at INFO level (visible with `-lv 4`), once each: `runtime_event_recorder: active <effective settings>` on first use; `runtime_event_recorder: inactive (<reason>)` if the gate is set but the recorder cannot run (bad path, file exists, unsupported path); `runtime_event_recorder: stats events=<n> lost=<n> bytes=<n>` at exit.
+- Invariants: token output, router IDs, mixture weights, sampling and ordering unchanged; greedy output byte identical to stock with the gate unset and with it set. Any error falls back to stock behaviour.
+- Allowed paths: new files under `src/`, edits under `src/`, `tools/server/server-context.cpp`, `tools/server/server-context.h`, and CMake files needed to compile new sources. Do not touch router, sampling or model files.

@@ -1,0 +1,160 @@
+diff --git a/src/llama-batch-layout.h b/src/llama-batch-layout.h
+new file mode 100644
+index 0000000..100af21
+--- /dev/null
++++ b/src/llama-batch-layout.h
+@@ -0,0 +1,28 @@
++#pragma once
++
++#include <cstdint>
++#include <cstdlib>
++#include <cstring>
++
++struct llama_batch_layout {
++    const char * const gate_reason = read_gate();
++    uint64_t decisions = 0;
++    uint64_t rows = 0;
++    uint64_t bypasses = 0;
++
++    static int32_t aligned_limit(int32_t n_batch, int32_t n_ubatch) {
++        if (n_ubatch <= 0 || n_ubatch > n_batch) {
++            return 0;
++        }
++        return n_batch - n_batch % n_ubatch;
++    }
++
++private:
++    static const char * read_gate() {
++        const char * value = std::getenv("LLAMA_BATCH_LAYOUT");
++        const bool enabled = value != nullptr && std::strcmp(value, "1") == 0;
++        return enabled ? nullptr : value ? "invalid LLAMA_BATCH_LAYOUT value" : "LLAMA_BATCH_LAYOUT unset";
++    }
++};
++
++static_assert(sizeof(llama_batch_layout) <= 128, "batch layout mapper state exceeds its budget");
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index 6a57aa8..6b61d91 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -19,6 +19,7 @@
+ #include "llama.h"
+ #include "log.h"
+ #include "sampling.h"
++#include "src/llama-batch-layout.h"
+ #include "speculative.h"
+ #include "mtmd.h"
+ #include "mtmd-helper.h"
+@@ -1062,6 +1063,13 @@ public:
+     }
+ 
+     ~server_context_impl() {
++        if (batch_layout.decisions == 0 && batch_layout.bypasses == 0) {
++            const char * reason = batch_layout_context_reason();
++            LOG_INFV(4, "batch_layout_mapper: inactive (%s)\n", reason ? reason : "no eligible prefill");
++        }
++        LOG_INFV(4, "batch_layout_mapper: stats decisions=%" PRIu64 " rows=%" PRIu64 " bypasses=%" PRIu64 "\n",
++                batch_layout.decisions, batch_layout.rows, batch_layout.bypasses);
++
+         if (!sleeping) {
+             // destroy() is already called when entering sleeping state
+             // we don't call it again here to avoid double free
+@@ -1089,6 +1097,7 @@ private:
+     llama_context * ctx_tgt = nullptr;
+ 
+     server_batch batch;
++    llama_batch_layout batch_layout;
+ 
+     llama_model   * model_dft = nullptr;
+     llama_context * ctx_dft   = nullptr;
+@@ -3701,6 +3710,60 @@ private:
+         });
+     }
+ 
++    const char * batch_layout_context_reason() const {
++        if (batch_layout.gate_reason) {
++            return batch_layout.gate_reason;
++        }
++        if (params_base.n_parallel != 1) {
++            return params_base.n_parallel > 1 ? "multiple slots configured" : "no slot configured";
++        }
++        if (spec) {
++            return "speculative decoding";
++        }
++        if (ctx_tgt && (!llama_get_causal_attn(ctx_tgt) || !llama_get_memory(ctx_tgt) ||
++                        llama_model_has_encoder(model_tgt) || llama_model_is_recurrent(model_tgt) ||
++                        llama_model_is_hybrid(model_tgt))) {
++            return "context does not use ordinary causal attention";
++        }
++        return nullptr;
++    }
++
++    int32_t batch_layout_prompt_limit(const server_slot & slot, bool do_checkpoint, int32_t n_batch, int32_t n_ubatch) {
++        const char * reason = batch_layout_context_reason();
++        const int32_t limit = reason ? 0 : llama_batch_layout::aligned_limit(n_batch, n_ubatch);
++        if (!reason) {
++            if (limit == 0) {
++                reason = "invalid effective batch limits";
++            } else if (batch.size() != 0) {
++                reason = "pending batch is not empty";
++            } else if (slot.task->type != SERVER_TASK_TYPE_COMPLETION || slot.need_embd() || !slot.can_split() ||
++                       slot.task->tokens.has_mtmd) {
++                reason = "request is not splittable text completion";
++            } else if (slot.task->is_parent() || slot.task->is_child() || slot.task->n_tokens_shared > 0) {
++                reason = "shared prompt";
++            } else if (do_checkpoint || !slot.prompt.checkpoints.empty()) {
++                reason = "prompt checkpoints";
++            } else if (slot.alora_invocation_start >= 0) {
++                reason = "aLoRA invocation";
++            } else if (slot.task->params.n_cache_reuse > 0) {
++                reason = "shifted prompt cache reuse";
++            }
++        }
++
++        if (reason) {
++            // Count attempts to enter the prompt row loop with the stock bound.
++            if (batch_layout.bypasses++ == 0) {
++                if (batch_layout.decisions == 0) {
++                    LOG_INFV(4, "batch_layout_mapper: inactive (%s)\n", reason);
++                } else {
++                    LOG_INFV(4, "batch_layout_mapper: bypass (%s)\n", reason);
++                }
++            }
++            return 0;
++        }
++        return limit;
++    }
++
+     void pre_decode() {
+         // apply context-shift if needed
+         // TODO: simplify and improve
+@@ -4379,8 +4442,12 @@ private:
+ 
+                     const int32_t n_decision_first = slot.task->type == SERVER_TASK_TYPE_DECISION ? slot.task->decision.pos_first() : -1;
+ 
++                    // Align intermediate submissions so the stock splitter can fill every microbatch.
++                    const int32_t layout_limit = batch_layout_prompt_limit(slot, do_checkpoint, n_batch, n_ubatch);
++                    const int32_t prompt_limit = layout_limit > 0 ? layout_limit : n_batch;
++
+                     // add prompt tokens for processing in the current batch
+-                    while (slot.prompt.n_tokens() < slot.task->n_tokens() && batch.size() < n_batch) {
++                    while (slot.prompt.n_tokens() < slot.task->n_tokens() && batch.size() < prompt_limit) {
+                         // get next token to process
+                         llama_token cur_tok = input_tokens[slot.prompt.n_tokens()];
+                         if (cur_tok == LLAMA_TOKEN_NULL) {
+@@ -4455,6 +4522,16 @@ private:
+ 
+                     const auto n_tokens_start = slot.prompt.n_tokens() - n_tokens_cur;
+ 
++                    if (layout_limit > 0 && n_tokens_cur > 0) {
++                        if (batch_layout.decisions++ == 0) {
++                            LOG_INFV(4, "batch_layout_mapper: active n_batch=%d n_ubatch=%d limit=%d\n",
++                                    n_batch, n_ubatch, layout_limit);
++                        }
++                        batch_layout.rows += n_tokens_cur;
++                        LOG_INFV(4, "batch_layout_mapper: layout length=%d cached_prefix=%" PRIu64 " begin=%d end=%d max_rows=%d\n",
++                                slot.task->n_tokens(), slot.stats.n_prompt_cached, n_tokens_start, slot.prompt.n_tokens(), layout_limit);
++                    }
++
+                     const bool near_prompt_end = slot.task->n_tokens() < slot.prompt.n_tokens() + n_ubatch;
+ 
+                     const bool is_user_start = spans.is_user_start(n_tokens_start);

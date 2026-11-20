@@ -1,0 +1,939 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 426c487..14e0bd7 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -16,6 +16,7 @@ set(LLAMA_CORE_SOURCES
+     llama-chat.cpp
+     llama-context.cpp
+     llama-cparams.cpp
++    llama-event-recorder.cpp
+     llama-grammar.cpp
+     llama-graph.cpp
+     llama-hparams.cpp
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index 969989a..6cce1d4 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -5,6 +5,7 @@
+ #include "llama-graph.h"
+ #include "llama-impl.h"
+ #include "llama-batch.h"
++#include "llama-event-recorder.h"
+ #include "llama-io.h"
+ #include "llama-memory.h"
+ #include "llama-mmap.h"
+@@ -779,7 +780,7 @@ void llama_context::sched_new(const sched_params & params) {
+     sched.reset(ggml_backend_sched_new(
+             backend_ptrs.data(), backend_buft.data(), backend_ptrs.size(), params.max_nodes, params.parallel, params.op_offload));
+ 
+-    ggml_backend_sched_set_copy_callback(sched.get(), sched_copy_experts, this);
++    ggml_backend_sched_set_copy_callback(sched.get(), sched_copy_experts<false>, this);
+     ggml_backend_sched_set_realloc_callback(sched.get(), sched_graph_realloc, this);
+ 
+     sched_params_cur = params;
+@@ -1877,7 +1878,7 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
+         //LLAMA_LOG_INFO("graph set inputs time: %.3f ms\n", (ggml_time_us() - t_start_us)/1000.0);
+     }
+ 
+-    const auto status = graph_compute(res->get_gf(), ubatch.n_tokens > 1);
++    const auto status = graph_compute(res->get_gf(), ubatch.n_tokens > 1, &ubatch);
+     if (status != GGML_STATUS_SUCCESS) {
+         LLAMA_LOG_ERROR("%s: failed to compute graph, compute status: %d\n", __func__, status);
+         ret = status;
+@@ -3125,9 +3126,11 @@ void llama_context::sched_graph_realloc(ggml_backend_sched_t sched, ggml_cgraph
+             lctx->n_reallocs_same, lctx->n_reallocs_diff);
+ }
+ 
+-ggml_status llama_context::graph_compute(
+-            ggml_cgraph * gf,
+-                   bool   batched) {
++ggml_status llama_context::graph_compute(ggml_cgraph * gf, bool batched) {
++    return graph_compute(gf, batched, nullptr);
++}
++
++ggml_status llama_context::graph_compute(ggml_cgraph * gf, bool batched, const llama_ubatch * ubatch) {
+     int n_threads        = batched ? cparams.n_threads_batch : cparams.n_threads;
+     ggml_threadpool_t tp = batched ? threadpool_batch        : threadpool;
+ 
+@@ -3146,7 +3149,11 @@ ggml_status llama_context::graph_compute(
+ 
+     copy_experts.reset();
+ 
+-    auto status = ggml_backend_sched_graph_compute_async(sched.get(), gf);
++    auto * recorder = ubatch ? llama_event_recorder_dispatch::current(this) : nullptr;
++    const auto status = recorder ?
++        recorder->compute(*ubatch, gf, sched.get(), cparams.cb_eval, cparams.cb_eval_user_data,
++                sched_copy_experts<false>, sched_copy_experts<true>) :
++        ggml_backend_sched_graph_compute_async(sched.get(), gf);
+     if (status != GGML_STATUS_SUCCESS) {
+         LLAMA_LOG_ERROR("%s: ggml_backend_sched_graph_compute_async failed with error %d\n", __func__, status);
+     }
+@@ -3156,27 +3163,36 @@ ggml_status llama_context::graph_compute(
+     return status;
+ }
+ 
++template<bool record>
+ bool llama_context::sched_copy_experts(ggml_backend_t backend, const ggml_tensor * src, ggml_tensor * dst, ggml_cgraph * graph, void * user_data) {
+     auto * lctx = static_cast<llama_context *>(user_data);
++    size_t copied = 0;
+ 
+     // the slot maps of the MoE cache
+-    if (lctx->moe_cache && lctx->moe_cache->copy(backend, src, dst, graph)) {
++    if (lctx->moe_cache && lctx->moe_cache->copy(backend, src, dst, graph, record ? &copied : nullptr)) {
++        if constexpr (record) {
++            llama_event_recorder_dispatch::copied_cache(src, copied);
++        }
+         return true;
+     }
+ 
+     auto & st = lctx->copy_experts;
+ 
+     // the ids must be computed before the split starts, so only the first node of the split is considered
+-    if (ggml_graph_n_nodes(graph) == 0) {
+-        return false;
+-    }
+-    const ggml_tensor * node = ggml_graph_node(graph, 0);
+-    if (node->op != GGML_OP_MUL_MAT_ID || node->src[0] != dst) {
++    const ggml_tensor * node = ggml_graph_n_nodes(graph) ? ggml_graph_node(graph, 0) : nullptr;
++    if (!node || node->op != GGML_OP_MUL_MAT_ID || node->src[0] != dst) {
++        if constexpr (record) {
++            // A declined callback sends this entire host weight through the scheduler's fallback.
++            llama_event_recorder_dispatch::copied_weight(dst, ggml_nbytes(src));
++        }
+         return false;
+     }
+ 
+     const ggml_tensor * ids = node->src[2];
+     if (ggml_nelements(ids) == 0) {
++        if constexpr (record) {
++            llama_event_recorder_dispatch::copied_weight(dst, 0);
++        }
+         return true;
+     }
+ 
+@@ -3214,13 +3230,17 @@ bool llama_context::sched_copy_experts(ggml_backend_t backend, const ggml_tensor
+         // the experts in the MoE cache are copied from device memory, the others are uploaded
+         int64_t next = first;
+         for (int64_t e = first; e <= last && lctx->moe_cache; ) {
+-            const int64_t n = lctx->moe_cache->copy_experts(backend, src, dst, e, last);
++            const int64_t n = lctx->moe_cache->copy_experts(backend, src, dst, e, last, record ? &copied : nullptr);
+             if (n == 0) {
+                 e++;
+                 continue;
+             }
+             if (next < e) {
+-                ggml_backend_tensor_set_async(backend, dst, (const uint8_t *) src->data + next*expert_size, next*expert_size, (e - next)*expert_size);
++                const size_t size = (e - next)*expert_size;
++                ggml_backend_tensor_set_async(backend, dst, (const uint8_t *) src->data + next*expert_size, next*expert_size, size);
++                if constexpr (record) {
++                    copied += size;
++                }
+             }
+             e   += n;
+             next = e;
+@@ -3232,11 +3252,17 @@ bool llama_context::sched_copy_experts(ggml_backend_t backend, const ggml_tensor
+         const size_t size    = (last + 1 - next)*expert_size + padding;
+         if (size > 0) {
+             ggml_backend_tensor_set_async(backend, dst, (const uint8_t *) src->data + offset, offset, size);
++            if constexpr (record) {
++                copied += size;
++            }
+         }
+ 
+         first = last + 1;
+     }
+ 
++    if constexpr (record) {
++        llama_event_recorder_dispatch::copied_weight(dst, copied);
++    }
+     return true;
+ }
+ 
+diff --git a/src/llama-context.h b/src/llama-context.h
+index 3e3921c..ac86d0f 100644
+--- a/src/llama-context.h
++++ b/src/llama-context.h
+@@ -314,6 +314,9 @@ private:
+     void sched_new(const sched_params & params);
+ 
+     // ggml_backend_sched copy callback, copies only the experts used by MUL_MAT_ID and updates the MoE cache
++    ggml_status graph_compute(ggml_cgraph * gf, bool batched, const llama_ubatch * ubatch);
++
++    template<bool record>
+     static bool sched_copy_experts(ggml_backend_t backend, const ggml_tensor * src, ggml_tensor * dst, ggml_cgraph * graph, void * user_data);
+ 
+     // ggml_backend_sched realloc callback, counts and traces the graph reallocations of this context
+diff --git a/src/llama-event-recorder.cpp b/src/llama-event-recorder.cpp
+new file mode 100644
+index 0000000..d5c9634
+--- /dev/null
++++ b/src/llama-event-recorder.cpp
+@@ -0,0 +1,590 @@
++#include "llama-event-recorder.h"
++
++#include "llama-batch.h"
++#include "llama-hparams.h"
++#include "llama-impl.h"
++
++#include <algorithm>
++#include <array>
++#include <cerrno>
++#include <charconv>
++#include <chrono>
++#include <cinttypes>
++#include <cstddef>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <functional>
++#include <limits>
++#include <memory>
++#include <mutex>
++#include <new>
++#include <string_view>
++
++#ifndef _WIN32
++#include <fcntl.h>
++#include <unistd.h>
++#endif
++
++namespace {
++
++using dispatch = llama_event_recorder_dispatch;
++
++constexpr size_t mib = 1024 * 1024;
++
++uint64_t now_ns() {
++    using namespace std::chrono;
++    return duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count();
++}
++
++int parse_layer(std::string_view name, std::string_view prefix, char delimiter = '\0') {
++    if (name.substr(0, prefix.size()) != prefix) {
++        return -1;
++    }
++    name.remove_prefix(prefix.size());
++    if (name.empty() || name.front() < '0' || name.front() > '9') {
++        return -1;
++    }
++
++    int layer = -1;
++    const char * end = name.data() + name.size();
++    const auto result = std::from_chars(name.data(), end, layer);
++    if (result.ec != std::errc{} || layer < 0 || layer >= LLAMA_MAX_LAYERS) {
++        return -1;
++    }
++    return (delimiter == '\0' ? result.ptr == end : result.ptr != end && *result.ptr == delimiter) ? layer : -1;
++}
++
++// The pinned scheduler names an allocated cross-backend input copy backend#source#copy.
++std::string_view copied_weight_name(std::string_view name) {
++    const size_t begin = name.find('#');
++    const size_t end = name.rfind('#');
++    if (begin == end) {
++        return {};
++    }
++    return name.substr(begin + 1, end - begin - 1);
++}
++
++struct event_header {
++    size_t size;
++    uint64_t microbatch;
++    uint64_t dispatch_ns;
++    uint64_t route_ready_ns;
++    uint64_t dispatch_end_ns;
++    uint64_t bytes_transferred;
++    int32_t layer;
++    uint32_t n_rows;
++    uint32_t n_experts;
++};
++
++struct weight_copy {
++    const ggml_tensor * dst;
++    size_t bytes;
++};
++
++struct layer_observation {
++    const ggml_tensor * ids = nullptr;
++    const ggml_tensor * boundary = nullptr;
++    size_t offset = 0;
++    uint64_t additional_bytes = 0;
++    bool captured = false;
++    bool overflow = false;
++    bool complete = true;
++
++    // Four expert projections in the common case. Allow extra copies for other backends and adapters.
++    std::array<weight_copy, 16> copies;
++    size_t n_copies = 0;
++
++    void reset() {
++        ids = nullptr;
++        boundary = nullptr;
++        additional_bytes = 0;
++        captured = false;
++        overflow = false;
++        complete = true;
++        n_copies = 0;
++    }
++
++    void plan_copy(const ggml_tensor * dst) {
++        for (size_t i = 0; i < n_copies; ++i) {
++            if (copies[i].dst == dst) {
++                return;
++            }
++        }
++        if (n_copies == copies.size()) {
++            complete = false;
++            return;
++        }
++        // For a computed source the scheduler submits a full copy unless its host-weight callback handles it.
++        copies[n_copies++] = { dst, ggml_nbytes(dst) };
++    }
++
++    void observe_copy(const ggml_tensor * dst, size_t bytes, bool expert_weight) {
++        for (size_t i = 0; i < n_copies; ++i) {
++            if (copies[i].dst == dst) {
++                copies[i].bytes = bytes;
++                return;
++            }
++        }
++        // A split can copy an expert weight also used by a branch that is not executed.
++        if (expert_weight) {
++            additional_bytes += bytes;
++        }
++    }
++
++    uint64_t submitted_bytes() const {
++        uint64_t bytes = additional_bytes;
++        for (size_t i = 0; i < n_copies; ++i) {
++            bytes += copies[i].bytes;
++        }
++        return bytes;
++    }
++};
++
++const char * phase(bool is_prompt) {
++    return is_prompt ? "prefill" : "decode";
++}
++
++bool write_event(FILE * file, const event_header & event, const uint8_t * payload) {
++    dispatch::row first;
++    memcpy(&first, payload, sizeof(first));
++    bool same_request = true;
++    bool same_phase = true;
++    for (uint32_t i = 1; i < event.n_rows; ++i) {
++        dispatch::row row;
++        memcpy(&row, payload + i * sizeof(row), sizeof(row));
++        same_request &= row.request_id == first.request_id;
++        same_phase &= row.is_prompt == first.is_prompt;
++    }
++    if (fprintf(file, "{\"type\":\"event\",\"microbatch\":%" PRIu64 ",\"layer\":%d,\"request_id\":",
++                event.microbatch, event.layer) < 0) {
++        return false;
++    }
++    if ((same_request && first.request_id >= 0 ? fprintf(file, "%d", first.request_id) : fputs("null", file)) < 0) {
++        return false;
++    }
++    if (fprintf(file, ",\"phase\":\"%s\",\"dispatch_ns\":%" PRIu64 ",\"route_ready_ns\":%" PRIu64
++                ",\"dispatch_end_ns\":%" PRIu64 ",\"bytes_transferred\":%" PRIu64 ",\"rows\":[",
++                same_phase ? phase(first.is_prompt) : "mixed", event.dispatch_ns, event.route_ready_ns,
++                event.dispatch_end_ns, event.bytes_transferred) < 0) {
++        return false;
++    }
++
++    const uint8_t * ids = payload + event.n_rows * sizeof(dispatch::row);
++    for (uint32_t i = 0; i < event.n_rows; ++i) {
++        dispatch::row row;
++        memcpy(&row, payload + i * sizeof(row), sizeof(row));
++        if (fprintf(file, "%s{\"request_id\":", i == 0 ? "" : ",") < 0 ||
++                (row.request_id >= 0 ? fprintf(file, "%d", row.request_id) : fputs("null", file)) < 0 ||
++                fprintf(file, ",\"phase\":\"%s\",\"selected_expert_ids\":[", phase(row.is_prompt)) < 0) {
++            return false;
++        }
++        for (uint32_t j = 0; j < event.n_experts; ++j) {
++            int32_t id;
++            memcpy(&id, ids, sizeof(id));
++            ids += sizeof(id);
++            if (fprintf(file, "%s%d", j == 0 ? "" : ",", id) < 0) {
++                return false;
++            }
++        }
++        if (fputs("]}", file) < 0) {
++            return false;
++        }
++    }
++    return fputs("]}\n", file) >= 0 && fflush(file) == 0;
++}
++
++} // namespace
++
++struct llama_event_recorder {
++    llama_event_recorder(const char * path, void (*flush_log)()) : flush_log(flush_log) {
++        if (const char * error = open_output(path)) {
++            LLAMA_LOG_INFO("runtime_event_recorder: inactive (%s)\n", error);
++        } else {
++            LLAMA_LOG_INFO("runtime_event_recorder: active path=%s capacity_bytes=%zu\n", path, capacity);
++        }
++    }
++
++    ~llama_event_recorder() {
++        const std::lock_guard<std::mutex> lock(mutex);
++
++        uint64_t written = 0;
++        uint64_t bytes = 0;
++        if (file) {
++            const uint64_t flush_start_ns = now_ns();
++            bool ok = true;
++            for (size_t offset = 0; offset < used; ) {
++                event_header event;
++                memcpy(&event, ring.get() + offset, sizeof(event));
++                if (!write_event(file, event, ring.get() + offset + sizeof(event))) {
++                    ok = false;
++                    break;
++                }
++                ++written;
++                bytes += event.bytes_transferred;
++                offset += event.size;
++            }
++            if (ok) {
++                ok = fprintf(file, "{\"type\":\"summary\",\"expected\":%" PRIu64 ",\"written\":%" PRIu64
++                        ",\"lost\":%" PRIu64 ",\"overflow\":%" PRIu64 ",\"incomplete\":%" PRIu64
++                        ",\"failed_microbatches\":%" PRIu64 ",\"bytes_transferred\":%" PRIu64
++                        ",\"overhead_ns\":%" PRIu64 ",\"flush_ns\":%" PRIu64 "}\n",
++                        expected, written, expected - written, overflow, incomplete, failed_microbatches, bytes,
++                        overhead_ns, now_ns() - flush_start_ns) >= 0 && fflush(file) == 0;
++            }
++            if (fclose(file) != 0 || !ok) {
++                LLAMA_LOG_INFO("runtime_event_recorder: inactive (output write failed)\n");
++            }
++        }
++        LLAMA_LOG_INFO("runtime_event_recorder: stats events=%" PRIu64 " lost=%" PRIu64 " bytes=%" PRIu64 "\n",
++                written, expected - written, bytes);
++        if (flush_log) {
++            flush_log();
++        }
++    }
++
++    const char * open_output(const char * path) {
++#ifdef _WIN32
++        (void) path;
++        return "unsupported path platform";
++#else
++        if (!*path) {
++            return "empty output path";
++        }
++        size_t capacity_mib = 64;
++        if (const char * override_mib = std::getenv("LLAMA_EVENT_REC_MIB")) {
++            const char * end = override_mib + strlen(override_mib);
++            const auto result = std::from_chars(override_mib, end, capacity_mib);
++            if (result.ec != std::errc{} || result.ptr != end || capacity_mib == 0 ||
++                    capacity_mib > size_t(std::numeric_limits<ptrdiff_t>::max()) / mib) {
++                return "invalid LLAMA_EVENT_REC_MIB";
++            }
++        }
++        // Keep the fixed join and writer storage within the configured reservation.
++        capacity = capacity_mib * mib;
++        ring_capacity = capacity - sizeof(*this);
++        ring.reset(new (std::nothrow) uint8_t[ring_capacity]);
++        if (!ring) {
++            return "buffer allocation failed";
++        }
++
++        const int fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
++        if (fd < 0) {
++            const int error = errno;
++            ring.reset();
++            return error == EEXIST ? "output already exists" : "cannot create output";
++        }
++        file = fdopen(fd, "w");
++        if (!file) {
++            close(fd);
++            ring.reset();
++            return "cannot open output stream";
++        }
++        if (setvbuf(file, output_buffer, _IOFBF, sizeof(output_buffer)) != 0) {
++            fclose(file);
++            file = nullptr;
++            ring.reset();
++            return "cannot buffer output stream";
++        }
++        return nullptr;
++#endif
++    }
++
++    std::array<layer_observation, LLAMA_MAX_LAYERS> layers;
++    std::array<int32_t, LLAMA_MAX_LAYERS> boundaries;
++    size_t n_boundaries = 0;
++
++    void (*flush_log)();
++    std::mutex mutex;
++    FILE * file = nullptr;
++    char output_buffer[4096];
++    std::unique_ptr<uint8_t[]> ring;
++    size_t capacity = 0;
++    size_t ring_capacity = 0;
++    // A drop-newest ring with a single final drain never wraps before shutdown.
++    size_t used = 0;
++    uint64_t next_microbatch = 0;
++    uint64_t expected = 0;
++    uint64_t overflow = 0;
++    uint64_t incomplete = 0;
++    uint64_t failed_microbatches = 0;
++    uint64_t overhead_ns = 0;
++};
++
++namespace {
++
++static_assert(sizeof(llama_event_recorder) < mib, "recorder state must fit in the minimum capacity");
++thread_local dispatch * current_dispatch = nullptr;
++thread_local llama_event_recorder * current_observation = nullptr;
++
++struct ubatch_observation {
++    llama_event_recorder & recorder;
++    const llama_ubatch & ubatch;
++    size_t n_rows;
++    dispatch::row_callback get_row;
++    const void * rows;
++    ggml_backend_sched_eval_callback eval;
++    void * eval_data;
++    uint64_t microbatch;
++    uint64_t dispatch_ns;
++    uint64_t overhead_ns = 0;
++
++    bool plan(ggml_cgraph * graph) {
++        for (auto & layer : recorder.layers) {
++            layer.reset();
++        }
++        recorder.n_boundaries = 0;
++
++        auto ** nodes = ggml_graph_nodes(graph);
++        int32_t pending = -1;
++        int32_t routed_layer = -1;
++        bool routed = false;
++        const int n_nodes = ggml_graph_n_nodes(graph);
++        for (int i = 0; i < n_nodes; ++i) {
++            const ggml_tensor * node = nodes[i];
++            if (!(node->flags & GGML_TENSOR_FLAG_COMPUTE)) {
++                continue;
++            }
++            const int32_t il = parse_layer(node->name, "ffn_moe_topk-");
++            if (il >= 0) {
++                routed_layer = il;
++                auto & layer = recorder.layers[il];
++                if (layer.ids) {
++                    layer.complete = false;
++                } else {
++                    layer.ids = node;
++                    pending = il;
++                    routed = true;
++                }
++            }
++            if (pending >= 0) {
++                auto & layer = recorder.layers[pending];
++                const bool copies_ids = node->src[0] == layer.ids &&
++                    (node->op == GGML_OP_CONT || node->op == GGML_OP_CPY);
++                if (node->op == GGML_OP_MUL_MAT_ID || copies_ids ||
++                        parse_layer(node->name, "ffn_moe_slots-") == pending) {
++                    // Read before the first expert matmul or ID remap, after the router fusion.
++                    layer.boundary = nodes[i - 1];
++                    recorder.boundaries[recorder.n_boundaries++] = pending;
++                    pending = -1;
++                }
++            }
++            if (node->op == GGML_OP_MUL_MAT_ID) {
++                const auto name = copied_weight_name(node->src[0]->name);
++                const int32_t copy_layer = parse_layer(name, "blk.", '.');
++                if (copy_layer >= 0) {
++                    recorder.layers[copy_layer].plan_copy(node->src[0]);
++                } else if (!name.empty() && routed_layer >= 0) {
++                    recorder.layers[routed_layer].complete = false;
++                }
++            }
++        }
++
++        const auto less = std::less<const ggml_tensor *>{};
++        std::sort(recorder.boundaries.begin(), recorder.boundaries.begin() + recorder.n_boundaries,
++                [&](int32_t a, int32_t b) {
++                    return less(recorder.layers[a].boundary, recorder.layers[b].boundary);
++                });
++        return routed;
++    }
++
++    void capture(int32_t il) {
++        const uint64_t route_ready_ns = now_ns();
++        auto & layer = recorder.layers[il];
++        if (!layer.complete || layer.captured) {
++            return;
++        }
++
++        const ggml_tensor * ids = layer.ids;
++        if (!ubatch.data || ubatch.data->batch_idxs.size() != ubatch.n_tokens || ubatch.n_tokens == 0 ||
++                ids->type != GGML_TYPE_I32 || ids->ne[0] <= 0 || ids->ne[0] > LLAMA_MAX_EXPERTS ||
++                ids->ne[1] != ubatch.n_tokens || ids->ne[2] != 1 || ids->ne[3] != 1 || !ids->data ||
++                !(ids->view_src ? ids->view_src->buffer : ids->buffer)) {
++            return;
++        }
++        for (const int32_t i : ubatch.data->batch_idxs) {
++            if (i < 0 || size_t(i) >= n_rows) {
++                return;
++            }
++        }
++
++        const size_t id_row_bytes = size_t(ids->ne[0]) * sizeof(int32_t);
++        const size_t row_bytes = sizeof(dispatch::row) + id_row_bytes;
++        const size_t available = recorder.ring_capacity - recorder.used;
++        if (available < sizeof(event_header) || ubatch.n_tokens > (available - sizeof(event_header)) / row_bytes) {
++            layer.overflow = true;
++            return;
++        }
++
++        const event_header event = { sizeof(event_header) + ubatch.n_tokens * row_bytes,
++            microbatch, dispatch_ns, route_ready_ns, 0, 0, il, ubatch.n_tokens, uint32_t(ids->ne[0]) };
++        uint8_t * to = recorder.ring.get() + recorder.used;
++        memcpy(to, &event, sizeof(event));
++        to += sizeof(event);
++        for (const int32_t i : ubatch.data->batch_idxs) {
++            const dispatch::row row = get_row(rows, i);
++            memcpy(to, &row, sizeof(row));
++            to += sizeof(row);
++        }
++
++        if (ids->nb[0] == sizeof(int32_t) && (ubatch.n_tokens == 1 || ids->nb[1] >= id_row_bytes)) {
++            ggml_backend_tensor_get_2d(ids, to, 0, id_row_bytes, ubatch.n_tokens, ids->nb[1], id_row_bytes);
++        } else {
++            for (uint32_t row = 0; row < ubatch.n_tokens; ++row) {
++                for (int64_t col = 0; col < ids->ne[0]; ++col) {
++                    ggml_backend_tensor_get(ids, to, row * ids->nb[1] + col * ids->nb[0], sizeof(int32_t));
++                    to += sizeof(int32_t);
++                }
++            }
++        }
++        layer.offset = recorder.used;
++        layer.captured = true;
++        recorder.used += event.size;
++        overhead_ns += now_ns() - route_ready_ns;
++    }
++
++    static bool evaluate(ggml_tensor * node, bool ask, void * user_data) {
++        auto & self = *static_cast<ubatch_observation *>(user_data);
++        const auto & indices = self.recorder.boundaries;
++        const auto end = indices.begin() + self.recorder.n_boundaries;
++        const auto it = std::lower_bound(indices.begin(), end, node, [&](int32_t il, const ggml_tensor * t) {
++            return std::less<const ggml_tensor *>{}(self.recorder.layers[il].boundary, t);
++        });
++        const bool observe = it != end && self.recorder.layers[*it].boundary == node;
++        if (ask) {
++            self.caller_asked = self.eval && self.eval(node, true, self.eval_data);
++            return observe || self.caller_asked;
++        }
++        if (observe && !self.caller_stopped) {
++            self.capture(*it);
++        }
++        if (self.caller_asked && !self.eval(node, false, self.eval_data)) {
++            self.caller_stopped = true;
++            return false;
++        }
++        return true;
++    }
++
++    void finish(uint64_t end_ns) {
++        for (auto & layer : recorder.layers) {
++            if (!layer.ids) {
++                continue;
++            }
++            ++recorder.expected;
++            if (!layer.complete || !layer.captured) {
++                if (layer.overflow) {
++                    ++recorder.overflow;
++                } else {
++                    ++recorder.incomplete;
++                }
++                continue;
++            }
++            uint8_t * record = recorder.ring.get() + layer.offset;
++            event_header event;
++            memcpy(&event, record, sizeof(event));
++            event.dispatch_end_ns = end_ns;
++            event.bytes_transferred = layer.submitted_bytes();
++            memcpy(record, &event, sizeof(event));
++        }
++    }
++
++    bool caller_asked = false;
++    bool caller_stopped = false;
++};
++
++} // namespace
++
++llama_event_recorder * llama_event_recorder_dispatch::get(void (*flush_log)()) {
++    static llama_event_recorder * const enabled = [flush_log]() -> llama_event_recorder * {
++        const char * path = std::getenv("LLAMA_EVENT_REC");
++        if (!path) {
++            return nullptr;
++        }
++        static llama_event_recorder recorder(path, flush_log);
++        return recorder.file ? &recorder : nullptr;
++    }();
++    return enabled;
++}
++
++llama_event_recorder_dispatch::llama_event_recorder_dispatch(llama_event_recorder * recorder, llama_context * ctx,
++        size_t n_rows, row_callback get_row, const void * rows)
++    : recorder(recorder), ctx(ctx), n_rows(n_rows), get_row(get_row), rows(rows), previous(current_dispatch) {
++    current_dispatch = this;
++}
++
++llama_event_recorder_dispatch::~llama_event_recorder_dispatch() {
++    current_dispatch = previous;
++}
++
++llama_event_recorder_dispatch * llama_event_recorder_dispatch::current(const llama_context * ctx) {
++    return current_dispatch && current_dispatch->ctx == ctx ? current_dispatch : nullptr;
++}
++
++ggml_status llama_event_recorder_dispatch::compute(const llama_ubatch & ubatch, ggml_cgraph * graph,
++        ggml_backend_sched_t sched, ggml_backend_sched_eval_callback eval, void * eval_data,
++        ggml_backend_sched_copy_callback stock_copy, ggml_backend_sched_copy_callback observed_copy) {
++    const std::lock_guard<std::mutex> lock(recorder->mutex);
++    const uint64_t start_ns = now_ns();
++    ubatch_observation observation = {
++        *recorder, ubatch, n_rows, get_row, rows, eval, eval_data, recorder->next_microbatch++, start_ns,
++    };
++    if (!observation.plan(graph)) {
++        return ggml_backend_sched_graph_compute_async(sched, graph);
++    }
++
++    struct restore_callbacks {
++        ggml_backend_sched_t sched;
++        ggml_backend_sched_eval_callback eval;
++        void * eval_data;
++        ggml_backend_sched_copy_callback stock_copy;
++        llama_context * ctx;
++        llama_event_recorder * previous;
++        size_t & used;
++        const size_t start;
++        bool commit = false;
++
++        ~restore_callbacks() {
++            ggml_backend_sched_set_eval_callback(sched, eval, eval_data);
++            ggml_backend_sched_set_copy_callback(sched, stock_copy, ctx);
++            current_observation = previous;
++            if (!commit) {
++                used = start;
++            }
++        }
++    } restore = { sched, eval, eval_data, stock_copy, ctx, current_observation, recorder->used, recorder->used };
++
++    current_observation = recorder;
++    ggml_backend_sched_set_eval_callback(sched, ubatch_observation::evaluate, &observation);
++    ggml_backend_sched_set_copy_callback(sched, observed_copy, ctx);
++    const uint64_t compute_ns = now_ns();
++    const auto status = ggml_backend_sched_graph_compute_async(sched, graph);
++    const uint64_t end_ns = now_ns();
++    if (status == GGML_STATUS_SUCCESS) {
++        observation.finish(end_ns);
++        restore.commit = true;
++    } else {
++        ++recorder->failed_microbatches;
++    }
++    recorder->overhead_ns += compute_ns - start_ns + observation.overhead_ns + now_ns() - end_ns;
++    return status;
++}
++
++void llama_event_recorder_dispatch::copied_weight(const ggml_tensor * dst, size_t bytes) {
++    const auto name = copied_weight_name(dst->name);
++    const int32_t il = parse_layer(name, "blk.", '.');
++    if (il >= 0) {
++        const bool expert_weight = name.find("_exps.weight") != std::string_view::npos ||
++            name.find("_chexps.weight") != std::string_view::npos;
++        current_observation->layers[il].observe_copy(dst, bytes, expert_weight);
++    }
++}
++
++void llama_event_recorder_dispatch::copied_cache(const ggml_tensor * src, size_t bytes) {
++    int32_t il = parse_layer(src->name, "moe_cache.slot_map-");
++    if (il < 0) {
++        il = parse_layer(src->name, "moe_cache.slot_map_cpu-");
++    }
++    if (il >= 0) {
++        current_observation->layers[il].additional_bytes += bytes;
++    }
++}
+diff --git a/src/llama-event-recorder.h b/src/llama-event-recorder.h
+new file mode 100644
+index 0000000..3a653fb
+--- /dev/null
++++ b/src/llama-event-recorder.h
+@@ -0,0 +1,43 @@
++#pragma once
++
++#include "ggml-backend.h"
++#include "llama.h"
++
++struct llama_event_recorder;
++struct llama_ubatch;
++
++// Tags apply only to the synchronous submission on this thread.
++class llama_event_recorder_dispatch {
++public:
++    struct row {
++        int32_t request_id;
++        bool is_prompt;
++    };
++
++    using row_callback = row (*)(const void * data, size_t i);
++
++    LLAMA_API static llama_event_recorder * get(void (*flush_log)());
++    LLAMA_API llama_event_recorder_dispatch(llama_event_recorder * recorder, llama_context * ctx,
++            size_t n_rows, row_callback get_row, const void * rows);
++    LLAMA_API ~llama_event_recorder_dispatch();
++
++    llama_event_recorder_dispatch(const llama_event_recorder_dispatch &) = delete;
++    llama_event_recorder_dispatch & operator=(const llama_event_recorder_dispatch &) = delete;
++
++    static llama_event_recorder_dispatch * current(const llama_context * ctx);
++
++    ggml_status compute(const llama_ubatch & ubatch, ggml_cgraph * graph, ggml_backend_sched_t sched,
++            ggml_backend_sched_eval_callback eval, void * eval_data,
++            ggml_backend_sched_copy_callback stock_copy, ggml_backend_sched_copy_callback observed_copy);
++
++    static void copied_weight(const ggml_tensor * dst, size_t bytes);
++    static void copied_cache(const ggml_tensor * src, size_t bytes);
++
++private:
++    llama_event_recorder * const recorder;
++    llama_context * const ctx;
++    const size_t n_rows;
++    const row_callback get_row;
++    const void * const rows;
++    llama_event_recorder_dispatch * previous = nullptr;
++};
+diff --git a/src/llama-moe-cache.cpp b/src/llama-moe-cache.cpp
+index ba35af0..36a57bf 100644
+--- a/src/llama-moe-cache.cpp
++++ b/src/llama-moe-cache.cpp
+@@ -729,7 +729,7 @@ struct llama_moe_cache::impl {
+         return it != bindings.end() ? it->second.cached : nullptr;
+     }
+ 
+-    int64_t copy_experts(ggml_backend_t backend, const ggml_tensor * w, ggml_tensor * dst, int64_t e, int64_t last) {
++    int64_t copy_experts(ggml_backend_t backend, const ggml_tensor * w, ggml_tensor * dst, int64_t e, int64_t last, size_t * submitted) {
+         const auto it = bindings.find(w);
+         if (it == bindings.end()) {
+             return 0;
+@@ -759,12 +759,16 @@ struct llama_moe_cache::impl {
+         ggml_backend_tensor_copy_async(backend, backend, src_view, dst_view);
+ 
+         stats_copy.hits  += n;
+-        stats_copy.bytes += ggml_nbytes(src_view);
++        const size_t bytes = ggml_nbytes(src_view);
++        stats_copy.bytes += bytes;
++        if (submitted) {
++            *submitted += bytes;
++        }
+ 
+         return n;
+     }
+ 
+-    bool copy(ggml_backend_t backend, const ggml_tensor * src, ggml_tensor * dst, ggml_cgraph * graph) {
++    bool copy(ggml_backend_t backend, const ggml_tensor * src, ggml_tensor * dst, ggml_cgraph * graph, size_t * submitted) {
+         const auto it = layer_of.find(src);
+         if (it == layer_of.end()) {
+             return false;
+@@ -854,6 +858,9 @@ struct llama_moe_cache::impl {
+         st.misses += fills.size() + cpu.size();
+         st.cpu    += cpu.size();
+         st.bytes  += bytes;
++        if (submitted) {
++            *submitted += bytes;
++        }
+ 
+         // the next copy synchronizes the backend before it changes the slot map again
+         ggml_backend_tensor_set_async(backend, dst, l.slot_map->data, 0, ggml_nbytes(l.slot_map));
+@@ -962,12 +969,12 @@ ggml_tensor * llama_moe_cache::build_experts(const llm_graph_context & g, const
+     return experts;
+ }
+ 
+-bool llama_moe_cache::copy(ggml_backend_t backend, const ggml_tensor * src, ggml_tensor * dst, ggml_cgraph * graph) {
+-    return pimpl->copy(backend, src, dst, graph);
++bool llama_moe_cache::copy(ggml_backend_t backend, const ggml_tensor * src, ggml_tensor * dst, ggml_cgraph * graph, size_t * submitted) {
++    return pimpl->copy(backend, src, dst, graph, submitted);
+ }
+ 
+-int64_t llama_moe_cache::copy_experts(ggml_backend_t backend, const ggml_tensor * w, ggml_tensor * dst, int64_t e, int64_t last) {
+-    return pimpl->copy_experts(backend, w, dst, e, last);
++int64_t llama_moe_cache::copy_experts(ggml_backend_t backend, const ggml_tensor * w, ggml_tensor * dst, int64_t e, int64_t last, size_t * submitted) {
++    return pimpl->copy_experts(backend, w, dst, e, last, submitted);
+ }
+ 
+ std::map<ggml_backend_buffer_type_t, size_t> llama_moe_cache::memory_breakdown() const {
+diff --git a/src/llama-moe-cache.h b/src/llama-moe-cache.h
+index 833eac3..52cf73f 100644
+--- a/src/llama-moe-cache.h
++++ b/src/llama-moe-cache.h
+@@ -54,11 +54,11 @@ public:
+             ggml_tensor * cur, ggml_tensor * selected_experts, llama_moe_cache_build_experts_t build, void * user_data) const;
+ 
+     // ggml_backend_sched copy callback, returns false if src is not a slot map
+-    bool copy(ggml_backend_t backend, const ggml_tensor * src, ggml_tensor * dst, ggml_cgraph * graph);
++    bool copy(ggml_backend_t backend, const ggml_tensor * src, ggml_tensor * dst, ggml_cgraph * graph, size_t * submitted);
+ 
+     // for large batches: copy the experts of w that are in the cache, starting at expert e and up to expert last, to the copy dst of w
+     // returns the number of experts copied, 0 if expert e is not in the cache
+-    int64_t copy_experts(ggml_backend_t backend, const ggml_tensor * w, ggml_tensor * dst, int64_t e, int64_t last);
++    int64_t copy_experts(ggml_backend_t backend, const ggml_tensor * w, ggml_tensor * dst, int64_t e, int64_t last, size_t * submitted);
+ 
+     std::map<ggml_backend_buffer_type_t, size_t> memory_breakdown() const;
+ 
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index 6a57aa8..89a73cc 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -17,6 +17,7 @@
+ #include "common.h"
+ #include "fit.h"
+ #include "llama.h"
++#include "src/llama-event-recorder.h"
+ #include "log.h"
+ #include "sampling.h"
+ #include "speculative.h"
+@@ -1082,6 +1083,7 @@ private:
+     // use server_context methods instead
+ 
+     common_params params_base;
++    llama_event_recorder * event_recorder = nullptr;
+ 
+     // note: keep these alive - they determine the lifetime of the model, context, etc.
+     common_init_result_ptr llama_init;
+@@ -4609,7 +4611,22 @@ private:
+         // note: the sync is done here too, so that the wait is also covered by the yield
+         int ret = 0;
+         queue_tasks.yield_to_queue([&]() {
+-            ret = llama_process(ctx_tgt, LLAMA_PROCESS_TYPE_DECODE, batch.view.get());
++            if (event_recorder) {
++                struct recorder_rows {
++                    const server_context_impl * server;
++                    int32_t off;
++                } rows = { this, off };
++                const auto get_row = [](const void * data, size_t i) -> llama_event_recorder_dispatch::row {
++                    const auto & rows = *static_cast<const recorder_rows *>(data);
++                    const auto & token = rows.server->batch.tokens[rows.off + i];
++                    const auto & task = rows.server->slots[token.id_slot].task;
++                    return { task ? task->id : -1, token.is_prompt };
++                };
++                const llama_event_recorder_dispatch dispatch(event_recorder, ctx_tgt, batch.view.size(), get_row, &rows);
++                ret = llama_process(ctx_tgt, LLAMA_PROCESS_TYPE_DECODE, batch.view.get());
++            } else {
++                ret = llama_process(ctx_tgt, LLAMA_PROCESS_TYPE_DECODE, batch.view.get());
++            }
+             if (ret == 0 && has_output) {
+                 llama_synchronize(ctx_tgt);
+             }
+@@ -5121,6 +5138,7 @@ bool server_context::load_model(common_params & params) {
+ 
+ void server_context::start_loop() {
+     auto & params = impl->params_base;
++    impl->event_recorder = llama_event_recorder_dispatch::get([] { common_log_flush(common_log_main()); });
+     impl->queue_tasks.start_loop(params.sleep_idle_seconds * 1000);
+ }
+ 

@@ -1,0 +1,876 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 426c487..face252 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -16,6 +16,7 @@ set(LLAMA_CORE_SOURCES
+     llama-chat.cpp
+     llama-context.cpp
+     llama-cparams.cpp
++    llama-expert-predict.cpp
+     llama-grammar.cpp
+     llama-graph.cpp
+     llama-hparams.cpp
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index 969989a..f62cec9 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -2,6 +2,7 @@
+ 
+ #include "ggml.h"
+ #include "llama-arch.h"
++#include "llama-expert-predict.h"
+ #include "llama-graph.h"
+ #include "llama-impl.h"
+ #include "llama-batch.h"
+@@ -631,6 +632,12 @@ llama_context::llama_context(
+ }
+ 
+ llama_context::~llama_context() {
++    if (expert_predict) {
++        expert_predict.reset();
++    } else if (expert_predict_requested) {
++        llama_expert_predict::log_stats(0, 0, 0, 0, 0);
++    }
++
+     // wait for any pending asynchronous copies into the output buffers before they are freed
+     synchronize();
+ 
+@@ -1814,7 +1821,8 @@ bool llama_context::set_adapter_cvec(
+     return res;
+ }
+ 
+-llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, llm_graph_type gtype, llama_memory_context_i * mctx, ggml_status & ret) {
++llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, llm_graph_type gtype, llama_memory_context_i * mctx,
++                                               ggml_status & ret, bool predict_experts) {
+     if (mctx && !mctx->apply()) {
+         LLAMA_LOG_ERROR("%s: failed to apply memory context\n", __func__);
+         ret = GGML_STATUS_FAILED;
+@@ -1877,7 +1885,24 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
+         //LLAMA_LOG_INFO("graph set inputs time: %.3f ms\n", (ggml_time_us() - t_start_us)/1000.0);
+     }
+ 
+-    const auto status = graph_compute(res->get_gf(), ubatch.n_tokens > 1);
++    auto * predictor = predict_experts && ubatch.n_seqs_unq == 1 ? expert_predict.get() : nullptr;
++    ggml_status status;
++    {
++        struct ubatch_observation {
++            llama_expert_predict * predictor;
++            bool completed = false;
++            ~ubatch_observation() {
++                if (predictor) {
++                    predictor->end_ubatch(completed);
++                }
++            }
++        } observation{predictor};
++        if (predictor) {
++            predictor->begin_ubatch(sched.get(), res->get_gf(), backend_cpu, ubatch.n_tokens, cparams.cb_eval, cparams.cb_eval_user_data);
++        }
++        status = graph_compute(res->get_gf(), ubatch.n_tokens > 1);
++        observation.completed = status == GGML_STATUS_SUCCESS;
++    }
+     if (status != GGML_STATUS_SUCCESS) {
+         LLAMA_LOG_ERROR("%s: failed to compute graph, compute status: %d\n", __func__, status);
+         ret = status;
+@@ -2137,7 +2162,23 @@ static bool needs_raw_logits(const llama_ubatch & ubatch, const std::map<llama_s
+     return false; // all sequences use backend sampling
+ }
+ 
++bool llama_context::init_expert_predict(bool single_slot) {
++    expert_predict_requested = llama_expert_predict::requested();
++    if (expert_predict_requested) {
++        try {
++            expert_predict = std::make_unique<llama_expert_predict>(model, single_slot);
++        } catch (...) {
++            LLAMA_LOG_INFO("expert_demand_predictor: inactive (could not allocate predictor state)\n");
++        }
++    }
++    return expert_predict && single_slot;
++}
++
+ int llama_context::decode(const llama_batch_ext & batch_inp) {
++    return decode(batch_inp, -1);
++}
++
++int llama_context::decode(const llama_batch_ext & batch_inp, int64_t prefill_request) {
+     if (!memory) {
+         LLAMA_LOG_DEBUG("%s: cannot decode batches with this context (calling encode() instead)\n", __func__);
+         return encode(batch_inp);
+@@ -2308,6 +2349,9 @@ int llama_context::decode(const llama_batch_ext & batch_inp) {
+ 
+     int64_t n_outputs_prev = 0;
+     int64_t n_tokens_prev  = 0;
++    const bool predict_experts = expert_predict && prefill_request >= 0 && cparams.causal_attn &&
++            cparams.ctx_type == LLAMA_CONTEXT_TYPE_DEFAULT &&
++            expert_predict->begin_request(prefill_request);
+ 
+     // ordering for the layer input device buffer
+     llama_context * inject_src     = has_embd_row ? cparams.ctx_other : nullptr;
+@@ -2364,7 +2408,7 @@ int llama_context::decode(const llama_batch_ext & batch_inp) {
+ 
+         ggml_status status;
+ 
+-        const auto * res = process_ubatch(ubatch, ctx_type_to_graph_type(cparams.ctx_type), mctx.get(), status);
++        const auto * res = process_ubatch(ubatch, ctx_type_to_graph_type(cparams.ctx_type), mctx.get(), status, predict_experts);
+ 
+         if (!res) {
+             // the last ubatch failed or was aborted -> remove all positions of that ubatch from the memory module
+@@ -3200,6 +3244,10 @@ bool llama_context::sched_copy_experts(ggml_backend_t backend, const ggml_tensor
+         st.ids = ids;
+     }
+ 
++    if (lctx->expert_predict && !lctx->moe_cache) {
++        lctx->expert_predict->observe_copy(src, st.used);
++    }
++
+     // group consecutive experts and copy them together
+     for (int64_t first = 0; first < n_expert; ) {
+         if (!st.used[first]) {
+@@ -5166,6 +5214,14 @@ void llama_opt_epoch(
+         callback_eval);
+ }
+ 
++bool llama_expert_predict_configure(llama_context * ctx, bool single_slot) {
++    return ctx->init_expert_predict(single_slot);
++}
++
++int32_t llama_expert_predict_decode(llama_context * ctx, const llama_batch_ext * batch, int64_t request) {
++    return ctx->decode(*batch, request);
++}
++
+ int32_t llama_process(llama_context * ctx, llama_process_type type, llama_batch_ext * batch) {
+     switch (type) {
+         case LLAMA_PROCESS_TYPE_ENCODE: return ctx->encode(*batch);
+diff --git a/src/llama-context.h b/src/llama-context.h
+index 3e3921c..0a06cae 100644
+--- a/src/llama-context.h
++++ b/src/llama-context.h
+@@ -18,6 +18,7 @@
+ 
+ struct llama_model;
+ class llama_batch_allocr;
++class llama_expert_predict;
+ class llama_moe_cache;
+ 
+ class llama_io_read_i;
+@@ -158,10 +159,13 @@ struct llama_context {
+                 const llama_ubatch & ubatch,
+                     llm_graph_type   gtype,
+             llama_memory_context_i * mctx,
+-                       ggml_status & ret);
++                       ggml_status & ret,
++                              bool   predict_experts = false);
+ 
+     int encode(const llama_batch_ext & batch_inp);
+     int decode(const llama_batch_ext & batch_inp);
++    int decode(const llama_batch_ext & batch_inp, int64_t prefill_request);
++    bool init_expert_predict(bool single_slot);
+ 
+     // compat version
+     int encode(const llama_batch & batch_inp);
+@@ -510,4 +514,7 @@ private:
+     mutable int32_t n_eval   = 0; // number of eval calls
+ 
+     mutable int32_t n_reused = 0; // number of times the previous graph was reused
++
++    std::unique_ptr<llama_expert_predict> expert_predict;
++    bool expert_predict_requested = false;
+ };
+diff --git a/src/llama-expert-predict.cpp b/src/llama-expert-predict.cpp
+new file mode 100644
+index 0000000..0155537
+--- /dev/null
++++ b/src/llama-expert-predict.cpp
+@@ -0,0 +1,595 @@
++#include "llama-expert-predict.h"
++
++#include "llama-impl.h"
++#include "llama-model.h"
++
++#include <algorithm>
++#include <array>
++#include <atomic>
++#include <bitset>
++#include <chrono>
++#include <cinttypes>
++#include <condition_variable>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <mutex>
++
++#if defined(__linux__)
++#include <pthread.h>
++#include <sys/mman.h>
++#include <unistd.h>
++#endif
++
++namespace {
++
++constexpr size_t request_budget = 8 * 1024 * 1024;
++constexpr size_t max_pages = request_budget / 4096;
++constexpr size_t worker_stack = 256 * 1024;
++constexpr size_t top_k = 4;
++constexpr size_t history_size = 3; // current microbatch and two completed microbatches
++
++using expert_set = std::bitset<LLAMA_MAX_EXPERTS>;
++using clock_type = std::chrono::steady_clock;
++
++struct expert_projection {
++    const ggml_tensor * tensor = nullptr;
++    uintptr_t begin = 0;
++    size_t stride = 0;
++    size_t size = 0;
++    bool mapped = false;
++};
++
++struct advice_range {
++    uintptr_t begin;
++    size_t size;
++    size_t rank;
++};
++
++struct forecast {
++    int layer = -1;
++    std::array<size_t, top_k> ids;
++    size_t count = 0;
++    bool queued = false;
++};
++
++bool buffer_contains(ggml_backend_buffer_t buffer, uintptr_t begin, size_t size) {
++    const auto base = reinterpret_cast<uintptr_t>(ggml_backend_buffer_get_base(buffer));
++    const size_t buffer_size = ggml_backend_buffer_get_size(buffer);
++    return base && begin >= base && begin - base <= buffer_size && size <= buffer_size - (begin - base);
++}
++
++int router_layer(const ggml_tensor * tensor, int n_layers) {
++    constexpr char prefix[] = "ffn_moe_topk-";
++    const char * name = tensor->name;
++    if (std::strncmp(name, prefix, sizeof(prefix) - 1) != 0) {
++        return -1;
++    }
++    name += sizeof(prefix) - 1;
++    int layer = 0;
++    if (*name < '0' || *name > '9') {
++        return -1;
++    }
++    for (; *name >= '0' && *name <= '9'; ++name) {
++        layer = 10 * layer + (*name - '0');
++        if (layer >= n_layers) {
++            return -1;
++        }
++    }
++    return *name == '\0' ? layer : -1;
++}
++
++} // namespace
++
++struct llama_expert_predict::impl {
++    impl(const llama_model & model, bool single_slot) : model(model) {
++        if (!single_slot) {
++            deactivate("server is configured for multiple slots");
++        }
++    }
++
++    ~impl() {
++#if defined(__linux__)
++        if (worker_started) {
++            cancel.store(true);
++            {
++                std::lock_guard<std::mutex> lock(mutex);
++                stopping = true;
++            }
++            ready.notify_one();
++            pthread_join(worker_thread, nullptr);
++        }
++#endif
++        check_failure();
++        if (!active && !disabled) {
++            deactivate(request < 0 ? "no eligible single-slot prefill" : "no eligible router observation with a mapped target");
++        }
++        log_stats(hits, misses, bytes_advised, lead_ns, lead_samples);
++    }
++
++    void deactivate(const char * reason) {
++        disabled = true;
++        LLAMA_LOG_INFO("expert_demand_predictor: inactive (%s)\n", reason);
++    }
++
++    bool check_failure() {
++        if (!disabled && advice_failed.load()) {
++            deactivate("MADV_WILLNEED failed");
++        }
++        return disabled;
++    }
++
++    bool prepare() {
++#if defined(__linux__)
++        const long system_page = sysconf(_SC_PAGESIZE);
++        if (system_page < 4096 || static_cast<unsigned long>(system_page) > request_budget) {
++            deactivate("unsupported page size");
++            return false;
++        }
++        page_size = static_cast<size_t>(system_page);
++        n_experts = model.hparams.n_expert;
++        const auto layers = model.hparams.n_layer();
++        if (n_experts == 0 || n_experts > LLAMA_MAX_EXPERTS || layers < 2 ||
++                layers > LLAMA_MAX_LAYERS || layers > model.layers.size()) {
++            deactivate("unsupported expert or layer count");
++            return false;
++        }
++        n_layers = static_cast<int>(layers);
++        for (int i = 0; i < n_layers; ++i) {
++            const auto & layer = model.layers[i];
++            projections[i] = {
++                projection(layer.ffn_gate_up_exps ? layer.ffn_gate_up_exps : layer.ffn_up_exps),
++                projection(layer.ffn_gate_up_exps ? nullptr : layer.ffn_gate_exps),
++                projection(layer.ffn_down_exps),
++            };
++        }
++        if (!find_mappings()) {
++            deactivate("no verified mmap-backed host expert ranges");
++            return false;
++        }
++
++        pthread_attr_t attr;
++        if (pthread_attr_init(&attr) != 0) {
++            deactivate("could not initialize advice worker");
++            return false;
++        }
++        if (pthread_attr_setstacksize(&attr, worker_stack) == 0) {
++            worker_started = pthread_create(&worker_thread, &attr, [](void * self) -> void * {
++                static_cast<impl *>(self)->advise();
++                return nullptr;
++            }, this) == 0;
++        }
++        pthread_attr_destroy(&attr);
++        if (!worker_started) {
++            deactivate("could not start advice worker");
++        }
++        return worker_started;
++#else
++        deactivate("mmap advice is unsupported on this platform");
++        return false;
++#endif
++    }
++
++    bool begin_request(int64_t id) {
++        if (check_failure() || (request < 0 && !prepare())) {
++            return false;
++        }
++        if (request != id) {
++            request = id;
++            for (auto & batch : history) {
++                batch.fill(expert_set{});
++            }
++            history_slot = 0;
++            charged_count = 0;
++        }
++        return true;
++    }
++
++    void begin_ubatch(ggml_backend_sched_t sched, ggml_cgraph * graph, ggml_backend_t cpu,
++                      uint32_t tokens, ggml_backend_sched_eval_callback callback, void * user_data) {
++        if (check_failure()) {
++            return;
++        }
++        history[history_slot].fill(expert_set{});
++        prediction.count = 0;
++        last_layer = -1;
++        n_tokens = tokens;
++        ubatch_open = true;
++
++        // Cutting an accelerator graph at top-k can break a fused router kernel. Use the existing
++        // demand-copy IDs on split graphs and only request extra eval boundaries on CPU graphs.
++        if (!cpu) {
++            return;
++        }
++        for (int i = 0; i < ggml_graph_n_nodes(graph); ++i) {
++            auto * node = ggml_graph_node(graph, i);
++            if ((node->flags & GGML_TENSOR_FLAG_COMPUTE) && ggml_backend_sched_get_tensor_backend(sched, node) != cpu) {
++                return;
++            }
++        }
++
++        stock_callback = callback;
++        stock_user_data = user_data;
++        eval_sched = sched;
++        ggml_backend_sched_set_eval_callback(sched, eval, this);
++    }
++
++    void end_ubatch(bool completed) {
++        if (!ubatch_open) {
++            return;
++        }
++        if (completed) {
++            history_slot = (history_slot + 1) % history_size;
++        }
++        if (eval_sched) {
++            ggml_backend_sched_set_eval_callback(eval_sched, stock_callback, stock_user_data);
++            eval_sched = nullptr;
++        }
++        cancel.store(true);
++        ubatch_open = false;
++        check_failure();
++    }
++
++    static bool eval(ggml_tensor * tensor, bool ask, void * user_data) {
++        auto & self = *static_cast<impl *>(user_data);
++        if (ask) {
++            self.stock_asked = self.stock_callback && self.stock_callback(tensor, true, self.stock_user_data);
++            const int layer = router_layer(tensor, self.n_layers);
++            return self.stock_asked || (!self.disabled && layer > self.last_layer);
++        }
++        if (self.stock_asked && !self.stock_callback(tensor, false, self.stock_user_data)) {
++            return false;
++        }
++        const int layer = router_layer(tensor, self.n_layers);
++        if (layer > self.last_layer && !self.check_failure()) {
++            self.observe_tensor(layer, tensor);
++        }
++        return true;
++    }
++
++    void observe_copy(const ggml_tensor * weight, const std::vector<bool> & used) {
++        if (!ubatch_open || eval_sched || used.size() != n_experts || check_failure()) {
++            return;
++        }
++        int layer = -1;
++        for (int i = 0; i < n_layers; ++i) {
++            for (const auto & projection : projections[i]) {
++                if (projection.tensor == weight) {
++                    if (layer >= 0 && layer != i) {
++                        return; // one tensor can be shared across layers
++                    }
++                    layer = i;
++                }
++            }
++        }
++        if (layer <= last_layer) {
++            return;
++        }
++        expert_set actual;
++        for (size_t id = 0; id < n_experts; ++id) {
++            actual[id] = used[id];
++        }
++        observe(layer, actual);
++    }
++
++private:
++    expert_projection projection(const ggml_tensor * tensor) const {
++        expert_projection result;
++        result.tensor = tensor;
++        if (!tensor || !tensor->data || !tensor->buffer || tensor->ne[2] != static_cast<int64_t>(n_experts) ||
++                tensor->ne[3] != 1 || tensor->nb[2] == 0 || tensor->nb[2] > SIZE_MAX / n_experts ||
++                !ggml_is_contiguous(tensor) || !ggml_backend_buffer_is_host(tensor->buffer) ||
++                ggml_backend_buffer_get_usage(tensor->buffer) != GGML_BACKEND_BUFFER_USAGE_WEIGHTS) {
++            return result;
++        }
++        const auto begin = reinterpret_cast<uintptr_t>(tensor->data);
++        const size_t size = tensor->nb[2] * n_experts;
++        if (size > UINTPTR_MAX - begin || size != ggml_nbytes(tensor) ||
++                !buffer_contains(tensor->buffer, begin, size)) {
++            return result;
++        }
++        result.begin = begin;
++        result.stride = tensor->nb[2];
++        result.size = size;
++        return result;
++    }
++
++#if defined(__linux__)
++    bool find_mappings() {
++        std::FILE * maps = std::fopen("/proc/self/maps", "r");
++        if (!maps) {
++            return false;
++        }
++        bool found = false;
++        char line[256];
++        while (std::fgets(line, sizeof(line), maps)) {
++            if (!std::strchr(line, '\n')) {
++                int c;
++                do {
++                    c = std::fgetc(maps);
++                } while (c != '\n' && c != EOF);
++            }
++            uintptr_t begin, end;
++            uint64_t inode;
++            char flags[5];
++            // The model loader maps GGUF weights read-only and shared. Check actual VMAs because
++            // a host buffer can also wrap writable heap memory, and the loader can unmap fragments.
++            if (std::sscanf(line, "%" SCNxPTR "-%" SCNxPTR " %4s %*s %*s %" SCNu64,
++                        &begin, &end, flags, &inode) != 4 || std::strcmp(flags, "r--s") != 0 || inode == 0) {
++                continue;
++            }
++            for (int i = 1; i < n_layers; ++i) {
++                for (auto & projection : projections[i]) {
++                    if (projection.size && projection.begin >= begin && projection.begin < end &&
++                            projection.size <= end - projection.begin) {
++                        projection.mapped = true;
++                        found = true;
++                    }
++                }
++            }
++        }
++        std::fclose(maps);
++        return found;
++    }
++#endif
++
++    void observe_tensor(int layer, const ggml_tensor * ids) {
++        const auto buffer = ids->view_src ? ids->view_src->buffer : ids->buffer;
++        if (ids->type != GGML_TYPE_I32 || !ids->data || !buffer || !ggml_backend_buffer_is_host(buffer) ||
++                ids->ne[0] <= 0 || ids->ne[0] > static_cast<int64_t>(n_experts) ||
++                ids->ne[1] <= 0 || ids->ne[1] > n_tokens || ids->ne[2] != 1 || ids->ne[3] != 1 ||
++                ids->nb[0] != sizeof(int32_t) || ids->nb[1] % sizeof(int32_t) != 0 ||
++                ids->nb[1] < ids->ne[0] * sizeof(int32_t) || ids->nb[1] > n_experts * sizeof(int32_t)) {
++            return;
++        }
++
++        const size_t columns = static_cast<size_t>(ids->ne[0]);
++        const size_t rows = static_cast<size_t>(ids->ne[1]);
++        const size_t stride = ids->nb[1] / sizeof(int32_t);
++        if (rows - 1 > (SIZE_MAX / sizeof(int32_t) - columns) / stride) {
++            return;
++        }
++        const size_t bytes = ((rows - 1) * stride + columns) * sizeof(int32_t);
++        if (!buffer_contains(buffer, reinterpret_cast<uintptr_t>(ids->data), bytes)) {
++            return;
++        }
++        expert_set actual;
++        const size_t rows_per_read = id_data.size() / stride;
++        for (size_t first = 0; first < rows; first += rows_per_read) {
++            const size_t count = std::min(rows - first, rows_per_read);
++            const size_t elements = (count - 1) * stride + columns;
++            ggml_backend_tensor_get(ids, id_data.data(), first * ids->nb[1], elements * sizeof(int32_t));
++            for (size_t row = 0; row < count; ++row) {
++                for (size_t col = 0; col < columns; ++col) {
++                    const int32_t id = id_data[row * stride + col];
++                    if (id < 0 || static_cast<size_t>(id) >= n_experts) {
++                        return;
++                    }
++                    actual.set(id);
++                }
++            }
++        }
++        observe(layer, actual);
++    }
++
++    void observe(int layer, const expert_set & actual) {
++        if (actual.none()) {
++            return;
++        }
++        if (prediction.count && layer == prediction.layer) {
++            size_t matched = 0;
++            for (size_t rank = 0; rank < prediction.count; ++rank) {
++                matched += actual[prediction.ids[rank]];
++            }
++            hits += matched;
++            misses += actual.count() - matched;
++        }
++        if (prediction.queued) {
++            cancel.store(true);
++            if (layer == prediction.layer) {
++                const auto consumed = clock_type::now();
++                std::lock_guard<std::mutex> lock(mutex);
++                for (size_t rank = 0; rank < prediction.count; ++rank) {
++                    if (actual[prediction.ids[rank]] && advised_at[rank] != clock_type::time_point{} &&
++                            advised_at[rank] <= consumed) {
++                        lead_ns += std::chrono::duration_cast<std::chrono::nanoseconds>(consumed - advised_at[rank]).count();
++                        ++lead_samples;
++                    }
++                }
++            }
++        }
++        last_layer = layer;
++        history[history_slot][layer] = actual;
++        prediction.count = 0;
++        prediction.queued = false;
++        const int target = layer + 1;
++        if (target == n_layers) {
++            return;
++        }
++        prediction.layer = target;
++        std::array<uint8_t, LLAMA_MAX_EXPERTS> counts{};
++        for (size_t id = 0; id < n_experts; ++id) {
++            counts[id] = actual[id];
++            for (size_t back = 1; back < history_size; ++back) {
++                counts[id] += history[(history_slot + history_size - back) % history_size][target][id];
++            }
++        }
++        while (prediction.count < top_k) {
++            const auto best = std::max_element(counts.begin(), counts.begin() + n_experts);
++            if (*best == 0) {
++                break;
++            }
++            prediction.ids[prediction.count++] = best - counts.begin();
++            *best = 0;
++        }
++        prediction.queued = queue_advice();
++    }
++
++    bool queue_advice() {
++        std::unique_lock<std::mutex> lock(mutex);
++        const size_t limit = request_budget / page_size;
++        if (busy || charged_count == limit || advice_failed.load()) {
++            return false;
++        }
++        job_count = 0;
++        for (size_t rank = 0; rank < prediction.count && charged_count < limit; ++rank) {
++            for (const auto & projection : projections[prediction.layer]) {
++                if (!projection.mapped) {
++                    continue;
++                }
++                const uintptr_t begin = projection.begin + prediction.ids[rank] * projection.stride;
++                const uintptr_t end = begin + projection.stride;
++                if (end > UINTPTR_MAX - (page_size - 1)) {
++                    continue;
++                }
++                const uintptr_t first = begin - begin % page_size;
++                const uintptr_t last = ((end + page_size - 1) / page_size) * page_size;
++                reserve_pages(first, last, rank, limit);
++            }
++        }
++        if (!job_count) {
++            return false;
++        }
++        advised_at.fill({});
++        cancel.store(false);
++        busy = true;
++        lock.unlock();
++        ready.notify_one();
++        if (!active) {
++            active = true;
++            LLAMA_LOG_INFO("expert_demand_predictor: active slots=1 lookahead=1 history=%zu top_k=%zu request_budget_bytes=%zu advice=MADV_WILLNEED\n",
++                    history_size - 1, top_k, request_budget);
++        }
++        return true;
++    }
++
++    void reserve_pages(uintptr_t page, uintptr_t end, size_t rank, size_t limit) {
++        while (page < end && charged_count < limit) {
++            auto * tail = charged_pages.data() + charged_count;
++            auto * next = std::lower_bound(charged_pages.data(), tail, page);
++            if (next != tail && *next == page) {
++                page += page_size;
++                continue;
++            }
++            const uintptr_t gap_end = next == tail ? end : std::min(end, *next);
++            const size_t count = std::min((gap_end - page) / page_size, limit - charged_count);
++            std::move_backward(next, tail, tail + count);
++            for (size_t i = 0; i < count; ++i) {
++                next[i] = page + i * page_size;
++            }
++            const size_t size = count * page_size;
++            job[job_count++] = {page, size, rank};
++            charged_count += count;
++            page += size;
++        }
++    }
++
++#if defined(__linux__)
++    void advise() {
++        std::unique_lock<std::mutex> lock(mutex);
++        while (true) {
++            ready.wait(lock, [&] { return busy || stopping; });
++            if (stopping) {
++                return;
++            }
++            lock.unlock();
++            for (size_t i = 0; i < job_count && !cancel.load(); ++i) {
++                const auto & range = job[i];
++                bytes_advised += range.size;
++                if (madvise(reinterpret_cast<void *>(range.begin), range.size, MADV_WILLNEED) != 0) {
++                    advice_failed.store(true);
++                    break;
++                }
++                const auto now = clock_type::now();
++                std::lock_guard<std::mutex> update(mutex);
++                if (advised_at[range.rank] == clock_type::time_point{}) {
++                    advised_at[range.rank] = now;
++                }
++            }
++            lock.lock();
++            busy = false;
++        }
++    }
++#endif
++
++    const llama_model & model;
++    bool active = false;
++    bool disabled = false;
++    bool ubatch_open = false;
++    bool stock_asked = false;
++    int64_t request = -1;
++    int n_layers = 0;
++    size_t n_experts = 0;
++    size_t page_size = 0;
++    uint32_t n_tokens = 0;
++    int last_layer = -1;
++    ggml_backend_sched_t eval_sched = nullptr;
++    ggml_backend_sched_eval_callback stock_callback = nullptr;
++    void * stock_user_data = nullptr;
++
++    std::array<std::array<expert_projection, 3>, LLAMA_MAX_LAYERS> projections;
++    std::array<std::array<expert_set, LLAMA_MAX_LAYERS>, history_size> history;
++    size_t history_slot = 0;
++    std::array<int32_t, 16 * LLAMA_MAX_EXPERTS> id_data;
++    forecast prediction;
++
++    std::array<uintptr_t, max_pages> charged_pages;
++    size_t charged_count = 0;
++    std::array<advice_range, max_pages> job;
++    size_t job_count = 0;
++    std::array<clock_type::time_point, top_k> advised_at;
++
++    std::mutex mutex;
++    std::condition_variable ready;
++    bool busy = false;
++    bool stopping = false;
++    std::atomic<bool> cancel{false};
++    std::atomic<bool> advice_failed{false};
++#if defined(__linux__)
++    pthread_t worker_thread;
++    bool worker_started = false;
++#endif
++
++    uint64_t hits = 0;
++    uint64_t misses = 0;
++    uint64_t bytes_advised = 0; // worker-owned until join
++    uint64_t lead_ns = 0;
++    uint64_t lead_samples = 0;
++};
++
++llama_expert_predict::llama_expert_predict(const llama_model & model, bool single_slot) :
++    state(std::make_unique<impl>(model, single_slot)) {
++    static_assert(sizeof(impl) + sizeof(llama_expert_predict) + worker_stack <= 1024 * 1024,
++                  "expert predictor exceeds its per-context memory budget");
++}
++
++llama_expert_predict::~llama_expert_predict() = default;
++
++bool llama_expert_predict::requested() {
++    const char * value = std::getenv("LLAMA_EXPERT_PREDICT");
++    return value && std::strcmp(value, "1") == 0;
++}
++
++void llama_expert_predict::log_stats(uint64_t hits, uint64_t misses, uint64_t advised, uint64_t lead_ns, uint64_t lead_samples) {
++    // Successful advice does not prove that it brought a page into memory before demand.
++    LLAMA_LOG_INFO("expert_demand_predictor: stats hits=%" PRIu64 " misses=%" PRIu64
++                   " bytes_useful_at_consumption=0 wasted_bytes=%" PRIu64 " lead_ns_total=%" PRIu64 " lead_samples=%" PRIu64 "\n",
++                   hits, misses, advised, lead_ns, lead_samples);
++}
++
++bool llama_expert_predict::begin_request(int64_t request) {
++    return state->begin_request(request);
++}
++
++void llama_expert_predict::begin_ubatch(ggml_backend_sched_t sched, ggml_cgraph * graph, ggml_backend_t cpu,
++                                      uint32_t n_tokens, ggml_backend_sched_eval_callback callback, void * user_data) {
++    state->begin_ubatch(sched, graph, cpu, n_tokens, callback, user_data);
++}
++
++void llama_expert_predict::end_ubatch(bool completed) {
++    state->end_ubatch(completed);
++}
++
++void llama_expert_predict::observe_copy(const ggml_tensor * weight, const std::vector<bool> & used) {
++    state->observe_copy(weight, used);
++}
+diff --git a/src/llama-expert-predict.h b/src/llama-expert-predict.h
+new file mode 100644
+index 0000000..3817bdf
+--- /dev/null
++++ b/src/llama-expert-predict.h
+@@ -0,0 +1,32 @@
++#pragma once
++
++#include "llama.h"
++
++#include <memory>
++#include <vector>
++
++struct llama_model;
++
++class llama_expert_predict {
++public:
++    llama_expert_predict(const llama_model & model, bool single_slot);
++    ~llama_expert_predict();
++
++    static bool requested();
++    static void log_stats(uint64_t hits, uint64_t misses, uint64_t advised, uint64_t lead_ns, uint64_t lead_samples);
++
++    bool begin_request(int64_t request);
++    void begin_ubatch(ggml_backend_sched_t sched, ggml_cgraph * graph, ggml_backend_t cpu,
++                      uint32_t n_tokens, ggml_backend_sched_eval_callback callback, void * user_data);
++    void end_ubatch(bool completed);
++
++    void observe_copy(const ggml_tensor * weight, const std::vector<bool> & used);
++
++private:
++    struct impl;
++    std::unique_ptr<impl> state;
++};
++
++// Private handoff from llama-server. The task ID is valid only for a single-slot prompt batch.
++LLAMA_API bool llama_expert_predict_configure(llama_context * ctx, bool single_slot);
++LLAMA_API int32_t llama_expert_predict_decode(llama_context * ctx, const llama_batch_ext * batch, int64_t request);
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index 6a57aa8..7f94866 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -17,6 +17,7 @@
+ #include "common.h"
+ #include "fit.h"
+ #include "llama.h"
++#include "src/llama-expert-predict.h"
+ #include "log.h"
+ #include "sampling.h"
+ #include "speculative.h"
+@@ -1110,6 +1111,7 @@ private:
+ 
+     // slots / clients
+     std::vector<server_slot> slots;
++    bool expert_predict = false;
+ 
+     int trace = 0;        // env: LLAMA_TRACE
+     int slots_debug = 0;  // env: LLAMA_SERVER_SLOTS_DEBUG
+@@ -1639,6 +1641,8 @@ private:
+         model_aliases = params_base.model_alias;
+         model_tags    = params_base.model_tags;
+ 
++        expert_predict = llama_expert_predict_configure(ctx_tgt, slots.size() == 1);
++
+         // propagate new defaults back to caller
+         params = params_base;
+ 
+@@ -4600,16 +4604,28 @@ private:
+             }
+         }
+ 
++        const auto * slot = batch.slot_batched;
++        int64_t prefill_request = -1;
++        if (expert_predict && slot && slot->task &&
++                (slot->state == SLOT_STATE_PROCESSING_PROMPT || slot->state == SLOT_STATE_DONE_PROMPT)) {
++            prefill_request = slot->task->id;
++        }
+         bool has_output = false;
+         for (int i = off; i < off + batch.view.size(); ++i) {
+-            has_output |= batch.tokens[i].output;
++            const auto & token = batch.tokens[i];
++            has_output |= token.output;
++            if (prefill_request >= 0 && (!token.is_prompt || token.id_slot != slot->id)) {
++                prefill_request = -1;
++            }
+         }
+ 
+         // yield to the queue, so we can still handle metrics tasks while decoding
+         // note: the sync is done here too, so that the wait is also covered by the yield
+         int ret = 0;
+         queue_tasks.yield_to_queue([&]() {
+-            ret = llama_process(ctx_tgt, LLAMA_PROCESS_TYPE_DECODE, batch.view.get());
++            ret = prefill_request >= 0
++                ? llama_expert_predict_decode(ctx_tgt, batch.view.get(), prefill_request)
++                : llama_process(ctx_tgt, LLAMA_PROCESS_TYPE_DECODE, batch.view.get());
+             if (ret == 0 && has_output) {
+                 llama_synchronize(ctx_tgt);
+             }

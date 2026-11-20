@@ -1,0 +1,8 @@
+WORK ORDER 2: expert weight cache for staged slices (llama.cpp pinned at 9048bad8d6e3a0f9f1726e238e451181c7e02613)
+Build, as a source diff, bounded reuse of already-staged expert weight slices on the stock scheduler copy path (`sched_copy_experts` in `src/llama-context.cpp` and the scheduler's input-weight copy callback), so an expert slice copied to a device buffer for one operation is reused instead of copied again within the same operation.
+- One shared lease per expert per graph operation, held through its last reader, released at scheduler synchronization. Demand-only admission, unleased LRU eviction, capacity cap default 64 MiB (`LLAMA_EXPERT_CACHE_MIB`, whole decimal MiB; invalid or zero means stock path). One cache per context.
+- Do not duplicate the stock native MoE cache (`--moe-cache-mib`, `src/llama-moe-cache.cpp`): if it is enabled, stay inactive and say so.
+- Gate: `LLAMA_EXPERT_CACHE=1`. Unset: binary identical in behaviour to stock.
+- INFO log lines (`-lv 4`): `expert_weight_cache: active cap_mib=<effective> backend=<name>` on first eligible use; `expert_weight_cache: inactive (<reason>)` on bypass or failure; `expert_weight_cache: stats leases=<n> reuses=<n> evictions=<n> bytes_copied_saved=<n> peak_bytes=<n>` at exit.
+- Invariants: slice bytes identical to the file; never release a slice before its last reader finishes; cap respected; any lease error falls back to a plain copy; output byte identical to stock.
+- Allowed paths: `src/`, `ggml/src/ggml-backend.cpp`, `ggml/include/ggml-backend.h` (only if a hook is genuinely needed), CMake files for new sources. Do not touch router, sampling or model files.
