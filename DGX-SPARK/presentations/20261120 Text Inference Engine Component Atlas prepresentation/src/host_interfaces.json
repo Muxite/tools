@@ -1,0 +1,26 @@
+{
+  "host.hostcpu": {
+    "inputs": "Runnable host threads and CPU operator work from the engine, with the process affinity and scheduling configuration.",
+    "outputs": "Scheduled thread execution and CPU work completion, including host-side tokenization, scheduling and device submission.",
+    "consumer": "Host-side request processing and the kernel dispatcher use CPU execution and any supported CPU operator path.",
+    "evidence": "Under a fixed worker count and workload, record scheduling delay separately from active CPU execution."
+  },
+  "host.device": {
+    "inputs": "Admitted kernel launches with device-accessible buffers, stream dependencies, synchronization and launch configuration.",
+    "outputs": "Executed kernels, results in their destination buffers and completion or error status through the device runtime.",
+    "consumer": "The kernel dispatcher, execution graph backend and buffer owners use device completion to advance or release work.",
+    "evidence": "Record device and runtime identity and clocks, then compare a measured kernel with a matched shape and precision ceiling."
+  },
+  "host.dram": {
+    "inputs": "Allocated physical backing and CPU or accelerator memory requests from the engine, including shared-address accesses and explicit transfers.",
+    "outputs": "Storage and access for resident weights, KV, workspace, staging and activations across the host memory topology.",
+    "consumer": "The accelerator, CPU, and engine state and weight components use these bytes. The placement planner accounts for their physical backing.",
+    "evidence": "Measure the actual access path and payload sizes on the target. Verify the unified memory ledger counts shared physical pages once."
+  },
+  "host.ssd": {
+    "inputs": "Requested checkpoint shard paths, offsets and lengths via the filesystem, mapping or configured I/O path.",
+    "outputs": "Requested checkpoint bytes and read completion or I/O failure. Service time can depend on the operating system cache.",
+    "consumer": "The checkpoint reader and expert weight cache use returned byte ranges for tensor binding and exact-demand expert fills.",
+    "evidence": "Verify known byte ranges under documented cold and warm cache conditions, alignment and concurrency. Track short reads, page faults and cache hits separately from device storage time."
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "weights.load_checkpoint": {
+    "inputs": "Checkpoint shards and manifest, expected tensor names and shapes, and loader settings.",
+    "outputs": "A directory binding each model parameter to its source shard, byte range, shape and data type, or an error identifying an invalid entry."
+  },
+  "weights.prepare_artifact": {
+    "inputs": "Source tensors and vocabulary, architecture metadata, target weight format and permitted numerical error.",
+    "outputs": "An engine-readable weight pack with vocabulary, tensor layout and quantization scales."
+  },
+  "weights.decode_blocks": {
+    "inputs": "Packed weight blocks, their format and scales, tensor dimensions and the layout the kernel accepts.",
+    "outputs": "Decoded weight values or equivalent packed blocks in the requested kernel layout."
+  },
+  "weights.adapter_binding": {
+    "inputs": "Base model identity, adapter tensors, the adapter ID on each request and available adapter capacity.",
+    "outputs": "Validated adapter handles and request-specific projection updates for the matching model layers."
+  },
+  "placement.partition_model": {
+    "inputs": "Tensor sizes and source locations, available devices and storage, memory reserved for live requests, and placement policy.",
+    "outputs": "A placement plan assigning weight ranges to memory or storage, with transfer boundaries and budgets for the runtime cache, or an infeasible-plan error."
+  },
+  "engine.expert_streaming": {
+    "inputs": "Selected expert IDs, checkpoint byte ranges, placement and slot budgets, optional prefetch hints, and completion signals from readers.",
+    "outputs": "Ready weight handles for the expert computation, with completion events and slot state that track when the weights can be replaced."
+  },
+  "backend.execute_operators": {
+    "inputs": "An operator and its tensors, shapes, layouts and data types, plus device capabilities and execution stream.",
+    "outputs": "Computed output tensors and the selected implementation, or a fallback decision or error for unsupported inputs."
+  },
+  "graph.lower_capture_replay": {
+    "inputs": "Model operations, tensor types and shapes, buffer addresses and backend capture capabilities.",
+    "outputs": "An executable graph and, for a reusable launch, a capture entry keyed to its shape and buffers. An incompatible launch takes the eager or recapture path."
+  },
+  "memory.reusable_sessions": {
+    "inputs": "Prompt prefix, model and adapter identities, saved sequence state, active references and available cache capacity.",
+    "outputs": "The length and state handle of the longest compatible saved prefix, or a miss that starts fresh prefill."
+  },
+  "memory.runtime_arenas": {
+    "inputs": "Buffer sizes and lifetimes, memory limits, mapped weight ranges and allocation granularity.",
+    "outputs": "Allocations and mapped views with addresses valid through the last reader, plus committed and peak memory usage."
+  },
+  "memory.sequence_kv": {
+    "inputs": "Sequence IDs and positions, new key and value rows, window and layout rules, and page capacity.",
+    "outputs": "Updated key and value pages and a sequence-specific view of the valid positions that attention can read."
+  },
+  "parallel.expert_exchange": {
+    "inputs": "Token rows, selected expert IDs and mixture weights, replica locations, and device-local slot assignments.",
+    "outputs": "Expert work grouped at the destination devices and weighted results returned to the corresponding source tokens."
+  },
+  "parallel.model_execution": {
+    "inputs": "Device topology and peer capabilities, model shard assignments, and the current batch and sequence state.",
+    "outputs": "Device-local batches, combined partial results and completion signals. A separate decode device also receives a validated sequence-state handle."
+  },
+  "routing.forecast_expert_demand": {
+    "inputs": "Prior expert selections and other features already available before the authoritative routing decision.",
+    "outputs": "Predicted expert IDs and timing or confidence information for optional early fetches."
+  }
+}

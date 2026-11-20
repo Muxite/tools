@@ -1,0 +1,500 @@
+{
+  "edition": "20261120",
+  "pins": {
+    "llama.cpp": {"repo": "https://github.com/ggml-org/llama.cpp", "commit": "9048bad8d6e3a0f9f1726e238e451181c7e02613"},
+    "Strata": {"repo": "https://github.com/Muxite/Strata", "commit": "ffa80d73133ea5c548aefe57889a16e8085a938f"}
+  },
+  "kinds": {
+    "builder": {
+      "label": "Builder CC",
+      "delivers": "Code for one component or subcomponent",
+      "naming": "<Component> builder",
+      "definition": "Delivers code for a named component. The engine contract sets the required behavior and the choices the code must support. Its evidence is a test against an independent reference.",
+      "examples": ["Expert weight cache builder", "Quantized matmul kernel builder"]
+    },
+    "tool": {
+      "label": "Tool CC",
+      "delivers": "A verified receipt or artifact from an existing tool or system",
+      "naming": "Named for the tool job",
+      "definition": "Operates an existing tool or system and returns a verified receipt or artifact. It does not deliver engine code.",
+      "examples": ["Capped lab runner", "Model quantizer", "Pack converter", "Native build runner", "MoE cache size tuner"]
+    },
+    "analysis": {
+      "label": "Analysis CC",
+      "delivers": "Findings or a report from evidence",
+      "naming": "<Subject> analysis",
+      "definition": "Reads retained evidence such as traces, counters and profiles and returns findings that a verifier can recompute from the same inputs.",
+      "examples": ["Expert routing profile analysis", "Request fault and I/O analysis", "Quantized kernel profile analysis"]
+    },
+    "factory": {
+      "label": "Factory worker CC",
+      "delivers": "A factory artifact on invocation",
+      "naming": "Named for the factory job and its handoff",
+      "definition": "Performs one step of the software factory: brief, contract, work orders, source integration, image or qualification verdict.",
+      "examples": ["Contract compiler", "Workflow orchestrator"]
+    }
+  },
+  "common": "Every CC is a packaged tool for agents: a method, helpers, tests, a verifier and pinned digests.",
+  "renames": [
+    {
+      "id": "factory.image_builder",
+      "from": "Image builder",
+      "to": "Image assembler",
+      "reason": "The name ended in \"builder\", which the atlas reserves for Builder CCs (\"<Component> builder\"). The worker is a factory worker that collects a build and identifies the image."
+    }
+  ],
+  "components": {
+    "backend.quantized_matmul": {
+      "slug": "quantized_matmul_kernel",
+      "name": "Quantized matmul kernel",
+      "endpointTitle": "Quantized matmul kernels",
+      "scope": "Engine",
+      "assembly": "backend",
+      "serves": ["backend/gemm", "backend/quant", "model/expert"],
+      "when": "Required when the pack stores projections in a quantized format that the GPU computes directly.",
+      "boundary": "Owns GPU arithmetic on packed weights. The block layout belongs to the weight block decoder; the choice of kernel belongs to the kernel dispatcher.",
+      "inputs": "Packed weight blocks and their format, activation rows, tensor shapes, selected expert IDs with their row groups, and the device architecture.",
+      "outputs": "Projection rows in the requested precision, or the dequantize fallback when no quantized kernel applies.",
+      "builder": {
+        "title": "Quantized matmul kernel builder",
+        "deliverable": "CUDA quantized matmul code for the approved formats: matrix-vector kernels for decode, tiled kernels for prefill with a tile configuration per GPU architecture, expert-ID grouping for MoE layers, the block dot-product helpers and a dequantize fallback.",
+        "integration": "Register each format and batch-size range with the kernel dispatcher. Read packed blocks in the layout the weight block decoder defines, and take expert IDs and row groups from the expert row dispatcher.",
+        "behavior": "Multiplies activation rows by packed low-bit weights on the GPU without a full dequantized copy. Decode uses matrix-vector kernels, prefill uses tiled kernels, and MoE layers launch per selected expert group.",
+        "consumer": "Kernel dispatcher, expert feed-forward block and dense projections.",
+        "evidence": "Compare each kernel with a dequantize-then-FP64 reference at block, tile and expert-group boundaries for every supported format. Cover batch-1 decode, a prefill tile and an uneven expert grouping, and force the dequantize fallback.",
+        "contractChoices": "Supported formats (for example IQ2_XXS and IQ4_NL), GPU architecture and tile configuration, activation quantization, the batch size at which tiled kernels replace matrix-vector kernels, and the permitted error.",
+        "requirement": "The kernels must return the projection the packed weights define, within the format's error budget, for every supported format, shape and expert grouping."
+      },
+      "role": {
+        "essential": true,
+        "contents": [
+          {"kind": "component", "name": "Quantized matrix-vector and tiled kernels", "detail": "Decode and prefill kernels per format, with the dot-product helpers they share."},
+          {"kind": "component", "name": "Expert-grouped matmul path", "detail": "Launches one grouped matmul per selected expert using the row groups and expert IDs from dispatch."},
+          {"kind": "tool", "name": "Kernel parity and boundary sweep", "detail": "Runs every format across block, tile and expert-group boundaries against an FP64 CPU reference."},
+          {"kind": "method", "name": "Tile configuration per architecture", "detail": "Chooses tile sizes per GPU generation and records the batch size at which the tiled kernel takes over."},
+          {"kind": "skill", "name": "Register a format with dispatch", "detail": "Adds a format's kernels and fallback to the dispatcher without changing other formats."}
+        ],
+        "check": "Sweep shapes and batch sizes across the vector-to-tile switch point, compare with an FP64 CPU reference per format, and confirm the dispatcher selects the expected kernel.",
+        "decisions": "Choose formats, matrix-vector or tiled kernel per batch size, activation quantization, tile shape per architecture and the fallback.",
+        "existing": "llama.cpp 9048bad8: ggml-cuda mmvq.cu, mmq.cu with mmq-config-blackwell.cuh, vecdotq.cuh, mmid.cu and convert.cu. Strata ffa80d73: src/dsv41/ds4_iq.cu, ds4_tq.cu and ds4_gguf.cu.",
+        "greenfield": "Implement block-format dot products, a matrix-vector kernel for decode, a tiled kernel for prefill, an expert-grouped launch and a dequantize fallback, then register them with dispatch.",
+        "handoff": {
+          "signals": ["Share of prefill and decode GPU time spent in quantized matmul kernels, per format (%).", "Achieved weight bandwidth per kernel against the device peak (GB/s)."],
+          "artifact": "Kernel inventory naming each format, kernel, shape range and parity result, with the dispatcher's selection per batch size.",
+          "consumer": "Kernel dispatcher, Quantized kernel profile analysis and qualification lab.",
+          "proof": "Compare outputs with a dequantize-then-FP64 reference across formats and boundary shapes, and check the dispatcher's selection.",
+          "rsi": "A large measured share in one format and shape justifies a kernel change. A small share points to other costs first."
+        }
+      }
+    },
+    "backend.cpu_expert_lane": {
+      "slug": "cpu_weight_repack",
+      "name": "CPU weight repack",
+      "endpointTitle": "CPU expert lane kernels and weight repack",
+      "scope": "Extension",
+      "assembly": "backend",
+      "serves": ["backend/cpu", "startup/layout"],
+      "when": "Active when some routed experts are computed on the CPU, for example with --cpu-moe or a CPU share of MoE cache misses.",
+      "boundary": "Owns CPU arithmetic on host-resident experts and the repacked host layout. Which experts run on the CPU is the placement planner's decision.",
+      "inputs": "Host-resident packed expert weights and their format, activation rows, CPU features and the thread budget.",
+      "outputs": "Expert output rows computed on the CPU, and repacked weight buffers for formats that have a repack layout.",
+      "builder": {
+        "title": "CPU weight repack builder",
+        "deliverable": "CPU expert-lane code: ARM dot products for the approved formats (x86 where the target needs it), load-time repack into interleaved blocks with per-format eligibility checks, and a plain path for formats without a repack.",
+        "integration": "Register the CPU kernels and repack eligibility with the kernel dispatcher and placement planner, so experts placed on the CPU lane run there and their buffers are repacked once at load.",
+        "behavior": "Computes routed experts that stay in host memory on the CPU with architecture-specific dot products. Formats with a repack layout are rearranged once at load into interleaved blocks the CPU kernels read faster.",
+        "consumer": "Kernel dispatcher, weight placement planner and expert feed-forward block.",
+        "evidence": "Compare CPU-lane expert outputs with a scalar reference for each format, with and without repack. Check that a format without a repack path, such as IQ2_XXS at llama.cpp 9048bad8, keeps the plain layout and still matches.",
+        "contractChoices": "CPU architecture and instruction set, formats computed on the CPU, repack eligibility per format, thread count and the share of experts placed on the CPU lane.",
+        "requirement": "The CPU lane must return the reference expert projections for each supported format and use a repacked layout only where one exists for that format."
+      },
+      "role": {
+        "essential": false,
+        "contents": [
+          {"kind": "component", "name": "CPU expert-lane dot products", "detail": "Per-format dot products for the target instruction set, reading host-resident expert blocks in place."},
+          {"kind": "component", "name": "Load-time weight repack", "detail": "Interleaves eligible formats once at load and records which tensors were repacked."},
+          {"kind": "tool", "name": "CPU lane parity runner", "detail": "Compares each format's CPU output, with and without repack, against a scalar reference."},
+          {"kind": "method", "name": "Repack eligibility table", "detail": "Lists formats with a repack path at the pinned revision and the plain path for the rest."}
+        ],
+        "check": "Run each supported format with repack on and off and compare outputs with a scalar reference. Check that the loader logs which tensors were repacked.",
+        "decisions": "Choose the formats computed on the CPU, which of them are repacked, the thread count and the instruction-set tier.",
+        "existing": "llama.cpp 9048bad8: ggml/src/ggml-cpu/arch/arm/quants.c (ggml_vec_dot_iq2_xxs_q8_K) and ggml/src/ggml-cpu/repack.cpp. repack.cpp has no IQ2_XXS repack path at this pin. Strata ffa80d73: src/dsv41/ds4_iq_cpu.cpp and ds4_mx_kern.inc.",
+        "greenfield": "Implement per-format CPU dot products, an interleaved repack for the formats that benefit, eligibility checks and a plain fallback.",
+        "handoff": {
+          "signals": ["CPU expert-lane time per decode token and per prefill microbatch (ms).", "Bytes of host expert weights read per token by the CPU lane (bytes)."],
+          "artifact": "Repack inventory listing each expert tensor, its format and whether it was repacked, with parity results per format.",
+          "consumer": "Kernel dispatcher, placement planner and Quantized kernel profile analysis.",
+          "proof": "Compare CPU-lane outputs with a scalar reference for every format, with repack on and off.",
+          "rsi": "A large CPU-lane share in a format without a repack path justifies adding one. Otherwise placement is the larger lever."
+        }
+      }
+    },
+    "weights.engram": {
+      "slug": "engram_row_cache",
+      "name": "Engram row cache",
+      "endpointTitle": "Engram row cache",
+      "scope": "Extension",
+      "assembly": "weights",
+      "serves": ["model/embed"],
+      "when": "Active when the checkpoint has Engram layers (DeepSeek V4.1) and the Engram table stays on storage.",
+      "boundary": "Owns Engram row reads and the row cache. The table bytes are checkpoint data; the Engram projection arithmetic belongs to the decoder.",
+      "inputs": "Token IDs of the current window, Engram hash metadata and table offsets, table storage and the cache budget.",
+      "outputs": "Ready Engram rows for each Engram layer of the window, with cache hit, miss and read counters.",
+      "builder": {
+        "title": "Engram row cache builder",
+        "deliverable": "Engram row reader and cache code: token-to-row offset mapping, batched reads started as soon as the window's tokens are known, a bounded row cache in RAM, and a check against buffered reads.",
+        "integration": "Bind the Engram table tensor and hash metadata from the checkpoint reader, start reads from the generation loop once tokens are known, and hand ready rows to the decoder layer that consumes them.",
+        "behavior": "Reads the Engram (n-gram memory) table rows a token window needs from storage ahead of the layers that use them, and keeps recently used rows in a bounded RAM cache.",
+        "consumer": "Decoder stack (Engram layers) and generation loop.",
+        "evidence": "Compare rows served through the cache with direct reads of the table for a fixed prompt, covering hits, misses and eviction. Compare logits with the cache on and off, and check the cache never exceeds its budget.",
+        "contractChoices": "Row cache size, read threads, read-ahead distance, buffered or unbuffered reads, and when the cache is disabled.",
+        "requirement": "The cache must supply each Engram layer with the exact table rows for the current tokens before that layer runs, within a fixed memory budget."
+      },
+      "role": {
+        "essential": false,
+        "contents": [
+          {"kind": "component", "name": "Engram row reader", "detail": "Maps token IDs to table rows and issues batched reads off the decode critical path."},
+          {"kind": "component", "name": "Bounded row cache", "detail": "Keeps recently used rows in RAM within a configured size."},
+          {"kind": "tool", "name": "Row read check", "detail": "Compares rows read unbuffered with buffered reads of the same offsets."}
+        ],
+        "check": "Read a fixed window with the cache off, on and undersized; compare rows and logits and report hit rate and bytes read.",
+        "decisions": "Choose cache size, read threads, read-ahead distance and read path.",
+        "existing": "Strata ffa80d73: src/dsv41/ds4_engram_io.hpp (EgRowCache, EgReader) and the DS4_ENGRAM_CACHE_MB and DS4_ENGRAM_THREADS settings in ds4_model.cu. llama.cpp 9048bad8 reads per-layer token embedding rows on demand (--lazy-mode, lazy_read) with no separate row cache.",
+        "greenfield": "Implement token-to-row mapping, a batched asynchronous reader, a bounded LRU row cache and a buffered-read check.",
+        "handoff": {
+          "signals": ["Engram row bytes read per token and row cache hit rate (bytes, %).", "Wait for Engram rows on the decode critical path (ms per token)."],
+          "artifact": "Row cache trace with window, layer, row offset, hit or miss and ready time.",
+          "consumer": "Decoder stack, Request fault and I/O analysis and qualification lab.",
+          "proof": "Compare cached rows and logits with direct table reads, and check the budget under eviction.",
+          "rsi": "Visible waits for rows justify read-ahead or a larger cache; hidden reads point elsewhere."
+        }
+      }
+    },
+    "engine.host_expert_tier": {
+      "slug": "host_expert_store",
+      "name": "Host expert store",
+      "endpointTitle": "Expert store and admission policy (host expert tier)",
+      "scope": "Extension",
+      "assembly": "weights",
+      "serves": ["state/fill", "state/residency"],
+      "when": "Active when routed experts exceed the device cache and the engine keeps its own RAM tier instead of relying on the OS page cache.",
+      "boundary": "Owns the RAM tier of whole experts and its admission and eviction policy. Device slots belong to the expert weight cache; file bytes belong to storage.",
+      "inputs": "Expert byte ranges, the RAM budget, the replacement policy, a routing profile or pack order, and demand from the expert weight cache and the CPU lane.",
+      "outputs": "Expert bytes ready in RAM slots, pins released after use, and hit, miss, eviction and read counters.",
+      "builder": {
+        "title": "Host expert store builder",
+        "deliverable": "Host expert store code: a slot arena within a byte budget, unbuffered aligned reads of whole experts, LRU, LFU or combined admission and eviction, pinning during use, and optional seeding in routing-profile order.",
+        "integration": "Take expert byte ranges from the checkpoint reader and the budget from the placement planner. Serve fills for the expert weight cache and the CPU lane, and accept a routing profile for seeding.",
+        "behavior": "Keeps a RAM tier of whole routed experts between storage and the device cache. Reads experts with unbuffered I/O into fixed slots, admits and evicts them under a replacement policy, and can be seeded in profile order.",
+        "consumer": "Expert weight cache, CPU weight repack and weight placement planner.",
+        "evidence": "Replay a routing trace against the store under a small budget for each policy. Compare served bytes with the file, check that pinned slots are never evicted, and report hit rate and bytes read against the OS page cache path.",
+        "contractChoices": "RAM budget, replacement policy (lru, lfu or lfulru), read path (unbuffered or page cache), seeding profile and pack ordering, and the memory floor left for the system.",
+        "requirement": "The store must return exact expert bytes from its RAM tier or from storage, stay within its budget, and never evict an expert that a running window or the GPU still reads."
+      },
+      "role": {
+        "essential": false,
+        "contents": [
+          {"kind": "component", "name": "Slot arena and unbuffered reader", "detail": "Whole-expert slots in a fixed budget, filled by aligned unbuffered reads."},
+          {"kind": "component", "name": "Admission and eviction policy", "detail": "LRU, LFU or combined policy that skips pinned and GPU-visible slots."},
+          {"kind": "method", "name": "Profile-ordered pack and seeding", "detail": "Orders pack tensors by a routing profile and seeds the hottest experts at start."},
+          {"kind": "tool", "name": "Policy replay", "detail": "Replays a routing trace against each policy and budget and reports hit rate and bytes read."}
+        ],
+        "check": "Replay one trace per policy under a small budget, compare bytes with the file, and confirm no pinned slot is evicted.",
+        "decisions": "Choose the RAM budget, policy, read path, seeding profile and memory floor.",
+        "existing": "Strata ffa80d73: src/dsv41/ds4_store.hpp (ExpertStore), --ssd-cache and --ssd-policy lru|lfu|lfulru in ds4_main.cpp, the profile-ordered pack (tensors.txt) and expert-profile.bin. llama.cpp 9048bad8 maps the pack with mmap, so host-resident experts live in the OS page cache.",
+        "greenfield": "Implement a slot arena, aligned unbuffered reads, a replacement policy with pinning, and profile-ordered seeding.",
+        "handoff": {
+          "signals": ["Host-tier hit rate and storage bytes read per token (%, bytes).", "Fill latency for a host-tier miss (ms per expert)."],
+          "artifact": "Store trace with layer, expert, slot, admission, eviction and pin times, plus the policy and budget.",
+          "consumer": "Expert weight cache, Page residency analysis and qualification lab.",
+          "proof": "Replay a routing trace per policy, compare bytes with the file and check pin safety.",
+          "rsi": "If the OS page cache already holds the hot set, an engine-owned tier adds little. High re-read volume justifies it."
+        }
+      }
+    }
+  },
+  "operatingCCs": [
+    {
+      "id": "tool.capped_lab_runner",
+      "name": "Capped lab runner",
+      "kind": "tool",
+      "summary": "Runs one lab attempt for an identified engine binary inside a memory and CPU cap and returns a receipt with the cap settings, scope peak memory, OOM and reclaim events, exit reason and per-request results.",
+      "operates": ["factory.qualification_lab", "host.dram"],
+      "inputs": "Binary or image identity, launch arguments, memory cap, CPU set, workload requests and stop rules.",
+      "outputs": "Lab receipt: cap and CPU affinity, scope peak memory, host minimum available memory, OOM and reclaim counts, exit reason, per-request timings and output hashes.",
+      "method": "Run a quiet preflight, launch under a cgroup memory limit and CPU affinity, supervise with a MemAvailable watchdog, send the requests, collect counters and stop with an orderly signal.",
+      "verifier": "Recompute the receipt from the retained scope logs and request records. Reject a window whose cap receipt or exit record is missing.",
+      "helpers": "Spark bin/capped wrapper, quiet preflight, MemAvailable watchdog, request client.",
+      "capsule": {"dir": "lab_client", "id": "factory.lab_client", "version": "1.2.4", "sha256": "6d873f79cf734a5c40cd185f6d4a14d579e6865ebaf91b85be4ff910f62e6e00", "note": "Closest packaged capsule: it submits and reads owned lab attempts. The cap itself was the Spark bin/capped wrapper (100 GiB memory limit, eight CPUs)."},
+      "findings": [
+        {"text": "C1 functional scope recorded the 100 GiB memory limit and eight-CPU affinity; wrapper termination reason \"normal exit\".", "link": "evidence/reports/spark-c1-functional--report-v3.md"},
+        {"text": "60 GiB run: the reverse C3 launch lost its final process-exit receipt during cgroup teardown, so its whole window was excluded and the position was repeated.", "link": "evidence/reports/spark-p4-cache60-build-overlap--report-v3.md"}
+      ],
+      "sources": [
+        {"repo": "llama.cpp", "path": "tools/server/server-queue.cpp", "symbol": "server_queue::post", "line": 28, "note": "The capped runs launch llama-server and drive it through its HTTP queue."}
+      ]
+    },
+    {
+      "id": "tool.model_quantizer",
+      "name": "Model quantizer",
+      "kind": "tool",
+      "summary": "Runs llama-quantize on an identified source model with declared per-tensor types and delivers a checksummed pack with its format metadata and a quantization receipt.",
+      "operates": ["weights.weight_pack_compiler"],
+      "inputs": "Source model and its digest, target format, optional importance matrix, per-tensor type overrides (for example from a routing profile) and the permitted error.",
+      "outputs": "Quantized GGUF pack with SHA-256 per file, the type of every tensor, the command and binary identity, and the size and error summary.",
+      "method": "Pin the llama.cpp binary, run llama-quantize with the declared --tensor-type or --tensor-type-file overrides, read back the written pack and record its tensor types and checksums.",
+      "verifier": "Re-read the pack, check every tensor's type against the request and every file's SHA-256 against the receipt, and decode sample blocks with an independent decoder.",
+      "helpers": "llama-quantize at the pinned revision, a tensor-type file writer, a pack index reader.",
+      "capsule": {"dir": null, "id": null, "version": null, "sha256": null, "note": "Proposed. No capsule in the 2026-11-20 snapshot."},
+      "findings": [],
+      "sources": [
+        {"repo": "llama.cpp", "path": "src/llama-quant.cpp", "symbol": "llama_model_quantize", "line": 1498},
+        {"repo": "llama.cpp", "path": "tools/quantize/quantize.cpp", "symbol": "--tensor-type", "line": 124}
+      ]
+    },
+    {
+      "id": "tool.pack_converter",
+      "name": "Pack converter",
+      "kind": "tool",
+      "summary": "Converts an existing pack to another engine's layout and key names without changing quantized weights, and delivers the new pack with a per-tensor read-back receipt.",
+      "operates": ["weights.weight_pack_compiler", "weights.checkpoint_reader"],
+      "inputs": "Source pack files and their published SHA-256, target layout and key names, and any small published side files.",
+      "outputs": "Converted pack shards, the list of renamed or folded tensors, per-tensor read-back results and the SHA-256 of each source file.",
+      "method": "Check each source file against its published SHA-256, write the target layout, copy quantized weights byte for byte, then read every written tensor back and compare it with its source.",
+      "verifier": "Re-run the read-back comparison from the written files and the source digests; stop on any mismatch.",
+      "helpers": "Standard-library Python converter, GGUF header reader and writer.",
+      "capsule": {"dir": null, "id": null, "version": null, "sha256": null, "note": "Proposed. Precedent: convert_ds41_upstream.py converted the DeepSeek V4.1 Flash IQ2_XXS pack used by Strata to llama.cpp's upstream deepseek41 keys, copying quantized weights byte for byte and reading every tensor back."},
+      "findings": [
+        {"text": "Converted DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS into six upstream shards (330, 296, 281 and 135 tensors in shards 2 to 5). The 111 GB Engram table was checked against the published file and only its 416-byte header was rewritten.", "link": "evidence/pack-conversion/conversion.log"}
+      ],
+      "sources": [
+        {"repo": "evidence", "path": "evidence/pack-conversion/convert_ds41_upstream.py", "symbol": "convert_ds41_upstream.py", "line": 1},
+        {"repo": "llama.cpp", "path": "ggml/src/gguf.cpp", "symbol": "gguf_init_from_file", "line": 1017}
+      ]
+    },
+    {
+      "id": "tool.native_build_runner",
+      "name": "Native build runner",
+      "kind": "tool",
+      "summary": "Runs the pinned native build for an identified source revision on the target architecture and returns a build receipt with the attempt ID, duration, binary digest and logs.",
+      "operates": ["factory.image_builder"],
+      "inputs": "Source revision and dependency commits, the native builder image, CUDA architecture flags and the build recipe.",
+      "outputs": "Build receipt: attempt ID, phase times, exit status, ELF and library digests, and the build log.",
+      "method": "Submit a durable build job on a native ARM64 builder with the pinned source and CUDA flags, read the attempt to completion, and diagnose a failure by phase before any retry.",
+      "verifier": "Reconcile the attempt record with the produced files and recompute the binary digests.",
+      "helpers": "Native ARM64 builder image, build job submit, read and cancel tools.",
+      "capsule": {"dir": "builder", "id": "factory.builder", "version": "1.1.2", "sha256": "659b3f53962f1542a99cef567119eeebae09b317115c4de3c70065f81307b109", "note": "The builder capsule (JOB.md: \"Native build job\") carries this job. Its cc.yaml ID factory.builder is also the legacy ID of the Image assembler factory worker, which invokes this tool."},
+      "findings": [
+        {"text": "P3 placement native build passed in 270.51 s (attempt 156cdc0569b442cdbe767f9fb106b2ae). The direct-seed build 8e704490 succeeded as attempt 13ce73a8df0f452291b7a7e8aee81a5b.", "link": "evidence/STATUS.md"}
+      ],
+      "sources": [
+        {"repo": "llama.cpp", "path": "tests/test-backend-ops.cpp", "symbol": "main", "line": 14685, "note": "Backend tests run on the built revision."}
+      ]
+    },
+    {
+      "id": "tool.moe_cache_size_tuner",
+      "name": "MoE cache size tuner",
+      "kind": "tool",
+      "summary": "Runs the stock MoE cache tuner under the memory cap at several cache sizes and CPU shares and returns the recommended --moe-cache-mib and --moe-cache-cpu-share with the measured speeds.",
+      "operates": ["engine.expert_weight_cache", "placement.weight_placement_planner"],
+      "inputs": "Server command and arguments, maximum cache size, memory cap and the tuning workload.",
+      "outputs": "Measured speeds per run, predicted tokens per second for other sizes and shares, the recommended arguments, and the cache hit and miss counters from each run.",
+      "method": "Put scripts/moe-cache-tune.py in front of the pinned llama-server, keep the size at or below the cap, stop each run with an orderly signal so the cache counters are written, and keep the run records.",
+      "verifier": "Recompute the recommendation and the Pareto front from the retained run records.",
+      "helpers": "scripts/moe-cache-tune.py at the pin, capped launcher with orderly SIGINT.",
+      "capsule": {"dir": "cache_size_pareto", "id": "analysis.cache_size_pareto", "version": "1.0.0", "sha256": "00de8f257ee92f9bc422f1d0a338d54eb1e82f8cb3b0fef0f47ea613dcd8ab5a", "note": "The capsule compares measured cache arms per prompt length. Its cc.yaml ID starts with analysis.; the atlas files the job as a Tool CC because the tuning run operates the stock tuner."},
+      "findings": [
+        {"text": "First A+ calibration: 12544 MiB, 4096 generated tokens over two tuner requests, 5.06 tok/s, 739918 cache hits and 244725 misses.", "link": "evidence/STATUS.md"},
+        {"text": "Run rule: the A+ tuner cache must never exceed 61440 MiB (60 GiB); the tuner launcher stops runs with an orderly SIGINT so the cache counters are written.", "link": "evidence/DECISIONS.md"}
+      ],
+      "sources": [
+        {"repo": "llama.cpp", "path": "scripts/moe-cache-tune.py", "symbol": "def main", "line": 612},
+        {"repo": "llama.cpp", "path": "common/arg.cpp", "symbol": "--moe-cache-mib", "line": 2752}
+      ]
+    },
+    {
+      "id": "analysis.expert_routing_profile",
+      "name": "Expert routing profile analysis",
+      "kind": "analysis",
+      "summary": "Ranks experts from routing counts and reports how well a fixed ranked set covers later demand, by phase and per dispatch. The profile also drives hotness-aware mixed precision and profile-ordered packs.",
+      "operates": ["model.expert_router", "engine.expert_weight_cache", "placement.weight_placement_planner", "routing.expert_demand_predictor", "weights.weight_pack_compiler"],
+      "inputs": "Routing counts (for example Strata's expert profile) and a retained recorder trace.",
+      "outputs": "Coverage report: share of observed picks and of per-dispatch expert unions covered by the top-N set, by phase.",
+      "method": "Rank experts from prior counts, then compute later coverage on held-out demand.",
+      "verifier": "Recompute the report from the pinned input artifacts and check every value.",
+      "helpers": "routing_profile.py, routing_transfer.py, residency_counterfactual.py and their tests.",
+      "capsule": {"dir": "routing_profile_analysis", "id": "analysis.expert_routing_profile", "version": "1.3.0", "sha256": "adbd9eeef8111caab4bbd305ed8c47207ccd71ab5f5b6a967e2119f7e3911a8d", "note": null},
+      "findings": [
+        {"text": "The frozen Strata top 32 per layer covered 45.50% of observed prefill picks and 16.90% of distinct per-dispatch expert unions.", "link": "evidence/reports/spark-c1-functional--report-v3.md"}
+      ],
+      "sources": [
+        {"repo": "Strata", "path": "src/dsv41/ds4_experts_rule.hpp", "symbol": "expert-profile.bin", "line": 53},
+        {"repo": "llama.cpp", "path": "src/llama-graph.cpp", "symbol": "llm_graph_context::build_moe_ffn", "line": 2252}
+      ]
+    },
+    {
+      "id": "analysis.request_fault_io",
+      "name": "Request fault and I/O analysis",
+      "kind": "analysis",
+      "summary": "Quantifies page faults, file-cache changes and storage reads before the first token and later during a retained request.",
+      "operates": ["engine.expert_weight_cache", "weights.checkpoint_reader", "weights.engram_row_cache", "host.ssd"],
+      "inputs": "Process and cgroup counter snapshots around the request, and the request record.",
+      "outputs": "Report of major faults, process reads and file-cache deltas per request phase.",
+      "method": "Take counter snapshots at request start, first token and end; attribute deltas to phases.",
+      "verifier": "Recompute the report from the exact captured window and request record.",
+      "helpers": "fault_io.py, calibration_intervals.py and their tests.",
+      "capsule": {"dir": "request_fault_io_analysis", "id": "analysis.request_fault_io", "version": "1.1.1", "sha256": "d54bb319d2b9102017afd6b1eba8e3f6e363218231133640578e261913646f9b", "note": null},
+      "findings": [
+        {"text": "C5 functional requests: gate off at 512 tokens had 16779 major faults and 24318382080 B of process reads; gate on had 24647 faults and 13925044224 B. All four requests were excluded from timing.", "link": "evidence/reports/spark-c5-functional--report.md"}
+      ],
+      "sources": [
+        {"repo": "llama.cpp", "path": "src/llama-mmap.cpp", "symbol": "llama_mmap::impl", "line": 708}
+      ]
+    },
+    {
+      "id": "analysis.quant_kernel_profile",
+      "name": "Quantized kernel profile analysis",
+      "kind": "analysis",
+      "summary": "Reports the share of TTFT and decode time spent in quantized matmul and dequantization, split by GPU and CPU, from common-clock traces, plus a static inventory of which quantized kernels the pack can use.",
+      "operates": ["backend.quantized_matmul_kernel", "backend.cpu_weight_repack", "weights.weight_block_decoder"],
+      "inputs": "Pack index with tensor types, pinned kernel sources, and a common-clock CPU and GPU trace per request phase.",
+      "outputs": "Inventory of tensor types and eligible kernels; per-phase wall-time share of quantized matmul and dequantization on GPU and CPU.",
+      "method": "Verify the pack index identity, map each tensor type to its eligible kernels at the pins, then take the union of trace spans per phase.",
+      "verifier": "Recompute the static inventory and the span unions from the same pack index and normalized trace.",
+      "helpers": "quant_kernel_profile.py and test_quant_kernel_profile.py, SOURCES.json.",
+      "capsule": {"dir": "quant_kernel_profile", "id": "analysis.quant_kernel_profile", "version": "1.0.0", "sha256": "6fb1725ea81d21a6ed8a0ea50366c23b86e0c4fff6f4b812405aab7a57af804c", "note": null},
+      "findings": [
+        {"text": "v1.0.0 was published as a static source and weight inventory from 21 pinned llama.cpp and Strata sources. Runtime wall share and critical path are not yet measured.", "link": "evidence/STATUS.md"}
+      ],
+      "sources": [
+        {"repo": "llama.cpp", "path": "ggml/src/ggml-cuda/mmvq.cu", "symbol": "ggml_cuda_mul_mat_vec_q", "line": 1460},
+        {"repo": "llama.cpp", "path": "ggml/src/ggml-cpu/arch/arm/quants.c", "symbol": "ggml_vec_dot_iq2_xxs_q8_K", "line": 3634},
+        {"repo": "Strata", "path": "src/dsv41/ds4_iq.cu", "symbol": "block_iq2_xxs", "line": 62}
+      ]
+    },
+    {
+      "id": "analysis.engine_gap",
+      "name": "Engine gap analysis",
+      "kind": "analysis",
+      "summary": "Analyzes fixed-prompt client TTFT and bounded engine metrics for matched arms and quantifies the gap to a reference engine at the evidence tier the lab supports.",
+      "operates": ["factory.qualification_lab", "serving.engine_image_gateway"],
+      "inputs": "Retained request results, launch records and engine metrics for each arm.",
+      "outputs": "Matched comparison report: medians, paired differences, intervals, startup costs and gap to the reference.",
+      "method": "Pair requests by position across mirrored launches, compute paired medians and resampled intervals within the launch windows, and report the gap.",
+      "verifier": "Recompute the analysis from the same pinned input records and check exact equality.",
+      "helpers": "Paired-median and interval helpers, launch window reader.",
+      "capsule": {"dir": "spark_gap_analysis", "id": "factory.spark_gap_analysis", "version": "1.8.2", "sha256": "f0f6f8b576fc2309d5befad1162036629223e928382678656fbdedbbf50b8cb3", "note": "The capsule ID keeps its factory. prefix; the atlas files it as an Analysis CC."},
+      "findings": [
+        {"text": "Produced the 60 GiB matched report (version 1.8.2): C3 27.08 s and 92.07 s sooner than same-budget stock A+ at 512 and 2048 tokens.", "link": "evidence/reports/spark-p4-cache60-build-overlap--report-v3.md"}
+      ],
+      "sources": [
+        {"repo": "llama.cpp", "path": "tools/server/server-common.cpp", "symbol": "server_slot_stats::to_json", "line": 146}
+      ]
+    },
+    {
+      "id": "analysis.expert_copy_replay",
+      "name": "Expert copy replay analysis",
+      "kind": "analysis",
+      "summary": "Replays recorded expert host-to-device copies in isolation and converts the measured copy rate into a serialized copy-time estimate for the request.",
+      "operates": ["engine.expert_weight_cache", "observability.runtime_event_recorder", "host.dram"],
+      "inputs": "Recorder trace of expert copies, the original file mappings and the request's TTFT.",
+      "outputs": "Replay timing per pass, effective bytes per second and the replay-equivalent copy time as a share of TTFT.",
+      "method": "Rebuild copy geometry from the mapped offsets, replay the copies on one stream with synchronization after each group, and use the stabilized passes.",
+      "verifier": "Recompute the copy timing report from the same input artifacts.",
+      "helpers": "copy_timing.py and test_copy_timing.py in the routing profile capsule.",
+      "capsule": {"dir": "routing_profile_analysis", "id": "analysis.expert_routing_profile", "version": "1.2.0", "sha256": null, "note": "No standalone capsule. Shipped as the copy timing capability of the routing profile capsule (release b7fa53d5c91345807b1372df359850a4c49d5f3c4b2d7bbdfaf0bfa3c1a454fa)."},
+      "findings": [
+        {"text": "52,689,716,736 bytes in 10,674 copies. The later-pass median of 52.621 GB/s gives 1.001 s of serialized copy time, 1.84% of the 54.367 s TTFT.", "link": "evidence/reports/spark-c1-functional--report-v3.md"}
+      ],
+      "sources": [
+        {"repo": "llama.cpp", "path": "src/llama-moe-cache.cpp", "symbol": "llama_moe_cache::build_lookup", "line": 891}
+      ]
+    },
+    {
+      "id": "analysis.page_residency",
+      "name": "Page residency analysis",
+      "kind": "analysis",
+      "summary": "Samples which pack file pages are resident in the OS page cache before and during requests, by expert class, and reports residency alongside engine reads.",
+      "operates": ["engine.host_expert_store", "engine.expert_weight_cache", "host.ssd", "host.dram"],
+      "inputs": "Pack file layout with expert classes, sampling strata and launch timeline.",
+      "outputs": "Residency percentages per class and capture point, with the number of sampled pages.",
+      "method": "Take one deterministic mincore observation per stratum at fixed capture points and exclude pages that cross slice or tensor boundaries.",
+      "verifier": "Recompute residency from the retained samples and strata.",
+      "helpers": "P4 source-page sampler.",
+      "capsule": {"dir": null, "id": null, "version": null, "sha256": null, "note": "No standalone capsule. The P4 source-page sampler produced the figures attached to the Engine gap analysis reports."},
+      "findings": [
+        {"text": "30 GiB direct-seed run, pass 2: 38.36% of sampled seeded-class pages were resident after direct startup and 38.47% after stock A+ startup, before any prompt.", "link": "evidence/reports/spark-p4-cache30-direct-seed--report-v2.md"}
+      ],
+      "sources": [
+        {"repo": "llama.cpp", "path": "src/llama-mmap.cpp", "symbol": "llama_mmap::impl", "line": 708},
+        {"repo": "Strata", "path": "src/dsv41/ds4_store.hpp", "symbol": "ExpertStore", "line": 38}
+      ]
+    }
+  ],
+  "capsuleMap": [
+    {"atlas": "engine.build_expert_weight_cache", "dir": "expert_weight_cache", "capsuleId": "engine.build_expert_weight_cache", "version": "1.4.1", "sha256": "1d56f513300a7008d739c42945cb3def7a21c4ff69b952fca528acc6c3ac0852"},
+    {"atlas": "placement.build_weight_placement_planner", "dir": "weight_placement_planner", "capsuleId": "placement.build_weight_placement_planner", "version": "1.2.1", "sha256": "8fcb0f105d9ee77e5572162cd6b687d8e204039dccd46dd609ecdcf350746612"},
+    {"atlas": "routing.build_expert_demand_predictor", "dir": "expert_demand_predictor", "capsuleId": "routing.build_expert_demand_predictor", "version": "1.2.1", "sha256": "a6f4ba3af157069298afaec1d706000544304347b98c65a8b161f78b40f24d07"},
+    {"atlas": "batch.build_batch_layout_builder", "dir": "batch_layout_mapper", "capsuleId": "engine.build_batch_layout_mapper", "version": "1.1.4", "sha256": "eb65807344e0464f8e9e04567e315093696821cb71e3ed352c617151b7c6a75d"},
+    {"atlas": "observability.build_runtime_event_recorder", "dir": "observability_event_recorder", "capsuleId": "observability.build_runtime_event_recorder", "version": "1.1.4", "sha256": "711f7a4ad5e05500f4e9bcfaf1bf28d1dfd5f6d4b7ce445746673c31e11c5a02"},
+    {"atlas": "factory.image_builder", "dir": "builder", "capsuleId": "factory.builder", "version": "1.1.2", "sha256": "659b3f53962f1542a99cef567119eeebae09b317115c4de3c70065f81307b109"},
+    {"atlas": "tool.capped_lab_runner", "dir": "lab_client", "capsuleId": "factory.lab_client", "version": "1.2.4", "sha256": "6d873f79cf734a5c40cd185f6d4a14d579e6865ebaf91b85be4ff910f62e6e00"},
+    {"atlas": "tool.moe_cache_size_tuner", "dir": "cache_size_pareto", "capsuleId": "analysis.cache_size_pareto", "version": "1.0.0", "sha256": "00de8f257ee92f9bc422f1d0a338d54eb1e82f8cb3b0fef0f47ea613dcd8ab5a"},
+    {"atlas": "analysis.expert_routing_profile", "dir": "routing_profile_analysis", "capsuleId": "analysis.expert_routing_profile", "version": "1.3.0", "sha256": "adbd9eeef8111caab4bbd305ed8c47207ccd71ab5f5b6a967e2119f7e3911a8d"},
+    {"atlas": "analysis.request_fault_io", "dir": "request_fault_io_analysis", "capsuleId": "analysis.request_fault_io", "version": "1.1.1", "sha256": "d54bb319d2b9102017afd6b1eba8e3f6e363218231133640578e261913646f9b"},
+    {"atlas": "analysis.quant_kernel_profile", "dir": "quant_kernel_profile", "capsuleId": "analysis.quant_kernel_profile", "version": "1.0.0", "sha256": "6fb1725ea81d21a6ed8a0ea50366c23b86e0c4fff6f4b812405aab7a57af804c"},
+    {"atlas": "analysis.engine_gap", "dir": "spark_gap_analysis", "capsuleId": "factory.spark_gap_analysis", "version": "1.8.2", "sha256": "f0f6f8b576fc2309d5befad1162036629223e928382678656fbdedbbf50b8cb3"}
+  ],
+  "capsuleMapNote": "Directory and cc.yaml IDs from the 2026-11-20 final snapshot (final-snapshot/capsules and capsule-releases.json). The digest is the snapshot release digest. The five JiuwenSwarm builder capsules use component-style directory names; the atlas names the same CCs \"<Component> builder\". Code was not renamed.",
+  "measured": {
+    "context": "DGX Spark GB10, DeepSeek V4.1 Flash, 2026-11-20. Comparisons are against same-budget stock llama.cpp with its native MoE cache (A+). Screening results compare one candidate launch with historical quiet controls; quiet results use mirrored launches with a strict quiet preflight.",
+    "components": {
+      "engine.expert_weight_cache": {
+        "status": "Positive at 60 GiB",
+        "tone": "positive",
+        "summary": "At 60 GiB, faster first token than same-budget stock in all ten pairs per size; decode unchanged. At 30 GiB, iteration 1 was negative and iteration 2 (direct seed, O_DIRECT) reached warm parity with a cold-start win.",
+        "rows": [
+          {"grade": "Quiet ABBA · 60 GiB · report-v3", "tone": "positive", "result": "C3 returned the first token sooner than stock A+ in all ten pairs per size: paired median 27.08 s saved at 512 tokens and 92.07 s at 2048 tokens (medians 23.317 s vs 49.936 s and 65.004 s vs 156.641 s). Decode change was -0.183 and -0.149 tok/s, inside the intervals.", "link": "evidence/reports/spark-p4-cache60-build-overlap--report-v3.md"},
+          {"grade": "Screening · 60 GiB · build overlap · superseded by report-v3", "tone": "positive", "result": "C3 saved time in 10/10 pairs per size: paired median 24.92 s at 512 tokens and 90.80 s at 2048 tokens; decode -0.41 and -0.15 tok/s.", "link": "evidence/reports/spark-p4-cache60-build-overlap--report-v2.md"},
+          {"grade": "Quiet ABBA · 30 GiB · iteration 1", "tone": "negative", "result": "Negative: -1.18 s and -2.84 s TTFT saved at 512 and 2048 tokens; decode +0.19 and +0.03 tok/s.", "link": "evidence/reports/spark-p4-cache30-attribution--report.md"},
+          {"grade": "Quiet ABBA · 30 GiB · iteration 2, direct seed (O_DIRECT)", "tone": "neutral", "result": "Warm parity: -0.02 s and +0.20 s TTFT saved at 512 and 2048 tokens. Cold-start win: the first 512-token request after ready was 15.83 s and 12.06 s sooner in the two passes (11.97 s and 1.06 s including startup).", "link": "evidence/reports/spark-p4-cache30-direct-seed--report-v2.md"}
+        ]
+      },
+      "placement.weight_placement_planner": {
+        "status": "Small decode gain · screening",
+        "tone": "neutral",
+        "summary": "Layer-27 placement showed a small decode gain in screening against pooled 30 GiB controls; TTFT moved little.",
+        "rows": [
+          {"grade": "Screening · pooled A+30 controls", "tone": "neutral", "result": "C2 placed three layer-27 expert tensors on CUDA0. Decode +1.905 and +1.289 tok/s, TTFT -0.144 and +1.193 s saved at 512 and 2048 tokens; greedy output matched.", "link": "evidence/reports/spark-pooled30-c2-01--report.md"},
+          {"grade": "Functional", "tone": "positive", "result": "Exactly three layer-27 expert tensors (3,609,722,880 bytes) moved to CUDA0, the other 117 stayed on CPU, and greedy output matched across all three launch modes.", "link": "evidence/reports/spark-c2-layer27-functional--report.md"}
+        ]
+      },
+      "observability.runtime_event_recorder": {
+        "status": "Correct · functional",
+        "tone": "positive",
+        "summary": "Recorded 1,360 of 1,360 expected events with no loss and no change to output. Timing was not measured.",
+        "rows": [
+          {"grade": "Functional · DeepSeek 512-token probe", "tone": "positive", "result": "Exactly 1,360 of 1,360 expected records, zero lost, zero failed dispatches; greedy output hash identical with the gate off and on.", "link": "evidence/reports/spark-c1-functional--report-v3.md"},
+          {"grade": "Granite fixture scorer", "tone": "positive", "result": "Stages S1 to S6 passed. The fixture replay retained 1151 of 1152 records per configuration, one accounted loss.", "link": "evidence/reports/spark-c1-functional--report-v3.md"}
+        ]
+      },
+      "routing.expert_demand_predictor": {
+        "status": "Negative · screening",
+        "tone": "negative",
+        "summary": "All 96 completed prefetches went unused.",
+        "rows": [
+          {"grade": "Screening · pooled A+30 controls", "tone": "negative", "result": "96 prefetches issued and completed, 0 used; 759,767,040 bytes wasted. TTFT -1.908 and -2.779 s saved, decode -0.688 and -0.867 tok/s at 512 and 2048 tokens. Output matched; competing CPU activity was observed.", "link": "evidence/reports/spark-pooled30-c4-01--report.md"}
+        ]
+      },
+      "batch.batch_layout_builder": {
+        "status": "No effect beyond serving flags · screening",
+        "tone": "neutral",
+        "summary": "The apparent package gain came from the serving flags. With flags matched, the mapper did not help.",
+        "rows": [
+          {"grade": "Screening · flags-matched A+30", "tone": "negative", "result": "With serving settings held equal, the mapper changed TTFT by +0.06 and +0.08 s and decode by -1.96 and -1.91 tok/s at 512 and 2048 tokens. Stock with the same flags alone gave +3.04 and +7.63 s TTFT saved.", "link": "evidence/reports/spark-pooled30-c5-01--report-v2.md"},
+          {"grade": "Functional", "tone": "neutral", "result": "Gate on recorded zero layout decisions and three bypasses. The batch kept the stock 2047 + 1 split because mapper eligibility required alora_scale == 0 while ordinary batches use -1.", "link": "evidence/reports/spark-c5-functional--report.md"}
+        ]
+      }
+    }
+  }
+}

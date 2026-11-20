@@ -1,0 +1,74 @@
+{
+  "attention.dense_execution": {
+    "inputs": "Query, key and value tensors, logical token positions, visibility mask, KV cache views, head geometry and rotary settings.",
+    "outputs": "Attention output rows in query order, with normalization statistics where partitioned results must be merged."
+  },
+  "attention.sparse_execution": {
+    "inputs": "Queries, indexed or compressed keys and values, logical positions, scoring parameters and the allowed selection budget.",
+    "outputs": "Updated index state, selected block or row IDs and attention output rows for the selected positions."
+  },
+  "batch.execution_layout": {
+    "inputs": "Scheduled tokens with positions, sequence state handles, adapter identities and backend batch limits.",
+    "outputs": "Microbatch partitions, row offsets and mappings from each execution lane to its request, token position and state."
+  },
+  "decode.advance_sequence": {
+    "inputs": "Prompt or committed token IDs, current positions, prefix or session state, batch mappings and the model runner.",
+    "outputs": "Updated sequence positions and state, plus next-token logits at the requested prompt or decode boundary."
+  },
+  "decode.speculative_execution": {
+    "inputs": "Accepted token history, draft and target model state, proposed tokens and target scores, sampling policy and draft effort budget.",
+    "outputs": "Verified token prefix and continuation decision, synchronized target and draft state after acceptance or rollback, and the next proposal budget."
+  },
+  "dense.feed_forward": {
+    "inputs": "Hidden rows, projection weights, configured activation, weight formats and scales for the selected device.",
+    "outputs": "Transformed hidden rows in token order for the decoder’s next residual or layer operation."
+  },
+  "merge.expert_contributions": {
+    "inputs": "Token rows with selected expert IDs and mixture weights, valid assignment counts and the expert-local output rows for recombination.",
+    "outputs": "Grouped rows and expert offsets for execution, an inverse map back to token and choice, and weighted sums restored to token order."
+  },
+  "model.decoder_architecture": {
+    "inputs": "Checkpoint layer configuration and bound tensor handles, token hidden rows, positions and sequence state for the configured sublayers.",
+    "outputs": "Hidden rows after the configured attention, feed-forward, normalization and residual operations, with the resulting sequence state."
+  },
+  "model.embedding_service": {
+    "inputs": "Token IDs, vocabulary table and, for configured variants, token history, layer identity and n-gram embedding tables.",
+    "outputs": "Embedding rows aligned with the supplied token order, or an error for IDs outside the configured vocabulary."
+  },
+  "model.expert_routing": {
+    "inputs": "Per-token router scores or a token-keyed routing table, per-layer expert counts, routed width, ranking bias, group policy and mixture scaling.",
+    "outputs": "Selected expert IDs paired with their contribution weights for each token, ready for grouping and expert weight lookup."
+  },
+  "model.logit_head": {
+    "inputs": "Final hidden rows, output weights or tied embedding weights, and configured normalization, scaling and softcapping rules.",
+    "outputs": "One logit per vocabulary entry for each requested row, in the model’s vocabulary order and output precision."
+  },
+  "observability.runtime_events": {
+    "inputs": "Request, layer and expert events, dispatch and readiness events, correlation IDs, clocks and trace-buffer capacity.",
+    "outputs": "Correlated phase timestamps, counters and ordered trace records, with an overflow indication when records are lost."
+  },
+  "sampling.select_tokens": {
+    "inputs": "Vocabulary logits, request sampling parameters, random generator state, active grammar constraints and stop conditions.",
+    "outputs": "Selected token IDs, updated random and constraint state, and the decision to continue or finish each sequence."
+  },
+  "scheduler.request_lifecycle": {
+    "inputs": "Queued or cancelled requests, prefix matches, available slots and KV capacity, token budgets and completed worker steps.",
+    "outputs": "Admitted sequences and scheduled prompt or decode work, request-state transitions, and released slots and memory reservations."
+  },
+  "sequence.recurrent_execution": {
+    "inputs": "Token activations, previous recurrent state, learned parameters, sequence identities and chunk boundaries.",
+    "outputs": "Recurrent output rows and updated state for the next step, with state copies or resets when a sequence branches or retires."
+  },
+  "serving.request_gateway": {
+    "inputs": "Client completion requests and stream disconnects, launcher configuration and mounted files, readiness probes and enabled diagnostic requests.",
+    "outputs": "Requests or cancellation signals to the scheduler, completion responses or streamed text to clients, and readiness or diagnostic responses to operators."
+  },
+  "tokenizer.prepare_request": {
+    "inputs": "Messages or prompt text, template, vocabulary and special-token policy for encoding, and committed output IDs with decoder state for streaming.",
+    "outputs": "Prompt token IDs and offsets for scheduling, and decoded UTF-8 text chunks for the response writer."
+  },
+  "model.expert_ffn": {
+    "inputs": "Expert-grouped hidden rows and offsets, ready gate, up and down projection weights, plus the activation, dtype and expert-output normalization parameters declared by the layer.",
+    "outputs": "Unweighted expert-local output rows in the same packed order, after any configured expert-output normalization."
+  }
+}

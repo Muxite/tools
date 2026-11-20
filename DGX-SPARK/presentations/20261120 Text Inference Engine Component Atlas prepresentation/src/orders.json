@@ -1,0 +1,22 @@
+{
+  "intent": {"compiler.intent_brief":"use"},
+  "contract": {"compiler.engine_contract":"use"},
+  "plan": {"factory.workflow_planning":"use"},
+  "weights": {"weights.load_checkpoint":"build"},
+  "serving": {"serving.request_gateway":"build","tokenizer.prepare_request":"build","scheduler.request_lifecycle":"build","batch.execution_layout":"build"},
+  "reference": {"model.embedding_service":"build","model.decoder_architecture":"build","attention.dense_execution":"build","model.logit_head":"build"},
+  "routing": {"model.expert_routing":"build","model.expert_ffn":"build","merge.expert_contributions":"build"},
+  "state": {"memory.sequence_kv":"build","memory.runtime_arenas":"build"},
+  "placement": {"placement.partition_model":"build","memory.runtime_arenas":"use"},
+  "storage": {"engine.expert_streaming":"build"},
+  "kernels": {"backend.execute_operators":"build","weights.decode_blocks":"build"},
+  "assemble": {"decode.advance_sequence":"build","sampling.select_tokens":"build","factory.source_integration":"use"},
+  "image": {"factory.builder":"use"},
+  "qualify": {"factory.controlled_experiment":"use"},
+  "route_trace": {"observability.runtime_events":"build"},
+  "forecast": {"routing.forecast_expert_demand":"build","engine.expert_streaming":"use"},
+  "capture": {"graph.lower_capture_replay":"build","backend.execute_operators":"use"},
+  "prefix_reuse": {"memory.reusable_sessions":"build","memory.sequence_kv":"change"},
+  "pack_convert": {"weights.prepare_artifact":"use","weights.decode_blocks":"use"},
+  "dense_path": {"dense.feed_forward":"build","model.decoder_architecture":"change"}
+}

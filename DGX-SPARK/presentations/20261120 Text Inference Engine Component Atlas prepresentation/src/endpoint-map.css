@@ -1,0 +1,36 @@
+.endpoint .ep-wired {background:#f1f7f6;border:1px solid #c8dcd9;border-radius:12px;overflow:hidden}
+.endpoint .ep-map-canvas {position:relative;aspect-ratio:1100 / 410}
+.endpoint .ep-map-canvas svg {position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.ep-map-canvas svg path {stroke:#477e86;stroke-width:1.7;fill:none}
+.ep-map-canvas svg polygon {fill:#477e86}
+.ep-map-canvas svg text {font:600 11px "Segoe UI",sans-serif;fill:#2f5963;stroke:#f1f7f6;stroke-width:3px;paint-order:stroke}
+.endpoint .ep-map-node {position:absolute;left:var(--map-x);top:var(--map-y);width:19.27%;height:21.46%;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:.28rem;border-left:4px solid #138077;padding:clamp(.55rem,1.2vw,1.1rem);background:white}
+.ep-map-canvas svg path.ep-budget-wire {stroke:#aa6c25;stroke-dasharray:6 4;stroke-width:1.8}
+.ep-map-canvas svg text.ep-budget-label {fill:#82551b}
+.endpoint .ep-budget-relation {border-left:3px dashed #aa6c25;padding-left:.7rem}
+.endpoint .ep-map-node strong {margin:0;font-size:clamp(.92rem,1.3vw,1.22rem)}
+.endpoint .ep-map-node small {font-size:clamp(.76rem,.95vw,.95rem);line-height:1.28}
+.endpoint .ep-edge-list {padding:.6rem 1.3rem .85rem;color:#315d65}
+.ep-edge-list summary {cursor:pointer;font-weight:650}
+.ep-edge-list li {margin:.5rem 0}
+.ep-edge-list li span {display:block;color:#4f6670}
+.endpoint .ep-ownership {display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin:1.3rem 0}
+.ep-ownership section {padding:.7rem 0;border-top:3px solid #c68b37}
+.ep-ownership section+section {border-color:#81939c}
+.endpoint .ep-definition {background:#f0f6f4;border-left:3px solid #127a72;padding:1rem 1.3rem;margin:.85rem 0}
+.ep-definition dl {display:grid;grid-template-columns:max-content 1fr;gap:.65rem 1.2rem}
+.ep-definition dt {font-weight:700}
+.ep-definition dd {margin:0}
+.endpoint .ep-nav {flex-wrap:wrap}
+.endpoint .ep-links a[href^="#cc/"] {background:#fbf2df;color:#795019}
+.endpoint .ep-steps a[href^="#evidence/"] {color:#65468a}
+@media(max-width:970px) {
+  .endpoint .ep-map-canvas {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem;aspect-ratio:auto;padding:1rem}
+  .endpoint .ep-map-canvas svg {display:none}
+  .endpoint .ep-map-node {position:static;width:auto;height:auto;min-height:80px}
+}
+@media(max-width:590px) {
+  .endpoint .ep-map-canvas,.endpoint .ep-ownership {grid-template-columns:1fr}
+  .endpoint .ep-map-node {min-height:0;padding:.72rem}
+  .endpoint .ep-ownership {gap:.4rem}
+}

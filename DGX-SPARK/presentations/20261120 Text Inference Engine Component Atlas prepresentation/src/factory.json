@@ -1,0 +1,50 @@
+{
+  "compiler.intent_brief": {
+    "title": "Intent compiler",
+    "deliverable": "The intake agent hands off a validated intent record and a reviewed brief that captures the requested outcome, workload, constraints, open decisions and review state.",
+    "integration": "Bind the original request, supplied material and clarifications to one brief revision. Carry unresolved choices forward for review.",
+    "behavior": "When invoked, the capability records and validates structured intent and tracks clarifications and the review decision.",
+    "consumer": "The Contract Compiler uses the approved brief revision to determine which requirements the engine must satisfy.",
+    "evidence": "Schema validation, source links for captured requirements and an identifiable review decision."
+  },
+  "compiler.engine_contract": {
+    "title": "Contract compiler",
+    "deliverable": "The Contract compiler hands the Workflow orchestrator a versioned engine contract. It states what each component must provide, which implementation choices are permitted and how the result will be accepted.",
+    "integration": "Use the reviewed intent brief and the system ontology to identify components and their interfaces. Bind the verified model facts and deployment limits. Return conflicting requirements for review before releasing the contract.",
+    "behavior": "When invoked, the capability resolves contract terms, checks constraints and freezes the accepted obligations with their units, workloads and thresholds.",
+    "consumer": "The Workflow orchestrator dispatches engineering agents against this contract. The Qualification evaluator uses the same revision to judge the assembled image.",
+    "evidence": "Trace each obligation to approved intent or a verified model or target fact. Confirm that the frozen inputs and measurement rules define a reproducible verdict."
+  },
+  "factory.workflow_planning": {
+    "title": "Workflow orchestrator",
+    "deliverable": "The Workflow orchestrator issues work orders that bind a named worker and component to the approved contract, its inputs, dependencies and acceptance checks.",
+    "integration": "Use the approved contract to choose and sequence work. Bind each order to source revisions, external suppliers, eligible prior results and retry conditions, and publish each admitted artifact under a stable identity.",
+    "behavior": "The orchestrator receives the contract, matches required components to worker capabilities and dispatches agents when their prerequisite artifacts are ready. It reuses accepted work and reassigns failed obligations.",
+    "consumer": "Engine builders receive component assignments. The Source integrator, Image assembler and Qualification evaluator receive the resulting revisions and artifacts in dependency order.",
+    "evidence": "Show a callable path and compatible configuration for each reused capability. Trace each required artifact to a provider and verify that a failed check can reopen the affected work."
+  },
+  "factory.source_integration": {
+    "title": "Source integrator",
+    "deliverable": "The integration agent hands off a reviewable patch and candidate source revision, with dependency identities, rollback revision and a build request.",
+    "integration": "Apply the assigned change in the authorized tree. Bind it through the normal call path, record the expected hook and ABI, and pin the candidate for the builder.",
+    "behavior": "When invoked, the workbench applies the scoped source edits, runs focused tests and submits the identified candidate for build.",
+    "consumer": "The image assembler packages the candidate. Reviewers and the lab use the pinned diff and interface bindings to trace which change reached the image.",
+    "evidence": "Review file ownership, the exact diff and prerequisite revisions. Verify code engagement, baseline behavior and a negative or fallback case."
+  },
+  "factory.builder": {
+    "title": "Image assembler",
+    "deliverable": "The build agent hands off the runnable image and a collected build receipt. The receipt identifies the completed attempt, image and archive digests, source revision, toolchain, dependencies and launch manifest.",
+    "integration": "Build the reviewed candidate with pinned dependencies. Publish the runtime entry point and separately identified checkpoint mount so the lab can launch the same combination.",
+    "behavior": "When invoked, the builder compiles and packages the candidate and collects the completed attempt. When launched, the packaged engine reports readiness and serves completion requests.",
+    "consumer": "The qualification lab stages the immutable image and the identified model pack under the recorded launch configuration.",
+    "evidence": "Reconcile source and attempt identity, verify image and archive digests, and record build logs and the clean-start external completion smoke result."
+  },
+  "factory.controlled_experiment": {
+    "title": "Qualification evaluator",
+    "deliverable": "The experiment agent hands off a scoped pass, fail or inconclusive verdict and a trial receipt that identifies the candidate, baseline, target, workload, controls and reproduction command.",
+    "integration": "Run the immutable candidate and baseline against the frozen contract and independent reference. Link each attempt and outcome to the exact image, model pack and configuration.",
+    "behavior": "When invoked, the lab stages the image, executes the trial, evaluates the contract gates and records the next decision for the identified scope.",
+    "consumer": "The planner and release reviewer use the verdict to accept the candidate, seek confirmation or reopen the relevant work order.",
+    "evidence": "Keep raw outputs, quality and latency comparisons, peak memory, sample counts, uncertainty and exclusions. Verify that a seeded error fails the oracle and preserve incomplete attempts."
+  }
+}

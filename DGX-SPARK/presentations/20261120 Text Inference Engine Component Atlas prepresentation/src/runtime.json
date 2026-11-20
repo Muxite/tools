@@ -1,0 +1,182 @@
+{
+  "attention.dense_execution": {
+    "title": "Dense attention operator builder",
+    "deliverable": "A callable dense attention operator that computes scaled, masked attention over visible key and value rows and returns attended rows in query order.",
+    "integration": "Connect the decoder’s query and mask parameters to the KV cache’s sequence views. Bind the supported backend attention path and its shape and precision checks.",
+    "behavior": "Prompt and cached decode produce the same attended rows as causal full-prefix evaluation at the corresponding positions. Sliding windows exclude expired positions and neither request can read the other request’s KV.",
+    "consumer": "Decoder stack and kernel dispatcher.",
+    "evidence": "Compare prompt and cached decode against independent masked attention using unequal sequence lengths, nonzero positions, and both full and sliding masks. Record backend selection and maximum row error.",
+    "contractChoices": "Head geometry, causal or sliding window, position encoding and numerical tolerance.",
+    "requirement": "The operator must combine only the values visible to each query under the model’s attention rule."
+  },
+  "attention.sparse_execution": {
+    "title": "Sparse attention operator builder",
+    "deliverable": "A callable sparse position selector and attention operator that maintains its index state, enforces the candidate budget, and evaluates the chosen key and value rows.",
+    "integration": "Wire the operator into layers that declare sparse attention and bind it to sequence-scoped index and KV views.",
+    "behavior": "Selected positions obey the model’s visibility and budget rules. The returned rows match attention over those selected positions.",
+    "consumer": "Sparse decoder layer and sequence-state owner.",
+    "evidence": "Compare selected logical positions and attended rows with an independent evaluator on the same indexed candidates. Include masked candidates, near ties under the declared rule, and a budget larger than the visible set.",
+    "contractChoices": "Candidate selection rule, index representation, mask and shortlist budget.",
+    "requirement": "The operator must select the permitted positions and compute attention over that selection."
+  },
+  "batch.execution_layout": {
+    "title": "Batch layout mapper builder",
+    "deliverable": "A batch layout builder that converts scheduled prompt spans and decode tokens into backend-ready microbatches with request identities, logical positions, and state-write locations.",
+    "integration": "Wire scheduler output into the generation loop’s execution interface. Carry adapter and state-handle identity through splits and padding.",
+    "behavior": "Interleaved requests retain the same logical positions and state writes as separate runs, including across microbatch splits.",
+    "consumer": "Generation loop and sequence KV cache.",
+    "evidence": "Compare row-to-request, position, and write-location maps for isolated and mixed runs with ragged prompts, a decode singleton, and a batch limit that forces a split.",
+    "contractChoices": "Batch size, row layout, position convention and state-handle format.",
+    "requirement": "The mapper must preserve each token’s request, position and state ownership when it packs rows into a batch."
+  },
+  "decode.advance_sequence": {
+    "title": "Generation loop builder",
+    "deliverable": "A generation loop that invokes prefill and decode, advances committed sequence state, and returns the next-token logits for each active request.",
+    "integration": "Join checked batch layouts, model forward execution, sequence state, sampling, and output emission. Bind the state resumption and invalidation rules at the accepted prefix.",
+    "behavior": "Repeated decode advances one committed position per step. Resuming after a prompt extension, shortening, or replacement yields the same next-token logits and state frontier as a fresh replay.",
+    "consumer": "Request scheduler, token sampler, and response writer.",
+    "evidence": "Compare step logits, committed IDs, and state positions against independent fresh replay. Include a changed suffix, end-of-sequence, and cancellation during an in-flight step.",
+    "contractChoices": "Prompt chunking, position updates, commit rules and stop conditions.",
+    "requirement": "The loop must advance each sequence from prompt to committed output while keeping its position and state consistent."
+  },
+  "decode.speculative_execution": {
+    "title": "Speculative decoder builder",
+    "deliverable": "A speculative verifier that requests draft proposals, checks them against the target, commits the verified prefix, and restores both states after rejection.",
+    "integration": "Bind the verifier to the draft and target generation interfaces, the contract’s acceptance policy, and the state checkpoint and truncation operations.",
+    "behavior": "On rejection, the next verified step resumes at the committed frontier. The response stream contains only committed IDs.",
+    "consumer": "Generation loop, draft runner, and sequence-state owner.",
+    "evidence": "Force rejection at each proposal position and test full acceptance. Compare greedy IDs, next logits, and both state frontiers with ordinary target decoding under the contracted policy.",
+    "contractChoices": "Draft source, verification rule, proposal width and rollback boundary.",
+    "requirement": "The decoder must commit only verified tokens and restore the correct sequence state after a rejected proposal."
+  },
+  "dense.feed_forward": {
+    "title": "Dense feed-forward block builder",
+    "deliverable": "A callable dense FFN that applies the layer’s configured projections and activation, dispatches compatible weight formats, and returns transformed rows in token order.",
+    "integration": "Bind the decoder’s declared dense layers to their actual projection handles. Wire the backend implementation and its supported eager fallback.",
+    "behavior": "Prompt batches and singleton decode rows produce the same transformed values as the configured dequantized calculation. The decoder invokes this branch at the declared layer indices.",
+    "consumer": "Decoder stack and kernel dispatcher.",
+    "evidence": "Compare signed gates, singleton decode, and a projection with a non-aligned tail against an independent dequantized reference. Check branch selection from the layer configuration.",
+    "contractChoices": "Configured layer indices, projection shapes, activation and accumulation precision.",
+    "requirement": "The block must apply the configured projections and activation to each token row."
+  },
+  "merge.expert_contributions": {
+    "title": "Expert row dispatcher and combiner builder",
+    "deliverable": "A dispatcher that packs routed rows by expert and a combiner that uses the preserved token-and-choice map to accumulate weighted expert outputs back into token order.",
+    "integration": "Consume authoritative ID and weight pairs from the router. Pass packed rows and group offsets to expert execution and bind the restored sums to the decoder’s output projection.",
+    "behavior": "Permuting packed rows and their matching inverse entries preserves the weighted token outputs. Each assignment contributes to its original token using its original weight.",
+    "consumer": "Expert feed-forward block and decoder stack.",
+    "evidence": "Compare to direct per-token summation with two choices per token, uneven groups, an empty expert, and nonuniform weights. Deliberately permute the packed rows to expose inverse-map faults.",
+    "contractChoices": "Assignment count, grouping layout, return order and accumulation precision.",
+    "requirement": "The dispatcher and combiner must preserve token ownership through expert grouping and restore each weighted result to its original token."
+  },
+  "model.decoder_architecture": {
+    "title": "Decoder stack builder",
+    "deliverable": "A decoder stack that binds checkpoint layer definitions to the executable attention and FFN branches, normalization, residual gates, and sequence-state updates.",
+    "integration": "Wire instantiated operators and validated weights in checkpoint order. Hand final normalized rows to the vocabulary projection head.",
+    "behavior": "Each executed layer matches the configured branch, normalization and residual order. The decoder produces the expected layer-boundary hidden rows and state positions.",
+    "consumer": "Generation loop and vocabulary projection head.",
+    "evidence": "Compare layer intermediates and state updates to a small independent model with nonzero positions and distinct projection parameters. Exercise both sides of the configured mask or layer schedule where applicable.",
+    "contractChoices": "Layer schedule, normalization, residual joins and checkpoint-specific branches.",
+    "requirement": "The stack must connect the model’s layers, normalization and residual paths in the order its contract specifies."
+  },
+  "model.embedding_service": {
+    "title": "Token embedding layer builder",
+    "deliverable": "A checked token embedding lookup that binds the checkpoint vocabulary table and returns one row per supplied token ID, with history-based lookup only for layers that declare it.",
+    "integration": "Register the embedding implementation with the decoder and connect the token codec’s model IDs to the loaded embedding table.",
+    "behavior": "Repeated and reordered IDs return their corresponding rows in input order. Out-of-range IDs produce an explicit error.",
+    "consumer": "Decoder stack and generation loop.",
+    "evidence": "Use a table with distinct rows to check duplicate, reordered, boundary, and invalid IDs. For enabled history-dependent layers, compare the address and output after branch and reset.",
+    "contractChoices": "Vocabulary identity, table dimensions, precision and any embedding normalization.",
+    "requirement": "The layer must map each token ID to the corresponding model embedding while preserving row order."
+  },
+  "model.expert_routing": {
+    "title": "Expert router builder",
+    "deliverable": "A model-bound expert router that computes or accepts the declared scores, selects the routed IDs using the checkpoint’s ranking rule, and emits aligned mixture weights from the selected original scores.",
+    "integration": "Bind the score transform, rank bias, routed width, tie behavior, and scaling from the selected model. Send the same authoritative IDs to row dispatch and expert-weight demand.",
+    "behavior": "A ranking bias can change membership while the weights still use unbiased selected scores. The decoder preserves the same ID and weight pairs across supported dispatch paths.",
+    "consumer": "Expert row dispatcher, expert weight cache, and decoder stack.",
+    "evidence": "Use scores [0.50, 0.30, 0.20] with an E2 rank bias of +0.15 and two picks. At unit scaling the router returns E0 and E2 with weights approximately 5/7 and 2/7. Also test nonunit scaling and the declared cutoff tie rule.",
+    "contractChoices": "Routed width, score function, bias, tie handling and mixture-weight normalization.",
+    "requirement": "The router must select the experts for each token and return a mixture weight paired with each selected ID."
+  },
+  "model.logit_head": {
+    "title": "Vocabulary projection head builder",
+    "deliverable": "A callable vocabulary projection head that binds tied or untied output weights and applies checkpoint-defined scaling or softcapping to emit logits in vocabulary order.",
+    "integration": "Consume the decoder’s final hidden rows at the declared normalization boundary. Pass logits with the contracted precision and row identity to generation and sampling.",
+    "behavior": "Each vocabulary ID receives the score from its own bound weight row before token selection.",
+    "consumer": "Generation loop and token sampler.",
+    "evidence": "Compare logits for asymmetric hidden and vocabulary rows with independent matrix multiplication and the declared transforms. Check tied-weight identity when the checkpoint declares it.",
+    "contractChoices": "Vocabulary shape, tied or separate weights, output multiplier and softcap.",
+    "requirement": "The head must convert each selected hidden row into correctly ordered scores for the model’s vocabulary."
+  },
+  "observability.runtime_events": {
+    "title": "Runtime event recorder builder",
+    "deliverable": "A bounded runtime event recorder and wired instrumentation that correlate request, layer, expert, readiness, and completion events with their clock domains.",
+    "integration": "Attach event hooks at the scheduler, expert cache, and backend dispatch. Expose the ordered trace and loss counters through the gateway’s diagnostic interface.",
+    "behavior": "An enabled trace records the known request and device sequence under the same identities and reports buffer overflow. The generated token IDs agree with tracing disabled.",
+    "consumer": "Gateway diagnostics, profiler, and qualification agent.",
+    "evidence": "Drive a known route, forced cache wait, and completed kernel. Correlate events and verify host and device timestamps against their respective clocks. Force overflow and compare tracing-on and tracing-off outputs.",
+    "contractChoices": "Required events, clock sources, correlation fields and overhead budget.",
+    "requirement": "The recorder must identify which request, layer or expert was running or waiting without changing generated results."
+  },
+  "sampling.select_tokens": {
+    "title": "Token sampler builder",
+    "deliverable": "A token sampler that applies the contracted constraints and logit transforms, selects a token, and advances the request’s random and constraint state.",
+    "integration": "Connect vocabulary logits and per-request sampling state to generation. Report the selected ID and resulting continuation decision using the generation interface.",
+    "behavior": "Greedy and seeded draws follow the configured policy, request interleaving preserves each request’s seeded sequence, and an impossible constraint produces the declared error.",
+    "consumer": "Generation loop and request scheduler.",
+    "evidence": "Use a small vocabulary to test greedy ties under the declared rule, seed replay under batch reordering, top-k or top-p when enabled, a masked winner, and an empty allowed set.",
+    "contractChoices": "Permitted sampling rules, RNG behavior, constraints and handling of an empty candidate set.",
+    "requirement": "The sampler must choose an allowed token using the request’s scores, constraints and sampling state."
+  },
+  "scheduler.request_lifecycle": {
+    "title": "Request scheduler builder",
+    "deliverable": "A scheduler that admits requests within resource budgets, schedules prompt and decode work, and retires completed or cancelled sequences.",
+    "integration": "Connect gateway requests and disconnects to the batch builder and resource owners. Track sequence identity and slot generation through worker completion.",
+    "behavior": "Long prompts make progress under the token budget. Finishing or cancelling a request releases its allocations once, and a late completion cannot update a reused slot.",
+    "consumer": "Gateway, batch layout builder, and sequence-state owner.",
+    "evidence": "Run mixed prompt lengths under limited token and KV budgets. Cancel queued and running requests, reuse a freed slot, and deliver a delayed completion to the old slot generation.",
+    "contractChoices": "Admission and token budgets, fairness, cancellation and resource-release rules.",
+    "requirement": "The scheduler must admit work within resource limits and release each request’s resources on completion or cancellation."
+  },
+  "sequence.recurrent_execution": {
+    "title": "Recurrent state operator builder",
+    "deliverable": "A recurrent state operator that applies the configured transition across token steps or prompt chunks and returns updated state for each sequence.",
+    "integration": "Bind it only at checkpoint-declared recurrent layers and connect branch, reset, and retirement operations to request-scoped state.",
+    "behavior": "Chunked prefill and individual token steps agree within the contracted tolerance. Advancing or resetting one sequence leaves another sequence’s state intact.",
+    "consumer": "Hybrid decoder layers and scheduler-state owner.",
+    "evidence": "Compare carried tensors and outputs to independent step-by-step recurrence. Interleave two sequences and check branch, reset, and resumed execution.",
+    "contractChoices": "Transition equations, state layout, precision and reset semantics.",
+    "requirement": "The operator must carry each sequence’s recurrent state across steps without mixing requests."
+  },
+  "serving.request_gateway": {
+    "title": "Engine image gateway builder",
+    "deliverable": "Completion and streaming handlers, readiness and diagnostic handlers, and launcher code that binds the declared port, model mount, output paths, and optional profiling controls.",
+    "integration": "Connect request parsing to the token codec and scheduler, route disconnects to cancellation, and return decoded text and runtime diagnostics through the image’s public interface.",
+    "behavior": "A cleanly launched image advertises readiness once the required model and runtime resources are usable. JSON and streaming calls return the agreed text, and disconnects trigger one terminal transition and resource release.",
+    "consumer": "Engine image assembler, benchmark client, and operations team.",
+    "evidence": "From outside the image, boot with valid and missing mounts, verify readiness and JSON and streaming completion, cancel an in-flight stream, and retrieve the matching trace when diagnostics are enabled.",
+    "contractChoices": "Service protocol, mounted artifacts, streaming format and exposed diagnostics.",
+    "requirement": "The gateway must accept requests and expose completions, readiness and the diagnostics required by the service contract."
+  },
+  "tokenizer.prepare_request": {
+    "title": "Token codec builder",
+    "deliverable": "A codec that renders prompts with the pinned template and special-token rules, encodes model IDs, and incrementally decodes committed output IDs.",
+    "integration": "Connect gateway prompts to the tokenizer assets bound at startup and pass model IDs to scheduling. Maintain decoding and stop-boundary state for each response stream.",
+    "behavior": "Prompt IDs match the checkpoint tokenizer. A multibyte character split across output tokens is emitted intact, and stream boundaries preserve the declared stop behavior.",
+    "consumer": "Serving gateway, request scheduler, and response writer.",
+    "evidence": "Compare formatted bytes, exact IDs, and incremental text to the pinned tokenizer using role boundaries, reserved tokens, split UTF-8, and stop strings split across chunks.",
+    "contractChoices": "Tokenizer revision, prompt template, special tokens and streaming text boundaries.",
+    "requirement": "The codec must encode the contracted prompt format and decode committed output IDs into the correct text."
+  },
+  "model.expert_ffn": {
+    "title": "Expert feed-forward block builder",
+    "deliverable": "A callable grouped expert forward operator that binds each group to its ready gate, up, and down weights, computes the configured activation product and down projection, then applies the layer’s declared expert-output normalization. It returns unweighted rows in packed order.",
+    "integration": "Wire the dispatcher’s grouped rows and offsets and the cache’s ready weight handles into the model runner. For Muse, run SiLU(gate) × up, down projection, then input-scaled RMSNorm with its declared rounding and reduction order. Pass outputs to the combiner for routed weighting and hold each handle through the final device read.",
+    "behavior": "Each output row comes from its assigned expert and retains its packed position. The Muse branch applies normalization per expert before the combiner multiplies by route weights.",
+    "consumer": "Expert row combiner, decoder stack, and runtime assembly agent.",
+    "evidence": "Compare gate, up, activation, down, and normalized rows with independent arithmetic. Exercise signed gates, distinct expert matrices, empty and uneven groups, nonuniform mixture weights, and asymmetric norm gains. Use a delayed device completion to test the weight-handle lifetime.",
+    "contractChoices": "Expert dimensions, activation, normalization, precision and eligible fused or grouped kernels.",
+    "requirement": "The block must evaluate each selected expert on its assigned rows and return results in the order expected by the combiner."
+  }
+}

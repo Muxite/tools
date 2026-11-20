@@ -1,0 +1,142 @@
+{
+  "weights.load_checkpoint": {
+    "title": "Checkpoint reader builder",
+    "deliverable": "Checkpoint loader code with shard enumeration, parameter-name binding, and shape, format and byte-range validation.",
+    "integration": "Bind the approved checkpoint reader to the model schema and expose validated source ranges for lazy reads.",
+    "behavior": "Returns a tensor directory keyed by model parameter, or reports the missing or invalid entry before its bytes are read.",
+    "consumer": "Decoder binder, placement planner and expert weight cache.",
+    "evidence": "Compare names, shapes and byte hashes against a split fixture and inspect an expert range in the pinned checkpoint. Exercise a missing shard, invalid shape and truncated range.",
+    "contractChoices": "Checkpoint schema, shard layout, tensor names and supported storage formats.",
+    "requirement": "The reader must identify each requested tensor and reject invalid storage ranges before any caller uses them."
+  },
+  "weights.prepare_artifact": {
+    "title": "Weight pack compiler builder",
+    "deliverable": "Weight converter and target pack writer with tensor-name mapping, format metadata and scale validation.",
+    "integration": "Bind the source checkpoint format to the loader's target pack schema, including vocabulary, tensor layout and quantization scales.",
+    "behavior": "Writes an engine-readable pack in the selected layout and precision.",
+    "consumer": "Checkpoint reader, weight block decoder and model quality evaluator.",
+    "evidence": "Convert a fixture, check tensor identities and vocabulary, and compare independently decoded blocks and projection outputs against the declared tolerances.",
+    "contractChoices": "Input format, target block layout, precision and permitted conversion error. Optional hotness-aware mixed precision: a routing profile from Expert routing profile analysis gives hot experts more bits and cold experts fewer, within the same accuracy budget.",
+    "requirement": "The compiler must produce a pack the selected backend can read within the contract’s accuracy budget."
+  },
+  "weights.decode_blocks": {
+    "title": "Weight block decoder builder",
+    "deliverable": "Weight block codec and repacking code for the approved formats, with the layout bindings required by the selected kernels.",
+    "integration": "Connect each format and scale layout to its decoder or repacker and register the resulting layout with kernel dispatch.",
+    "behavior": "Decodes weight values or rearranges packed blocks for the requested kernel.",
+    "consumer": "Weight loader, kernel dispatcher and projection operators.",
+    "evidence": "Compare signed extrema, scale boundaries and partial blocks against an independent decoder for each supported format. Compare a projection before and after repacking.",
+    "contractChoices": "Block format, scale interpretation, tail handling and kernel layout.",
+    "requirement": "The decoder must recover the specified values or kernel layout from each supported packed block."
+  },
+  "weights.adapter_binding": {
+    "title": "Adapter binder builder",
+    "deliverable": "Adapter loader and projection binding code with request-scoped selection and reference-aware release.",
+    "integration": "Map adapter tensors to the base model's approved layers and pass the request's adapter identity through batching to those projections.",
+    "behavior": "Validates the adapter, acquires its handle and applies the matching projection updates for the requesting sequence.",
+    "consumer": "Request scheduler and adapter-aware projection operators.",
+    "evidence": "Interleave requests using two adapters and compare their logits with isolated runs. Release the adapters and check that base-model logits recover.",
+    "contractChoices": "Supported adapter format, affected projections and request-scoped lifetime.",
+    "requirement": "The binder must apply the selected adapter to the correct projections for exactly the requests that selected it."
+  },
+  "placement.partition_model": {
+    "title": "Weight placement planner builder",
+    "deliverable": "Placement planner code with byte-budget accounting, checked tensor assignments and transfer requirements.",
+    "integration": "Bind validated tensor ranges to resident or storage-backed placement and pass the slot and staging limits to loading and execution.",
+    "behavior": "Returns a placement plan for the current target or reports that the budget is infeasible. Accounts for live KV, workspace and transient transfers alongside weights.",
+    "consumer": "Checkpoint reader, expert weight cache, workspace allocator and request scheduler.",
+    "evidence": "Reconcile the plan's byte ledger with physical backing and measured peak usage. Check that all required ranges are assigned and force a budget too small for the admitted workload.",
+    "contractChoices": "Available memory, live request budget, storage tiers and which tensors may be streamed.",
+    "requirement": "The planner must fit the selected weights and live request state into the available memory or report why they cannot fit."
+  },
+  "engine.expert_streaming": {
+    "title": "Expert weight cache builder",
+    "deliverable": "Expert weight cache code with a storage reader, transfer completion, shared in-flight fills and generation-tagged handle acquisition and release.",
+    "integration": "Read the selected expert's validated source range into a bounded slot. Expose the ready handle to expert execution and accept its last-reader completion signal.",
+    "behavior": "Fills a slot on demand, publishes a handle for that occupant after transfer completes and protects the slot until its readers finish.",
+    "consumer": "Expert feed-forward block, placement planner and runtime event recorder.",
+    "evidence": "Force cold misses, duplicate demand, a short read and delayed device completion. Compare fetched bytes and expert outputs with fully resident execution, and verify stale handles cannot access a reused slot.",
+    "contractChoices": "Slot budget, permitted I/O path, alignment and device completion mechanism.",
+    "requirement": "The cache must make the requested expert weights ready and keep them valid through the final read."
+  },
+  "backend.execute_operators": {
+    "title": "Kernel dispatcher builder",
+    "deliverable": "Dispatch code and backend registrations with shape, type and layout guards, supported implementations and an explicit fallback or error path.",
+    "integration": "Bind the selected CPU or accelerator libraries to the engine's tensor descriptors, workspace requirements and execution streams.",
+    "behavior": "Selects and runs an eligible kernel and produces output tensors, or reports an unsupported operation when no implementation applies.",
+    "consumer": "Decoder operators, execution graph backend and image assembler.",
+    "evidence": "Compare outputs to an independent reference at supported shape boundaries. Force an unsupported specialization and check the qualified fallback or explicit error.",
+    "contractChoices": "Device, operand layout, supported precision and allowed fallback.",
+    "requirement": "The dispatcher must select an eligible implementation for each supported operation and handle unsupported inputs explicitly."
+  },
+  "graph.lower_capture_replay": {
+    "title": "Execution graph backend builder",
+    "deliverable": "Graph lowering and execution code with capture compatibility checks and an eager or recapture path.",
+    "integration": "Connect graph operations to registered kernels and track the shape, buffer identity and stream dependencies required by the capture backend.",
+    "behavior": "Lowers model operations to device work, replays compatible launches and recaptures or executes directly when compatibility changes.",
+    "consumer": "Generation loop and backend operators.",
+    "evidence": "Compare replay with eager outputs. Change the input shape or replace a captured buffer and verify that the resulting path produces matching outputs.",
+    "contractChoices": "Capture-eligible segments, shape keys, address lifetime and fallback policy.",
+    "requirement": "The backend must lower model operations into executable device work and reuse a saved execution only while its assumptions hold."
+  },
+  "memory.reusable_sessions": {
+    "title": "Prefix state cache builder",
+    "deliverable": "Prefix cache code with lookup, resume, identity checks and eviction that respects active page ownership.",
+    "integration": "Connect exact token-prefix lookup to the scheduler and generation loop, and retain shared KV pages through the sequence-state API.",
+    "behavior": "Returns the longest compatible saved prefix and a state handle for resuming, or starts fresh prefill on a miss.",
+    "consumer": "Request scheduler, generation loop and sequence KV cache.",
+    "evidence": "Compare resumed logits with fresh prefix execution. Exercise near matches, incompatible model or adapter identities, and eviction while a resumed request still holds shared pages.",
+    "contractChoices": "Prefix identity, admissible reuse, eviction policy and state-sharing rules.",
+    "requirement": "The cache must resume a compatible prefix without changing the result of generation or invalidating another request’s state."
+  },
+  "memory.runtime_arenas": {
+    "title": "Workspace allocator builder",
+    "deliverable": "Arena allocator code with bounded allocate, map and release interfaces, usage accounting and last-reader completion tracking.",
+    "integration": "Connect buffer and mapped-view ownership to placement, backend launches and execution graph lifetimes.",
+    "behavior": "Provides stable addresses for working buffers and mapped views, tracks peak usage and makes storage reusable after the final reader completes.",
+    "consumer": "Placement planner, backend operators and execution graph backend.",
+    "evidence": "Delay a reader while overlapping work requests the same capacity. Check reuse only after completion, verify peak accounting and check that all owned allocations are released.",
+    "contractChoices": "Memory envelope, alignment, backend allocation API and completion fences.",
+    "requirement": "The allocator must provide bounded working storage and prevent reuse until all readers finish."
+  },
+  "memory.sequence_kv": {
+    "title": "Sequence KV manager builder",
+    "deliverable": "Code that maps each sequence’s token positions to KV pages and exposes append, read and release operations to the decoder and scheduler.",
+    "integration": "Wire updates into the generation loop, position and layout views into attention, and safe release into scheduler completion and cancellation.",
+    "behavior": "Stores attention keys and values by layer and sequence position and exposes the valid positions for the next step.",
+    "consumer": "Attention operator, generation loop and request scheduler.",
+    "evidence": "Compare incremental logits with full-prefix recomputation across page and supported window boundaries. Cancel one of two active requests during a read. Verify that the other request retains its state and that the released pages can be reused without stale values.",
+    "contractChoices": "KV layout and dtype, page capacity, attention window and permitted sharing.",
+    "requirement": "The manager must give attention the valid keys and values for each sequence and release pages safely when that sequence ends."
+  },
+  "parallel.expert_exchange": {
+    "title": "Distributed expert exchange builder",
+    "deliverable": "Expert exchange code with physical expert ownership lookup, rank dispatch and inverse token mapping for returning results.",
+    "integration": "Bind selected expert IDs to device-local slots, use the selected collective transport, and connect returned contributions to the source token combiner.",
+    "behavior": "Sends token rows to ranks holding the selected experts and returns each computed contribution to the source token.",
+    "consumer": "Distributed expert workers and expert row dispatcher and combiner.",
+    "evidence": "Run uneven assignments across two ranks, including replicated experts when enabled. Trace tagged rows to verify ownership and exactly one return to each original token, and compare the combined outputs with a local reference.",
+    "contractChoices": "Device topology, expert ownership, row transport and return mapping.",
+    "requirement": "The exchange must deliver each routed row to its expert’s device and return its result to the owning token."
+  },
+  "parallel.model_execution": {
+    "title": "Distributed execution coordinator builder",
+    "deliverable": "Rank coordination code with shard assignments, collective execution and a sequence-state transfer interface for split prefill when enabled.",
+    "integration": "Connect device-local workers to placement and collective transport, and validate received sequence identity and positions before handing state to a separate decode worker.",
+    "behavior": "Runs shard-local work and combines partial results. A split prefill run transfers sequence state with a completion signal before remote decode.",
+    "consumer": "Placement planner, generation loop and distributed worker processes.",
+    "evidence": "Compare sharded logits with an unsharded reference. For split prefill, delay transfer completion and compare the first receiver-side decode logits after validating the received state.",
+    "contractChoices": "Device count, shard axes, collective operations and permitted state transfers.",
+    "requirement": "The coordinator must partition work across the contracted devices while preserving sequence and tensor ownership."
+  },
+  "routing.forecast_expert_demand": {
+    "title": "Expert demand predictor builder",
+    "deliverable": "Expert demand predictor code with a bounded prefetch hint interface and a definition of the features available before routing.",
+    "integration": "Send early hints to the weight cache within the speculative read budget. Keep demand lookups tied to the router's authoritative selections.",
+    "behavior": "Predicts likely expert IDs early enough to start optional reads and leaves the selected experts and mixture weights to the router.",
+    "consumer": "Expert weight cache and qualification lab.",
+    "evidence": "Replay held-out demand with only features available before routing. Report forecast lead time and wasted bytes, and check that wrong or late hints preserve selected IDs and model outputs.",
+    "contractChoices": "Available pre-selection signals, hint budget and measured benefit required to enable prediction.",
+    "requirement": "The predictor must issue bounded early fetch hints while leaving final selection and output under the router’s control."
+  }
+}
