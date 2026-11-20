@@ -49,6 +49,17 @@ The 60 GiB report-v3 appeared in the staging folder during this work and is used
 
 **Sources convention.** Every new entry links to exact files: llama.cpp paths at 9048bad8 and Strata paths at ffa80d73 (`src/dsv41/`), with a symbol and line. Local evidence copies use relative `evidence/...` paths. Component pages show these under **Sources at the pins**.
 
+## Alignment with the JiuwenSwarm demo UI (presentation update)
+
+The atlas now matches the demo UI catalog (`factory/ccs/atlas-names.json`, branch `demo/cc-star-ui-20261120`, 63 capsule directories: 19 builder, 11 tool, 22 analysis, 11 factory worker).
+
+- **Kind legend.** Labels and the one-line definitions are word for word the UI legend: Builder, Tool, Analysis, Factory worker (`kinds.*.plain` in `edition.json`). Each legend entry shows atlas CCs and capsules per kind.
+- **Capsules in the JiuwenSwarm catalog.** All CCs → a table of all 63 directories with title, kind, capsule directory and cc.yaml ID, what it builds or does, the related atlas component and the atlas CC when there is one (`capsuleCatalog`). Twelve directories carry an atlas CC; their titles and kinds are identical, which `build.py` and `verify_flip.py` check. The other 51 are listed, not added as full atlas CC entries.
+- **Capsule claims.** Native build runner and Expert copy replay analysis no longer claim the `builder` and `routing_profile_analysis` directories, which the UI titles Image assembler and Expert routing profile analysis; their pages say where the job ships.
+- **Spark campaign 2026-11-20.** Engine → Spark campaign 2026-11-20 (`#endpoint/campaign`, data in `campaign`): campaign counts from the factory stores (73 capped model launches, 28 factory homes, 87 planner decisions, 16 native build attempts, 538 observations, 5 starred builder CCs, 6 analysis CCs created), the five builder CCs C1 to C5 with what each built, build and verify, lab outcome and result label, the combined build D (null, screening), and the tool and analysis CCs that ran. The earlier Satay (Jetson) demo applied one engine CC; this campaign applied many on the target hardware.
+
+Counts: 53 atlas CCs (36 builder, 5 tool, 6 analysis, 6 factory worker) and 63 capsule directories (19 builder, 11 tool, 22 analysis, 11 factory worker).
+
 ## CC kinds
 
 Every CC is a packaged tool for agents: a method, helpers, tests, a verifier and pinned digests.

@@ -17,6 +17,16 @@ TABS = ["Engine", "Compare engines", "Software factory", "Factory integration",
 EDITION = json.loads((SOURCE / "edition.json").read_text("utf-8"))
 KIND_COUNTS = {"builder": 36, "tool": 5, "analysis": 6, "factory": 6}
 N_CCS, N_COMPONENTS, N_ACTIONS, N_HANDOFFS, N_JOBS = sum(KIND_COUNTS.values()), 46, 101, 65, 20
+# JiuwenSwarm capsule catalog (demo UI atlas-names.json, 63 directories) and the UI kind legend, word for word.
+CAPSULE_COUNTS = {"builder": 19, "tool": 11, "analysis": 22, "factory": 11}
+UI_LEGEND = {
+    "builder": ("Builder", "Writes the source code for one engine component. The CC is the method that builds the code; it is not the component itself."),
+    "tool": ("Tool", "Runs an existing tool, lab or runner and returns a verified receipt or artifact. It does not write product source."),
+    "analysis": ("Analysis", "Reads evidence such as traces, counters and profiles and returns findings that a verifier can recompute. It does not write product source."),
+    "factory": ("Factory worker", "Performs one step of the software factory and hands off its artifact."),
+}
+CAMPAIGN_COUNTS = {"73": "capped model launches", "28": "factory homes", "87": "planner decisions", "16": "native build attempts",
+                   "538": "observations", "5": "starred builder CCs", "6": "analysis CCs created"}
 
 # Include dimensions to catch wrapping and positioning regressions at both widths.
 HEADER = """() => Array.from(document.querySelectorAll(
@@ -443,6 +453,46 @@ def edition_checks(page, data, url, html):
     dirs=set(table.evaluate_all("rs=>rs.map(r=>r.dataset.capsule)"))
     for d in ["expert_weight_cache","weight_placement_planner","expert_demand_predictor","batch_layout_mapper","observability_event_recorder"]:
         check(d in dirs,"Capsule map lacks "+d)
+    # UI legend wording and the JiuwenSwarm capsule catalog.
+    for kind,(label,plain) in UI_LEGEND.items():
+        item=page.locator(f'.kind-legend [data-kind-legend="{kind}"]')
+        check(item.locator(".kind-badge").inner_text()==label,"Legend label differs from UI: "+kind)
+        check(item.locator("[data-kind-plain]").inner_text()==plain,"Legend wording differs from UI: "+kind)
+        expect(item).to_contain_text(f"{CAPSULE_COUNTS[kind]} capsules")
+    rows=page.locator("#capsule-catalog tr[data-catalog-dir]").evaluate_all(
+        "rs=>rs.map(r=>({dir:r.dataset.catalogDir,kind:r.dataset.catalogKind,title:r.querySelector('[data-catalog-title]').textContent,"
+        "cc:[...r.querySelectorAll('a[href^=\"#cc/\"]')].map(a=>a.hash.slice(4))}))")
+    check(len(rows)==63 and len({r["dir"] for r in rows})==63,"Capsule catalog must list 63 directories")
+    check({k:sum(r["kind"]==k for r in rows) for k in CAPSULE_COUNTS}==CAPSULE_COUNTS,"Capsule catalog kind counts")
+    by_dir={r["dir"]:r for r in data["capsuleCatalog"]}
+    linked=set()
+    for r in rows:
+        src=by_dir[r["dir"]]
+        check(r["title"]==src["title"] and r["kind"]==src["kind"],"Catalog row differs from atlas-names: "+r["dir"])
+        check(r["cc"]==([src["atlas"]] if src["atlas"] else []),"Catalog atlas link: "+r["dir"])
+        for cid in r["cc"]:
+            check(ccs[cid]["name"]==r["title"] and ccs[cid]["ccKind"]==r["kind"],"Atlas CC title or kind differs from capsule: "+cid)
+            linked.add(cid)
+    check(linked=={r["atlas"] for r in data["capsuleMap"]},"Capsule map and catalog disagree")
+    expect(page.locator("#capsule-catalog [data-catalog-counts]")).to_contain_text(f"{N_CCS} atlas CCs · 63 capsule directories")
+    # Spark campaign view.
+    visit(page,"endpoint/campaign")
+    counts=dict(page.locator("[data-campaign-counts] div").evaluate_all("ds=>ds.map(d=>[d.querySelector('strong').textContent,d.querySelector('span').textContent])"))
+    check(counts==CAMPAIGN_COUNTS,"Campaign counts: "+str(counts))
+    expect(main.locator("[data-campaign-contrast]")).to_contain_text("Satay (Jetson) demo applied one engine CC")
+    for b in data["campaign"]["builders"]:
+        row=main.locator(f'[data-campaign-builders] tr[data-campaign-cc="{b["cc"]}"]')
+        check(row.count()==1,"Campaign lacks builder "+b["cc"])
+        expect(row).to_contain_text(data["measured"]["components"][b["component"]]["status"])
+        check(row.locator(f'a[href="{b["link"]}"]').count()==1 and (root/b["link"]).is_file(),"Campaign report link "+b["link"])
+    check(main.locator("[data-campaign-builders] tr[data-campaign-cc]").count()==5,"Campaign lists five builder CCs")
+    expect(main.locator("[data-campaign-combined]")).to_contain_text("Null · screening")
+    for text in ["61,440 MiB","27.08 s at 512 tokens and 92.07 s at 2048 tokens","20/20 pairs","near parity","cold-start win",
+                 "iteration 1: slower","1,360 of 1,360","96 unused prefetches","not the mapper"]:
+        expect(main.locator("[data-campaign-builders]")).to_contain_text(text)
+    check(main.locator("[data-campaign-operating] tr[data-campaign-cc]").count()==len(data["campaign"]["operating"]),"Campaign tool and analysis rows")
+    for href in main.locator('a[href^="evidence/"]').evaluate_all("as=>as.map(a=>a.getAttribute('href'))"):
+        check((root/href).is_file(),"Campaign evidence link broken: "+href)
     # Tool and analysis CC pages.
     for cid,cc in ccs.items():
         if cc["ccKind"] not in ("tool","analysis"):
@@ -614,7 +664,7 @@ def main():
                           "cc/"+reader["id"],"library","integration/coverage","construction/serving",
                           "evidence/"+reader["id"],"construction/designs","construction/trials",
                           "integration","quantization","sources","engine/actions","factory/actions",
-                          "construction/actions","construction/actions/routing"]:
+                          "construction/actions","construction/actions/routing","endpoint/campaign"]:
                 visit(page,route)
                 check(page.evaluate("document.documentElement.scrollWidth<=innerWidth+1"),
                       f"{width}px overflow on {route}")

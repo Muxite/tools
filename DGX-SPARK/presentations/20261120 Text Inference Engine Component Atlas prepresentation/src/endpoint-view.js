@@ -49,6 +49,21 @@
         r.rows.map(x=>'<li><span class="tone tone-'+esc(x.tone)+'">'+esc(x.grade)+'</span><p>'+esc(x.result)+'</p><a href="'+esc(x.link)+'" target="_blank" rel="noopener">'+esc(x.link.split('/').pop())+' ↗</a></li>').join('')+'</ul></article>').join('')+'</div>'+
       '<section class="ep-detail"><h2>Headline rows as staged</h2><p>Copied from <a href="evidence/final-headlines.json" target="_blank" rel="noopener">final-headlines.json ↗</a>. Its 60 GiB row is the report-v2 screening result; report-v3 (quiet ABBA, 27.08 / 92.07 s saved) supersedes it above. Rows without a local report copy keep their Spark path.</p><div class="table-wrap"><table><thead><tr><th>Arm</th><th>Grade</th><th>TTFT</th><th>Decode</th><th>Summary</th><th>Report</th></tr></thead><tbody>'+headline+'</tbody></table></div></section>';
   }
+  function campaign() {
+    const c=records.campaign||{}, meas=(records.measured||{}).components||{};
+    const cmpName=id=>((records.components||[]).find(x=>x.id===id)||{}).name||id;
+    const ccRow=id=>(records.ccs||[]).find(x=>x.id===id)||{};
+    const report=path=>'<a href="'+esc(path)+'" target="_blank" rel="noopener">'+esc(path.split('/').pop())+' ↗</a>';
+    const builders=list(c.builders).map(b=>{const m=meas[b.component]||{};return '<tr data-campaign-cc="'+esc(b.cc)+'"><td><b>'+esc(b.arm)+'</b></td><td>'+kindLabel(b.cc)+'<a href="#cc/'+encodeURIComponent(b.cc)+'">'+esc(ccName(b.cc))+'</a><br><small>Component: <a href="#component/'+encodeURIComponent(b.component)+'">'+esc(cmpName(b.component))+'</a></small></td><td>'+esc(b.built)+'</td><td>'+esc(b.build)+'</td><td>'+esc(b.lab)+'</td><td><span class="tone tone-'+esc(m.tone)+'">'+esc(m.status)+'</span><br>'+report(b.link)+'</td></tr>';}).join('');
+    const d=c.combined||{};
+    const combined=d.arm?'<tr data-campaign-combined><td><b>'+esc(d.arm)+'</b></td><td>'+esc(d.title)+'</td><td colspan="3">'+esc(d.result)+'</td><td><span class="tone tone-'+esc(d.tone)+'">'+esc(d.status)+'</span><br>'+report(d.link)+'</td></tr>':'';
+    const operating=list(c.operating).map(id=>{const cc=ccRow(id), f=list(cc.findings)[0];return '<tr data-campaign-cc="'+esc(id)+'"><td>'+kindLabel(id)+'<a href="#cc/'+encodeURIComponent(id)+'">'+esc(ccName(id))+'</a></td><td>'+esc(cc.summary)+'</td><td>'+(f?esc(f.text)+'<br>'+report(f.link):'')+'</td></tr>';}).join('');
+    return panel('Spark campaign 2026-11-20',c.title||'Spark campaign 2026-11-20',c.context||'')+
+      '<div class="ep-callout" data-campaign-contrast><p>'+esc(c.contrast)+'</p></div>'+
+      '<div class="ep-metrics ep-counts" data-campaign-counts>'+list(c.counts).map(n=>'<div><strong>'+esc(n.value)+'</strong><span>'+esc(n.label)+'</span></div>').join('')+'</div><p class="caption">'+esc(c.countsSource)+'</p>'+
+      '<section class="ep-detail" data-campaign-builders><h2>Builder CCs applied on the target</h2><p>Each builder CC wrote the source code for one engine component. Results compare the built engine with same-budget stock llama.cpp with its native MoE cache (A+).</p><div class="table-wrap"><table><thead><tr><th>Arm</th><th>CC</th><th>What it built</th><th>Build and verify</th><th>Lab outcome</th><th>Result label</th></tr></thead><tbody>'+builders+combined+'</tbody></table></div></section>'+
+      '<section class="ep-detail" data-campaign-operating><h2>Tool and analysis CCs that ran, built and read the evidence</h2><div class="table-wrap"><table><thead><tr><th>CC</th><th>What it does</th><th>Campaign finding</th></tr></thead><tbody>'+operating+'</tbody></table></div></section>';
+  }
   function budgetComparison() {
     const cap = 96, fixed = 52, workspace = 8, headroom = 4;
     const cards = [['Shorter context', 8], ['Longer context', 16]].map(([label, sequence]) => {
@@ -67,8 +82,8 @@
     let view=location.hash==='#engine'?'map':(route[0]||'map'), selected=decodeURIComponent(route[1]||'');
     function draw() {
       container.classList.add('endpoint');
-      const nav='<nav class="ep-nav" aria-label="Architecture views">'+[['map','Component map'],['ranks','Priorities'],['changes','What would I change?'],['walks','Walkthroughs'],['demo','Performance demo'],['measured','Measured evidence'],['coverage','Source coverage']].map(([id,label])=>button(id,label,view===id||(id==='map'&&view==='parent'))).join('')+'</nav>';
-      container.innerHTML=nav+'<div class="ep-content">'+(view==='parent'?parent(d,selected):view==='ranks'?ranks(s):view==='changes'?changes(d):view==='walks'?walks(s):view==='demo'?demo(s):view==='measured'?measured():view==='coverage'?coverage(d):endpointRelationshipMap(d))+'</div>';
+      const nav='<nav class="ep-nav" aria-label="Architecture views">'+[['map','Component map'],['ranks','Priorities'],['changes','What would I change?'],['walks','Walkthroughs'],['demo','Performance demo'],['campaign','Spark campaign 2026-11-20'],['measured','Measured evidence'],['coverage','Source coverage']].map(([id,label])=>button(id,label,view===id||(id==='map'&&view==='parent'))).join('')+'</nav>';
+      container.innerHTML=nav+'<div class="ep-content">'+(view==='parent'?parent(d,selected):view==='ranks'?ranks(s):view==='changes'?changes(d):view==='walks'?walks(s):view==='demo'?demo(s):view==='measured'?measured():view==='campaign'?campaign():view==='coverage'?coverage(d):endpointRelationshipMap(d))+'</div>';
     }
     draw();
   };

@@ -224,7 +224,29 @@ for row in edition["capsuleMap"]:
     assert row["atlas"] in cc_index, row
     if row["capsuleId"] not in cc_index and row["capsuleId"] not in aliases:
         aliases[row["capsuleId"]] = row["atlas"]
-data = dict(factoryCapabilities=factory_capabilities,components=components,ccs=ccs,builds=builds,serves=serves,actions=actions,cross=connections,assets=assets,**orders,
+# The JiuwenSwarm capsule catalog (demo UI atlas-names.json): same titles and kinds wherever a capsule carries an atlas CC.
+catalog = edition["capsuleCatalog"]
+by_cc = {cc["id"]: cc for cc in ccs}
+assert len({r["dir"] for r in catalog}) == len(catalog) == 63
+assert {k: sum(r["kind"] == k for r in catalog) for k in edition["kinds"]} == {"builder": 19, "tool": 11, "analysis": 22, "factory": 11}
+for r in catalog:
+    assert r["kind"] in edition["kinds"] and r["relates"] in component_index | {None}, r["dir"]
+    assert (r["kind"] == "analysis") == r["title"].endswith(" analysis") and (r["kind"] == "builder") == r["title"].endswith(" builder"), r["title"]
+    if r["atlas"]:
+        cc = by_cc[r["atlas"]]
+        assert cc["name"] == r["title"] and cc["ccKind"] == r["kind"], r["dir"]
+mapped = {r["dir"]: r["atlas"] for r in catalog if r["atlas"]}
+assert mapped == {r["dir"]: r["atlas"] for r in edition["capsuleMap"]}, "capsuleMap must match the catalog"
+for cc in ccs:
+    cap = cc.get("capsule") or {}
+    assert not cap.get("dir") or mapped.get(cap["dir"]) == cc["id"], cc["id"]
+campaign = edition["campaign"]
+for row in campaign["builders"] + [campaign["combined"]]:
+    assert (EDITION_ROOT / row["link"]).is_file(), row["link"]
+for row in campaign["builders"]:
+    assert [row["cc"], row["component"]] in builds and row["component"] in measured["components"], row
+assert set(campaign["operating"]) <= {cc["id"] for cc in ccs if cc["ccKind"] in ("tool", "analysis")}
+data = dict(capsuleCatalog=catalog,capsuleCatalogNote=edition["capsuleCatalogNote"],campaign=campaign,factoryCapabilities=factory_capabilities,components=components,ccs=ccs,builds=builds,serves=serves,actions=actions,cross=connections,assets=assets,**orders,
             aliases=aliases,operates=operates,kinds=edition["kinds"],kindNote=edition["common"],renames=edition["renames"],
             capsuleMap=edition["capsuleMap"],capsuleMapNote=edition["capsuleMapNote"],measured=measured,headlines=headlines,pins=pins,
             localReports=[f"evidence/reports/{p.name}" for p in sorted((EDITION_ROOT / "evidence" / "reports").glob("*.md"))])

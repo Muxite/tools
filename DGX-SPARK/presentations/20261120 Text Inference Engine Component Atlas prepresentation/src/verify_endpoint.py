@@ -115,6 +115,11 @@ def endpoint(page):
     check(page.locator('main a[href="evidence/pack-conversion/convert_ds41_upstream.py"]').count() == 1, 'Pack converter precedent missing')
     go(page, 'endpoint/measured')
     check(page.locator('main article[data-measured]').count() == 5, 'Measured view lists five components')
+    go(page, 'endpoint/campaign')
+    check(page.locator('main [data-campaign-builders] tr[data-campaign-cc]').count() == 5, 'Campaign view lists five builder CCs')
+    check(page.locator('.ep-nav a[href="#endpoint/campaign"][aria-current]').count() == 1, 'Campaign view missing from the Engine nav')
+    for href in page.locator('main a[href^="evidence/"]').evaluate_all('as => as.map(a => a.getAttribute("href"))'):
+        check((HTML_DIR / href).is_file(), 'Broken campaign evidence link: ' + href)
     for href in page.locator('main a[href^="evidence/"]').evaluate_all('as => as.map(a => a.getAttribute("href"))'):
         check((HTML_DIR / href).is_file(), 'Broken evidence link: ' + href)
     page.goto(page.url.split('#')[0])
@@ -191,7 +196,7 @@ def endpoint(page):
     expect(page).to_have_url(__import__('re').compile(__import__('re').escape(evidence_href) + '$'))
     for width, height in [(1440, 900), (390, 844)]:
         page.set_viewport_size({'width': width, 'height': height})
-        for route in ['engine', 'assemblies', 'endpoint/parent/service', 'endpoint/parent/model', 'endpoint/parent/memory', 'endpoint/parent/sequence-state', 'endpoint/parent/weight-residency', 'endpoint/parent/backend', 'endpoint/ranks', 'endpoint/changes', 'endpoint/walks', 'endpoint/demo', 'endpoint/measured', 'endpoint/coverage', 'library']:
+        for route in ['engine', 'assemblies', 'endpoint/parent/service', 'endpoint/parent/model', 'endpoint/parent/memory', 'endpoint/parent/sequence-state', 'endpoint/parent/weight-residency', 'endpoint/parent/backend', 'endpoint/ranks', 'endpoint/changes', 'endpoint/walks', 'endpoint/demo', 'endpoint/measured', 'endpoint/campaign', 'endpoint/coverage', 'library']:
             go(page, route)
             check(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'),
                   f'{width}px horizontal overflow on {route}')

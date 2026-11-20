@@ -18,9 +18,9 @@ function evidenceLink(path, label) {
   return '<a class="evidence-file" href="'+e(path)+'" target="_blank" rel="noopener">'+e(label||path.split('/').pop())+' ↗</a>';
 }
 function kindLegend() {
-  return '<section class="kind-legend" aria-label="CC kinds"><h2>Four kinds of CC</h2><p>'+e(data.kindNote)+'</p><dl>'+kindOrder.map(k=>{
-    const r=data.kinds[k], n=data.ccs.filter(cc=>ccKind(cc)===k).length;
-    return '<div data-kind-legend="'+k+'"><dt><span class="kind-badge kind-'+k+'">'+e(r.label)+'</span> <small>'+n+' CCs</small></dt><dd><b>'+e(r.delivers)+'.</b> '+e(r.definition)+'<br><small>Name rule: '+e(r.naming)+'. Examples: '+r.examples.map(e).join(', ')+'.</small></dd></div>';
+  return '<section class="kind-legend" aria-label="CC kinds"><h2>Four kinds of CC</h2><p>'+e(data.kindNote)+' Counts: '+data.ccs.length+' atlas CCs and '+data.capsuleCatalog.length+' capsule directories in the JiuwenSwarm catalog.</p><dl>'+kindOrder.map(k=>{
+    const r=data.kinds[k], n=data.ccs.filter(cc=>ccKind(cc)===k).length, m=data.capsuleCatalog.filter(c=>c.kind===k).length;
+    return '<div data-kind-legend="'+k+'"><dt><span class="kind-badge kind-'+k+'">'+e(r.label)+'</span> <small>'+n+' CCs · '+m+' capsules</small></dt><dd><p class="kind-plain" data-kind-plain>'+e(r.plain)+'</p><small>Delivers: '+e(r.delivers)+'. Name rule: '+e(r.naming)+'. Examples: '+r.examples.map(e).join(', ')+'.</small></dd></div>';
   }).join('')+'</dl></section>';
 }
 function formerNote(row) {
@@ -64,13 +64,24 @@ function operatingView(cc) {
     section('Package',fact('Capsule',capsuleText)+(cap.sha256?fact('Pinned release digest',cap.sha256):'')+fact('Packaging note',cap.note))+
     (cc.findings.length?section('Runs and findings','<ul class="measured-rows">'+cc.findings.map(f=>'<li><p>'+e(f.text)+'</p>'+evidenceLink(f.link)+'</li>').join('')+'</ul>'):'')+
     section('Sources','<ul class="source-list">'+cc.sources.map(r=>'<li>'+sourceLink(r.repo,r)+(r.note?' <small>'+e(r.note)+'</small>':'')+'</li>').join('')+'</ul>'+
-      pillbox([link('evidence/'+cc.id,'Inspect references ('+cc.examples.length+')'),link('library?kind='+k,'All '+data.kinds[k].label+'s')]));
+      pillbox([link('evidence/'+cc.id,'Inspect references ('+cc.examples.length+')'),link('library?kind='+k,'All '+data.kinds[k].label+' CCs')]));
 }
 function capsuleTable() {
   return '<details class="sheet capsule-map" id="capsule-map"><summary>Atlas CC IDs and JiuwenSwarm capsule directories · '+data.capsuleMap.length+'</summary><p>'+e(data.capsuleMapNote)+'</p>'+
     '<div class="table-wrap"><table><thead><tr><th>Atlas CC</th><th>Kind</th><th>Capsule directory</th><th>cc.yaml ID</th><th>Version</th><th>Release digest</th></tr></thead><tbody>'+
     data.capsuleMap.map(r=>{const cc=capsules.get(r.atlas);return '<tr data-capsule="'+e(r.dir)+'"><td>'+ccLink(cc)+'<br><code>'+e(r.atlas)+'</code></td><td>'+e(data.kinds[ccKind(cc)].label)+'</td><td><code>'+e(r.dir)+'</code></td><td><code>'+e(r.capsuleId)+'</code></td><td>'+e(r.version)+'</td><td><code title="'+e(r.sha256)+'">'+e(r.sha256.slice(0,12))+'…</code></td></tr>';}).join('')+
     '</tbody></table></div></details>';
+}
+function capsuleCatalogTable() {
+  const rows=data.capsuleCatalog, count=k=>rows.filter(r=>r.kind===k).length;
+  return '<section class="sheet capsule-catalog" id="capsule-catalog" aria-label="Capsules in the JiuwenSwarm catalog"><h2>Capsules in the JiuwenSwarm catalog · '+rows.length+'</h2><p>'+e(data.capsuleCatalogNote)+'</p>'+
+    '<p class="caption" data-catalog-counts>'+data.ccs.length+' atlas CCs · '+rows.length+' capsule directories ('+kindOrder.map(k=>count(k)+' '+data.kinds[k].label.toLowerCase()).join(', ')+') · '+rows.filter(r=>r.atlas).length+' directories carry an atlas CC.</p>'+
+    '<div class="table-wrap"><table><thead><tr><th>Title</th><th>Kind</th><th>Capsule</th><th>What it builds or does</th><th>Related atlas component</th><th>Atlas CC</th></tr></thead><tbody>'+
+    rows.map(r=>{const cc=r.atlas&&capsules.get(r.atlas), part=r.relates&&components.get(r.relates);
+      return '<tr data-catalog-dir="'+e(r.dir)+'" data-catalog-kind="'+e(r.kind)+'"><td><b data-catalog-title>'+e(r.title)+'</b>'+(r.formerNames?'<br><small>Formerly '+r.formerNames.map(n=>'“'+e(n)+'”').join(', ')+'</small>':'')+'</td><td><span class="kind-badge kind-'+e(r.kind)+'">'+e(data.kinds[r.kind].label)+'</span></td>'+
+        '<td><code>'+e(r.dir)+'</code><br><small><code>'+e(r.capsuleId)+'</code></small></td><td>'+e(r.does)+(r.component?'<br><small>Builds: '+e(r.component)+(r.target?' ('+e(r.target)+')':'')+'</small>':'')+'</td>'+
+        '<td>'+(part?cmpLink(part):'<small>'+e(r.relatesNote||'None')+'</small>')+'</td><td>'+(cc?ccLink(cc):'<small>Not an atlas CC entry</small>')+'</td></tr>';}).join('')+
+    '</tbody></table></div></section>';
 }
 function catalogCard(cc) {
   const k=ccKind(cc), parts=(k==='tool'||k==='analysis')?operated(cc.id):targets(cc.id);
@@ -83,7 +94,7 @@ function library(query) {
   const scopes=[['','All CCs'],['builder','Builder CCs'],['tool','Tool CCs'],['analysis','Analysis CCs'],['factory','Factory worker CCs']];
   const older={'Engine':'builder','Software factory':'factory'};
   root.innerHTML='<h1>All CCs</h1><p class="lead">A CC is a packaged tool for agents. An agent can receive several CCs, and several agents can use the same CC. Search by name, former name, component, capsule directory or source symbol.</p>'+actorExample()+kindLegend()+
-    '<div class="tools"><input id="search" type="search" aria-label="Search CCs"><select id="scope" aria-label="CC kind">'+scopes.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('')+'</select></div><div id="results"></div>'+capsuleTable();
+    '<div class="tools"><input id="search" type="search" aria-label="Search CCs"><select id="scope" aria-label="CC kind">'+scopes.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('')+'</select></div><div id="results"></div>'+capsuleCatalogTable()+capsuleTable();
   const input=root.querySelector('#search'), scope=root.querySelector('#scope');
   const wanted=query.get('kind')||older[query.get('scope')]||'';
   input.value=query.get('q')||''; scope.value=scopes.some(([v])=>v===wanted)?wanted:'';
