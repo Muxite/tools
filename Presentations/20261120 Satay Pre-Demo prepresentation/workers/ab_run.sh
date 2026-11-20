@@ -6,7 +6,7 @@ AB=$HOME/predemo/ab
 CODEX=/home/muk/.codex/packages/app-server-daemon/releases/0.170.0-aarch64-unknown-linux-musl/bin/codex
 DIRS=(x observability_event_recorder expert_weight_cache weight_placement_planner expert_demand_predictor batch_layout_mapper)
 CAP=$HOME/predemo/jiuwenswarm-work/jiuwenswarm/factory/ccs/${DIRS[$N]}
-D=$AB/runs/wo$N-$ARM
+D=$AB/${RUNROOT:-runs}/wo$N-$ARM
 rm -rf "$D"; mkdir -p "$D"
 cp -a $HOME/predemo/llama.cpp-stock "$D/src"
 git -C "$D/src" status --porcelain | head -1 | grep -q . && { echo "stock copy not clean"; exit 2; }
