@@ -1,0 +1,1357 @@
+{
+  "analysis": {
+    "ccs": [
+      {
+        "id": "factory.spark_gap_analysis",
+        "release": "8ba83ff9bcf67cdfba5a1043b4d839354e4443e0ae1ea773ac6828ccec1a7543",
+        "version": "1.8.1"
+      }
+    ],
+    "output_artifact_ids": [
+      "spark-pooled30-c2-01/analysis.json",
+      "spark-pooled30-c2-01/verify-receipt.json",
+      "spark-pooled30-c2-01/analyze-receipt.json",
+      "spark-pooled30-c2-01/release-manifest.json"
+    ],
+    "pooled_comparison": {
+      "activation_readbacks": {
+        "verified_placement": {
+          "activation": {
+            "artifact_id": "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/placement-activation.json@626dd2515ba35cf8a64300c83472cdcb0ce7f041b73381f1efdd7ae32a2d2aa1",
+            "sha256": "626dd2515ba35cf8a64300c83472cdcb0ce7f041b73381f1efdd7ae32a2d2aa1"
+          },
+          "active_marker": "weight_placement_planner: active cap_bytes=130661142528 peak_bytes=239514023200",
+          "control": {
+            "artifact_id": "spark-pooled30-c2-01/raw/OPS/p3/placement-v1-matched-controls.json@2e031ddf01e7d46e632a7a465ceefd2be89312e14bce5321b31176cb91f006e9",
+            "sha256": "2e031ddf01e7d46e632a7a465ceefd2be89312e14bce5321b31176cb91f006e9"
+          },
+          "cpu_mapped_expert_tensors": 117,
+          "native_bank": {
+            "allocated_mib": 30691.85,
+            "cpu_share_pct": 0.0,
+            "host_experts_mib": 122512.5,
+            "requested_mib": 30720
+          },
+          "placement_plan": {
+            "artifact_id": "spark-pooled30-c2-01/raw/OPS/p3/placement-v1-layer27-plan.json@97d217e82ef762a09223dc9865120095c04d8a32ddd6577579224ed57ce2a9f6",
+            "sha256": "97d217e82ef762a09223dc9865120095c04d8a32ddd6577579224ed57ce2a9f6"
+          },
+          "plan_sha256": "97d217e82ef762a09223dc9865120095c04d8a32ddd6577579224ed57ce2a9f6",
+          "policy": "manual-v1-layer27",
+          "selected": [
+            {
+              "buffer": "CUDA0",
+              "bytes": 990904320,
+              "name": "blk.27.ffn_down_exps.weight",
+              "planned": "CUDA0"
+            },
+            {
+              "buffer": "CUDA0",
+              "bytes": 1309409280,
+              "name": "blk.27.ffn_gate_exps.weight",
+              "planned": "CUDA0"
+            },
+            {
+              "buffer": "CUDA0",
+              "bytes": 1309409280,
+              "name": "blk.27.ffn_up_exps.weight",
+              "planned": "CUDA0"
+            }
+          ],
+          "source_commit": "24dbb8309e604de8d8c97e623b78d49d0f14a736"
+        },
+        "weight_placement_planner:": {
+          "count": 1047,
+          "first": [
+            "active cap_bytes=130661142528 peak_bytes=239514023200",
+            "assignment name=\"token_embd.weight\" planned=stock actual=CPU_Mapped bytes=455065600",
+            "assignment name=\"blk.0.ffn_gate_exps.weight\" planned=stock actual=CPU_Mapped bytes=990904320",
+            "assignment name=\"blk.0.ffn_down_exps.weight\" planned=stock actual=CPU_Mapped bytes=990904320",
+            "assignment name=\"blk.0.ffn_up_exps.weight\" planned=stock actual=CPU_Mapped bytes=990904320",
+            "assignment name=\"blk.1.ffn_gate_exps.weight\" planned=stock actual=CPU_Mapped bytes=990904320",
+            "assignment name=\"blk.1.ffn_down_exps.weight\" planned=stock actual=CPU_Mapped bytes=990904320",
+            "assignment name=\"blk.1.ffn_up_exps.weight\" planned=stock actual=CPU_Mapped bytes=990904320"
+          ],
+          "last": [
+            "assignment name=\"blk.39.ffn_norm.weight\" planned=stock actual=CUDA0 bytes=20480",
+            "assignment name=\"blk.39.ffn_gate_shexp.weight\" planned=stock actual=CUDA0 bytes=8110080",
+            "assignment name=\"blk.39.ffn_down_shexp.weight\" planned=stock actual=CUDA0 bytes=8110080",
+            "assignment name=\"blk.39.ffn_up_shexp.weight\" planned=stock actual=CUDA0 bytes=8110080",
+            "assignment name=\"per_layer_token_embd.weight\" planned=stock actual=CPU_Mapped bytes=110595290400",
+            "assignment class=expert assigned=3 stock=117",
+            "assignment class=other assigned=0 stock=923",
+            "stats assigned=3 stock=1040"
+          ]
+        }
+      },
+      "basis": "per-size-all-request-ordinal",
+      "candidate_bank": {
+        "allocated_mib": 30691.85,
+        "argv": [
+          "-m",
+          "~/software-factory-spark-20261113/deepseek-v41-upstream-20261119/converted/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00001-of-00006.gguf",
+          "-lm",
+          "mmap",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "8082",
+          "-lv",
+          "4",
+          "-ot",
+          "^(?!blk\\.27\\.ffn_(gate|up|down)_exps\\.weight$).*\\.ffn_(up|down|gate|gate_up)_(ch|)exps=CPU",
+          "--placement-plan",
+          "~/predemo-spark/OPS/p3/placement-v1-layer27-plan.json",
+          "--moe-cache-mib",
+          "30720",
+          "--moe-cache-cpu-share",
+          "0"
+        ],
+        "cpu_share_pct": 0.0,
+        "effective_settings": {
+          "n_batch": 2048,
+          "n_ctx": 1048576,
+          "n_ctx_seq": 1048576,
+          "n_slots": 4,
+          "n_threads": 20,
+          "n_threads_batch": 20,
+          "n_ubatch": 512
+        },
+        "host_experts_mib": 122512.5,
+        "requested_mib": 30720,
+        "runtime_environment": {}
+      },
+      "candidate_scope": {
+        "artifact_id": "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/result.json@e882612d857e458bcbc0c4a70132ba4f3e01baf2048a8d604a2bb76309a97e9a",
+        "sha256": "e882612d857e458bcbc0c4a70132ba4f3e01baf2048a8d604a2bb76309a97e9a"
+      },
+      "candidate_source_commit": "24dbb8309e604de8d8c97e623b78d49d0f14a736",
+      "candidate_warmups_per_size": 2,
+      "cap": {
+        "memory_events": {
+          "high": "0",
+          "low": "0",
+          "max": "954",
+          "oom": "0",
+          "oom_group_kill": "0",
+          "oom_kill": "0",
+          "sock_throttled": "5"
+        },
+        "min_mem_available_bytes": 53052383232,
+        "peak_memory_bytes": 107374182400
+      },
+      "control_allocated_mib": [
+        30682.35,
+        30682.35,
+        30682.35,
+        30682.35
+      ],
+      "control_count": 4,
+      "controls": [
+        {
+          "id": "spark-p4-cache30-attribution:A+:1",
+          "iteration_id": "spark-p4-cache30-attribution",
+          "launch_pass": 1,
+          "scope_artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-1-01/result.json@59276ffed7cf7c807f39d8a344c7045cbc4934630b8a4b1bba78792116655354",
+          "scope_sha256": "59276ffed7cf7c807f39d8a344c7045cbc4934630b8a4b1bba78792116655354"
+        },
+        {
+          "id": "spark-p4-cache30-attribution:A+:2",
+          "iteration_id": "spark-p4-cache30-attribution",
+          "launch_pass": 2,
+          "scope_artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-2-01/result.json@d10294b7dec54b0e14ee174032ab8874069f61a71485e8f8bb6ee4ca2af30120",
+          "scope_sha256": "d10294b7dec54b0e14ee174032ab8874069f61a71485e8f8bb6ee4ca2af30120"
+        },
+        {
+          "id": "spark-p4-cache30-direct-seed:A+:1",
+          "iteration_id": "spark-p4-cache30-direct-seed",
+          "launch_pass": 1,
+          "scope_artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-1-01/result.json@9dc9bb9b7375d10fba06613cfa0e1c32da36486ba259b7bd77f0c1a035a52092",
+          "scope_sha256": "9dc9bb9b7375d10fba06613cfa0e1c32da36486ba259b7bd77f0c1a035a52092"
+        },
+        {
+          "id": "spark-p4-cache30-direct-seed:A+:2",
+          "iteration_id": "spark-p4-cache30-direct-seed",
+          "launch_pass": 2,
+          "scope_artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-2-01/result.json@5d3bd59645ab07bb5c8d06bff17503351e7cef2beda66dc55bcb8edc140194e1",
+          "scope_sha256": "5d3bd59645ab07bb5c8d06bff17503351e7cef2beda66dc55bcb8edc140194e1"
+        }
+      ],
+      "cpu_overlap_observed": false,
+      "greedy_parity": true,
+      "limitations": [
+        "One prospective candidate scope was compared with four historical quiet controls. Differences are descriptive screening estimates.",
+        "Candidate per-size ordinal 3 aligns with the controls\u2019 third discarded warmup. Ordinals 4\u20136 align with their first three measured requests.",
+        "The across-control range and warmup exclusion show sensitivity. A positive difference favors the candidate."
+      ],
+      "matched_ordinals": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "package_treatment": true,
+      "placement": {
+        "activation": {
+          "artifact_id": "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/placement-activation.json@626dd2515ba35cf8a64300c83472cdcb0ce7f041b73381f1efdd7ae32a2d2aa1",
+          "sha256": "626dd2515ba35cf8a64300c83472cdcb0ce7f041b73381f1efdd7ae32a2d2aa1"
+        },
+        "active_marker": "weight_placement_planner: active cap_bytes=130661142528 peak_bytes=239514023200",
+        "control": {
+          "artifact_id": "spark-pooled30-c2-01/raw/OPS/p3/placement-v1-matched-controls.json@2e031ddf01e7d46e632a7a465ceefd2be89312e14bce5321b31176cb91f006e9",
+          "sha256": "2e031ddf01e7d46e632a7a465ceefd2be89312e14bce5321b31176cb91f006e9"
+        },
+        "cpu_mapped_expert_tensors": 117,
+        "native_bank": {
+          "allocated_mib": 30691.85,
+          "cpu_share_pct": 0.0,
+          "host_experts_mib": 122512.5,
+          "requested_mib": 30720
+        },
+        "placement_plan": {
+          "artifact_id": "spark-pooled30-c2-01/raw/OPS/p3/placement-v1-layer27-plan.json@97d217e82ef762a09223dc9865120095c04d8a32ddd6577579224ed57ce2a9f6",
+          "sha256": "97d217e82ef762a09223dc9865120095c04d8a32ddd6577579224ed57ce2a9f6"
+        },
+        "plan_sha256": "97d217e82ef762a09223dc9865120095c04d8a32ddd6577579224ed57ce2a9f6",
+        "policy": "manual-v1-layer27",
+        "selected": [
+          {
+            "buffer": "CUDA0",
+            "bytes": 990904320,
+            "name": "blk.27.ffn_down_exps.weight",
+            "planned": "CUDA0"
+          },
+          {
+            "buffer": "CUDA0",
+            "bytes": 1309409280,
+            "name": "blk.27.ffn_gate_exps.weight",
+            "planned": "CUDA0"
+          },
+          {
+            "buffer": "CUDA0",
+            "bytes": 1309409280,
+            "name": "blk.27.ffn_up_exps.weight",
+            "planned": "CUDA0"
+          }
+        ],
+        "source_commit": "24dbb8309e604de8d8c97e623b78d49d0f14a736"
+      },
+      "predictor_decode": null,
+      "rows": [
+        {
+          "candidate": {
+            "decode_tps": {
+              "median": 16.78700700122111,
+              "observed_range": [
+                8.33693031536456,
+                22.136026597507055
+              ],
+              "values": [
+                8.33693031536456,
+                19.86202937401931,
+                13.71198462842291,
+                22.136026597507055
+              ]
+            },
+            "ttft_s": {
+              "median": 6.921306630130857,
+              "observed_range": [
+                3.8029816965572536,
+                9.324357751756907
+              ],
+              "values": [
+                9.324357751756907,
+                8.940702454186976,
+                3.8029816965572536,
+                4.9019108060747385
+              ]
+            }
+          },
+          "controls": [
+            {
+              "absolute": {
+                "decode_tps": {
+                  "median": 14.91739430947111,
+                  "observed_range": [
+                    6.506272361375998,
+                    21.54866801426939
+                  ],
+                  "values": [
+                    6.506272361375998,
+                    18.266411486862324,
+                    11.568377132079894,
+                    21.54866801426939
+                  ]
+                },
+                "ttft_s": {
+                  "median": 6.481518244836479,
+                  "observed_range": [
+                    3.9597924281843007,
+                    11.565177237149328
+                  ],
+                  "values": [
+                    8.510579308960587,
+                    11.565177237149328,
+                    3.9597924281843007,
+                    4.452457180712372
+                  ]
+                }
+              },
+              "decode_tps_gained": {
+                "median": 1.7131379205727746,
+                "observed_range": [
+                  0.5873585832376662,
+                  2.143607496343016
+                ],
+                "values": [
+                  1.8306579539885623,
+                  1.5956178871569868,
+                  2.143607496343016,
+                  0.5873585832376662
+                ]
+              },
+              "id": "spark-p4-cache30-attribution:A+:1",
+              "ttft_seconds_saved": {
+                "median": -0.1463214468676597,
+                "observed_range": [
+                  -0.8137784427963197,
+                  2.624474782962352
+                ],
+                "values": [
+                  -0.8137784427963197,
+                  2.624474782962352,
+                  0.15681073162704706,
+                  -0.44945362536236644
+                ]
+              }
+            },
+            {
+              "absolute": {
+                "decode_tps": {
+                  "median": 13.41282049993561,
+                  "observed_range": [
+                    4.885738340658263,
+                    19.962431990891982
+                  ],
+                  "values": [
+                    4.885738340658263,
+                    18.210078514809492,
+                    8.615562485061727,
+                    19.962431990891982
+                  ]
+                },
+                "ttft_s": {
+                  "median": 7.540184081532061,
+                  "observed_range": [
+                    3.8958276780322194,
+                    13.501526798587292
+                  ],
+                  "values": [
+                    10.886239307001233,
+                    13.501526798587292,
+                    4.194128856062889,
+                    3.8958276780322194
+                  ]
+                }
+              },
+              "decode_tps_gained": {
+                "median": 2.8123932906606846,
+                "observed_range": [
+                  1.651950859209819,
+                  5.096422143361183
+                ],
+                "values": [
+                  3.4511919747062967,
+                  1.651950859209819,
+                  5.096422143361183,
+                  2.1735946066150724
+                ]
+              },
+              "id": "spark-p4-cache30-attribution:A+:2",
+              "ttft_seconds_saved": {
+                "median": 0.976514357374981,
+                "observed_range": [
+                  -1.006083128042519,
+                  4.5608243444003165
+                ],
+                "values": [
+                  1.5618815552443266,
+                  4.5608243444003165,
+                  0.3911471595056355,
+                  -1.006083128042519
+                ]
+              }
+            },
+            {
+              "absolute": {
+                "decode_tps": {
+                  "median": 15.080685823490953,
+                  "observed_range": [
+                    5.955744209623752,
+                    22.21836785303195
+                  ],
+                  "values": [
+                    5.955744209623752,
+                    19.531828374454133,
+                    10.629543272527773,
+                    22.21836785303195
+                  ]
+                },
+                "ttft_s": {
+                  "median": 5.770602111937478,
+                  "observed_range": [
+                    3.967888214159757,
+                    9.535483472049236
+                  ],
+                  "values": [
+                    7.089010533876717,
+                    9.535483472049236,
+                    3.967888214159757,
+                    4.452193689998239
+                  ]
+                }
+              },
+              "decode_tps_gained": {
+                "median": 1.3556935526529932,
+                "observed_range": [
+                  -0.08234125552489502,
+                  3.0824413558951367
+                ],
+                "values": [
+                  2.3811861057408077,
+                  0.3302009995651787,
+                  3.0824413558951367,
+                  -0.08234125552489502
+                ]
+              },
+              "id": "spark-p4-cache30-direct-seed:A+:1",
+              "ttft_seconds_saved": {
+                "median": -0.14240529923699796,
+                "observed_range": [
+                  -2.2353472178801894,
+                  0.5947810178622603
+                ],
+                "values": [
+                  -2.2353472178801894,
+                  0.5947810178622603,
+                  0.1649065176025033,
+                  -0.4497171160764992
+                ]
+              }
+            },
+            {
+              "absolute": {
+                "decode_tps": {
+                  "median": 14.160919651497839,
+                  "observed_range": [
+                    6.344898445806892,
+                    19.96698362642933
+                  ],
+                  "values": [
+                    6.344898445806892,
+                    18.02495351306344,
+                    10.296885789932235,
+                    19.96698362642933
+                  ]
+                },
+                "ttft_s": {
+                  "median": 9.067429434275255,
+                  "observed_range": [
+                    3.8096876959316432,
+                    17.908772099763155
+                  ],
+                  "values": [
+                    6.211617665831,
+                    17.908772099763155,
+                    3.8096876959316432,
+                    11.92324120271951
+                  ]
+                }
+              },
+              "decode_tps_gained": {
+                "median": 2.0805374203176967,
+                "observed_range": [
+                  1.8370758609558706,
+                  3.4150988384906746
+                ],
+                "values": [
+                  1.9920318695576675,
+                  1.8370758609558706,
+                  3.4150988384906746,
+                  2.169042971077726
+                ]
+              },
+              "id": "spark-p4-cache30-direct-seed:A+:2",
+              "ttft_seconds_saved": {
+                "median": 3.5140181980095804,
+                "observed_range": [
+                  -3.112740085925907,
+                  8.968069645576179
+                ],
+                "values": [
+                  -3.112740085925907,
+                  8.968069645576179,
+                  0.0067059993743896484,
+                  7.021330396644771
+                ]
+              }
+            }
+          ],
+          "matched_result_artifacts": {
+            "candidate": [
+              {
+                "artifact_id": "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-512/result.json@045183abc74f230e01e14b0d9150fdfce7518c3c3586ae4715d118ab984f274d",
+                "sha256": "045183abc74f230e01e14b0d9150fdfce7518c3c3586ae4715d118ab984f274d"
+              },
+              {
+                "artifact_id": "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-512/result.json@3649b70bf595e5631f7ab42d96b510a01fb0c2d94e68ed9734045027c5552c09",
+                "sha256": "3649b70bf595e5631f7ab42d96b510a01fb0c2d94e68ed9734045027c5552c09"
+              },
+              {
+                "artifact_id": "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-512/result.json@d29267f84628b24987a870e76545f6f074a310b2928885648f7de8de02724bbb",
+                "sha256": "d29267f84628b24987a870e76545f6f074a310b2928885648f7de8de02724bbb"
+              },
+              {
+                "artifact_id": "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-512/result.json@504dc3cb033d9008d2655e30b6ad1615e29d25d93ea7f5750fcbaf2c00c55cdb",
+                "sha256": "504dc3cb033d9008d2655e30b6ad1615e29d25d93ea7f5750fcbaf2c00c55cdb"
+              }
+            ],
+            "controls": {
+              "spark-p4-cache30-attribution:A+:1": [
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-1-01/p4-window/warmup-3-512/result.json@45fd5e80509735eda9cf2c8442880aeea8c0e4e23f313e166065442c573d84b6",
+                  "sha256": "45fd5e80509735eda9cf2c8442880aeea8c0e4e23f313e166065442c573d84b6"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-1-01/p4-window/repeat-1-512/result.json@4871cbf6af8aa234b873a3e36797c9f31238600c880aac257a296411103c6208",
+                  "sha256": "4871cbf6af8aa234b873a3e36797c9f31238600c880aac257a296411103c6208"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-1-01/p4-window/repeat-2-512/result.json@e98baac8e0a260be022e337d73260bf6b763cccce69f512f46c15e12ff0558f5",
+                  "sha256": "e98baac8e0a260be022e337d73260bf6b763cccce69f512f46c15e12ff0558f5"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-1-01/p4-window/repeat-3-512/result.json@ef3f612a6e7e391dd10af2975b535714b349883e5132f7612558ecfa64b08118",
+                  "sha256": "ef3f612a6e7e391dd10af2975b535714b349883e5132f7612558ecfa64b08118"
+                }
+              ],
+              "spark-p4-cache30-attribution:A+:2": [
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-2-01/p4-window/warmup-3-512/result.json@8871f0d0d8aee826498518204f5822f4bb0ad24280a7ca1f56c77bb9ccce3618",
+                  "sha256": "8871f0d0d8aee826498518204f5822f4bb0ad24280a7ca1f56c77bb9ccce3618"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-2-01/p4-window/repeat-6-512/result.json@1cb0f87bb87157a60fd78e3617c3f9b68409bd35c11d4f6582cdcb76bb99be76",
+                  "sha256": "1cb0f87bb87157a60fd78e3617c3f9b68409bd35c11d4f6582cdcb76bb99be76"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-2-01/p4-window/repeat-7-512/result.json@f5223735a926a28e80a11f8fb3628e894ffdccbcc598aece71a127f8d6b075f9",
+                  "sha256": "f5223735a926a28e80a11f8fb3628e894ffdccbcc598aece71a127f8d6b075f9"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-2-01/p4-window/repeat-8-512/result.json@867ed385db29da6407e9e5105b5e4c7e6d053c790ac95a10944f623fc6cba0bb",
+                  "sha256": "867ed385db29da6407e9e5105b5e4c7e6d053c790ac95a10944f623fc6cba0bb"
+                }
+              ],
+              "spark-p4-cache30-direct-seed:A+:1": [
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-1-01/p4-window/warmup-3-512/result.json@3420e942683c301d8c35535e608f08650dc9b1e679d5f547d32eb15f7c02baf2",
+                  "sha256": "3420e942683c301d8c35535e608f08650dc9b1e679d5f547d32eb15f7c02baf2"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-1-01/p4-window/repeat-1-512/result.json@24af8c51f62f190d219df469c82f92f8cdcf513995e9fdbad058ef0332e54829",
+                  "sha256": "24af8c51f62f190d219df469c82f92f8cdcf513995e9fdbad058ef0332e54829"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-1-01/p4-window/repeat-2-512/result.json@6fe2a8fe1a5a2d81d38e1d1fb044c1201b37cac8231406bd6f22eb321bbe474e",
+                  "sha256": "6fe2a8fe1a5a2d81d38e1d1fb044c1201b37cac8231406bd6f22eb321bbe474e"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-1-01/p4-window/repeat-3-512/result.json@154dd8e8a5f1cb8d1bde65dab9e6deb4bb57bcdb6378aa0632e4b396ee6273cd",
+                  "sha256": "154dd8e8a5f1cb8d1bde65dab9e6deb4bb57bcdb6378aa0632e4b396ee6273cd"
+                }
+              ],
+              "spark-p4-cache30-direct-seed:A+:2": [
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-2-01/p4-window/warmup-3-512/result.json@f32f5cf1e5fccdb672cb39643dbc4edc0a75dc6e62d05aaea75e3b530551c56b",
+                  "sha256": "f32f5cf1e5fccdb672cb39643dbc4edc0a75dc6e62d05aaea75e3b530551c56b"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-2-01/p4-window/repeat-6-512/result.json@22a4d7b5e8b6f4c12faaed6b83d17d9a99bb48aa231ab1168468a8aab9f094fd",
+                  "sha256": "22a4d7b5e8b6f4c12faaed6b83d17d9a99bb48aa231ab1168468a8aab9f094fd"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-2-01/p4-window/repeat-7-512/result.json@6d7418b616a67f8c7e98bbd6591d663eea0e44934244a25a4ae81d03f15dbf5e",
+                  "sha256": "6d7418b616a67f8c7e98bbd6591d663eea0e44934244a25a4ae81d03f15dbf5e"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-2-01/p4-window/repeat-8-512/result.json@5c01695024ca4cd1b3ebef7eb20b944c9bb066a41c5202b3aec631b8e88cd220",
+                  "sha256": "5c01695024ca4cd1b3ebef7eb20b944c9bb066a41c5202b3aec631b8e88cd220"
+                }
+              ]
+            }
+          },
+          "n": 4,
+          "pooled_estimates": {
+            "decode_tps_gained": {
+              "median": 1.9051966804163194,
+              "observed_range": [
+                1.3782007771576943,
+                3.2487700971929048
+              ],
+              "values": [
+                2.1866089876492376,
+                1.6237843731834012,
+                3.2487700971929048,
+                1.3782007771576943
+              ]
+            },
+            "ttft_seconds_saved": {
+              "median": -0.14436337305232882,
+              "observed_range": [
+                -1.5245628303382546,
+                3.5926495636813343
+              ],
+              "values": [
+                -1.5245628303382546,
+                3.5926495636813343,
+                0.16085862461477518,
+                -0.44958537071943283
+              ]
+            }
+          },
+          "pooled_reference": {
+            "decode_tps": {
+              "median": 14.350729766032957,
+              "observed_range": [
+                6.150321327715322,
+                20.75782582034936
+              ],
+              "values": [
+                6.150321327715322,
+                18.23824500083591,
+                10.463214531230005,
+                20.75782582034936
+              ]
+            },
+            "ttft_s": {
+              "median": 6.126060178386979,
+              "observed_range": [
+                3.963840321172029,
+                12.53335201786831
+              ],
+              "values": [
+                7.799794921418652,
+                12.53335201786831,
+                3.963840321172029,
+                4.452325435355306
+              ]
+            }
+          },
+          "prompt_tokens": 512,
+          "sensitivity": {
+            "decode_tps_gained": [
+              1.3556935526529932,
+              2.8123932906606846
+            ],
+            "exclude_control_warmup": {
+              "decode_tps_gained": {
+                "median": 1.6237843731834012,
+                "observed_range": [
+                  1.3782007771576943,
+                  3.2487700971929048
+                ],
+                "values": [
+                  1.6237843731834012,
+                  3.2487700971929048,
+                  1.3782007771576943
+                ]
+              },
+              "ttft_seconds_saved": {
+                "median": 0.16085862461477518,
+                "observed_range": [
+                  -0.44958537071943283,
+                  3.5926495636813343
+                ],
+                "values": [
+                  3.5926495636813343,
+                  0.16085862461477518,
+                  -0.44958537071943283
+                ]
+              }
+            },
+            "ttft_seconds_saved": [
+              -0.1463214468676597,
+              3.5140181980095804
+            ]
+          }
+        },
+        {
+          "candidate": {
+            "decode_tps": {
+              "median": 20.011696487856938,
+              "observed_range": [
+                8.980852821783957,
+                21.93471238992843
+              ],
+              "values": [
+                21.641803027478804,
+                8.980852821783957,
+                21.93471238992843,
+                18.38158994823507
+              ]
+            },
+            "ttft_s": {
+              "median": 18.16730274283327,
+              "observed_range": [
+                11.99393825372681,
+                29.822062010411173
+              ],
+              "values": [
+                29.822062010411173,
+                22.572889253031462,
+                13.76171623263508,
+                11.99393825372681
+              ]
+            }
+          },
+          "controls": [
+            {
+              "absolute": {
+                "decode_tps": {
+                  "median": 19.92238956115983,
+                  "observed_range": [
+                    6.099066547702079,
+                    21.834906972731023
+                  ],
+                  "values": [
+                    21.491853547577072,
+                    6.099066547702079,
+                    21.834906972731023,
+                    18.352925574742585
+                  ]
+                },
+                "ttft_s": {
+                  "median": 20.85040705301799,
+                  "observed_range": [
+                    11.069128612056375,
+                    38.511874731164426
+                  ],
+                  "values": [
+                    38.511874731164426,
+                    25.98232841398567,
+                    15.718485692050308,
+                    11.069128612056375
+                  ]
+                }
+              },
+              "decode_tps_gained": {
+                "median": 0.12487744854956873,
+                "observed_range": [
+                  0.02866437349248585,
+                  2.881786274081878
+                ],
+                "values": [
+                  0.14994947990173202,
+                  2.881786274081878,
+                  0.09980541719740543,
+                  0.02866437349248585
+                ]
+              },
+              "id": "spark-p4-cache30-attribution:A+:1",
+              "ttft_seconds_saved": {
+                "median": 2.683104310184717,
+                "observed_range": [
+                  -0.9248096416704357,
+                  8.689812720753253
+                ],
+                "values": [
+                  8.689812720753253,
+                  3.409439160954207,
+                  1.9567694594152272,
+                  -0.9248096416704357
+                ]
+              }
+            },
+            {
+              "absolute": {
+                "decode_tps": {
+                  "median": 15.11474935838907,
+                  "observed_range": [
+                    6.551275459365925,
+                    19.690916135752985
+                  ],
+                  "values": [
+                    19.6110930464125,
+                    6.551275459365925,
+                    19.690916135752985,
+                    10.61840567036564
+                  ]
+                },
+                "ttft_s": {
+                  "median": 23.13347626524046,
+                  "observed_range": [
+                    12.138974512927234,
+                    37.777637044899166
+                  ],
+                  "values": [
+                    37.777637044899166,
+                    17.874357173219323,
+                    28.392595357261598,
+                    12.138974512927234
+                  ]
+                }
+              },
+              "decode_tps_gained": {
+                "median": 2.3366868082967374,
+                "observed_range": [
+                  2.0307099810663054,
+                  7.763184277869431
+                ],
+                "values": [
+                  2.0307099810663054,
+                  2.4295773624180317,
+                  2.243796254175443,
+                  7.763184277869431
+                ]
+              },
+              "id": "spark-p4-cache30-attribution:A+:2",
+              "ttft_seconds_saved": {
+                "median": 4.050305646844208,
+                "observed_range": [
+                  -4.698532079812139,
+                  14.630879124626517
+                ],
+                "values": [
+                  7.9555750344879925,
+                  -4.698532079812139,
+                  14.630879124626517,
+                  0.14503625920042396
+                ]
+              }
+            },
+            {
+              "absolute": {
+                "decode_tps": {
+                  "median": 17.625682276836862,
+                  "observed_range": [
+                    8.552377657547902,
+                    22.074819395933247
+                  ],
+                  "values": [
+                    21.257964021924504,
+                    8.552377657547902,
+                    22.074819395933247,
+                    13.99340053174922
+                  ]
+                },
+                "ttft_s": {
+                  "median": 18.5505165013019,
+                  "observed_range": [
+                    12.944781051948667,
+                    32.05815092893317
+                  ],
+                  "values": [
+                    32.05815092893317,
+                    22.36188989970833,
+                    14.739143102895468,
+                    12.944781051948667
+                  ]
+                }
+              },
+              "decode_tps_gained": {
+                "median": 0.40615708489517743,
+                "observed_range": [
+                  -0.1401070060048184,
+                  4.388189416485851
+                ],
+                "values": [
+                  0.38383900555430017,
+                  0.4284751642360547,
+                  -0.1401070060048184,
+                  4.388189416485851
+                ]
+              },
+              "id": "spark-p4-cache30-direct-seed:A+:1",
+              "ttft_seconds_saved": {
+                "median": 0.964134834241122,
+                "observed_range": [
+                  -0.2109993533231318,
+                  2.2360889185220003
+                ],
+                "values": [
+                  2.2360889185220003,
+                  -0.2109993533231318,
+                  0.9774268702603877,
+                  0.9508427982218564
+                ]
+              }
+            },
+            {
+              "absolute": {
+                "decode_tps": {
+                  "median": 17.350963378477264,
+                  "observed_range": [
+                    6.7877023474283265,
+                    21.850543690866964
+                  ],
+                  "values": [
+                    21.51613814471199,
+                    6.7877023474283265,
+                    21.850543690866964,
+                    13.185788612242536
+                  ]
+                },
+                "ttft_s": {
+                  "median": 17.37522764946334,
+                  "observed_range": [
+                    15.25493657309562,
+                    32.84797477023676
+                  ],
+                  "values": [
+                    32.84797477023676,
+                    19.269984997808933,
+                    15.480470301117748,
+                    15.25493657309562
+                  ]
+                }
+              },
+              "decode_tps_gained": {
+                "median": 1.1594076785612217,
+                "observed_range": [
+                  0.08416869906146474,
+                  5.195801335992535
+                ],
+                "values": [
+                  0.12566488276681298,
+                  2.1931504743556305,
+                  0.08416869906146474,
+                  5.195801335992535
+                ]
+              },
+              "id": "spark-p4-cache30-direct-seed:A+:2",
+              "ttft_seconds_saved": {
+                "median": 2.3723334141541272,
+                "observed_range": [
+                  -3.302904255222529,
+                  3.2609983193688095
+                ],
+                "values": [
+                  3.0259127598255873,
+                  -3.302904255222529,
+                  1.7187540684826672,
+                  3.2609983193688095
+                ]
+              }
+            }
+          ],
+          "matched_result_artifacts": {
+            "candidate": [
+              {
+                "artifact_id": "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-2048/result.json@2b2f79655087361adad2c2a82d48ef264276cd3a663143757b71eb43e2ed5479",
+                "sha256": "2b2f79655087361adad2c2a82d48ef264276cd3a663143757b71eb43e2ed5479"
+              },
+              {
+                "artifact_id": "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-2048/result.json@7721834b929ea4667b6bc5efc7f269f9975d4aa2d87263c0f9ed5157a2401c9f",
+                "sha256": "7721834b929ea4667b6bc5efc7f269f9975d4aa2d87263c0f9ed5157a2401c9f"
+              },
+              {
+                "artifact_id": "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-2048/result.json@bc2c8ac2853f5704231dd67f8657f211bc08e88bcfb475f8fc8d6f6cceb9181d",
+                "sha256": "bc2c8ac2853f5704231dd67f8657f211bc08e88bcfb475f8fc8d6f6cceb9181d"
+              },
+              {
+                "artifact_id": "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-2048/result.json@775b9210db6b79127d85846ef477030a98fb86a54e97bb31e5a973706dd62047",
+                "sha256": "775b9210db6b79127d85846ef477030a98fb86a54e97bb31e5a973706dd62047"
+              }
+            ],
+            "controls": {
+              "spark-p4-cache30-attribution:A+:1": [
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-1-01/p4-window/warmup-3-2048/result.json@45deffb8bd044223e9da15fae4a416111f6272bc64acdc7dab897ef9ded1ca2a",
+                  "sha256": "45deffb8bd044223e9da15fae4a416111f6272bc64acdc7dab897ef9ded1ca2a"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-1-01/p4-window/repeat-1-2048/result.json@d27e3e1e6aca91962528feb353577ee45aeb62acef2ca39c19775f6d2cff0e5d",
+                  "sha256": "d27e3e1e6aca91962528feb353577ee45aeb62acef2ca39c19775f6d2cff0e5d"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-1-01/p4-window/repeat-2-2048/result.json@ec9d1e5eb6307665f32629d1552a98a69dd59762e1f7b198ed51c3e1c8b9ea3a",
+                  "sha256": "ec9d1e5eb6307665f32629d1552a98a69dd59762e1f7b198ed51c3e1c8b9ea3a"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-1-01/p4-window/repeat-3-2048/result.json@c953e75f7aa0b97873138f433fc0ce66d1e03dfa9a3593035a35415cf3443a1c",
+                  "sha256": "c953e75f7aa0b97873138f433fc0ce66d1e03dfa9a3593035a35415cf3443a1c"
+                }
+              ],
+              "spark-p4-cache30-attribution:A+:2": [
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-2-01/p4-window/warmup-3-2048/result.json@2cbfd4a7374957add9b16d3eddb479ad6eabb3a7058e1336d9dac156382d434d",
+                  "sha256": "2cbfd4a7374957add9b16d3eddb479ad6eabb3a7058e1336d9dac156382d434d"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-2-01/p4-window/repeat-6-2048/result.json@a9a9880f39931bf2a0491c02543dde930f5820e9b1f56c79e3bc39a38c0540af",
+                  "sha256": "a9a9880f39931bf2a0491c02543dde930f5820e9b1f56c79e3bc39a38c0540af"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-2-01/p4-window/repeat-7-2048/result.json@4051ae65a05b18165d09abd71a205fe1a71d9e64e7754d1215204fc61c78855a",
+                  "sha256": "4051ae65a05b18165d09abd71a205fe1a71d9e64e7754d1215204fc61c78855a"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-attribution/raw/OPS/runs/p4-cache30-aplus-pass-2-01/p4-window/repeat-8-2048/result.json@e5254327d977a20134f5a34e8d896e669113ae84a4b22bacb160f50981b9f509",
+                  "sha256": "e5254327d977a20134f5a34e8d896e669113ae84a4b22bacb160f50981b9f509"
+                }
+              ],
+              "spark-p4-cache30-direct-seed:A+:1": [
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-1-01/p4-window/warmup-3-2048/result.json@ac9666f8b049a41318afde44bd2fca665edc2f74dbcd92f034029482260d3a9a",
+                  "sha256": "ac9666f8b049a41318afde44bd2fca665edc2f74dbcd92f034029482260d3a9a"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-1-01/p4-window/repeat-1-2048/result.json@5e7b09addd1362321d995555d7f7a3f4fd55d0a00989f9318c4578f49ad4b1d4",
+                  "sha256": "5e7b09addd1362321d995555d7f7a3f4fd55d0a00989f9318c4578f49ad4b1d4"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-1-01/p4-window/repeat-2-2048/result.json@d17293c772dcc5b7a26c1ffeecce9b5d92dd4fb06913a64050d82153d0133db7",
+                  "sha256": "d17293c772dcc5b7a26c1ffeecce9b5d92dd4fb06913a64050d82153d0133db7"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-1-01/p4-window/repeat-3-2048/result.json@9faafc7ce3e8d38c091b7433cc8c6566a6bed40dafce6672785c1ce3142d353e",
+                  "sha256": "9faafc7ce3e8d38c091b7433cc8c6566a6bed40dafce6672785c1ce3142d353e"
+                }
+              ],
+              "spark-p4-cache30-direct-seed:A+:2": [
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-2-01/p4-window/warmup-3-2048/result.json@ffbafbdee6527b363b9d261d388b91ab07289a9cf4ebbb0dbba81b17db810d53",
+                  "sha256": "ffbafbdee6527b363b9d261d388b91ab07289a9cf4ebbb0dbba81b17db810d53"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-2-01/p4-window/repeat-6-2048/result.json@8b8ca02c0083b54a1f5061eb810a05233c1def67c308074352f8ac05a7f69218",
+                  "sha256": "8b8ca02c0083b54a1f5061eb810a05233c1def67c308074352f8ac05a7f69218"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-2-01/p4-window/repeat-7-2048/result.json@5391ff93e5e4c586b45cd91f4dfd6e0ffe8e46f42c0131feb7871f7cae0cbe07",
+                  "sha256": "5391ff93e5e4c586b45cd91f4dfd6e0ffe8e46f42c0131feb7871f7cae0cbe07"
+                },
+                {
+                  "artifact_id": "spark-p4-cache30-direct-seed/raw/OPS/runs/p4-cache30-direct-aplus-pass-2-01/p4-window/repeat-8-2048/result.json@a515a696ff1cfc6dfd2ff2f4c05759338ab94eb61d42a0042f6753d31fc9c2f7",
+                  "sha256": "a515a696ff1cfc6dfd2ff2f4c05759338ab94eb61d42a0042f6753d31fc9c2f7"
+                }
+              ]
+            }
+          },
+          "n": 4,
+          "pooled_estimates": {
+            "decode_tps_gained": {
+              "median": 1.2891290805574247,
+              "observed_range": [
+                0.09198705812943331,
+                4.791995376239193
+              ],
+              "values": [
+                0.26689424272801787,
+                2.3113639183868315,
+                0.09198705812943331,
+                4.791995376239193
+              ]
+            },
+            "ttft_seconds_saved": {
+              "median": 1.1928506463300437,
+              "observed_range": [
+                -1.7569518042728305,
+                5.49074389715679
+              ],
+              "values": [
+                5.49074389715679,
+                -1.7569518042728305,
+                1.8377617639489472,
+                0.5479395287111402
+              ]
+            }
+          },
+          "pooled_reference": {
+            "decode_tps": {
+              "median": 17.48225167837333,
+              "observed_range": [
+                6.669488903397125,
+                21.842725331798995
+              ],
+              "values": [
+                21.374908784750787,
+                6.669488903397125,
+                21.842725331798995,
+                13.589594571995878
+              ]
+            },
+            "ttft_s": {
+              "median": 18.20770772267133,
+              "observed_range": [
+                12.54187778243795,
+                35.31280590756796
+              ],
+              "values": [
+                35.31280590756796,
+                20.815937448758632,
+                15.599477996584028,
+                12.54187778243795
+              ]
+            }
+          },
+          "prompt_tokens": 2048,
+          "sensitivity": {
+            "decode_tps_gained": [
+              0.12487744854956873,
+              2.3366868082967374
+            ],
+            "exclude_control_warmup": {
+              "decode_tps_gained": {
+                "median": 2.3113639183868315,
+                "observed_range": [
+                  0.09198705812943331,
+                  4.791995376239193
+                ],
+                "values": [
+                  2.3113639183868315,
+                  0.09198705812943331,
+                  4.791995376239193
+                ]
+              },
+              "ttft_seconds_saved": {
+                "median": 0.5479395287111402,
+                "observed_range": [
+                  -1.7569518042728305,
+                  1.8377617639489472
+                ],
+                "values": [
+                  -1.7569518042728305,
+                  1.8377617639489472,
+                  0.5479395287111402
+                ]
+              }
+            },
+            "ttft_seconds_saved": [
+              0.964134834241122,
+              4.050305646844208
+            ]
+          }
+        }
+      ],
+      "schema": "spark-pooled30-screen/1",
+      "startup_seconds": 79.11723465239629,
+      "subject_arm": "C2"
+    },
+    "result_artifact": {
+      "artifact_id": "spark-pooled30-c2-01/analysis.json",
+      "sha256": "36662bd4c8fb64dbdb35941206aac71c82dc07fcad3d4240069b80019793f412"
+    }
+  },
+  "do": {
+    "build_receipt_ids": [
+      "spark-pooled30-c2-01/do/ce1eef65da2341f59846b0c6bb7711a7:receipt",
+      "spark-pooled30-c2-01/do/ce1eef65da2341f59846b0c6bb7711a7:build-record"
+    ],
+    "diff_artifact_id": "spark-pooled30-c2-01/do/spark-placement-tier-source-product.diff",
+    "home": "~/predemo-spark/factory-runs/star-weight_placement_planner-tier-03",
+    "source_commit": "24dbb8309e604de8d8c97e623b78d49d0f14a736",
+    "source_product": {
+      "artifact_id": "spark-pooled30-c2-01/do/placement-v2-source-verified-controls.json",
+      "sha256": "d4f027b2a5cb8c88b8ae9f846d728a832ac3add6b39b5317bd9106e615f46497"
+    },
+    "task_id": "spark-star-weight-placement-planner-tier-03",
+    "verification_receipt_ids": [
+      "spark-pooled30-c2-01/do/spark-placement-tier-source-verify.json"
+    ]
+  },
+  "iteration_id": "spark-pooled30-c2-01",
+  "lab": {
+    "result_artifact_ids": [
+      "spark-pooled30-c2-01/admitted-launch.json",
+      "spark-pooled30-c2-01/raw/jiuwenswarm/ops/spark/prompts/MANIFEST.json@eaba043a72be89ae59b2d71cd7cd38a62b6d85547434e03abdac4790899c451a",
+      "spark-pooled30-c2-01/raw/OPS/p4/source-regions.json@9ea8774da2921aeccd9c2951f2f0e916480b7a7f2d93bfea369e03ce99351f7c",
+      "spark-pooled30-c2-01/raw/jiuwenswarm/ops/spark/prompts/512.txt@e1fafe8ac4513e944626eb7de27bd04a29feaf0778ab753786bd7f291dc3a722",
+      "spark-pooled30-c2-01/raw/jiuwenswarm/ops/spark/prompts/2048.txt@61bd0ff5c00855d2469fe1f9d2bdfff947da2c20dab991c06033fd3a5582904d",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/start.json@b4e84caf40ded37a9ade98dfab013d56b27beb867d3e02929c0ec0ef230e53ef",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/result.json@e882612d857e458bcbc0c4a70132ba4f3e01baf2048a8d604a2bb76309a97e9a",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/load-ready.json@ffd724445c2919d4918fe98958eb986c46e5a21ba2d35197c147db2f3bb69d8e",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/scope.json@e50e9bce4b9dfdfebfa0e1957fcbf62cc7b9da1d8b2eba54b1b10539b0e02805",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-launch-profile.json@774bce4fec32de12e7f3970276d220ddb6d191af69c75629f62c4ccbba6598dc",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/probe.json@76b1ae644d728138125ec5fae0db065814c08ab82b0816b1d2c612b40372cb9f",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/window.json@51e26605a9df16d1a2e28aaa4548390117bfedefcfc1f1381d15f34d23af3ba9",
+      "spark-pooled30-c2-01/raw/OPS/p3/placement-tier-native-products.json@6f11cded5a8b66f84e162ece09dc9a08d2829980c515d0c161f102c1ca677eb9",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/quiet-prelaunch.json@a71ad8c0101fe501a84d63a748337cf921b3929dc2c48d366ad733a463f90bf3",
+      "spark-pooled30-c2-01/raw/OPS/p3/early-preflights/pooled30-c2-01-quiet.json@a71ad8c0101fe501a84d63a748337cf921b3929dc2c48d366ad733a463f90bf3",
+      "spark-pooled30-c2-01/raw/OPS/p3/early-preflights/pooled30-c2-01-source.json@1754db435e102c23b3a6184fc5a1495935c77e84a86b783b41a6d1d8a4b7ce86",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/memory.jsonl@ff29d798001d0f9b0950fe9661f7a5b1db862a11ce826d5d78c2c7e5dd032d77",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-512/result.json@97e9d79c089c22ad98473b9c30c1044030621abb2b4a2c75102a8f762b128ab1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-512/request.json@d11f6970eb4180de3e6698eb680cf875c17523b876185d61e1c458cf84839529",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-512-before-resources.json@b230e7004f36132e1e870a0e133664063c10508f48619f7d40ae8fecfc02f6c0",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-512-after-resources.json@b6a4cc76b7093217b7b18c80943483d032529c1356cb12de97143ef869e9bc77",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-512/resource-windows.json@e340bb45e39b180f36070ceefaa4a2895681deed711cf36ca5e76480ec72e1a2",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-512/output.txt@ca9f89c46a40f9bcbde19b09af6c0c06eea4fa91c84d4563192cf633405b10d5",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-512/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-512/response.sse@548aa1dbb4fc326ac3c465444c9028eb6741db148efd73ac668db118ab43e3ed",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-512-client.log@97e9d79c089c22ad98473b9c30c1044030621abb2b4a2c75102a8f762b128ab1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-2048/result.json@03b9d0624153f7ad0d32c2bf2dd88ea73457e50cf0593118cdc2fdc7e647c86e",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-2048/request.json@2e92b013e05a33bd384c5d12f647a7468203ecb53015a0aed8d3b83ea7495a0c",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-2048-before-resources.json@ede4a502ab0f2fd112121790b3d0bb6992ff0c4679e63aaa412766a3a9a6792d",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-2048-after-resources.json@517b42d6811bfb8ff9586a14f840277a953a77a00ba81308942d09d95be0e0be",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-2048/resource-windows.json@422bcdf675f682fc4f20fc3b4e6a0b43e76271d2b39ca7d821e7d7850d4859a1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-2048/output.txt@b2881b1b899ae178b31d75a78842b421df5c9773ad7775b04241afc7ba0b26a1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-2048/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-2048/response.sse@1e6e29055c95bf643c186129e43030dee78fb83106dd1583ecb365db5473a66e",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-2048-client.log@03b9d0624153f7ad0d32c2bf2dd88ea73457e50cf0593118cdc2fdc7e647c86e",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-1-2048-after-residency.json@ed6944e5c3671bf02cfcd72e685ec1ed8aa5e1b5e2dadc2c9f45fc49831c838f",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-512/result.json@9ca2ff1e1f268c32cda26c63ee257b0c9403cf100610fbe001fa145f48057d5d",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-512/request.json@d11f6970eb4180de3e6698eb680cf875c17523b876185d61e1c458cf84839529",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-512-before-resources.json@c46739076dd8c996c033eb525860af21dcd3f92cec78b06dc9345cd081d028a3",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-512-after-resources.json@b5c8ffb7ad2ec9b79e437276214ca05867546e216e28095a25c4f0df1e04fbfa",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-512/resource-windows.json@b1953bbe734c21570b8155e97a450ef103813acc440874eb5e768176c268c026",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-512/output.txt@ca9f89c46a40f9bcbde19b09af6c0c06eea4fa91c84d4563192cf633405b10d5",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-512/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-512/response.sse@db356832b5d2f346310305b0b3084440a14b30e45dadd28b2d475b5cba3c149f",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-512-client.log@9ca2ff1e1f268c32cda26c63ee257b0c9403cf100610fbe001fa145f48057d5d",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-2048/result.json@7dd37f30e2b7fa7d27ed3d69f86edece5a15d128b89a050086c366b2cc19d3ec",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-2048/request.json@2e92b013e05a33bd384c5d12f647a7468203ecb53015a0aed8d3b83ea7495a0c",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-2048-before-resources.json@413077591a173d682d949113cb8f3e2e307453d02850b775d0f99e12cdf7b448",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-2048-after-resources.json@12df7403511999c530cce468f2d8f344dcbaf126076ba0b6b0ea80a10f81ea1e",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-2048/resource-windows.json@1adac6edca5a7ac8484970bf0414c73f82d0dc92cc962b56421dbec179d7aa6e",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-2048/output.txt@b2881b1b899ae178b31d75a78842b421df5c9773ad7775b04241afc7ba0b26a1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-2048/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-2048/response.sse@f5edf8548e32638e6ae5d09850e69590a0e729a1e6076f054a76ad1a8989dc16",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-2048-client.log@7dd37f30e2b7fa7d27ed3d69f86edece5a15d128b89a050086c366b2cc19d3ec",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/warmup-2-2048-after-residency.json@920ad5ece998b10d9afe57257067b20aad8fac67055591b1a3235c13a7123934",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-2048/result.json@2b2f79655087361adad2c2a82d48ef264276cd3a663143757b71eb43e2ed5479",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-2048/request.json@2e92b013e05a33bd384c5d12f647a7468203ecb53015a0aed8d3b83ea7495a0c",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-2048-before-resources.json@757f4d0f244188995e6d92c3702c9460e163cd056db398dc325788215c3ed0fd",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-2048-after-resources.json@3dd44590e568628a05d483062f6644a378a1098ecc38873100d0f84a16eedb45",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-2048/resource-windows.json@4bfe2aa0d8cef680dd521e4ad34b009fe7abc284f711ebe0c9321c9f766759be",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-2048/output.txt@b2881b1b899ae178b31d75a78842b421df5c9773ad7775b04241afc7ba0b26a1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-2048/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-2048/response.sse@a508a5c48136dc440f568a3d036f871310193575648464cafd928dc65ee0303e",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-2048-client.log@2b2f79655087361adad2c2a82d48ef264276cd3a663143757b71eb43e2ed5479",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-2048-before-residency.json@55d46466e40da61c67ac2ba53efa8e2b24a376a4b8944b52e215a9f56648b012",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-512/result.json@045183abc74f230e01e14b0d9150fdfce7518c3c3586ae4715d118ab984f274d",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-512/request.json@d11f6970eb4180de3e6698eb680cf875c17523b876185d61e1c458cf84839529",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-512-before-resources.json@3aa667ab488779f8e3a36ba512382383a7b3d467a17a22e8357194d5d3eb9da7",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-512-after-resources.json@d23e8278ec7e2833f4a1530bb4c9f93061443421391c03cbd7e9e709731b4e0d",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-512/resource-windows.json@8c399c25c6460bebe1823edb53d46d51187325868af00c75dd73340111774ea1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-512/output.txt@ca9f89c46a40f9bcbde19b09af6c0c06eea4fa91c84d4563192cf633405b10d5",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-512/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-512/response.sse@300b1d5166d8eb5caaf05e571775e6b849a889297e8cd3e9ea3c0ae79542d283",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-512-client.log@045183abc74f230e01e14b0d9150fdfce7518c3c3586ae4715d118ab984f274d",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-1-512-before-residency.json@f2ae7b37df52d6828d668a61ddcc18069437f09eb7dca284d53615575219fb17",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-512/result.json@3649b70bf595e5631f7ab42d96b510a01fb0c2d94e68ed9734045027c5552c09",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-512/request.json@d11f6970eb4180de3e6698eb680cf875c17523b876185d61e1c458cf84839529",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-512-before-resources.json@04a01187cb31f47ab89a6191517c141747b4c68bb2c6af06e4b1f6837f239543",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-512-after-resources.json@f6e93c595b387742481ad0d55e89930f7e91aa99a432b3cce35959cb9c357bd2",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-512/resource-windows.json@3edd0094bd96882d5f17e7132578d26d758556937bb73af1054f34086cc081a6",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-512/output.txt@ca9f89c46a40f9bcbde19b09af6c0c06eea4fa91c84d4563192cf633405b10d5",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-512/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-512/response.sse@9b4c68ff3f4c6f0b8410583d4109251824ebe3e9a056d2bdc451722e8fc58682",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-512-client.log@3649b70bf595e5631f7ab42d96b510a01fb0c2d94e68ed9734045027c5552c09",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-512-before-residency.json@99f5e480eafa062ae22e9bebd037fc304f530509a0219b912b7bf1cb40ab4a5b",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-2048/result.json@7721834b929ea4667b6bc5efc7f269f9975d4aa2d87263c0f9ed5157a2401c9f",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-2048/request.json@2e92b013e05a33bd384c5d12f647a7468203ecb53015a0aed8d3b83ea7495a0c",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-2048-before-resources.json@bb4533e24bb7430ad0c6b0a53793ac5c05bb9739961ae986a3a043aef49ab3a6",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-2048-after-resources.json@0f322c984a6a05331cbfc80b61451119f485a652ad901af721e0aeb3b64af1f4",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-2048/resource-windows.json@da69507b65a5344da6c7b7d807b3d2a5fd83a8d7de9f98936ec1c7fab065c16c",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-2048/output.txt@b2881b1b899ae178b31d75a78842b421df5c9773ad7775b04241afc7ba0b26a1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-2048/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-2048/response.sse@db64522f47005da7f6a985fab6c2664253842629946b7c632607a01a1ee4726d",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-2048-client.log@7721834b929ea4667b6bc5efc7f269f9975d4aa2d87263c0f9ed5157a2401c9f",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-2-2048-before-residency.json@560a07a4e8730b4f86061c12292ab767dfbe257f510f8810078b62b01d1da6c5",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-2048/result.json@bc2c8ac2853f5704231dd67f8657f211bc08e88bcfb475f8fc8d6f6cceb9181d",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-2048/request.json@2e92b013e05a33bd384c5d12f647a7468203ecb53015a0aed8d3b83ea7495a0c",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-2048-before-resources.json@c4c87fb9a1f81f970c8b08e9538e8335493566c4f136f670b451928ec07fc769",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-2048-after-resources.json@ec2d8a0f9d5959a11591cc838e9aa7c4fe2d0a98593401f7e4aee641fcb351b7",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-2048/resource-windows.json@f8a3600628fe2a1c089ebd30568e088ae65c921d8fbe5d8f6b4c09101e8defd5",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-2048/output.txt@b2881b1b899ae178b31d75a78842b421df5c9773ad7775b04241afc7ba0b26a1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-2048/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-2048/response.sse@e7bd096a27e052a0bbbd6f10bd54c70bd6c205298069ae74957ac312e4f2553d",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-2048-client.log@bc2c8ac2853f5704231dd67f8657f211bc08e88bcfb475f8fc8d6f6cceb9181d",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-2048-before-residency.json@ac1393cf3db7aa934ad7f24ac473a43922d19265e637a4cf232bc09d99636ab1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-512/result.json@d29267f84628b24987a870e76545f6f074a310b2928885648f7de8de02724bbb",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-512/request.json@d11f6970eb4180de3e6698eb680cf875c17523b876185d61e1c458cf84839529",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-512-before-resources.json@96c636ba48dd3c29bfdfa88e59da45c93675c73eacd4133fef00f357ad4b86a3",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-512-after-resources.json@87efbf845cbf0d79cfcb1d908c50936912b731a13bcb1d0694b9d2ab564ef1a2",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-512/resource-windows.json@e5d043b1c59635d0af3b2ed5a29ba8405bcb8959cf29ac7e9cd0bd528ee3ebd3",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-512/output.txt@ca9f89c46a40f9bcbde19b09af6c0c06eea4fa91c84d4563192cf633405b10d5",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-512/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-512/response.sse@c0be577fd2ed6e74d09fbf7473e4427728134a12cabeb26b15567b0a97c3b42b",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-512-client.log@d29267f84628b24987a870e76545f6f074a310b2928885648f7de8de02724bbb",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-3-512-before-residency.json@6bfd977da3d9404939295d7ac0cdf8226cdedc6fffc73164d857a8b2ecef6ee1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-512/result.json@504dc3cb033d9008d2655e30b6ad1615e29d25d93ea7f5750fcbaf2c00c55cdb",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-512/request.json@d11f6970eb4180de3e6698eb680cf875c17523b876185d61e1c458cf84839529",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-512-before-resources.json@ac80b845edc73d5590ebad6a55082449eb41ab6ff0884dd5a564a2a85f988e0a",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-512-after-resources.json@cf42fd7d8491d0d1c97e26fa3ec34ba568a81059e2569c8dc89a7ac4deb2b3a9",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-512/resource-windows.json@aa5379d2cfe42d2235d4aeb77a7ef3760dbf419d7e379b7d4f30ae3520a2302b",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-512/output.txt@ca9f89c46a40f9bcbde19b09af6c0c06eea4fa91c84d4563192cf633405b10d5",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-512/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-512/response.sse@a1db869f56431bf2bca674115148985f9f667e617c4c83a40d0603d6e3880e3f",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-512-client.log@504dc3cb033d9008d2655e30b6ad1615e29d25d93ea7f5750fcbaf2c00c55cdb",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-512-before-residency.json@8a9a9041a85e62d3cfd500b4eb041d7a88cf679f7c0728b13e30ab1625020679",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-2048/result.json@775b9210db6b79127d85846ef477030a98fb86a54e97bb31e5a973706dd62047",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-2048/request.json@2e92b013e05a33bd384c5d12f647a7468203ecb53015a0aed8d3b83ea7495a0c",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-2048-before-resources.json@b4e75ec09db588ebed1b3ef05800555640324611e22989839c4077d70bb1e90b",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-2048-after-resources.json@29a2541fd13f1c3ac8e647bd10b9eb653eaf8b6ce1e1963428b2619e1e512b10",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-2048/resource-windows.json@a0c82b3456fd6aecfe3bccb416b4203368b3f8f884497b17561fd9e159e81376",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-2048/output.txt@b2881b1b899ae178b31d75a78842b421df5c9773ad7775b04241afc7ba0b26a1",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-2048/reasoning.txt@e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-2048/response.sse@4760696e87feb2809e8a1ba37a3184891da7a1b27fda61d742e7556497dcb941",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-2048-client.log@775b9210db6b79127d85846ef477030a98fb86a54e97bb31e5a973706dd62047",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/p4-window/repeat-4-2048-before-residency.json@1a66ccd7786b43f60b1b2e52866658faad784a305420974d292d6004145e8563",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/stderr.log@dd2fce151618bbeb154d2d54c089d7106c85751a30c147de8bc4e983b02aeb44",
+      "spark-pooled30-c2-01/raw/OPS/p3/placement-v1-matched-controls.json@2e031ddf01e7d46e632a7a465ceefd2be89312e14bce5321b31176cb91f006e9",
+      "spark-pooled30-c2-01/raw/OPS/p3/placement-v1-layer27-plan.json@97d217e82ef762a09223dc9865120095c04d8a32ddd6577579224ed57ce2a9f6",
+      "spark-pooled30-c2-01/raw/OPS/runs/pooled30-c2-01/placement-activation.json@626dd2515ba35cf8a64300c83472cdcb0ce7f041b73381f1efdd7ae32a2d2aa1",
+      "spark-pooled30-c2-01/analysis-input.json",
+      "spark-pooled30-c2-01/do/placement-v2-source-verified-controls.json",
+      "spark-pooled30-c2-01/do/spark-placement-tier-source-product.diff",
+      "spark-pooled30-c2-01/do/spark-placement-tier-source-verify.json",
+      "spark-pooled30-c2-01/do/ce1eef65da2341f59846b0c6bb7711a7:receipt",
+      "spark-pooled30-c2-01/do/ce1eef65da2341f59846b0c6bb7711a7:build-record",
+      "spark-pooled30-c2-01/do/source-decision.json",
+      "spark-p4-cache30-attribution/report.md",
+      "spark-p4-cache30-attribution/admitted-launches.json",
+      "spark-p4-cache30-attribution/analysis.json",
+      "spark-p4-cache30-attribution/verify-receipt.json",
+      "spark-p4-cache30-attribution/analysis-input.json",
+      "spark-p4-cache30-direct-seed/report.md",
+      "spark-p4-cache30-direct-seed/admitted-launches.json",
+      "spark-p4-cache30-direct-seed/analysis.json",
+      "spark-p4-cache30-direct-seed/verify-receipt.json",
+      "spark-p4-cache30-direct-seed/analysis-input.json"
+    ],
+    "status": "pooled-control-screening"
+  },
+  "next_plan": {
+    "decision_id": null
+  },
+  "plan": {
+    "builder_ccs": [
+      {
+        "id": "placement.build_weight_placement_planner",
+        "release": "6c6aebcf975317d083a9c23f3805e31f5240154ad01580798c8d7374298a912e",
+        "version": "1.2.1"
+      }
+    ],
+    "decision_artifact_id": "spark-pooled30-c2-01/do/source-decision.json",
+    "decision_id": "spark-star-weight-placement-planner-tier-03:decision:3",
+    "decision_sha256": "230106f4fcf4f96f7a9dd276f73de6ad0b88344c4c35e6dccb316946ada3f3bd",
+    "home": "~/predemo-spark/factory-runs/star-weight_placement_planner-tier-03",
+    "incoming_report_ids": [],
+    "manifest": {
+      "artifact_id": "spark-pooled30-c2-01/admitted-launch.json",
+      "sha256": "8cd3bec49c3c9efa5bf3429bc3de5371103d38e3d9f49f7992692a25cd55e667"
+    },
+    "summary": "Screen one candidate launch against four closed, position-matched A+30 controls.",
+    "task_id": "spark-star-weight-placement-planner-tier-03"
+  },
+  "predecessor_report_ids": [],
+  "report": {
+    "artifact_id": "spark-pooled30-c2-01/report.md",
+    "sha256": "cf3e4a5812654a7cb3a5df47928884a5f4a2ad3b0370a47a57ce01517f96151e",
+    "status": "pooled-control-screening",
+    "summary": "C2 placed three layer-27 projections on CUDA0. C2 screened against four prior quiet A+30 scopes. Median paired differences at 512 tokens (-0.144 s TTFT saved, +1.905 tok/s gained) and 2048 tokens (+1.193 s TTFT saved, +1.289 tok/s gained). Greedy output and reasoning matched."
+  },
+  "schema": "spark-factory-iteration/1"
+}
